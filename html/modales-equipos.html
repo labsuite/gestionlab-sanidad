@@ -77,13 +77,17 @@
         </div>
         <div class="form-group">
           <label>Responsable(s)</label>
-          <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;min-height:38px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg-card);cursor:text" id="responsable-wrap" onclick="document.getElementById('responsable-search').focus()">
-            <div id="responsable-tags" style="display:contents"></div>
-            <input type="text" id="responsable-search" placeholder="Buscar responsable…"
-                   style="border:none;outline:none;background:transparent;font-size:13px;min-width:160px;flex:1"
-                   oninput="filtrarResponsables(this.value)" autocomplete="off">
+          <div style="position:relative">
+            <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;min-height:38px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg-card);cursor:text" id="responsable-wrap" onclick="document.getElementById('responsable-search').focus()">
+              <div id="responsable-tags" style="display:contents"></div>
+              <input type="text" id="responsable-search" placeholder="Buscar responsable…"
+                     style="border:none;outline:none;background:transparent;font-size:13px;min-width:160px;flex:1"
+                     oninput="filtrarResponsables(this.value)"
+                     onfocus="filtrarResponsables(this.value)"
+                     autocomplete="off">
+            </div>
+            <div class="autocomplete-list" id="responsable-autocomplete"></div>
           </div>
-          <div class="autocomplete-list" id="responsable-autocomplete"></div>
           <input type="hidden" id="eq-responsable">
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Solo Administradores, Gestores y Profesores</div>
         </div>
