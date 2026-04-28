@@ -33,7 +33,7 @@ const COLS = {
   incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
   ubicaciones:        ['ID_Ubicacion','Laboratorio_Aula','Zona','Subzona','Descripcion_Completa','Activa'],
-  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo'],
+  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas'],
   material:           ['ID_Material','Nombre','Categoria','Referencia_Proveedor','Proveedor','Unidad','Ubicacion','Stock_Actual','Stock_Minimo','Stock_Optimo','Observaciones','Gestion_Automatica'],
   movimientos:        ['ID_Movimiento','Material','Tipo','Cantidad','Usuario','Fecha','Motivo','Observaciones'],
   solicitudes:        ['ID_Solicitud','Material','Cantidad_Solicitada','Solicitante','Fecha','Motivo','Proveedor_Requerido','Estado','Lista_Pedido','Observaciones'],
@@ -122,6 +122,21 @@ function esResponsableDeEquipo(equipo) {
   if (!miNombre) return false;
   const responsables = (equipo.Responsable || '').split(',').map(r => r.trim().toLowerCase());
   return responsables.some(r => r === miNombre);
+}
+
+/**
+ * Devuelve los ID_Ubicacion accesibles para el Alumno actual:
+ * - Los de su campo Ubicaciones_Asignadas (columna F en hoja Usuarios)
+ * - Más todas las ubicaciones cuyo Laboratorio_Aula === '205 - Zona común'
+ */
+function getUbicacionesAlumno() {
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const asignadas = (u?.Ubicaciones_Asignadas || '').split(',').map(s => s.trim()).filter(Boolean);
+  const zonasComun = DATA.ubicaciones
+    .filter(ub => (ub.Laboratorio_Aula || '').trim() === '205 - Zona común')
+    .map(ub => ub.ID_Ubicacion);
+  return [...new Set([...asignadas, ...zonasComun])];
 }
 
 /** Devuelve los lotes de zona común de un material cuyo stock está bajo el mínimo local */

@@ -127,7 +127,7 @@ async function loadAllData() {
       sheetsGet('Incidencias!A2:I'),
       sheetsGet('Proveedores!A2:I'),
       sheetsGet('Ubicaciones!A2:F'),
-      sheetsGet('Usuarios!A2:E'),
+      sheetsGet('Usuarios!A2:F'),
       sheetsGet('Material!A2:L'),
       sheetsGet('Movimientos!A2:H'),
       sheetsGet('Solicitudes!A2:J'),

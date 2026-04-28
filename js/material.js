@@ -533,8 +533,30 @@ function openModalConsumoLote(matId, idUbicacion) {
 function _mostrarSelectorUbicConsumo(matId) {
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (!ubiGrp) return;
-  const lotes = getMatUbics(matId);
-  if (lotes.length <= 1) { ubiGrp.style.display = 'none'; return; }
+  let lotes = getMatUbics(matId);
+
+  // Alumno: filtrar a sus ubicaciones asignadas + zona común
+  if (getUserRole() === 'Alumno') {
+    const permitidas = getUbicacionesAlumno();
+    lotes = lotes.filter(l => permitidas.includes(l.ID_Ubicacion));
+    if (!lotes.length) {
+      showToast('Este material no está disponible en tus ubicaciones asignadas', 'error');
+      const sel = document.getElementById('consumo-ubicacion-sel');
+      if (sel) sel.innerHTML = '<option value="">No disponible en tus ubicaciones</option>';
+      ubiGrp.style.display = '';
+      return;
+    }
+  }
+
+  if (lotes.length <= 1) {
+    // Pre-seleccionar silenciosamente si hay exactamente 1 lote
+    const sel = document.getElementById('consumo-ubicacion-sel');
+    if (sel && lotes.length === 1) {
+      sel.innerHTML = `<option value="${lotes[0].ID_Ubicacion}">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</option>`;
+    }
+    ubiGrp.style.display = 'none';
+    return;
+  }
   const sel = document.getElementById('consumo-ubicacion-sel');
   if (sel) {
     sel.innerHTML = lotes.map(l => {
@@ -692,6 +714,17 @@ async function guardarConsumo() {
   const cantidad = parseFloat(cantStr);
   const lotes    = getMatUbics(matId);
   const ubiSel   = document.getElementById('consumo-ubicacion-sel')?.value || '';
+
+  // Alumno: validar que la ubicación seleccionada sea de las permitidas
+  if (getUserRole() === 'Alumno') {
+    const permitidas = getUbicacionesAlumno();
+    if (lotes.length > 0 && !ubiSel) {
+      showToast('Selecciona una ubicación', 'error'); return;
+    }
+    if (ubiSel && !permitidas.includes(ubiSel)) {
+      showToast('No tienes permiso para consumir de esa ubicación', 'error'); return;
+    }
+  }
 
   showLoading('Registrando...');
   try {

@@ -193,7 +193,20 @@ function renderUsuarios() {
 // ============================================================
 function openModalProveedor() { editingRow = null; ['prov-nombre','prov-contacto','prov-email','prov-telefono','prov-web','prov-observaciones'].forEach(id => sv(id,'')); clearTiposProveedor(); openModal('modal-proveedor'); }
 function openModalUbicacion() { editingRow = null; ['ubi-id','ubi-lab','ubi-zona','ubi-subzona','ubi-desc'].forEach(id => sv(id,'')); openModal('modal-ubicacion'); }
-function openModalUsuario()   { editingRow = null; ['usr-nombre','usr-email'].forEach(id => sv(id,'')); sv('usr-rol','Profesor'); openModal('modal-usuario'); }
+function openModalUsuario()   {
+  editingRow = null;
+  ['usr-nombre','usr-email','usr-ubicaciones-asignadas'].forEach(id => sv(id,''));
+  sv('usr-rol','Profesor');
+  toggleUbicacionesAsignadasField('Profesor');
+  const selRol = document.getElementById('usr-rol');
+  if (selRol) selRol.disabled = false;
+  openModal('modal-usuario');
+}
+
+function toggleUbicacionesAsignadasField(rol) {
+  const grp = document.getElementById('usr-ubicaciones-group');
+  if (grp) grp.style.display = rol === 'Alumno' ? '' : 'none';
+}
 
 function editProveedor(idx) {
   const p = DATA.proveedores[idx];
@@ -217,6 +230,8 @@ function editUsuario(idx) {
   }
   editingRow = { sheet: 'Usuarios', rowIndex: idx };
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
+  sv('usr-ubicaciones-asignadas', u.Ubicaciones_Asignadas||'');
+  toggleUbicacionesAsignadasField(u.Rol);
   // Profesor no puede cambiar el rol: bloqueamos el select
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
@@ -299,11 +314,12 @@ async function guardarUsuario() {
 
   const id = genId('USR-');
   const rol = v('usr-rol') || 'Alumno';
-  const row = [id, nombre, email, rol, 'TRUE'];
+  const ubicAsignadas = rol === 'Alumno' ? v('usr-ubicaciones-asignadas') : '';
+  const row = [id, nombre, email, rol, 'TRUE', ubicAsignadas];
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Usuarios') {
-      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:E${editingRow.rowIndex+2}`, row);
+      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:F${editingRow.rowIndex+2}`, row);
       DATA.usuarios[editingRow.rowIndex] = rowToObj(row, 'usuarios');
       showToast('Usuario actualizado', 'success');
     } else {

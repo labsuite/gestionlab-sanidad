@@ -76,12 +76,13 @@ function updateBadges() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['equipos', 'equipo-detalle', 'incidencias', 'solicitudes'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
-    gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: false,
-    verProveedores: false, verUbicaciones: false, crearProveedores: false,
-    verMaterial: false, editarMaterial: false, registrarConsumo: false,
-    verPedidos: false, gestionarPedidos: false, crearSolicitudes: true,
+    crearIncidencias: false,
+    gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,
+    verProveedores: false, verUbicaciones: true, crearProveedores: false,
+    verMaterial: true, editarMaterial: false, registrarConsumo: true,
+    verPedidos: false, gestionarPedidos: false, crearSolicitudes: false, verTareas: false,
   },
   Profesor: {
     // Páginas visibles
@@ -91,6 +92,7 @@ const PERMISOS = {
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
+    crearIncidencias: true,
     verIntervenciones: true,
     // Incidencias: solo ve y crea las suyas (filtrado en renderIncidencias)
     gestionarIncidencias: false,
@@ -105,7 +107,7 @@ const PERMISOS = {
   },
   Gestor: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad'],
-    verIntervenciones: true, editarEquipos: true, crearIntervenciones: true,
+    verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
     verMaterial: true, editarMaterial: true, registrarConsumo: true,
@@ -114,7 +116,7 @@ const PERMISOS = {
   },
   Administrador: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad'],
-    verIntervenciones: true, editarEquipos: true, crearIntervenciones: true,
+    verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
     verMaterial: true, editarMaterial: true, registrarConsumo: true,
@@ -151,6 +153,32 @@ function showPage(page) {
 }
 
 function showApp() {
+  // ── Bloqueo estricto: email no registrado → pantalla no autorizado ──────
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const userInDb  = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  if (!userInDb) {
+    document.getElementById('auth-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    let noAuthEl = document.getElementById('no-auth-screen');
+    if (!noAuthEl) {
+      noAuthEl = document.createElement('div');
+      noAuthEl.id = 'no-auth-screen';
+      noAuthEl.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:9999';
+      document.body.appendChild(noAuthEl);
+    }
+    noAuthEl.style.display = 'flex';
+    noAuthEl.innerHTML = `
+      <div style="text-align:center;max-width:420px;padding:40px 24px">
+        <div style="font-size:48px;margin-bottom:16px">🔒</div>
+        <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px">Acceso no autorizado</div>
+        <div style="font-size:14px;color:var(--text-muted);margin-bottom:24px;line-height:1.6">
+          Tu cuenta <strong>(${currentUser?.email||''})</strong> no está registrada en GestionLab.<br>
+          Contacta con el administrador del laboratorio para solicitar acceso.
+        </div>
+        <button class="btn btn-secondary" onclick="signOut()" style="font-size:14px">↩ Cerrar sesión</button>
+      </div>`;
+    return;
+  }
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   const rol = getUserRole();
