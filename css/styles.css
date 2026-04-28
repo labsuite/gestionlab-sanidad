@@ -880,7 +880,7 @@
     }
     .intervenciones-mini-header {
       display: grid;
-      grid-template-columns: 90px 100px 1fr 90px;
+      grid-template-columns: 90px 90px 80px 120px 1fr 90px auto;
       gap: 8px;
       font-size: 10px; font-weight: 600; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.05em;
@@ -888,9 +888,10 @@
     }
     .intervencion-mini-row {
       display: grid;
-      grid-template-columns: 90px 100px 1fr 90px;
+      grid-template-columns: 90px 90px 80px 120px 1fr 90px auto;
       gap: 8px; font-size: 12px; padding: 5px 0;
       border-bottom: 1px solid var(--border); color: var(--text-soft);
+      align-items: center;
     }
     .intervencion-mini-row:last-child { border-bottom: none; }
 
