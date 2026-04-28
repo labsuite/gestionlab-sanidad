@@ -131,6 +131,35 @@ function getHistoricoMaterial(nombre, proveedor) {
   return { count: precios.length, ultimoPrecio: precios[0].precio, media, ultimaFecha: precios[0].fecha };
 }
 
+/**
+ * Busca en el histórico qué proveedor ha ofrecido el precio medio más bajo
+ * para un material dado. Devuelve { proveedor, media, count } o null.
+ */
+function getMejorProveedorPrecio(nombreMaterial) {
+  const norm = s => (s || '').normalize('NFC').trim().toLowerCase();
+  const hist = (DATA.historicoPrecio || []).filter(h =>
+    norm(h.Nombre_Material) === norm(nombreMaterial) &&
+    h.Proveedor &&
+    parseFloat(h.Precio_Unitario) > 0
+  );
+  if (!hist.length) return null;
+  // Agrupar por proveedor y calcular precio medio
+  const porProv = {};
+  hist.forEach(h => {
+    const p = h.Proveedor;
+    if (!porProv[p]) porProv[p] = { sum: 0, count: 0 };
+    porProv[p].sum   += parseFloat(h.Precio_Unitario);
+    porProv[p].count += 1;
+  });
+  let mejorProv = null, mejorMedia = Infinity;
+  Object.entries(porProv).forEach(([prov, { sum, count }]) => {
+    const media = sum / count;
+    if (media < mejorMedia) { mejorMedia = media; mejorProv = prov; }
+  });
+  if (!mejorProv) return null;
+  return { proveedor: mejorProv, media: mejorMedia, count: porProv[mejorProv].count };
+}
+
 // ============================================================
 // CONTABILIDAD — RESUMEN ANUAL
 // ============================================================

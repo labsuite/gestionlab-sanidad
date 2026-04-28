@@ -42,9 +42,14 @@ function renderSolicitudes(filtroEstado = '') {
   // Insertar el toggle encima de la tabla
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = toggleHtml;
-  tbody.innerHTML = items.map(s => `<tr>
+  tbody.innerHTML = items.map(s => {
+    const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
+    const hintProv = mejorProv
+      ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
+      : '';
+    return `<tr>
     <td><strong>${s.ID_Solicitud}</strong></td>
-    <td>${s.Material}</td>
+    <td><div>${s.Material}</div>${hintProv}</td>
     <td>${s.Cantidad_Solicitada}</td>
     <td style="font-size:12px">${s.Solicitante}</td>
     <td style="font-size:12px">${formatDate(s.Fecha)}</td>
@@ -56,7 +61,7 @@ function renderSolicitudes(filtroEstado = '') {
       ${s.Lista_Pedido && !['Pendiente','Rechazado','Archivado'].includes(s.Estado) ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
       ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
     </div></td>
-  </tr>`).join('');
+  </tr>`;}).join('');
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
   const badge = document.getElementById('badge-solicitudes');
   if (badge) { badge.textContent = pendientes; badge.style.display = pendientes > 0 ? '' : 'none'; }
