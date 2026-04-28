@@ -311,7 +311,9 @@ function clearUbicacionMat() {
 }
 
 document.addEventListener('click', e => {
-  if (!e.target.closest('.search-material-wrap') && !e.target.closest('#mat-lotes-container')) {
+  if (!e.target.closest('.search-material-wrap') &&
+      !e.target.closest('#mat-lotes-container') &&
+      !e.target.closest('#responsable-field-wrap')) {
     document.querySelectorAll('.autocomplete-list').forEach(l => l.classList.remove('open'));
   }
 });

@@ -220,15 +220,12 @@ function renderIntervenciones(filtroTipo = '') {
   const tbody = document.getElementById('tabla-intervenciones');
   let items = DATA.intervenciones;
   const rol = getUserRole();
-  // Profesor: solo ve las intervenciones que él mismo creó (Realizado_Por)
-  // sobre equipos de los que es responsable
+  // Profesor: ve todas las intervenciones de los equipos de los que es responsable
+  // (no solo las que él mismo creó — así puede ejecutar intervenciones planificadas por Gestores)
   if (rol === 'Profesor') {
-    const miNombre = (currentUser?.name || '').toLowerCase().trim();
     items = items.filter(i => {
-      const creadaPorMi = (i.Realizado_Por || '').toLowerCase().trim() === miNombre;
       const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
-      const esDesuEquipo = equipo ? esResponsableDeEquipo(equipo) : false;
-      return creadaPorMi && esDesuEquipo;
+      return equipo ? esResponsableDeEquipo(equipo) : false;
     });
   }
   if (filtroTipo) items = items.filter(i => i.Tipo === filtroTipo);
