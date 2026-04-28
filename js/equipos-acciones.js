@@ -307,6 +307,9 @@ async function guardarPlanificacion() {
     }
 
     showToast('Intervención planificada. Incidencia → En gestión', 'success');
+    // El equipo ya debería estar En mantenimiento desde guardarIncidencia,
+    // pero lo reforzamos aquí por si la incidencia llegó por otra vía.
+    try { await actualizarEstadoEquipo(equipo, 'Revisión planificada'); } catch(e) { console.warn(e); }
     closeModal('modal-planificar-intervencion');
     renderAll();
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
@@ -446,14 +449,11 @@ async function guardarActuacion() {
     await sheetsUpdate(`Intervenciones!A${intIdx + 2}:R${intIdx + 2}`, updatedRow);
     DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
 
-    // ── Estado operativo del equipo según resultado ────────────────────────
-    const equipoId = i.Equipo.split(' – ')[0];
-    if (resultado === 'Resuelto' && operativo === 'Sí') {
-      try { await actualizarEstadoEquipo(i.Equipo, 'Operativo'); } catch(e) { console.warn(e); }
-    } else if (resultado === 'Resuelto' && operativo === 'No') {
-      try { await actualizarEstadoEquipo(i.Equipo, 'No operativo'); } catch(e) { console.warn(e); }
+    // ── Estado operativo del equipo según resultado + campo operativo ─────
+    if (resultado === 'Resuelto') {
+      try { await actualizarEstadoEquipo(i.Equipo, operativo === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
     } else if (resultado === 'Pendiente' || resultado === 'Resuelto parcialmente') {
-      try { await actualizarEstadoEquipo(i.Equipo, 'Operativo con fallos'); } catch(e) { console.warn(e); }
+      try { await actualizarEstadoEquipo(i.Equipo, operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
     }
 
     // ── Actualizar preventivo si Preventivo + Resuelto ─────────────────────
@@ -688,6 +688,15 @@ async function guardarIntervencion() {
       showToast('Intervención guardada', 'success');
     }
 
+    // Actualizar Estado_Operativo del equipo según resultado indicado
+    const resultadoInt = v('int-resultado');
+    const operativoInt = v('int-operativo');
+    if (resultadoInt === 'Resuelto') {
+      try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
+    } else if (resultadoInt === 'Pendiente' || resultadoInt === 'Resuelto parcialmente') {
+      try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
+    }
+
     // Actualizar preventivo si aplica
     if (v('int-actualiza-preventivo') === 'Sí' && tipo === 'Preventivo') {
       const equipoId = equipo.split(' – ')[0];
@@ -722,7 +731,7 @@ async function guardarIncidencia() {
     DATA.incidencias.push(rowToObj(row, 'incidencias'));
     // Marcar equipo como "En mantenimiento" siempre que se abra una incidencia
     // (el impacto real se muestra en el badge de la tabla de equipos)
-    try { await actualizarEstadoEquipo(equipo, 'En mantenimiento'); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
+    try { await actualizarEstadoEquipo(equipo, 'En revisión'); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
     showToast('Incidencia reportada', 'success');
     closeModal('modal-incidencia'); renderAll();
   } catch(e) { showToast('Error guardando', 'error'); }

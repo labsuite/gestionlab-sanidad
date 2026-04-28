@@ -113,15 +113,33 @@ function renderEquipos(filtro, filtroEstado) {
   if (!items.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🔬</div><div class="empty-state-title">Sin equipos registrados</div><div class="empty-state-text">Añade el primer equipo con el botón superior</div></div></td></tr>`; return; }
 
   tbody.innerHTML = items.map(e => {
-    const estadoBadge = {'Operativo':'badge-green','En mantenimiento':'badge-orange','Averiado':'badge-red','Fuera de servicio':'badge-gray'}[e.Estado_Operativo] || 'badge-gray';
-    // Buscar incidencia abierta para mostrar impacto junto al estado
+    const estadoBadge = {
+      'Operativo':            'badge-green',
+      'Operativo con fallos': 'badge-orange',
+      'En revisión':          'badge-orange',
+      'Revisión planificada': 'badge-blue',
+      'No operativo':         'badge-red',
+      'Averiado':             'badge-red',
+      'Fuera de servicio':    'badge-gray'
+    }[e.Estado_Operativo] || 'badge-gray';
+
+    // Etiqueta adicional: impacto si hay incidencia abierta, o fecha si hay revisión planificada
     const incAbierta = DATA.incidencias.find(i =>
       (i.Estado === 'Abierta' || i.Estado === 'En gestión') &&
       i.Equipo && (i.Equipo === e.ID_Activo || i.Equipo.startsWith(e.ID_Activo + ' '))
     );
-    const impactoBadge = incAbierta
-      ? `<span class="badge badge-orange" style="font-size:10px;margin-left:4px" title="Incidencia ${incAbierta.ID_Incidencia}">⚠️ ${incAbierta.Impacto}</span>`
-      : '';
+    let impactoBadge = '';
+    if (incAbierta) {
+      impactoBadge = `<span class="badge badge-orange" style="font-size:10px;margin-left:4px" title="Incidencia ${incAbierta.ID_Incidencia}">⚠️ ${incAbierta.Impacto}</span>`;
+    } else if (e.Estado_Operativo === 'Revisión planificada') {
+      // Buscar la intervención planificada más reciente para este equipo
+      const intPlan = DATA.intervenciones
+        .filter(i => i.Equipo && i.Equipo.startsWith(e.ID_Activo) && i.Estado === 'Planificada' && i.Fecha_Planificada)
+        .sort((a, b) => new Date(a.Fecha_Planificada) - new Date(b.Fecha_Planificada))[0];
+      if (intPlan) {
+        impactoBadge = `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">📅 ${formatDate(intPlan.Fecha_Planificada)}</span>`;
+      }
+    }
     const proxPreventivo = e.Fecha_Proximo_Preventivo ? (() => {
       const diffDias = Math.ceil((new Date(e.Fecha_Proximo_Preventivo) - new Date()) / 86400000);
       if (diffDias < 0)    return `<span class="badge badge-red">Vencido</span>`;
@@ -157,28 +175,37 @@ function renderEquipos(filtro, filtroEstado) {
 function toggleEquipoExpand(id) { const row = document.getElementById(id); if (row) row.classList.toggle('open'); }
 
 function buildIntervencionesEquipo(equipoId) {
-  const ints = DATA.intervenciones.filter(i => i.Equipo && i.Equipo.startsWith(equipoId))
-    .sort((a,b) => new Date(b.Fecha_Realizacion||b.Fecha_Planificada) - new Date(a.Fecha_Realizacion||a.Fecha_Planificada))
-    .slice(0,8);
+  const ints = DATA.intervenciones
+    .filter(i => i.Equipo && i.Equipo.startsWith(equipoId))
+    .map(i => ({ i, origIdx: DATA.intervenciones.indexOf(i) }))
+    .sort((a, b) => {
+      const dA = new Date(a.i.Fecha_Realizacion || a.i.Fecha_Planificada || 0);
+      const dB = new Date(b.i.Fecha_Realizacion || b.i.Fecha_Planificada || 0);
+      if (dB - dA !== 0) return dB - dA;       // fecha descendente
+      return b.origIdx - a.origIdx;             // mismo día → mayor índice (más reciente) primero
+    })
+    .slice(0, 8);
   if (!ints.length) return `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
-  const tipoBadge = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
-  const estadoBadgeInt = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
+  const tipoBadge    = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
+  const estadoBadgeI = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   return `<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
-    <div class="intervenciones-mini-header"><span>Tipo</span><span>Estado</span><span>Fecha</span><span>Descripción</span><span>Resultado</span><span></span></div>
-    ${ints.map(i => {
-      const intIdx = DATA.intervenciones.indexOf(i);
+    <div class="intervenciones-mini-header"><span>Tipo</span><span>Estado</span><span>Fecha</span><span>Quién</span><span>Descripción</span><span>Resultado</span><span></span></div>
+    ${ints.map(({ i, origIdx }) => {
+      const intIdx = origIdx;
       const puedeRegistrar = puedeHacer('crearIntervenciones') &&
         (getUserRole() !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(eq => eq.ID_Activo === equipoId) || {})) &&
         (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado) &&
         i.Resultado !== 'Resuelto';
       const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir actuación';
+      const quien = i.Realizado_Por || i.Tecnico_Externo || i.Proveedor || '—';
       return `<div class="intervencion-mini-row">
         <span><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}" style="font-size:10px">${i.Tipo||'—'}</span></span>
-        <span>${i.Estado ? `<span class="badge ${estadoBadgeInt[i.Estado]||'badge-gray'}" style="font-size:10px">${i.Estado}</span>` : '—'}</span>
+        <span>${i.Estado ? `<span class="badge ${estadoBadgeI[i.Estado]||'badge-gray'}" style="font-size:10px">${i.Estado}</span>` : '—'}</span>
         <span>${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</span>
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${i.Descripcion_Actuacion||''}">${i.Descripcion_Actuacion||i.Descripcion_Planificada||'—'}</span>
-        <span>${i.Resultado||'—'}${i.Observaciones ? ' · <em>' + i.Observaciones + '</em>' : ''}</span>
-        <span>${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openModalActuacionDerivada(${intIdx})">${btnLabel}</button>` : ''}<button class="icon-btn" style="font-size:11px;margin-left:2px" onclick="event.stopPropagation();openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button></span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${quien}">${quien}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${i.Descripcion_Actuacion||i.Descripcion_Planificada||''}">${i.Descripcion_Actuacion||i.Descripcion_Planificada||'—'}</span>
+        <span>${i.Resultado||'—'}</span>
+        <span style="white-space:nowrap">${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openModalActuacionDerivada(${intIdx})">${btnLabel}</button>` : ''}<button class="icon-btn" style="font-size:11px;margin-left:2px" onclick="event.stopPropagation();openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button></span>
       </div>`;
     }).join('')}`;
 }
@@ -205,7 +232,14 @@ function renderIntervenciones(filtroTipo = '') {
     });
   }
   if (filtroTipo) items = items.filter(i => i.Tipo === filtroTipo);
-  items = [...items].sort((a,b) => new Date(b.Fecha_Realizacion||b.Fecha_Planificada) - new Date(a.Fecha_Realizacion||a.Fecha_Planificada));
+  items = [...items].map((i, _) => ({ i, origIdx: DATA.intervenciones.indexOf(i) }))
+    .sort((a, b) => {
+      const dA = new Date(a.i.Fecha_Realizacion || a.i.Fecha_Planificada || 0);
+      const dB = new Date(b.i.Fecha_Realizacion || b.i.Fecha_Planificada || 0);
+      if (dB - dA !== 0) return dB - dA;
+      return b.origIdx - a.origIdx;
+    })
+    .map(x => x.i);
   if (!items.length) { tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-title">Sin intervenciones registradas</div></div></td></tr>`; return; }
   const tipoBadge  = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
