@@ -118,10 +118,15 @@
         </div>
         <div class="form-group">
           <label>Rol *</label>
-          <select id="usr-rol">
+          <select id="usr-rol" onchange="toggleUbicacionesAsignadasField(this.value)">
             <option>Administrador</option><option>Gestor</option>
             <option>Profesor</option><option>Alumno</option>
           </select>
+        </div>
+        <div class="form-group full" id="usr-ubicaciones-group" style="display:none">
+          <label>Ubicaciones asignadas</label>
+          <input id="usr-ubicaciones-asignadas" placeholder="Ej: UBI-001, UBI-003">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">IDs de ubicación separados por comas. La zona común (205) se incluye siempre automáticamente.</div>
         </div>
       </div>
       <div class="form-footer">
