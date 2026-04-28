@@ -122,7 +122,7 @@ async function loadAllData() {
     const [equipos, intervenciones, incidencias, proveedores, ubicaciones, usuarios,
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
            materialUbicaciones, historicoPrecio, tareas] = await Promise.all([
-      sheetsGet('Equipos!A2:R'),
+      sheetsGet('Equipos!A2:S'),
       sheetsGet('Intervenciones!A2:R'),
       sheetsGet('Incidencias!A2:I'),
       sheetsGet('Proveedores!A2:I'),

@@ -28,7 +28,7 @@ let DATA = {
 // MAPAS DE COLUMNAS
 // ============================================================
 const COLS = {
-  equipos:            ['ID_Activo','Tipo_Equipo','Marca','Modelo','Numero_Serie','Ubicacion','Responsable','Fecha_Adquisicion','Origen_Financiacion','Proveedor_Compra','Proveedor_Servicio_Tecnico','Estado_Operativo','Periodicidad_Mantenimiento','Periodicidad_Custom','Fecha_Ultimo_Preventivo','Fecha_Proximo_Preventivo','Manual_Ficha_Tecnica','Observaciones'],
+  equipos:            ['ID_Activo','Tipo_Equipo','Marca','Modelo','Numero_Serie','Ubicacion','Responsable','Fecha_Adquisicion','Origen_Financiacion','Proveedor_Compra','Proveedor_Servicio_Tecnico','Estado_Operativo','Periodicidad_Mantenimiento','Periodicidad_Custom','Fecha_Ultimo_Preventivo','Fecha_Proximo_Preventivo','Manual_Ficha_Tecnica','Observaciones','Coste'],
   intervenciones:     ['ID_Intervencion','Equipo','Tipo','Origen','Fecha_Planificada','Fecha_Realizacion','Realizado_Por','Tecnico_Externo','Proveedor','Descripcion_Actuacion','Resultado','Equipo_Operativo_Tras_Intervencion','URL_Adjunto','Factura_Asociada','Actualiza_Proximo_Preventivo','Observaciones','Nombre_Adjunto','Estado'],
   incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
@@ -112,8 +112,13 @@ function esZonaComun(idUbicacion) {
  * El campo Responsable admite varios nombres separados por comas.
  */
 function esResponsableDeEquipo(equipo) {
-  if (!currentUser) return false;
-  const miNombre = (currentUser.name || '').toLowerCase().trim();
+  if (!currentUser?.email) return false;
+  // Usar el Nombre de la tabla Usuarios (no currentUser.name de Google),
+  // porque el campo Responsable almacena exactamente ese valor.
+  const emailNorm = currentUser.email.toLowerCase().trim();
+  const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  if (!u) return false;
+  const miNombre = (u.Nombre || '').toLowerCase().trim();
   if (!miNombre) return false;
   const responsables = (equipo.Responsable || '').split(',').map(r => r.trim().toLowerCase());
   return responsables.some(r => r === miNombre);

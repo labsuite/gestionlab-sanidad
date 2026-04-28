@@ -82,9 +82,12 @@ function renderDashboard() {
     alertasStock.innerHTML += `<div class="alert-banner" style="border-left:3px solid var(--accent);background:var(--accent-light)"><div class="alert-icon">🏬</div><div class="alert-content"><div class="alert-title" style="color:var(--accent)">${alertasZC.length} material(es) bajo mínimo en la zona común (almacén)</div><div class="alert-text" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px">${itemsZC}${alertasZC.length > 6 ? ' y ' + (alertasZC.length-6) + ' más...' : ''}</div></div></div>`;
   }
 
-  const proximos = misEquipos.filter(e => e.Fecha_Proximo_Preventivo).sort((a,b) => new Date(a.Fecha_Proximo_Preventivo) - new Date(b.Fecha_Proximo_Preventivo)).slice(0, 8);
+  const proximos = misEquipos
+    .filter(e => e.Fecha_Proximo_Preventivo && new Date(e.Fecha_Proximo_Preventivo) <= en30)
+    .sort((a,b) => new Date(a.Fecha_Proximo_Preventivo) - new Date(b.Fecha_Proximo_Preventivo))
+    .slice(0, 8);
   const tbody = document.getElementById('tabla-proximos');
-  if (!proximos.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">Sin preventivos programados</div><div class="empty-state-text">Asigna fechas de próximo preventivo en el inventario</div></div></td></tr>`; return; }
+  if (!proximos.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin preventivos en los próximos 30 días</div></div></td></tr>`; return; }
   tbody.innerHTML = proximos.map(e => {
     const f = new Date(e.Fecha_Proximo_Preventivo);
     const diffDias = Math.ceil((f - hoy) / 86400000);
@@ -175,6 +178,27 @@ function renderEquipos(filtro, filtroEstado) {
 function toggleEquipoExpand(id) { const row = document.getElementById(id); if (row) row.classList.toggle('open'); }
 
 function buildIntervencionesEquipo(equipoId) {
+  const equipo = DATA.equipos.find(e => e.ID_Activo === equipoId) || {};
+
+  // ── Panel de detalles del equipo ────────────────────────────
+  const costeStr = equipo.Coste
+    ? parseFloat(equipo.Coste).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
+    : '—';
+  const manualBtn = equipo.Manual_Ficha_Tecnica
+    ? `<a href="${equipo.Manual_Ficha_Tecnica}" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">📄 Ver manual</a>`
+    : '<span style="color:var(--text-muted)">—</span>';
+  const detalle = (label, valor) =>
+    `<div><div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">${label}</div><div style="font-size:12px">${valor||'—'}</div></div>`;
+
+  const panelDetalles = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px">
+      ${detalle('Nº de serie', equipo.Numero_Serie)}
+      ${detalle('Origen financiación', equipo.Origen_Financiacion)}
+      ${detalle('Coste', costeStr)}
+      ${detalle('Proveedor compra', equipo.Proveedor_Compra)}
+      ${detalle('Servicio técnico', equipo.Proveedor_Servicio_Tecnico)}
+      <div>${detalle('Manual / Ficha técnica', '')}<div style="margin-top:2px">${manualBtn}</div></div>
+    </div>`;
   const ints = DATA.intervenciones
     .filter(i => i.Equipo && i.Equipo.startsWith(equipoId))
     .map(i => ({ i, origIdx: DATA.intervenciones.indexOf(i) }))
@@ -185,10 +209,10 @@ function buildIntervencionesEquipo(equipoId) {
       return b.origIdx - a.origIdx;             // mismo día → mayor índice (más reciente) primero
     })
     .slice(0, 8);
-  if (!ints.length) return `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
+  if (!ints.length) return panelDetalles + `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
   const tipoBadge    = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadgeI = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
-  return `<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
+  return panelDetalles + `<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
     <div class="intervenciones-mini-header"><span>Tipo</span><span>Estado</span><span>Fecha</span><span>Quién</span><span>Descripción</span><span>Resultado</span><span></span></div>
     ${ints.map(({ i, origIdx }) => {
       const intIdx = origIdx;

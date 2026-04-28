@@ -50,9 +50,9 @@ function renderTareas() {
         </div>
 
         <!-- Lista tareas pendientes -->
-        ${pending.length === 0 && done.length === 0 ? `
-          <div style="padding:20px 0;text-align:center;color:var(--text-muted);font-size:13px">
-            Sin tareas pendientes · ¡Todo al día! 🎉
+        ${pending.length === 0 && !(_mostrarCompletadas && done.length) ?
+          `<div style="padding:20px 0;text-align:center;color:var(--text-muted);font-size:13px">
+            ${done.length ? 'Todas las tareas completadas' : 'Sin tareas pendientes'} · ¡Todo al día! 🎉
           </div>` : ''}
         ${pending.map(t => _renderTarea(t)).join('')}
 

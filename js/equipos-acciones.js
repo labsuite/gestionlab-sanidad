@@ -92,8 +92,8 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
     eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion,
     eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, nuevoEstado,
     eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo,
-    eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones];
-  await sheetsUpdate(`Equipos!A${eqIdx + 2}:R${eqIdx + 2}`, eqRow);
+    eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||''];
+  await sheetsUpdate(`Equipos!A${eqIdx + 2}:S${eqIdx + 2}`, eqRow);
 }
 
 // ============================================================
@@ -102,7 +102,7 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
 function openModalEquipo() {
   editingRow = null; pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Nuevo equipo';
-  ['eq-id','eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-ultimo-preventivo','eq-observaciones','eq-periodicidad-custom'].forEach(id => sv(id,''));
+  ['eq-id','eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-ultimo-preventivo','eq-observaciones','eq-periodicidad-custom'].forEach(id => sv(id,''));
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
   sv('eq-estado','Operativo'); sv('eq-periodicidad','Anual'); sv('eq-pdf-url','');
@@ -129,6 +129,7 @@ function editEquipo(idx) {
   sv('eq-periodicidad',e.Periodicidad_Mantenimiento); sv('eq-periodicidad-custom',e.Periodicidad_Custom||'');
   togglePeriodicidadCustom(e.Periodicidad_Mantenimiento);
   sv('eq-ultimo-preventivo',e.Fecha_Ultimo_Preventivo); sv('eq-observaciones',e.Observaciones);
+  sv('eq-coste', e.Coste||'');
   sv('eq-pdf-url',e.Manual_Ficha_Tecnica||'');
   // Restaurar autocomplete de ubicación
   document.getElementById('eq-ubicacion').value = e.Ubicacion || '';
@@ -638,12 +639,12 @@ async function guardarEquipo() {
     pendingEqFileBase64 = null;
   }
 
-  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), periodicidad, periodicidadCustom, ultimo, proximo, manualUrl, v('eq-observaciones')];
+  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), periodicidad, periodicidadCustom, ultimo, proximo, manualUrl, v('eq-observaciones'), v('eq-coste')];
 
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Equipos') {
-      await sheetsUpdate(`Equipos!A${editingRow.rowIndex + 2}:R${editingRow.rowIndex + 2}`, row);
+      await sheetsUpdate(`Equipos!A${editingRow.rowIndex + 2}:S${editingRow.rowIndex + 2}`, row);
       DATA.equipos[editingRow.rowIndex] = rowToObj(row, 'equipos');
       showToast('Equipo actualizado', 'success');
     } else {
@@ -706,8 +707,8 @@ async function guardarIntervencion() {
         const nuevo = calcProximoPreventivo(fechaReal, eq.Periodicidad_Mantenimiento);
         if (nuevo) {
           eq.Fecha_Ultimo_Preventivo = fechaReal; eq.Fecha_Proximo_Preventivo = nuevo;
-          const eqRow = [eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.Numero_Serie, eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion, eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, eq.Estado_Operativo, eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo, eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones];
-          await sheetsUpdate(`Equipos!A${eqIdx + 2}:R${eqIdx + 2}`, eqRow);
+          const eqRow = [eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.Numero_Serie, eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion, eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, eq.Estado_Operativo, eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo, eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||''];
+          await sheetsUpdate(`Equipos!A${eqIdx + 2}:S${eqIdx + 2}`, eqRow);
         }
       }
     }
