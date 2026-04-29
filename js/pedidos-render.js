@@ -44,7 +44,7 @@ function renderSolicitudes(filtroEstado = '') {
   if (toggleContainer) toggleContainer.innerHTML = toggleHtml;
   tbody.innerHTML = items.map(s => {
     const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
-    const hintProv = mejorProv
+    const hintProv = mejorProv && puedeGestionar
       ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
       : '';
     return `<tr>
