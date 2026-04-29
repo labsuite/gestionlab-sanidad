@@ -527,7 +527,10 @@ function openModalConsumoMaterial(matId) {
 function openModalConsumoLote(matId, idUbicacion) {
   openModalConsumoMaterial(matId);
   const sel = document.getElementById('consumo-ubicacion-sel');
-  if (sel) { sel.value = idUbicacion; }
+  if (sel) sel.value = idUbicacion;
+  // La ubicación ya está fijada — ocultamos el selector
+  const ubiGrp = document.getElementById('consumo-ubicacion-group');
+  if (ubiGrp) ubiGrp.style.display = 'none';
 }
 
 function _mostrarSelectorUbicConsumo(matId) {
