@@ -112,6 +112,8 @@ async function generarHojaPedido() {
           await sheetsUpdate(`Pedidos!Q${pedIdx+2}:R${pedIdx+2}`, [cicloNuevo, moduloNuevo]);
           DATA.pedidos[pedIdx].Ciclo  = cicloNuevo;
           DATA.pedidos[pedIdx].Modulo = moduloNuevo;
+          // Refrescar contabilidad en caliente sin esperar recarga
+          if (typeof renderContabilidad === 'function') renderContabilidad();
         } catch(e) { console.warn('No se pudo guardar ciclo/módulo', e); }
       }
     }
