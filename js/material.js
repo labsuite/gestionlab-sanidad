@@ -135,7 +135,7 @@ function renderFilaMaterial(m) {
         <td style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
           <button class="icon-btn" onclick="openModalConsumoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Consumo en esta ubicación">📦</button>
-          <button class="icon-btn" onclick="openModalEntradaLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Entrada en esta ubicación">📥</button>
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Entrada en esta ubicación">📥</button>` : ''}
           <button class="icon-btn" onclick="openModalTrasladoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Trasladar a otra ubicación">🔀</button>
         </div></td>
       </tr>`;

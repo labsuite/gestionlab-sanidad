@@ -8,10 +8,13 @@ function renderDashboard() {
   const en30 = new Date(); en30.setDate(hoy.getDate() + 30);
   const miNombre = currentUser?.name || '';
   const esProfesor = getUserRole() === 'Profesor';
-  // Profesor solo ve sus propios equipos en el dashboard de preventivos (multi-responsable)
+  const esAlumno   = getUserRole() === 'Alumno';
+  // Profesor: solo sus equipos (por responsabilidad). Alumno: equipos de sus ubicaciones asignadas + zona común.
   const misEquipos = esProfesor
     ? DATA.equipos.filter(e => esResponsableDeEquipo(e))
-    : DATA.equipos;
+    : esAlumno
+      ? DATA.equipos.filter(e => getUbicacionesAlumno().includes(e.Ubicacion))
+      : DATA.equipos;
   const preventivos = misEquipos.filter(e => e.Fecha_Proximo_Preventivo && new Date(e.Fecha_Proximo_Preventivo) <= en30);
   setText('stat-preventivos', preventivos.length);
 
