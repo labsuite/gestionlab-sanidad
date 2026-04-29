@@ -507,6 +507,9 @@ function openModalConsumo() {
   sv('consumo-cantidad', ''); sv('consumo-motivo', ''); sv('consumo-obs', '');
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
+  // Limpiar ubicación fija (puede venir de openModalConsumoLote anterior)
+  const fixedInput = document.getElementById('consumo-ubicacion-fixed');
+  if (fixedInput) fixedInput.value = '';
   openModal('modal-consumo');
 }
 
@@ -526,9 +529,17 @@ function openModalConsumoMaterial(matId) {
 
 function openModalConsumoLote(matId, idUbicacion) {
   openModalConsumoMaterial(matId);
-  const sel = document.getElementById('consumo-ubicacion-sel');
-  if (sel) sel.value = idUbicacion;
-  // La ubicación ya está fijada — ocultamos el selector
+  // Guardar la ubicación fija en un input hidden dedicado
+  // (más robusto que confiar en el value de un select oculto)
+  let fixedInput = document.getElementById('consumo-ubicacion-fixed');
+  if (!fixedInput) {
+    fixedInput = document.createElement('input');
+    fixedInput.type = 'hidden';
+    fixedInput.id = 'consumo-ubicacion-fixed';
+    document.getElementById('modal-consumo').appendChild(fixedInput);
+  }
+  fixedInput.value = idUbicacion;
+  // Ocultar el selector — la ubicación ya está fijada
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
 }
@@ -716,7 +727,9 @@ async function guardarConsumo() {
   if (!mat) { showToast('Material no encontrado', 'error'); return; }
   const cantidad = parseFloat(cantStr);
   const lotes    = getMatUbics(matId);
-  const ubiSel   = document.getElementById('consumo-ubicacion-sel')?.value || '';
+  // Primero: ubicación fija (viene de openModalConsumoLote). Si no, la del selector.
+  const fixedUbi = document.getElementById('consumo-ubicacion-fixed')?.value || '';
+  const ubiSel   = fixedUbi || document.getElementById('consumo-ubicacion-sel')?.value || '';
 
   // Alumno: validar que la ubicación seleccionada sea de las permitidas
   if (getUserRole() === 'Alumno') {
