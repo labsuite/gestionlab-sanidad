@@ -73,40 +73,33 @@ function renderSolicitudes(filtroEstado = '') {
     return;
   }
 
-  // Modo normal: dos secciones
-  const pendientes   = [...items.filter(s => !_ESTADOS_FINALIZADOS.includes(s.Estado))].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
-  const finalizadas  = [...items.filter(s =>  _ESTADOS_FINALIZADOS.includes(s.Estado))].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  // Modo normal: dos secciones — archivadas/rechazadas completamente ocultas
+  const pendientes = [...items.filter(s => s.Estado !== 'Recibido' && s.Estado !== 'Archivado' && s.Estado !== 'Rechazado')]
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  const recibidas  = [...items.filter(s => s.Estado === 'Recibido')]
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
 
   let html = '';
 
-  if (!pendientes.length && !finalizadas.length) {
+  if (!pendientes.length && !recibidas.length) {
     html = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
     tbody.innerHTML = html;
     _actualizarBadgeSolicitudes();
     return;
   }
 
-  // — Sección superior: pendientes/en gestión —
-  const labelPendientes = pendientes.length
-    ? `Pendientes de gestionar · ${pendientes.length}`
-    : 'Sin solicitudes activas';
-  html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">${labelPendientes}</td></tr>`;
+  // — Sección 1: pendientes / en gestión —
+  html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">Pendientes de gestionar · ${pendientes.length}</td></tr>`;
   if (pendientes.length) {
     html += pendientes.map(s => _renderFilaSolicitud(s, rol)).join('');
   } else {
     html += `<tr><td colspan="9" style="padding:16px;text-align:center;font-size:13px;color:var(--text-muted)">No hay solicitudes pendientes</td></tr>`;
   }
 
-  // — Sección inferior: recibidas / archivadas / rechazadas (colapsable) —
-  if (finalizadas.length) {
-    html += `<tr style="cursor:pointer" onclick="_mostrarSolicitudesArchivadas=!_mostrarSolicitudesArchivadas;renderSolicitudes()">
-      <td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:2px solid var(--border);user-select:none">
-        ${_mostrarSolicitudesArchivadas ? '▾' : '▸'} Recibidas y archivadas · ${finalizadas.length}
-      </td>
-    </tr>`;
-    if (_mostrarSolicitudesArchivadas) {
-      html += finalizadas.map(s => _renderFilaSolicitud(s, rol)).join('');
-    }
+  // — Sección 2: recibidas — siempre visible, desaparece sola al archivarse
+  if (recibidas.length) {
+    html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:2px solid var(--border)">✅ Material recibido · ${recibidas.length}</td></tr>`;
+    html += recibidas.map(s => _renderFilaSolicitud(s, rol)).join('');
   }
 
   tbody.innerHTML = html;
