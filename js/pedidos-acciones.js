@@ -349,15 +349,25 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
       if (solOrigen) {
         const solIdx = DATA.solicitudes.indexOf(solOrigen);
         if (!solOrigen.Lista_Pedido) solOrigen.Lista_Pedido = pedidoId;
+        // Guardar fecha de recepción en Observaciones para auto-archivo posterior
+        const fechaHoy = new Date().toISOString().split('T')[0];
+        const obsActual = solOrigen.Observaciones || '';
+        // Eliminar etiqueta previa si existía y añadir la nueva
+        const obsSinFecha = obsActual.replace(/\[Recibido:\d{4}-\d{2}-\d{2}\]\s*/g, '').trim();
+        solOrigen.Observaciones = (obsSinFecha ? obsSinFecha + ' ' : '') + `[Recibido:${fechaHoy}]`;
         solOrigen.Estado = 'Recibido';
         const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Recibido', solOrigen.Lista_Pedido, solOrigen.Observaciones];
-        await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
+        try {
+          await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
+        } catch(e) { console.warn('No se pudo actualizar solicitud a Recibido', e); }
+        // Gestor/Admin: archivar inmediatamente
         const rolActual = getUserRole();
         if (rolActual === 'Gestor' || rolActual === 'Administrador') {
           solOrigen.Estado = 'Archivado';
           const rowArch = [...rowSol]; rowArch[7] = 'Archivado';
           try { await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowArch); } catch(e) { console.warn('No se pudo archivar solicitud', e); }
         }
+        // Profesor: queda en "Recibido" — se archivará automáticamente pasada 1 semana
       }
     }
     showToast('Recepción registrada', 'success');
@@ -478,6 +488,86 @@ async function guardarProveedorPedido() {
     closeModal('modal-editar-proveedor');
     verDetallePedido(pedidoId);
     renderPedidos();
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
+// AUTO-ARCHIVO DE SOLICITUDES "RECIBIDO" TRAS 1 SEMANA
+// ============================================================
+async function checkAutoArchivarRecibidas() {
+  const DIAS = 7;
+  const ahora = new Date();
+  const recibidas = DATA.solicitudes.filter(s => s.Estado === 'Recibido');
+  if (!recibidas.length) return;
+  for (const sol of recibidas) {
+    const match = (sol.Observaciones || '').match(/\[Recibido:(\d{4}-\d{2}-\d{2})\]/);
+    if (!match) continue;
+    const fechaRecepcion = new Date(match[1]);
+    const diasTranscurridos = (ahora - fechaRecepcion) / (1000 * 60 * 60 * 24);
+    if (diasTranscurridos >= DIAS) {
+      const idx = DATA.solicitudes.indexOf(sol);
+      sol.Estado = 'Archivado';
+      const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, 'Archivado', sol.Lista_Pedido, sol.Observaciones];
+      try {
+        await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+        console.log(`[AutoArchivo] Solicitud ${sol.ID_Solicitud} archivada automáticamente (${Math.floor(diasTranscurridos)} días en Recibido)`);
+      } catch(e) { console.warn('No se pudo auto-archivar solicitud', sol.ID_Solicitud, e); }
+    }
+  }
+  // Re-renderizar si hubo cambios
+  if (typeof renderSolicitudes === 'function') renderSolicitudes();
+}
+
+// ============================================================
+// EDITAR SOLICITUD (solo Profesor, solo en estado Pendiente)
+// ============================================================
+function openModalEditarSolicitud(solId) {
+  const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
+  if (!sol || sol.Estado !== 'Pendiente') { showToast('Esta solicitud no se puede editar', 'error'); return; }
+  sv('edit-sol-id', solId);
+  sv('edit-sol-cantidad', sol.Cantidad_Solicitada);
+  sv('edit-sol-urgencia', sol.Urgencia || 'Normal');
+  sv('edit-sol-motivo', sol.Motivo || '');
+  // Observaciones: limpiar etiqueta interna [Unidad:...] si la hubiera para no mostrarla al usuario
+  const obsLimpia = (sol.Observaciones || '').replace(/\[Unidad:[^\]]+\]\s*/g, '').replace(/\[Recibido:[^\]]+\]\s*/g, '').trim();
+  sv('edit-sol-obs', obsLimpia);
+  const sel = document.getElementById('edit-sol-proveedor');
+  if (sel) {
+    sel.innerHTML = '<option value="">Sin preferencia</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}"${sol.Proveedor_Requerido === p.Nombre_Proveedor ? ' selected' : ''}>${p.Nombre_Proveedor}</option>`).join('');
+  }
+  // Mostrar nombre del material (solo lectura)
+  const matLabel = document.getElementById('edit-sol-material-nombre');
+  if (matLabel) matLabel.textContent = sol.Material;
+  openModal('modal-editar-solicitud');
+}
+
+async function guardarEdicionSolicitud() {
+  const solId = v('edit-sol-id');
+  const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
+  if (!sol) { showToast('Error: solicitud no encontrada', 'error'); return; }
+  const cant = v('edit-sol-cantidad');
+  if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
+  const urgencia = v('edit-sol-urgencia');
+  const motivo   = v('edit-sol-motivo');
+  const proveedor = v('edit-sol-proveedor');
+  const obsBase  = urgencia === 'Urgente' ? '⚠️ URGENTE — ' + v('edit-sol-obs') : v('edit-sol-obs');
+  // Preservar etiquetas internas ([Unidad:...]) que pudieran existir en observaciones originales
+  const tagUnidad = ((sol.Observaciones || '').match(/\[Unidad:[^\]]+\]/)||[])[0] || '';
+  const obsFinal = (tagUnidad ? tagUnidad + ' ' : '') + obsBase;
+  sol.Cantidad_Solicitada = cant;
+  sol.Urgencia = urgencia;
+  sol.Motivo = motivo;
+  sol.Proveedor_Requerido = proveedor;
+  sol.Observaciones = obsFinal;
+  const idx = DATA.solicitudes.indexOf(sol);
+  const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, sol.Estado, sol.Lista_Pedido, sol.Observaciones];
+  showLoading('Guardando...');
+  try {
+    await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+    showToast('Solicitud actualizada', 'success');
+    closeModal('modal-editar-solicitud');
+    renderSolicitudes();
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
 }

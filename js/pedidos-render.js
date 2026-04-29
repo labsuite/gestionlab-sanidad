@@ -3,69 +3,122 @@
 // ============================================================
 let _mostrarSolicitudesArchivadas = false;
 
-function renderSolicitudes(filtroEstado = '') {
-  const tbody = document.getElementById('tabla-solicitudes');
-  if (!tbody) return;
-  const rol = getUserRole();
-  let items = DATA.solicitudes;
-  if (rol === 'Profesor' || rol === 'Alumno') { const miNombre = currentUser?.name||''; items = items.filter(s => s.Solicitante === miNombre); }
-  if (filtroEstado) {
-    items = items.filter(s => s.Estado === filtroEstado);
-  } else {
-    // Ocultar archivadas por defecto
-    if (!_mostrarSolicitudesArchivadas) items = items.filter(s => s.Estado !== 'Archivado');
-  }
-  items = [...items].sort((a,b) => new Date(b.Fecha) - new Date(a.Fecha));
-  const archivadas = DATA.solicitudes.filter(s => s.Estado === 'Archivado').length;
-  const toggleHtml = archivadas > 0 && !filtroEstado
-    ? `<div style="margin-bottom:10px"><button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="_mostrarSolicitudesArchivadas=!_mostrarSolicitudesArchivadas;renderSolicitudes()">${_mostrarSolicitudesArchivadas ? '← Ocultar archivadas' : '📦 Ver archivadas (' + archivadas + ')'}</button></div>`
-    : '';
-  if (!items.length) {
-    const toggleContainer = document.getElementById('solicitudes-toggle-container');
-    if (toggleContainer) toggleContainer.innerHTML = toggleHtml;
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
-    return;
-  }
-  const estadoBadge = {
-    'Pendiente':              'badge-orange',
-    'Añadida a pedido':       'badge-blue',
-    'Presupuesto solicitado': 'badge-blue',
-    'Presupuesto aprobado':   'badge-green',
-    'En camino':              'badge-blue',
-    'En espera de recepción': 'badge-blue',  // estado legacy, compatibilidad
-    'Recibido':               'badge-green',
-    'Rechazado':              'badge-red',
-    'Archivado':              'badge-gray'
-  };
-  const urgenciaBadge = {'Urgente':'badge-red','Normal':'badge-gray'};
+// Badge de estados
+const _estadoBadge = {
+  'Pendiente':              'badge-orange',
+  'Añadida a pedido':       'badge-blue',
+  'Presupuesto solicitado': 'badge-blue',
+  'Presupuesto aprobado':   'badge-green',
+  'En camino':              'badge-blue',
+  'En espera de recepción': 'badge-blue',
+  'Recibido':               'badge-green',
+  'Rechazado':              'badge-red',
+  'Archivado':              'badge-gray'
+};
+const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
+
+// Estados considerados "finalizados" (van a la sección inferior)
+const _ESTADOS_FINALIZADOS = ['Recibido', 'Archivado', 'Rechazado'];
+
+function _renderFilaSolicitud(s, rol) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
-  // Insertar el toggle encima de la tabla
-  const toggleContainer = document.getElementById('solicitudes-toggle-container');
-  if (toggleContainer) toggleContainer.innerHTML = toggleHtml;
-  tbody.innerHTML = items.map(s => {
-    const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
-    const hintProv = mejorProv && puedeGestionar
-      ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
-      : '';
-    return `<tr>
+  const esProfesor = rol === 'Profesor' || rol === 'Alumno';
+  const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
+  const hintProv = mejorProv && puedeGestionar
+    ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
+    : '';
+  // "Ver pedido" solo para Gestor/Admin, nunca para Profesor
+  const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado','Archivado'].includes(s.Estado);
+  // Editar: solo el Profesor puede editar sus propias solicitudes en estado Pendiente
+  const puedeEditar = esProfesor && s.Estado === 'Pendiente';
+  return `<tr>
     <td><strong>${s.ID_Solicitud}</strong></td>
     <td><div>${s.Material}</div>${hintProv}</td>
     <td>${s.Cantidad_Solicitada}</td>
     <td style="font-size:12px">${s.Solicitante}</td>
     <td style="font-size:12px">${formatDate(s.Fecha)}</td>
-    <td><span class="badge ${urgenciaBadge[s.Urgencia]||'badge-gray'}">${s.Urgencia||'Normal'}</span></td>
-    <td style="font-size:12px">${s.Proveedor_Requerido||'—'}</td>
-    <td><span class="badge ${estadoBadge[s.Estado]||'badge-gray'}">${s.Estado||'Pendiente'}</span></td>
+    <td><span class="badge ${_urgenciaBadge[s.Urgencia] || 'badge-gray'}">${s.Urgencia || 'Normal'}</span></td>
+    <td style="font-size:12px">${s.Proveedor_Requerido || '—'}</td>
+    <td><span class="badge ${_estadoBadge[s.Estado] || 'badge-gray'}">${s.Estado || 'Pendiente'}</span></td>
     <td><div class="row-actions">
       ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Añadir a pedido" onclick="solicitudAPedido('${s.ID_Solicitud}')">🛒</button>` : ''}
-      ${s.Lista_Pedido && !['Pendiente','Rechazado','Archivado'].includes(s.Estado) ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
+      ${mostrarVerPedido ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
       ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
+      ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
     </div></td>
-  </tr>`;}).join('');
+  </tr>`;
+}
+
+function renderSolicitudes(filtroEstado = '') {
+  const tbody = document.getElementById('tabla-solicitudes');
+  if (!tbody) return;
+  const rol = getUserRole();
+  const esProfesor = rol === 'Profesor' || rol === 'Alumno';
+  let items = DATA.solicitudes;
+  if (esProfesor) { const miNombre = currentUser?.name || ''; items = items.filter(s => s.Solicitante === miNombre); }
+
+  // Limpiar toggle container (ya no se usa para el botón, pero se limpia)
+  const toggleContainer = document.getElementById('solicitudes-toggle-container');
+  if (toggleContainer) toggleContainer.innerHTML = '';
+
+  // Modo filtro: tabla plana
+  if (filtroEstado) {
+    const filtradas = [...items.filter(s => s.Estado === filtroEstado)].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+    if (!filtradas.length) {
+      tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = filtradas.map(s => _renderFilaSolicitud(s, rol)).join('');
+    }
+    _actualizarBadgeSolicitudes();
+    return;
+  }
+
+  // Modo normal: dos secciones
+  const pendientes   = [...items.filter(s => !_ESTADOS_FINALIZADOS.includes(s.Estado))].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  const finalizadas  = [...items.filter(s =>  _ESTADOS_FINALIZADOS.includes(s.Estado))].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+  let html = '';
+
+  if (!pendientes.length && !finalizadas.length) {
+    html = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
+    tbody.innerHTML = html;
+    _actualizarBadgeSolicitudes();
+    return;
+  }
+
+  // — Sección superior: pendientes/en gestión —
+  const labelPendientes = pendientes.length
+    ? `Pendientes de gestionar · ${pendientes.length}`
+    : 'Sin solicitudes activas';
+  html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">${labelPendientes}</td></tr>`;
+  if (pendientes.length) {
+    html += pendientes.map(s => _renderFilaSolicitud(s, rol)).join('');
+  } else {
+    html += `<tr><td colspan="9" style="padding:16px;text-align:center;font-size:13px;color:var(--text-muted)">No hay solicitudes pendientes</td></tr>`;
+  }
+
+  // — Sección inferior: recibidas / archivadas / rechazadas (colapsable) —
+  if (finalizadas.length) {
+    html += `<tr style="cursor:pointer" onclick="_mostrarSolicitudesArchivadas=!_mostrarSolicitudesArchivadas;renderSolicitudes()">
+      <td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:2px solid var(--border);user-select:none">
+        ${_mostrarSolicitudesArchivadas ? '▾' : '▸'} Recibidas y archivadas · ${finalizadas.length}
+      </td>
+    </tr>`;
+    if (_mostrarSolicitudesArchivadas) {
+      html += finalizadas.map(s => _renderFilaSolicitud(s, rol)).join('');
+    }
+  }
+
+  tbody.innerHTML = html;
+  _actualizarBadgeSolicitudes();
+}
+
+function _actualizarBadgeSolicitudes() {
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
   const badge = document.getElementById('badge-solicitudes');
   if (badge) { badge.textContent = pendientes; badge.style.display = pendientes > 0 ? '' : 'none'; }
 }
+
 function filtrarSolicitudesEstado(v) { renderSolicitudes(v); }
 
 // ============================================================
