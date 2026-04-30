@@ -53,7 +53,10 @@ async function rechazarSolicitud(solId) {
   DATA.solicitudes[idx].Estado = 'Rechazado';
   showLoading('Actualizando...');
   try {
-    const row = Object.values(DATA.solicitudes[idx]);
+    const sol = DATA.solicitudes[idx];
+    const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada,
+      sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido,
+      'Rechazado', sol.Lista_Pedido, sol.Observaciones];
     await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
     showToast('Solicitud rechazada', 'success'); renderSolicitudes();
   } catch(e) { showToast('Error', 'error'); }
@@ -212,11 +215,8 @@ async function guardarEstadoPedido() {
     // Mapa pedido → solicitud. Los estados finales (Recibido, Rechazado,
     // Archivado) los gestiona guardarRecepcionLinea; aquí no los tocamos.
     const MAPA_SOL = {
-      'Abierto':                'Añadida a pedido',
-      'Presupuesto solicitado': 'Presupuesto solicitado',
-      'Presupuesto aprobado':   'Presupuesto aprobado',
-      'Pedido enviado':         'En camino',
-    };
+      'Presupuesto aprobado': 'En espera de recepción',
+    }
     const ESTADOS_FINALES_SOL = ['Recibido', 'Archivado', 'Rechazado'];
     const nuevoEstadoSol = MAPA_SOL[nuevoEstado];
     if (nuevoEstadoSol) {
