@@ -235,7 +235,7 @@ async function guardarEstadoPedido() {
       }
     }
     showToast('Estado actualizado', 'success');
-    closeModal('modal-estado-pedido'); renderPedidos();
+    closeModal('modal-estado-pedido'); renderPedidos(); renderSolicitudes();
     if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
   } catch(e) { showToast('Error', 'error'); }
   hideLoading();
@@ -373,6 +373,7 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');
     renderMaterial();
+    renderSolicitudes();
     renderPedidos();
     verDetallePedido(pedidoId);
   } catch(e) { showToast('Error', 'error'); console.error(e); }
