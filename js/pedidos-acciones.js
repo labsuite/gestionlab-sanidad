@@ -362,10 +362,14 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
         } catch(e) { console.warn('No se pudo actualizar solicitud a Recibido', e); }
         // Archivar inmediatamente solo si el SOLICITANTE es Gestor/Admin
         // Si es Profesor/Alumno → queda en "Recibido" y se archiva automáticamente en 7 días
-        const userSolicitante = DATA.usuarios.find(u =>
-          (u.Nombre||'').toLowerCase().trim() === (solOrigen.Solicitante||'').toLowerCase().trim()
-        );
-        const rolSolicitante = userSolicitante?.Rol || 'Alumno';
+        // Buscar solicitante por coincidencia de prefijo: el nombre corto del usuario
+        // puede ser prefijo del nombre completo que devuelve Google OAuth
+        const _solNorm = (solOrigen.Solicitante||'').toLowerCase().trim();
+        const userSolicitante = DATA.usuarios
+          .filter(u => { const n = (u.Nombre||'').toLowerCase().trim(); return n && (_solNorm === n || _solNorm.startsWith(n + ' ')); })
+          .sort((a, b) => (b.Nombre||'').length - (a.Nombre||'').length)[0];
+        // Si no se encuentra el usuario, asumir Profesor (más seguro: deja en Recibido 7 días)
+        const rolSolicitante = userSolicitante?.Rol || 'Profesor';
         if (rolSolicitante === 'Gestor' || rolSolicitante === 'Administrador') {
           solOrigen.Estado = 'Archivado';
           const rowArch = [...rowSol]; rowArch[7] = 'Archivado';
