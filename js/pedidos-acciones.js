@@ -360,9 +360,13 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
         try {
           await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
         } catch(e) { console.warn('No se pudo actualizar solicitud a Recibido', e); }
-        // Gestor/Admin: archivar inmediatamente
-        const rolActual = getUserRole();
-        if (rolActual === 'Gestor' || rolActual === 'Administrador') {
+        // Archivar inmediatamente solo si el SOLICITANTE es Gestor/Admin
+        // Si es Profesor/Alumno → queda en "Recibido" y se archiva automáticamente en 7 días
+        const userSolicitante = DATA.usuarios.find(u =>
+          (u.Nombre||'').toLowerCase().trim() === (solOrigen.Solicitante||'').toLowerCase().trim()
+        );
+        const rolSolicitante = userSolicitante?.Rol || 'Alumno';
+        if (rolSolicitante === 'Gestor' || rolSolicitante === 'Administrador') {
           solOrigen.Estado = 'Archivado';
           const rowArch = [...rowSol]; rowArch[7] = 'Archivado';
           try { await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowArch); } catch(e) { console.warn('No se pudo archivar solicitud', e); }
