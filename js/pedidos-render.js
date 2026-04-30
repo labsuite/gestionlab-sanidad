@@ -7,9 +7,6 @@ let _mostrarSolicitudesArchivadas = false;
 const _estadoBadge = {
   'Pendiente':              'badge-orange',
   'Añadida a pedido':       'badge-blue',
-  'Presupuesto solicitado': 'badge-blue',
-  'Presupuesto aprobado':   'badge-green',
-  'En camino':              'badge-blue',
   'En espera de recepción': 'badge-blue',
   'Recibido':               'badge-green',
   'Rechazado':              'badge-red',
@@ -23,6 +20,7 @@ const _ESTADOS_FINALIZADOS = ['Recibido', 'Archivado', 'Rechazado'];
 function _renderFilaSolicitud(s, rol) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
   const esProfesor = rol === 'Profesor' || rol === 'Alumno';
+  const urgencia = s.Urgencia || ((s.Observaciones||'').includes('⚠️ URGENTE') ? 'Urgente' : 'Normal');
   const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
   const hintProv = mejorProv && puedeGestionar
     ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
@@ -37,7 +35,7 @@ function _renderFilaSolicitud(s, rol) {
     <td>${s.Cantidad_Solicitada}</td>
     <td style="font-size:12px">${s.Solicitante}</td>
     <td style="font-size:12px">${formatDate(s.Fecha)}</td>
-    <td><span class="badge ${_urgenciaBadge[s.Urgencia] || 'badge-gray'}">${s.Urgencia || 'Normal'}</span></td>
+    <td><span class="badge ${_urgenciaBadge[urgencia] || 'badge-gray'}">${urgencia}</span></td>
     <td style="font-size:12px">${s.Proveedor_Requerido || '—'}</td>
     <td><span class="badge ${_estadoBadge[s.Estado] || 'badge-gray'}">${s.Estado || 'Pendiente'}</span></td>
     <td><div class="row-actions">
@@ -88,20 +86,35 @@ function renderSolicitudes(filtroEstado = '') {
     return;
   }
 
-  // — Sección 1: pendientes / en gestión —
-  html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">Pendientes de gestionar · ${pendientes.length}</td></tr>`;
-  if (pendientes.length) {
-    html += pendientes.map(s => _renderFilaSolicitud(s, rol)).join('');
-  } else {
-    html += `<tr><td colspan="9" style="padding:16px;text-align:center;font-size:13px;color:var(--text-muted)">No hay solicitudes pendientes</td></tr>`;
+    const pendientes = [...items.filter(s => s.Estado === 'Pendiente')]
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  const enCurso = [...items.filter(s => s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')]
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  const recibidas = [...items.filter(s => s.Estado === 'Recibido')]
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+  if (!pendientes.length && !enCurso.length && !recibidas.length) {
+    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
+    _actualizarBadgeSolicitudes();
+    return;
   }
 
-  // — Sección 2: recibidas — siempre visible, desaparece sola al archivarse
+  const _secHeader = (label, n) =>
+    `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">${label} · ${n}</td></tr>`;
+
+  let html = '';
+  if (pendientes.length) {
+    html += _secHeader('⏳ Pendientes de gestionar', pendientes.length);
+    html += pendientes.map(s => _renderFilaSolicitud(s, rol)).join('');
+  }
+  if (enCurso.length) {
+    html += _secHeader('🔄 En tramitación', enCurso.length);
+    html += enCurso.map(s => _renderFilaSolicitud(s, rol)).join('');
+  }
   if (recibidas.length) {
-    html += `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-top:2px solid var(--border)">✅ Material recibido · ${recibidas.length}</td></tr>`;
+    html += _secHeader('✅ Material recibido', recibidas.length);
     html += recibidas.map(s => _renderFilaSolicitud(s, rol)).join('');
   }
-
   tbody.innerHTML = html;
   _actualizarBadgeSolicitudes();
 }
