@@ -698,7 +698,23 @@ async function guardarIntervencion() {
       try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
     }
 
-    // Actualizar preventivo si aplica
+      // Cerrar incidencia abierta vinculada al equipo cuando resultado=Resuelto
+  if (resultadoInt === 'Resuelto') {
+    const eqId = equipo.split(' – ')[0].trim();
+    const incVinculadaIdx = DATA.incidencias.findIndex(inc =>
+      (inc.Equipo||'').startsWith(eqId) &&
+      !['Resuelta','Cerrada','Archivada'].includes(inc.Estado)
+    );
+    if (incVinculadaIdx !== -1) {
+      const inc = DATA.incidencias[incVinculadaIdx];
+      inc.Estado = 'Archivada';
+      const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora,
+        inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Archivada', inc.Intervencion_Generada];
+      try { await sheetsUpdate(`Incidencias!A${incVinculadaIdx+2}:I${incVinculadaIdx+2}`, incRow); } catch(e) { console.warn(e); }
+    }
+  }
+
+  // Actualizar preventivo si aplica
     if (v('int-actualiza-preventivo') === 'Sí' && tipo === 'Preventivo') {
       const equipoId = equipo.split(' – ')[0];
       const eqIdx = DATA.equipos.findIndex(e => e.ID_Activo === equipoId);
