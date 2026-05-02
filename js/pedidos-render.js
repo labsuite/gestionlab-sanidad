@@ -9,13 +9,9 @@ const _estadoBadge = {
   'Añadida a pedido':       'badge-blue',
   'En espera de recepción': 'badge-blue',
   'Recibido':               'badge-green',
-  'Rechazado':              'badge-red',
-  'Archivado':              'badge-gray'
+  'Rechazado':              'badge-red'
 };
 const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
-
-// Estados considerados "finalizados" (van a la sección inferior)
-const _ESTADOS_FINALIZADOS = ['Recibido', 'Archivado', 'Rechazado'];
 
 function _renderFilaSolicitud(s, rol) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
@@ -25,9 +21,7 @@ function _renderFilaSolicitud(s, rol) {
   const hintProv = mejorProv && puedeGestionar
     ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
     : '';
-  // "Ver pedido" solo para Gestor/Admin, nunca para Profesor
-  const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado','Archivado'].includes(s.Estado);
-  // Editar: solo el Profesor puede editar sus propias solicitudes en estado Pendiente
+  const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado'].includes(s.Estado);
   const puedeEditar = esProfesor && s.Estado === 'Pendiente';
   return `<tr>
     <td><strong>${s.ID_Solicitud}</strong></td>
@@ -47,7 +41,24 @@ function _renderFilaSolicitud(s, rol) {
   </tr>`;
 }
 
-function renderSolicitudes(filtroEstado = '') {
+// Estado colapsado por grupo (persiste durante la sesión)
+const _seccionesColapsadas = new Set();
+
+function toggleSeccionSolicitud(key) {
+  const rows = document.querySelectorAll('[data-sec="' + key + '"]');
+  const arrow = document.getElementById('sol-arrow-' + key);
+  if (_seccionesColapsadas.has(key)) {
+    _seccionesColapsadas.delete(key);
+    rows.forEach(r => r.style.display = '');
+    if (arrow) arrow.textContent = '▾';
+  } else {
+    _seccionesColapsadas.add(key);
+    rows.forEach(r => r.style.display = 'none');
+    if (arrow) arrow.textContent = '▸';
+  }
+}
+
+function renderSolicitudes() {
   const tbody = document.getElementById('tabla-solicitudes');
   if (!tbody) return;
   const rol = getUserRole();
@@ -57,61 +68,51 @@ function renderSolicitudes(filtroEstado = '') {
     const miNombre = currentUser?.name || '';
     items = items.filter(s => s.Solicitante === miNombre);
   }
+
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = '';
 
-  // Modo filtro: tabla plana
-  if (filtroEstado) {
-    const filtradas = [...items.filter(s => s.Estado === filtroEstado)]
-      .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
-    tbody.innerHTML = filtradas.length
-      ? filtradas.map(s => _renderFilaSolicitud(s, rol)).join('')
-      : `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes con ese estado</div></div></td></tr>`;
-    _actualizarBadgeSolicitudes();
-    return;
-  }
-
-  // Tres grupos
-  const pendientes = [...items.filter(s => s.Estado === 'Pendiente')]
-    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
-  const enCurso = [...items.filter(s => s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')]
-    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
-  const recibidas = [...items.filter(s => s.Estado === 'Recibido')]
-    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
-
-  if (!pendientes.length && !enCurso.length && !recibidas.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
-    _actualizarBadgeSolicitudes();
-    return;
-  }
-
-  const _secHeader = (label, n) =>
-    `<tr><td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">${label} · ${n}</td></tr>`;
+  const ORDEN  = ['Pendiente', 'Añadida a pedido', 'En espera de recepción', 'Recibido', 'Rechazado'];
+  const ICONOS = { 'Pendiente': '⏳', 'Añadida a pedido': '🛒', 'En espera de recepción': '🔄', 'Recibido': '✅', 'Rechazado': '❌' };
+  // Normalizar key: quitar espacios y tildes
+  const toKey = s => s.replace(/s+/g,'-').normalize('NFD').replace(/[̀-ͯ]/g,'');
 
   let html = '';
-  if (pendientes.length) {
-    html += _secHeader('⏳ Pendientes de gestionar', pendientes.length);
-    html += pendientes.map(s => _renderFilaSolicitud(s, rol)).join('');
+  let hayAlgo = false;
+  for (const estado of ORDEN) {
+    const grupo = [...items.filter(s => s.Estado === estado)]
+      .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+    if (!grupo.length) continue;
+    hayAlgo = true;
+    const key = toKey(estado);
+    const collapsed = _seccionesColapsadas.has(key);
+    html += `<tr class="sol-sec-header" onclick="toggleSeccionSolicitud('${key}')" style="cursor:pointer;user-select:none">
+      <td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">
+        <span style="display:flex;align-items:center;justify-content:space-between">
+          <span>${ICONOS[estado] || '📋'} ${estado} · ${grupo.length}</span>
+          <span id="sol-arrow-${key}" style="font-size:13px">${collapsed ? '▸' : '▾'}</span>
+        </span>
+      </td>
+    </tr>`;
+    html += grupo.map(s => {
+      const tr = _renderFilaSolicitud(s, rol);
+      return tr.replace('<tr>', `<tr data-sec="${key}"${collapsed ? ' style="display:none"' : ''}`);
+    }).join('');
   }
-  if (enCurso.length) {
-    html += _secHeader('🔄 En tramitación', enCurso.length);
-    html += enCurso.map(s => _renderFilaSolicitud(s, rol)).join('');
-  }
-  if (recibidas.length) {
-    html += _secHeader('✅ Material recibido', recibidas.length);
-    html += recibidas.map(s => _renderFilaSolicitud(s, rol)).join('');
-  }
-  tbody.innerHTML = html;
+
+  tbody.innerHTML = hayAlgo
+    ? html
+    : `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
   _actualizarBadgeSolicitudes();
 }
+
+function filtrarSolicitudesEstado() { renderSolicitudes(); } // no-op: se usan grupos colapsables
+
 function _actualizarBadgeSolicitudes() {
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
   const badge = document.getElementById('badge-solicitudes');
   if (badge) { badge.textContent = pendientes; badge.style.display = pendientes > 0 ? '' : 'none'; }
 }
-
-function filtrarSolicitudesEstado(v) { renderSolicitudes(v); }
-
 // ============================================================
 // PEDIDOS — RENDER
 // ============================================================
