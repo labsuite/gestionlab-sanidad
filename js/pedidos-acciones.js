@@ -217,7 +217,7 @@ async function guardarEstadoPedido() {
     const MAPA_SOL = {
       'Presupuesto aprobado': 'En espera de recepción',
     }
-    const ESTADOS_FINALES_SOL = ['Recibido', 'Archivado', 'Rechazado'];
+    const ESTADOS_FINALES_SOL = ['Recibido', 'Rechazado'];
     const nuevoEstadoSol = MAPA_SOL[nuevoEstado];
     if (nuevoEstadoSol) {
       const solsVinculadas = DATA.solicitudes.filter(s =>
@@ -362,20 +362,6 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
         } catch(e) { console.warn('No se pudo actualizar solicitud a Recibido', e); }
         // Archivar inmediatamente solo si el SOLICITANTE es Gestor/Admin
         // Si es Profesor/Alumno → queda en "Recibido" y se archiva automáticamente en 7 días
-        // Buscar solicitante por coincidencia de prefijo: el nombre corto del usuario
-        // puede ser prefijo del nombre completo que devuelve Google OAuth
-        const _solNorm = (solOrigen.Solicitante||'').toLowerCase().trim();
-        const userSolicitante = DATA.usuarios
-          .filter(u => { const n = (u.Nombre||'').toLowerCase().trim(); return n && (_solNorm === n || _solNorm.startsWith(n + ' ')); })
-          .sort((a, b) => (b.Nombre||'').length - (a.Nombre||'').length)[0];
-        // Si no se encuentra el usuario, asumir Profesor (más seguro: deja en Recibido 7 días)
-        const rolSolicitante = userSolicitante?.Rol || 'Profesor';
-        if (rolSolicitante === 'Gestor' || rolSolicitante === 'Administrador') {
-          solOrigen.Estado = 'Archivado';
-          const rowArch = [...rowSol]; rowArch[7] = 'Archivado';
-          try { await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowArch); } catch(e) { console.warn('No se pudo archivar solicitud', e); }
-        }
-        // Profesor: queda en "Recibido" — se archivará automáticamente pasada 1 semana
       }
     }
     showToast('Recepción registrada', 'success');
@@ -501,34 +487,11 @@ async function guardarProveedorPedido() {
   hideLoading();
 }
 
-// ============================================================
-// AUTO-ARCHIVO DE SOLICITUDES "RECIBIDO" TRAS 1 SEMANA
-// ============================================================
-async function checkAutoArchivarRecibidas() {
-  const DIAS = 7;
-  const ahora = new Date();
-  const recibidas = DATA.solicitudes.filter(s => s.Estado === 'Recibido');
-  if (!recibidas.length) return;
-  for (const sol of recibidas) {
-    const match = (sol.Observaciones || '').match(/\[Recibido:(\d{4}-\d{2}-\d{2})\]/);
-    if (!match) continue;
-    const fechaRecepcion = new Date(match[1]);
-    const diasTranscurridos = (ahora - fechaRecepcion) / (1000 * 60 * 60 * 24);
-    if (diasTranscurridos >= DIAS) {
-      const idx = DATA.solicitudes.indexOf(sol);
-      sol.Estado = 'Archivado';
-      const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, 'Archivado', sol.Lista_Pedido, sol.Observaciones];
-      try {
-        await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
-        console.log(`[AutoArchivo] Solicitud ${sol.ID_Solicitud} archivada automáticamente (${Math.floor(diasTranscurridos)} días en Recibido)`);
-      } catch(e) { console.warn('No se pudo auto-archivar solicitud', sol.ID_Solicitud, e); }
-    }
-  }
-  // Re-renderizar si hubo cambios
-  if (typeof renderSolicitudes === 'function') renderSolicitudes();
-}
+// checkAutoArchivarRecibidas: eliminado — ya no existe estado Archivado en solicitudes
+function checkAutoArchivarRecibidas() { return; }
 
 // ============================================================
+// EDITAR SOLICITUD// ============================================================
 // EDITAR SOLICITUD (solo Profesor, solo en estado Pendiente)
 // ============================================================
 function openModalEditarSolicitud(solId) {
