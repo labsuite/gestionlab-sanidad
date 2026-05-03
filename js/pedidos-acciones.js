@@ -369,6 +369,8 @@ async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat,
     renderMaterial();
     renderSolicitudes();
     renderPedidos();
+    renderDashboard();
+    updateBadges();
     verDetallePedido(pedidoId);
   } catch(e) { showToast('Error', 'error'); console.error(e); }
   hideLoading();
