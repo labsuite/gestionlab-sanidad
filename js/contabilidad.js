@@ -99,6 +99,7 @@ async function guardarPrecios() {
       verDetallePedido(pedidoId);
     }
     renderContabilidad();
+    renderMaterial(); // actualizar columna precio medio
   } catch(e) {
     showToast('Error guardando precios', 'error');
     console.error(e);
