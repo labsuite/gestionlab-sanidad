@@ -867,6 +867,8 @@ async function guardarTraslado() {
     DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
     showToast(`Traslado registrado: ${cant} ${mat.Unidad} → ${getNombreUbicacion(idDestino)}`, 'success');
     closeModal('modal-traslado'); renderMaterial();
+    renderDashboard();
+    updateBadges();
   } catch(e) { showToast('Error en el traslado', 'error'); console.error(e); }
   hideLoading();
 }
