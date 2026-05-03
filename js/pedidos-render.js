@@ -13,7 +13,8 @@ const _estadoBadge = {
 };
 const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
 
-function _renderFilaSolicitud(s, rol) {
+// trExtra: atributos extra para el tag <tr> (data-sec, style, etc.)
+function _renderFilaSolicitud(s, rol, trExtra) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
   const esProfesor = rol === 'Profesor' || rol === 'Alumno';
   const urgencia = s.Urgencia || ((s.Observaciones||'').includes('⚠️ URGENTE') ? 'Urgente' : 'Normal');
@@ -23,7 +24,8 @@ function _renderFilaSolicitud(s, rol) {
     : '';
   const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado'].includes(s.Estado);
   const puedeEditar = esProfesor && s.Estado === 'Pendiente';
-  return `<tr>
+  const trOpen = trExtra ? ` ${trExtra}` : '';
+  return `<tr${trOpen}>
     <td><strong>${s.ID_Solicitud}</strong></td>
     <td><div>${s.Material}</div>${hintProv}</td>
     <td>${s.Cantidad_Solicitada}</td>
@@ -41,7 +43,6 @@ function _renderFilaSolicitud(s, rol) {
   </tr>`;
 }
 
-// Estado colapsado por grupo (persiste durante la sesión)
 const _seccionesColapsadas = new Set();
 
 function toggleSeccionSolicitud(key) {
@@ -68,14 +69,13 @@ function renderSolicitudes() {
     const miNombre = currentUser?.name || '';
     items = items.filter(s => s.Solicitante === miNombre);
   }
-
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = '';
 
   const ORDEN  = ['Pendiente', 'Añadida a pedido', 'En espera de recepción', 'Recibido', 'Rechazado'];
   const ICONOS = { 'Pendiente': '⏳', 'Añadida a pedido': '🛒', 'En espera de recepción': '🔄', 'Recibido': '✅', 'Rechazado': '❌' };
-  // Normalizar key: quitar espacios y tildes
-  const toKey = s => s.replace(/s+/g,'-').normalize('NFD').replace(/[̀-ͯ]/g,'');
+  // key: solo alfanumérico y guión, sin tildes ni espacios
+  const toKey = str => str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
   let html = '';
   let hayAlgo = false;
@@ -95,8 +95,8 @@ function renderSolicitudes() {
       </td>
     </tr>`;
     html += grupo.map(s => {
-      const tr = _renderFilaSolicitud(s, rol);
-      return tr.replace('<tr>', `<tr data-sec="${key}"${collapsed ? ' style="display:none"' : ''}>`);
+      const attrs = `data-sec="${key}"${collapsed ? ' style="display:none"' : ''}`;
+      return _renderFilaSolicitud(s, rol, attrs);
     }).join('');
   }
 
@@ -106,7 +106,7 @@ function renderSolicitudes() {
   _actualizarBadgeSolicitudes();
 }
 
-function filtrarSolicitudesEstado() { renderSolicitudes(); } // no-op: se usan grupos colapsables
+function filtrarSolicitudesEstado() { renderSolicitudes(); }
 
 function _actualizarBadgeSolicitudes() {
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
