@@ -1,4 +1,4 @@
-// ============================================================
+ññ// ============================================================
 // SOLICITUDES — RENDER Y LÓGICA
 // ============================================================
 let _mostrarSolicitudesArchivadas = false;
@@ -69,6 +69,13 @@ function renderSolicitudes() {
     const miNombre = currentUser?.name || '';
     items = items.filter(s => s.Solicitante === miNombre);
   }
+  // Filtrar: solo año actual y anterior
+  const _anioActual = new Date().getFullYear();
+  items = items.filter(s => {
+    const anio = s.Fecha ? new Date(s.Fecha).getFullYear() : _anioActual;
+    return anio >= _anioActual - 1;
+  });
+
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = '';
 
@@ -123,6 +130,20 @@ function estadoPedidoClass(estado) {
 }
 
 let _mostrarArchivados = false;
+const _pedidosAnioColapsados = new Set();
+function _togglePedidosAnio(key) {
+  const el = document.getElementById(key);
+  const arrow = document.getElementById('arr-' + key);
+  if (_pedidosAnioColapsados.has(key)) {
+    _pedidosAnioColapsados.delete(key);
+    if (el) el.style.display = '';
+    if (arrow) arrow.textContent = '▾';
+  } else {
+    _pedidosAnioColapsados.add(key);
+    if (el) el.style.display = 'none';
+    if (arrow) arrow.textContent = '▸';
+  }
+}
 
 function renderPedidos(filtroEstado = '') {
   const cont = document.getElementById('pedidos-lista');
@@ -137,7 +158,8 @@ function renderPedidos(filtroEstado = '') {
     cont.innerHTML = toggleHtml + `<div class="empty-state"><div class="empty-state-icon">🛒</div><div class="empty-state-title">${_mostrarArchivados ? 'Sin pedidos archivados' : 'Sin listas de pedido'}</div><div class="empty-state-text">${_mostrarArchivados ? '' : 'Crea la primera lista con el botón superior'}</div></div>`;
     return;
   }
-  cont.innerHTML = toggleHtml + filtrados.map(p => {
+  // Helper card
+  const _card = p => {
     const lineas    = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
     const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
     const docBadges = [p.Doc_Hoja_Generada==='TRUE'?'📄':'', p.Doc_Hoja_Completada==='TRUE'?'✅':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬':''].filter(Boolean).join(' ');
@@ -157,7 +179,35 @@ function renderPedidos(filtroEstado = '') {
         ${(() => { const coste = lineas.reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0); return coste > 0 ? `<div class="pedido-stat">Total <strong>${coste.toFixed(2)} €</strong></div>` : ''; })()}
       </div>
     </div>`;
-  }).join('');
+  };
+
+  if (_mostrarArchivados && !filtroEstado) {
+    // Agrupar archivados por año
+    const _porAnio = {};
+    filtrados.forEach(p => {
+      const anio = p.Fecha_Creacion ? new Date(p.Fecha_Creacion).getFullYear() : 'Sin fecha';
+      if (!_porAnio[anio]) _porAnio[anio] = [];
+      _porAnio[anio].push(p);
+    });
+    const aniosOrden = Object.keys(_porAnio).sort((a, b) => b - a);
+    let archivoHtml = toggleHtml;
+    for (const anio of aniosOrden) {
+      const key = 'ped-anio-' + anio;
+      const col = _pedidosAnioColapsados.has(key);
+      archivoHtml += `<div style="margin-bottom:8px">
+        <div onclick="_togglePedidosAnio('${key}')" style="cursor:pointer;padding:8px 14px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius,6px);display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;user-select:none">
+          <span>📅 ${anio} · ${_porAnio[anio].length} pedido${_porAnio[anio].length > 1 ? 's' : ''}</span>
+          <span id="arr-${key}" style="font-size:14px">${col ? '▸' : '▾'}</span>
+        </div>
+        <div id="${key}" style="${col ? 'display:none' : ''}">
+          ${_porAnio[anio].map(_card).join('')}
+        </div>
+      </div>`;
+    }
+    cont.innerHTML = archivoHtml;
+  } else {
+    cont.innerHTML = toggleHtml + filtrados.map(_card).join('');
+  }
 }
 function filtrarPedidosEstado(v) { renderPedidos(v); }
 
