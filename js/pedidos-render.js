@@ -96,7 +96,7 @@ function renderSolicitudes() {
     </tr>`;
     html += grupo.map(s => {
       const tr = _renderFilaSolicitud(s, rol);
-      return tr.replace('<tr>', `<tr data-sec="${key}"${collapsed ? ' style="display:none"' : ''}`);
+      return tr.replace('<tr>', `<tr data-sec="${key}"${collapsed ? ' style="display:none"' : ''}>`);
     }).join('');
   }
 
