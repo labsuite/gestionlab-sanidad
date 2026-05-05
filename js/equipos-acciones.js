@@ -610,6 +610,53 @@ function removeEqFile() {
 }
 
 // ============================================================
+// TIPO DE EQUIPO — campo libre ("Otro")
+// Definido aquí para garantizar que siempre esté disponible
+// (equipos.js ya no se carga como módulo independiente)
+// ============================================================
+function toggleTipoEquipoLibre(val) {
+  const group = document.getElementById('eq-tipo-libre-group');
+  if (group) group.style.display = val === 'Otro' ? '' : 'none';
+  if (val !== 'Otro') sv('eq-tipo-libre', '');
+}
+
+// ============================================================
+// AUTO-ID EQUIPOS
+// Genera un ID automático a partir del tipo de equipo,
+// siguiendo la misma lógica que autoIdMaterial.
+// Solo actúa si el campo ID está vacío o contiene un valor
+// que parece auto-generado (patrón PREFIX-NN).
+// Si el equipo ya tiene un ID manual, no lo toca.
+// ============================================================
+function generarIdEquipo(tipo) {
+  if (!tipo || tipo === 'Otro') return '';
+  const stopWords = ['de','del','la','las','los','el','en','y','a','con','para','por'];
+  const palabras = tipo.split(/[\s/]+/).filter(p => p.length > 1 && !stopWords.includes(p.toLowerCase()));
+  let prefix = '';
+  if (palabras.length >= 2)       prefix = (palabras[0].slice(0, 2) + palabras[1].slice(0, 1)).toUpperCase();
+  else if (palabras.length === 1) prefix = palabras[0].slice(0, 3).toUpperCase();
+  else                            prefix = tipo.slice(0, 3).toUpperCase();
+
+  const existing = DATA.equipos
+    .map(e => e.ID_Activo)
+    .filter(id => id && id.startsWith(prefix + '-'))
+    .map(id => parseInt(id.split('-')[1]) || 0);
+  const nextNum = existing.length > 0 ? Math.max(...existing) + 1 : 1;
+  return prefix + '-' + String(nextNum).padStart(2, '0');
+}
+
+function autoIdEquipo(tipo) {
+  const idField = document.getElementById('eq-id');
+  if (!idField) return;
+  const currentVal = idField.value;
+  // Solo sobreescribir si está vacío o si el valor actual parece auto-generado
+  const autoPattern = /^[A-Z]{2,4}-\d{2,}$/;
+  if (currentVal && !autoPattern.test(currentVal)) return;
+  const newId = generarIdEquipo(tipo);
+  if (newId) idField.value = newId;
+}
+
+// ============================================================
 // GUARDAR EQUIPO
 // ============================================================
 function calcProximoPreventivo(ultimoPreventivo, periodicidad) {
@@ -622,9 +669,18 @@ function calcProximoPreventivo(ultimoPreventivo, periodicidad) {
 }
 
 async function guardarEquipo() {
-  const id = v('eq-id'); const tipo = v('eq-tipo'); const marca = v('eq-marca');
-  if (!id || !tipo) { showToast('ID y tipo son obligatorios', 'error'); return; }
-  if (!marca)       { showToast('La marca es obligatoria', 'error'); return; }
+  let id = v('eq-id');
+  const tipo  = v('eq-tipo');
+  const marca = v('eq-marca');
+  if (!tipo)  { showToast('El tipo de equipo es obligatorio', 'error'); return; }
+  if (!marca) { showToast('La marca es obligatoria', 'error'); return; }
+  // Auto-generar ID si el campo está vacío (solo en creación)
+  if (!id && !editingRow) {
+    id = generarIdEquipo(tipo);
+    if (!id) { showToast('No se pudo generar ID automático. Indícalo manualmente.', 'error'); return; }
+    sv('eq-id', id);
+  }
+  if (!id) { showToast('El ID del equipo es obligatorio', 'error'); return; }
 
   const ultimo = v('eq-ultimo-preventivo');
   const periodicidad = v('eq-periodicidad');

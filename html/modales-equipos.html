@@ -13,7 +13,7 @@
         </div>
         <div class="form-group">
           <label>Tipo de equipo *</label>
-          <select id="eq-tipo" onchange="toggleTipoEquipoLibre(this.value)">
+          <select id="eq-tipo" onchange="toggleTipoEquipoLibre(this.value); autoIdEquipo(this.value)">
             <option value="">Seleccionar...</option>
             <option>Agitador / Vórtex</option>
             <option>Autoclave</option>
