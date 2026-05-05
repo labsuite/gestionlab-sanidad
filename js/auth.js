@@ -9,7 +9,7 @@
 //   - Los datos del usuario (email, nombre, foto) se guardan 1 año en
 //     localStorage.
 //   - Al recargar: si conocemos al usuario pero el token caducó, se
-//     lanza requestAccessToken({ prompt:'' }) — renovación silenciosa.
+//     lanza requestAccessToken({ prompt:'' }) — renovación silenciosa.h
 //     Google completa sin mostrar ningún diálogo si la sesión de Google
 //     sigue activa en el navegador (el caso habitual).
 //   - Solo se muestra la pantalla de login si el usuario se desconectó
@@ -205,7 +205,7 @@ async function getUserInfo() {
 function _mostrarPantallaLogin() {
   const app  = document.getElementById('app');
   const auth = document.getElementById('auth-screen');
-  if (app)  app.style.display  = 'none';
+  const noAuth = document.getElementById('no-auth-screen'); if (noAuth) noAuth.style.display = 'none'; if (app)  app.style.display  = 'none';
   if (auth) auth.style.display = 'flex';
 }
 
