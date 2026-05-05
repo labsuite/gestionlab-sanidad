@@ -9,7 +9,8 @@ const _estadoBadge = {
   'Añadida a pedido':       'badge-blue',
   'En espera de recepción': 'badge-blue',
   'Recibido':               'badge-green',
-  'Rechazado':              'badge-red'
+  'Rechazado':              'badge-red',
+  'Cancelado':              'badge-gray'
 };
 const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
 
@@ -39,6 +40,7 @@ function _renderFilaSolicitud(s, rol, trExtra) {
       ${mostrarVerPedido ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
       ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
       ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
+      ${puedeEditar ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
     </div></td>
   </tr>`;
 }
@@ -79,8 +81,8 @@ function renderSolicitudes() {
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = '';
 
-  const ORDEN  = ['Pendiente', 'Añadida a pedido', 'En espera de recepción', 'Recibido', 'Rechazado'];
-  const ICONOS = { 'Pendiente': '⏳', 'Añadida a pedido': '🛒', 'En espera de recepción': '🔄', 'Recibido': '✅', 'Rechazado': '❌' };
+  const ORDEN  = ['Pendiente', 'Añadida a pedido', 'En espera de recepción', 'Recibido', 'Rechazado', 'Cancelado'];
+  const ICONOS = { 'Pendiente': '⏳', 'Añadida a pedido': '🛒', 'En espera de recepción': '🔄', 'Recibido': '✅', 'Rechazado': '❌', 'Cancelado': '🚫' };
   // key: solo alfanumérico y guión, sin tildes ni espacios
   const toKey = str => str.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
 
