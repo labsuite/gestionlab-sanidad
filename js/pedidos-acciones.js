@@ -63,6 +63,24 @@ async function rechazarSolicitud(solId) {
   hideLoading();
 }
 
+async function cancelarSolicitud(solId) {
+  if (!confirm('¿Cancelar esta solicitud? Se marcará como Cancelada.')) return;
+  const idx = DATA.solicitudes.findIndex(s => s.ID_Solicitud === solId);
+  if (idx === -1) return;
+  const sol = DATA.solicitudes[idx];
+  if (sol.Estado !== 'Pendiente') { showToast('Solo se pueden cancelar solicitudes Pendientes', 'error'); return; }
+  DATA.solicitudes[idx].Estado = 'Cancelado';
+  showLoading('Actualizando...');
+  try {
+    const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada,
+      sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido,
+      'Cancelado', sol.Lista_Pedido, sol.Observaciones];
+    await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+    showToast('Solicitud cancelada', 'success'); renderSolicitudes();
+  } catch(e) { showToast('Error', 'error'); }
+  hideLoading();
+}
+
 async function solicitudAPedido(solId) {
   const pedidosAbiertos = DATA.pedidos.filter(p => p.Estado === 'Abierto');
   if (!pedidosAbiertos.length) {
@@ -217,7 +235,7 @@ async function guardarEstadoPedido() {
     const MAPA_SOL = {
       'Presupuesto aprobado': 'En espera de recepción',
     }
-    const ESTADOS_FINALES_SOL = ['Recibido', 'Rechazado'];
+    const ESTADOS_FINALES_SOL = ['Recibido', 'Rechazado', 'Cancelado'];
     const nuevoEstadoSol = MAPA_SOL[nuevoEstado];
     if (nuevoEstadoSol) {
       const solsVinculadas = DATA.solicitudes.filter(s =>
