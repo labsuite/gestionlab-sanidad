@@ -171,3 +171,34 @@ async function loadAllData() {
   }
   hideLoading();
 }
+
+// ── sheetsDeleteRow ──────────────────────────────────────────
+// Elimina físicamente una fila de una hoja (rowIndex: 0-based en DATA, sin contar cabecera).
+// Obtiene el sheetId numérico dinámicamente para no depender de IDs hardcodeados.
+async function sheetsDeleteRow(sheetName, rowIndex) {
+  const meta = await authFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`
+  );
+  const data = await meta.json();
+  const sheet = data.sheets.find(s => s.properties.title === sheetName);
+  if (!sheet) throw new Error(`Hoja "${sheetName}" no encontrada`);
+  const sheetId = sheet.properties.sheetId;
+  await authFetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          deleteDimension: {
+            range: { sheetId, dimension: 'ROWS',
+              startIndex: rowIndex + 1,  // +1 por la fila de cabecera
+              endIndex:   rowIndex + 2
+            }
+          }
+        }]
+      })
+    }
+  );
+}
+ñí
