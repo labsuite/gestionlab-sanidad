@@ -45,7 +45,7 @@ function _renderFilaSolicitud(s, rol, trExtra) {
   </tr>`;
 }
 
-const _seccionesColapsadas = new Set();
+const _seccionesColapsadas = new Set(['recibido', 'rechazado', 'cancelado']);
 
 function toggleSeccionSolicitud(key) {
   const rows = document.querySelectorAll('[data-sec="' + key + '"]');
@@ -61,7 +61,7 @@ function toggleSeccionSolicitud(key) {
   }
 }
 
-function renderSolicitudes() {
+function renderSolicitudes(filtroEstado = '') {
   const tbody = document.getElementById('tabla-solicitudes');
   if (!tbody) return;
   const rol = getUserRole();
@@ -77,6 +77,8 @@ function renderSolicitudes() {
     const anio = s.Fecha ? new Date(s.Fecha).getFullYear() : _anioActual;
     return anio >= _anioActual - 1;
   });
+
+  if (filtroEstado) items = items.filter(s => s.Estado === filtroEstado);
 
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
   if (toggleContainer) toggleContainer.innerHTML = '';
@@ -115,7 +117,7 @@ function renderSolicitudes() {
   _actualizarBadgeSolicitudes();
 }
 
-function filtrarSolicitudesEstado() { renderSolicitudes(); }
+function filtrarSolicitudesEstado(val) { renderSolicitudes(val || ''); }
 
 function _actualizarBadgeSolicitudes() {
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
