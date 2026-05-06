@@ -209,12 +209,19 @@ function _mostrarPantallaLogin() {
   if (auth) auth.style.display = 'flex';
 }
 
-// scheduleTokenRenewal es llamado desde showApp() en ui.js.
-// Con GIS no necesitamos timers: authFetch detecta el 401
-// automáticamente cuando el token expira de verdad.
-function scheduleTokenRenewal() { /* no-op con flujo GIS */ }
+// scheduleTokenRenewal — llamado desde showApp() en ui.js.
+// Renueva el token silenciosamente 5 min antes de que caduque (~55 min),
+// evitando que authFetch encuentre un 401 durante el uso normal.
+function scheduleTokenRenewal() {
+  setTimeout(() => {
+    if (tokenClient && loadSavedUser()) {
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
+  }, 50 * 60 * 1000); // 50 min — 5 antes de la caducidad real
+}
 
 // Stub de compatibilidad
 function renewTokenPromise() {
   return Promise.reject(new Error('Usar signIn() para renovar'));
 }
+óá
