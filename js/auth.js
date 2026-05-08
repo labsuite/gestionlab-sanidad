@@ -126,7 +126,8 @@ async function initAuth() {
   // Caso 2: token caducado pero usuario conocido → silent re-auth (sin diálogo)
   if (savedUser) {
     currentUser = savedUser;
-    tokenClient.requestAccessToken({ prompt: '' });
+    // Sin prompt: Google autentica silenciosamente si puede; hint preselecciona la cuenta
+    tokenClient.requestAccessToken({ hint: savedUser.email });
     return; // _onTokenReceived gestionará el resultado
   }
 
@@ -229,7 +230,8 @@ function _mostrarPantallaLogin() {
 function scheduleTokenRenewal() {
   setTimeout(() => {
     if (tokenClient && loadSavedUser()) {
-      tokenClient.requestAccessToken({ prompt: '' });
+      const u = loadSavedUser();
+      tokenClient.requestAccessToken(u?.email ? { hint: u.email } : {});
     }
   }, 50 * 60 * 1000); // 50 min — 5 antes de la caducidad real
 }
