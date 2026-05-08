@@ -138,15 +138,29 @@ async function initAuth() {
 
 async function _onTokenReceived(response) {
   if (response.error) {
-    console.error('Error OAuth:', response);
-    // Silent re-auth fallida (sesión Google caducada) → limpiar y pedir login
-    if (response.error !== 'access_denied') {
-      showToast('Sesión expirada. Vuelve a iniciar sesión.', 'error');
-    }
-    clearFullSession();
-    currentUser = null;
+    console.warn('OAuth error:', response.error);
+    clearSession(); // Solo borra el token, conserva datos de usuario
     accessToken = null;
-    _mostrarPantallaLogin();
+
+    if (response.error === 'access_denied') {
+      // El usuario rechazó explícitamente → logout completo
+      clearFullSession();
+      currentUser = null;
+      _mostrarPantallaLogin();
+      return;
+    }
+
+    // Re-auth silenciosa fallida (Google necesita interacción del usuario).
+    // Relanzamos con hint del email guardado: el popup abre con la cuenta
+    // preseleccionada y el usuario solo tiene que hacer clic en "Continuar".
+    const hint = currentUser?.email;
+    currentUser = null; // Se recupera en getUserInfo tras el nuevo token
+    if (hint && tokenClient) {
+      tokenClient.requestAccessToken({ hint });
+    } else {
+      clearFullSession();
+      _mostrarPantallaLogin();
+    }
     return;
   }
 
