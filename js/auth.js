@@ -19,7 +19,8 @@ const TOKEN_STORAGE_KEY = 'gestionlab_token';
 const USER_STORAGE_KEY  = 'gestionlab_user';
 const USER_EXPIRY_DAYS  = 365;
 
-let tokenClient = null;
+let tokenClient    = null;
+let _silentRenewal = false; // true cuando el token request es renovación de fondo
 
 // ── Sesión persistente en localStorage ──────────────────────
 
@@ -126,8 +127,7 @@ async function initAuth() {
   // Caso 2: token caducado pero usuario conocido → silent re-auth (sin diálogo)
   if (savedUser) {
     currentUser = savedUser;
-    // Sin prompt: Google autentica silenciosamente si puede; hint preselecciona la cuenta
-    tokenClient.requestAccessToken({ hint: savedUser.email });
+    tokenClient.requestAccessToken({ prompt: 'none', hint: savedUser.email });
     return; // _onTokenReceived gestionará el resultado
   }
 
@@ -139,23 +139,31 @@ async function initAuth() {
 
 async function _onTokenReceived(response) {
   if (response.error) {
-    console.warn('OAuth error:', response.error);
-    clearSession(); // Solo borra el token, conserva datos de usuario
+    console.warn('OAuth error:', response.error, '| silent renewal:', _silentRenewal);
+    const wasSilentRenewal = _silentRenewal;
+    _silentRenewal = false;
+    clearSession();
     accessToken = null;
 
+    if (wasSilentRenewal) {
+      // Renovación de fondo fallida — no interrumpir al usuario con popup.
+      // Mostrar toast discreto con botón para que renueve cuando le convenga.
+      mostrarToastConAccion('Tu sesión está a punto de expirar.', 'Renovar', signIn, 12000);
+      // Reintentar renovación silenciosa en 10 min
+      setTimeout(scheduleTokenRenewal, 10 * 60 * 1000);
+      return;
+    }
+
     if (response.error === 'access_denied') {
-      // El usuario rechazó explícitamente → logout completo
       clearFullSession();
       currentUser = null;
       _mostrarPantallaLogin();
       return;
     }
 
-    // Re-auth silenciosa fallida (Google necesita interacción del usuario).
-    // Relanzamos con hint del email guardado: el popup abre con la cuenta
-    // preseleccionada y el usuario solo tiene que hacer clic en "Continuar".
+    // Carga inicial silenciosa fallida → mostrar popup con cuenta preseleccionada
     const hint = currentUser?.email;
-    currentUser = null; // Se recupera en getUserInfo tras el nuevo token
+    currentUser = null;
     if (hint && tokenClient) {
       tokenClient.requestAccessToken({ hint });
     } else {
@@ -164,6 +172,8 @@ async function _onTokenReceived(response) {
     }
     return;
   }
+
+  _silentRenewal = false;
 
   accessToken = response.access_token;
   try {
@@ -231,7 +241,8 @@ function scheduleTokenRenewal() {
   setTimeout(() => {
     if (tokenClient && loadSavedUser()) {
       const u = loadSavedUser();
-      tokenClient.requestAccessToken(u?.email ? { hint: u.email } : {});
+      _silentRenewal = true;
+      tokenClient.requestAccessToken({ prompt: 'none', hint: u?.email || '' });
     }
   }, 50 * 60 * 1000); // 50 min — 5 antes de la caducidad real
 }

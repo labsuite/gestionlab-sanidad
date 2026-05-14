@@ -46,14 +46,14 @@ function showToast(msg, type = '') {
   setTimeout(() => t.remove(), 3000);
 }
 
-function mostrarToastConAccion(msg, labelBtn, callback) {
+function mostrarToastConAccion(msg, labelBtn, callback, duracion = 5000) {
   const c = document.getElementById('toasts');
   const t = document.createElement('div');
   t.className = 'toast success';
   t.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px';
   t.innerHTML = `<span>${msg}</span><button onclick="this.closest('.toast').remove();(${callback})()" style="background:rgba(255,255,255,0.25);border:1px solid rgba(255,255,255,0.4);color:inherit;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:12px;white-space:nowrap">${labelBtn}</button>`;
   c.appendChild(t);
-  setTimeout(() => t.remove(), 5000);
+  setTimeout(() => t.remove(), duracion);
 }
 
 function formatDate(d) {
