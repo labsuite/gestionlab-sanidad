@@ -350,13 +350,24 @@ let _pendientesCache = []; // para que filtrarPendientes() pueda acceder sin re-
 
 function _detectarLabEquipo(eq) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === eq.Ubicacion);
-  if (!u) return 'Otros';
-  const txt = [u.ID_Ubicacion, u.Laboratorio_Aula, u.Zona, u.Subzona, u.Descripcion_Completa].join(' ').toLowerCase();
-  if (txt.includes('207')) return 'LAB 207';
-  if (txt.includes('205')) return 'LAB 205';
-  if (txt.includes('203')) return 'LAB 203';
-  if (txt.includes('201')) return 'LAB 201';
+  if (u && u.Laboratorio_Aula) return u.Laboratorio_Aula; // "201", "205", "205 - Zona común"…
+  // Fallback: inferir del ID de ubicación si no se encontró la fila
+  const id = (eq.Ubicacion || '').toLowerCase();
+  if (id.startsWith('207')) return '207';
+  if (id.startsWith('205')) return '205';
+  if (id.startsWith('203')) return '203';
+  if (id.startsWith('201')) return '201';
   return 'Otros';
+}
+
+// Mapea el valor real de Laboratorio_Aula a la hoja Excel correspondiente
+function _labAHoja(labAula) {
+  const s = String(labAula || '');
+  if (s.includes('207')) return 'LAB 207';
+  if (s.includes('205')) return 'LAB 205'; // incluye "205 - Zona común"
+  if (s.includes('203')) return 'LAB 203';
+  if (s.includes('201')) return 'LAB 201';
+  return null;
 }
 
 function renderMantenimiento() {
@@ -424,8 +435,8 @@ function renderMantenimiento() {
           <div class="card-actions">
             <select id="filter-pend-lab" onchange="filtrarPendientes()" style="font-size:12px">
               <option value="">Todos los labs</option>
-              ${['LAB 201','LAB 203','LAB 205','LAB 207','Otros']
-                .filter(l => pendientesList.some(s => s.lab === l))
+              ${[...new Set(pendientesList.map(s => s.lab))]
+                .filter(l => l && l !== 'Otros').sort()
                 .map(l => `<option value="${l}">${l}</option>`).join('')}
             </select>
             <select id="filter-pend-periodo" onchange="filtrarPendientes()" style="font-size:12px">
@@ -588,13 +599,11 @@ async function exportarModeloCalidad(cursoAcademico) {
   }
 
   // Una fila por equipo × tipo (Interno/Externo), con todas las fechas en la misma celda
-  const LAB_SHEETS = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207'];
-  const porLab = {};
-  LAB_SHEETS.forEach(l => porLab[l] = []);
+  const porLab = { 'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [] };
 
   DATA.equipos.forEach(eq => {
-    const lab = _detectarLabEquipo(eq);
-    if (!LAB_SHEETS.includes(lab)) return;
+    const hoja = _labAHoja(_detectarLabEquipo(eq));
+    if (!hoja) return;
     const planesEq = planesActivos.filter(p => p.ID_Equipo === eq.ID_Activo);
     if (!planesEq.length) return;
 
@@ -620,7 +629,7 @@ async function exportarModeloCalidad(cursoAcademico) {
         .filter(Boolean)
         .join(', ');
 
-      porLab[lab].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas });
+      porLab[hoja].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas });
     });
   });
 
