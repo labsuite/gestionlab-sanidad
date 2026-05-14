@@ -587,7 +587,7 @@ async function exportarModeloCalidad(cursoAcademico) {
     return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(', ');
   }
 
-  // Una fila por plan × periodo, todos los equipos con planes activos
+  // Una fila por equipo × tipo (Interno/Externo), con todas las fechas en la misma celda
   const LAB_SHEETS = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207'];
   const porLab = {};
   LAB_SHEETS.forEach(l => porLab[l] = []);
@@ -596,11 +596,31 @@ async function exportarModeloCalidad(cursoAcademico) {
     const lab = _detectarLabEquipo(eq);
     if (!LAB_SHEETS.includes(lab)) return;
     const planesEq = planesActivos.filter(p => p.ID_Equipo === eq.ID_Activo);
-    planesEq.forEach(plan => {
-      getPeriodosCursoCompleto(plan, eq).forEach(periodo => {
-        const reg = getRegistroMant(plan.ID_Plan, curso, periodo);
-        porLab[lab].push({ eq, plan, periodo, reg });
-      });
+    if (!planesEq.length) return;
+
+    ['Interno', 'Externo'].forEach(tipo => {
+      const planesDelTipo = planesEq.filter(p => p.Tipo_Intervencion === tipo);
+      if (!planesDelTipo.length) return;
+
+      const operaciones    = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
+      const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
+
+      // Todos los periodos esperados del curso completo (incluidos futuros)
+      const todosPeriodos = planesDelTipo.flatMap(p => getPeriodosCursoCompleto(p, eq));
+      const periodosUnicos = [...new Set(todosPeriodos)].sort();
+
+      const previstas  = periodosUnicos.map(p => labelPeriodo(p)).join(', ');
+      const realizadas = periodosUnicos
+        .map(p => {
+          const regs = planesDelTipo
+            .map(pl => getRegistroMant(pl.ID_Plan, curso, p))
+            .filter(Boolean);
+          return regs.length ? formatDate(regs[0].Fecha_Realizacion) : '';
+        })
+        .filter(Boolean)
+        .join(', ');
+
+      porLab[lab].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas });
     });
   });
 
@@ -656,18 +676,18 @@ async function exportarModeloCalidad(cursoAcademico) {
     const items = porLab[labKey] || [];
     let xml = await zip.file(sheetFile).async('string');
 
-    items.forEach(({ eq, plan, periodo, reg }, i) => {
+    items.forEach(({ eq, tipo, operaciones, periodicidades, previstas, realizadas }, i) => {
       const r = DATA_ROW + i;
       xml = fillCell(xml, `A${r}`, denominacion(eq));
       xml = fillCell(xml, `B${r}`, ubicacionTexto(eq.Ubicacion));
       xml = fillCell(xml, `C${r}`, eq.Responsable || '');
-      xml = fillCell(xml, `D${r}`, plan.Tipo_Intervencion);
-      xml = fillCell(xml, `E${r}`, plan.Periodicidad);
-      xml = fillCell(xml, `F${r}`, plan.Operacion);
-      xml = fillCell(xml, `G${r}`, labelPeriodo(periodo));
-      xml = fillCell(xml, `H${r}`, reg ? formatDate(reg.Fecha_Realizacion) : '');
+      xml = fillCell(xml, `D${r}`, tipo);
+      xml = fillCell(xml, `E${r}`, periodicidades);
+      xml = fillCell(xml, `F${r}`, operaciones);
+      xml = fillCell(xml, `G${r}`, previstas);
+      xml = fillCell(xml, `H${r}`, realizadas);
       // I (Supervisado por): siempre en blanco
-      xml = fillCell(xml, `J${r}`, reg ? (reg.Observaciones || '') : '');
+      // J (Observacións): en blanco — sin registro único de referencia
     });
 
     zip.file(sheetFile, xml);
