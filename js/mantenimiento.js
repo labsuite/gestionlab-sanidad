@@ -477,41 +477,37 @@ function toggleMantInstr(key) {
 // ============================================================
 // EXPORTAR MODELO DE CALIDAD
 // ============================================================
-function exportarModeloCalidad(cursoAcademico) {
+async function exportarModeloCalidad(cursoAcademico) {
   const curso = cursoAcademico || getCursoAcademico();
   const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso);
   const planesActivos = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
 
-  // Detecta el laboratorio de una ubicación por su texto descriptivo
   function detectarLab(idUbicacion) {
     const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
-    if (!u) return 'Otros';
+    if (!u) return null;
     const txt = [u.ID_Ubicacion, u.Laboratorio_Aula, u.Zona, u.Subzona, u.Descripcion_Completa].join(' ').toLowerCase();
     if (txt.includes('207')) return 'LAB 207';
-    if (txt.includes('205')) return 'LAB 205'; // incluye zona común del 205
+    if (txt.includes('205')) return 'LAB 205';
     if (txt.includes('203')) return 'LAB 203';
     if (txt.includes('201')) return 'LAB 201';
-    return 'Otros';
+    return null;
   }
 
-  // Nombre del equipo para la columna Denominación
   function nombreEquipo(eq) {
     return [eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
   }
 
-  // Nombre de ubicación legible
   function nombreUbicacion(idUbicacion) {
     const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
-    if (!u) return idUbicacion || '—';
+    if (!u) return idUbicacion || '';
     return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ') || idUbicacion;
   }
 
-  // Construir filas: máximo 2 filas por equipo (último Interno + último Externo)
-  const LAB_ORDER = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207', 'Otros'];
+  // Construir filas: máximo 2 por equipo (Interno + Externo)
+  const LAB_SHEETS = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207'];
   const porLab = {};
-  LAB_ORDER.forEach(l => porLab[l] = []);
+  LAB_SHEETS.forEach(l => porLab[l] = []);
 
-  // Agrupar planes por equipo
   const planesPorEquipo = {};
   planesActivos.forEach(plan => {
     if (!planesPorEquipo[plan.ID_Equipo]) planesPorEquipo[plan.ID_Equipo] = [];
@@ -522,23 +518,20 @@ function exportarModeloCalidad(cursoAcademico) {
     const eq = DATA.equipos.find(e => e.ID_Activo === equipoId);
     if (!eq) return;
     const lab = detectarLab(eq.Ubicacion);
+    if (!lab) return;
 
-    // Para cada tipo (Interno / Externo), una sola fila con el último registro
     ['Interno', 'Externo'].forEach(tipo => {
       const planesDelTipo = planes.filter(p => p.Tipo_Intervencion === tipo);
       if (!planesDelTipo.length) return;
 
-      // Operaciones y periodicidades del tipo (para columnas descriptivas)
-      const operaciones  = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
+      const operaciones    = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
       const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
 
-      // Todos los registros de este tipo, ordenados por fecha
       const regsDelTipo = registros
         .filter(r => planesDelTipo.some(p => p.ID_Plan === r.ID_Plan))
         .sort((a, b) => new Date(a.Fecha_Realizacion) - new Date(b.Fecha_Realizacion));
       const ultimoReg = regsDelTipo[regsDelTipo.length - 1] || null;
 
-      // Data prevista: último periodo esperado del plan de referencia
       const planRef = planesDelTipo[0];
       const periodos = getPeriodosEsperados(planRef, eq, curso);
       const prevista = periodos.length ? labelPeriodo(periodos[periodos.length - 1]) : '';
@@ -547,107 +540,68 @@ function exportarModeloCalidad(cursoAcademico) {
     });
   });
 
-  // Generar una sección HTML por laboratorio
-  function seccionLab(labKey, items) {
-    if (!items.length) return '';
-    const total      = items.length;
-    const realizados = items.filter(x => x.reg).length;
-    const pendentes = total - realizados;
-    const pct = total > 0 ? ((realizados / total) * 100).toFixed(0) : 0;
-    const hoy = new Date().toLocaleDateString('es-ES');
+  // Cargar plantilla xlsx
+  if (typeof XLSX === 'undefined') {
+    showToast('La librería Excel no está cargada. Recarga la página.', 'error');
+    return;
+  }
+  showToast('Generando documento…', 'info');
+  let wb;
+  try {
+    const resp = await fetch('./assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const buf = await resp.arrayBuffer();
+    wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellStyles: true });
+  } catch (e) {
+    showToast('No se pudo cargar la plantilla: ' + e.message, 'error');
+    return;
+  }
 
-    const filas = items.map(({ eq, tipo, operaciones, periodicidades, prevista, regs, ultimoReg }) => {
-      const realizada   = regs.map(r => formatDate(r.Fecha_Realizacion)).filter(Boolean).join(', ');
+  const DATA_ROW = 11; // fila 10 = cabecera, fila 11 = primer dato
+
+  LAB_SHEETS.forEach(labKey => {
+    const items = porLab[labKey] || [];
+    const ws = wb.Sheets[labKey];
+    if (!ws) return;
+
+    // Actualizar contadores (J3/J4/J5)
+    const total      = items.length;
+    const realizados = items.filter(x => x.ultimoReg).length;
+    const pendentes  = total - realizados;
+    ws['J3'] = { v: total,      t: 'n' };
+    ws['J4'] = { v: realizados, t: 'n' };
+    ws['J5'] = { v: pendentes,  t: 'n' };
+
+    // Rellenar filas de datos
+    items.forEach(({ eq, tipo, operaciones, periodicidades, prevista, regs, ultimoReg }, i) => {
+      const r = DATA_ROW + i;
+      const realizada   = regs.map(x => formatDate(x.Fecha_Realizacion)).filter(Boolean).join(', ');
       const supervisado = ultimoReg ? (ultimoReg.Supervisado_Por || '') : '';
       const observacions = ultimoReg ? (ultimoReg.Observaciones || '') : '';
-      return `<tr>
-        <td>${nombreEquipo(eq)}</td>
-        <td>${nombreUbicacion(eq.Ubicacion)}</td>
-        <td>${eq.Responsable || ''}</td>
-        <td>${tipo}</td>
-        <td>${periodicidades}</td>
-        <td>${operaciones}</td>
-        <td>${prevista}</td>
-        <td>${realizada}</td>
-        <td>${supervisado}</td>
-        <td>${observacions}</td>
-      </tr>`;
-    }).join('');
 
-    return `
-<div class="lab-section">
-  <div class="lab-header">
-    <div class="lab-title">Plan de Mantemento Preventivo · ${labKey} · CIFP Manuel Antonio · Curso ${curso}</div>
-    <div class="lab-meta">
-      <span><strong>MD84MAN01</strong></span>
-      <span>Data de actualización: ${hoy}</span>
-      <span>Total: <strong>${total}</strong></span>
-      <span>Realizados: <strong>${realizados}</strong></span>
-      <span>Pendentes: <strong>${pendentes}</strong></span>
-      <span>% realizado: <strong>${pct}%</strong></span>
-    </div>
-    <div class="purpose">
-      <strong>Serve para:</strong> Definir as instalacións, equipos e servizos de apoio sometidos ao procedemento de mantemento.
-      Designar responsables específicos. Determinar as frecuencias de control.<br>
-      <em>No caso do mantemento externalizado, o Responsable de mantemento limítase a xestionar a tarefa.</em>
-    </div>
-  </div>
-  <table>
-    <thead><tr>
-      <th>Denominación<br><small>(instalación, equipo, servizo de apoio)</small></th>
-      <th>Ubicación do equipo</th>
-      <th>Responsable<br>Mantemento</th>
-      <th>Mantemento<br>Interno/Externo</th>
-      <th>Periodicidade</th>
-      <th>Operación a realizar</th>
-      <th>Data prevista de realización</th>
-      <th>Data de realización</th>
-      <th>Supervisado por</th>
-      <th>Observacións</th>
-    </tr></thead>
-    <tbody>${filas}</tbody>
-  </table>
-</div>`;
-  }
+      const s = v => ({ v: v || '', t: 's' });
+      ws[`A${r}`] = s(nombreEquipo(eq));
+      ws[`B${r}`] = s(nombreUbicacion(eq.Ubicacion));
+      ws[`C${r}`] = s(eq.Responsable || '');
+      ws[`D${r}`] = s(tipo);
+      ws[`E${r}`] = s(periodicidades);
+      ws[`F${r}`] = s(operaciones);
+      ws[`G${r}`] = s(prevista);
+      ws[`H${r}`] = s(realizada);
+      ws[`I${r}`] = s(supervisado);
+      ws[`J${r}`] = s(observacions);
+    });
 
-  const secciones = LAB_ORDER
-    .filter(lab => porLab[lab] && porLab[lab].length)
-    .map(lab => seccionLab(lab, porLab[lab]))
-    .join('<div class="page-break"></div>');
+    // Ampliar el rango declarado de la hoja
+    if (items.length > 0) {
+      const lastRow = DATA_ROW + items.length - 1;
+      const ref = XLSX.utils.decode_range(ws['!ref'] || 'A1:L10');
+      ref.e.r = Math.max(ref.e.r, lastRow - 1); // 0-indexed
+      ref.e.c = Math.max(ref.e.c, 11);           // hasta col L (índice 11)
+      ws['!ref'] = XLSX.utils.encode_range(ref);
+    }
+  });
 
-  const html = `<!DOCTYPE html>
-<html lang="gl"><head><meta charset="UTF-8">
-<title>Plan de Mantemento Preventivo – ${curso} – CIFP Manuel Antonio</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 10px; margin: 16px; color: #111; }
-  .lab-section { margin-bottom: 32px; }
-  .lab-header { margin-bottom: 8px; }
-  .lab-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
-  .lab-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 10px; margin-bottom: 6px; color: #333; }
-  .purpose { font-size: 9px; color: #555; border: 1px solid #ccc; padding: 6px 8px; margin-top: 6px; background: #fafafa; }
-  table { width: 100%; border-collapse: collapse; }
-  thead tr { background: #1a3a6e; color: #fff; }
-  th { padding: 5px 6px; text-align: left; font-size: 9px; border: 1px solid #1a3a6e; }
-  th small { font-weight: normal; opacity: .85; }
-  td { border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; font-size: 9px; }
-  tr:nth-child(even) td { background: #f5f7fb; }
-  .page-break { page-break-after: always; margin: 0; }
-  @media print {
-    body { margin: 0; font-size: 9px; }
-    .lab-section { page-break-inside: avoid; }
-    .page-break { display: block; page-break-after: always; }
-  }
-</style></head><body>
-${secciones}
-</body></html>`;
-
-  const win = window.open('', '_blank');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 400);
-  } else {
-    showToast('Activa las ventanas emergentes para exportar', 'error');
-  }
+  XLSX.writeFile(wb, `MD84MAN01_Plan_mantemento_${curso}.xlsx`);
+  showToast('Documento generado correctamente', 'success');
 }
