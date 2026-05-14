@@ -138,7 +138,7 @@ async function loadAllData() {
       sheetsGet('Material_Ubicaciones!A2:F'),
       sheetsGet('Historico_Precios!A2:F').catch(() => []),
       sheetsGet('Tareas_Usuario!A2:F').catch(() => []),
-      sheetsGet('Planes_Mantenimiento!A2:F').catch(() => []),
+      sheetsGet('Planes_Mantenimiento!A2:G').catch(() => []),
       sheetsGet('Registro_Mantenimientos!A2:I').catch(() => [])
     ]);
 

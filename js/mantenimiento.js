@@ -164,12 +164,21 @@ function buildMantenimientoEquipo(equipoId) {
                       onclick="event.stopPropagation();openModalRegistrarMant('${plan.ID_Plan}','${equipoId.replace(/'/g,"\\'")}','${periodo}','${curso}')">Registrar</button>`
                   : `<span class="badge badge-orange" style="font-size:10px">Pendiente</span>`);
               const tipoBadge = plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
+              const instrKey = `${plan.ID_Plan}-${periodo}`.replace(/[^a-z0-9]/gi,'_');
+              const instrBtn = plan.Instrucciones
+                ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="Ver instrucciones"
+                    onclick="event.stopPropagation();toggleMantInstr('${instrKey}')">▸ Cómo</button>`
+                : '';
+              const instrDiv = plan.Instrucciones
+                ? `<div id="mant-instr-${instrKey}" style="display:none;grid-column:1/-1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.6;color:var(--text);margin-top:2px">${plan.Instrucciones}</div>`
+                : '';
               return `<div class="mant-plan-row">
                 <span class="badge ${tipoBadge}" style="font-size:10px;min-width:60px">${plan.Tipo_Intervencion||'—'}</span>
                 <span style="font-size:11px;font-weight:500;min-width:90px">${plan.Periodicidad} · ${labelPeriodo(periodo)}</span>
                 <span style="font-size:11px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
+                ${instrBtn}
                 ${badge}
-              </div>`;
+              </div>${instrDiv}`;
             }).join('');
           }).join('')}
         </div>
@@ -188,11 +197,17 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
   if (!plan || !equipo) return;
 
   const nombreEquipo = `${equipo.ID_Activo} – ${equipo.Tipo_Equipo || ''} ${equipo.Marca || ''}`.trim();
+  const instrHtml = plan.Instrucciones ? `
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Instrucciones paso a paso</div>
+      <div style="white-space:pre-line;line-height:1.7;color:var(--text)">${plan.Instrucciones}</div>
+    </div>` : '';
   document.getElementById('mant-info-plan').innerHTML = `
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.6">
       <div><strong>Equipo:</strong> ${nombreEquipo}</div>
       <div><strong>Operación:</strong> ${plan.Operacion}</div>
       <div><strong>Tipo:</strong> ${plan.Tipo_Intervencion} · ${plan.Periodicidad} · ${labelPeriodo(periodo)}</div>
+      ${instrHtml}
     </div>`;
 
   document.getElementById('mant-id-plan').value    = idPlan;
@@ -262,37 +277,39 @@ function openModalPlan(equipoId, idPlan = null) {
   if (idPlan) {
     const plan = DATA.planesMantenimiento.find(p => p.ID_Plan === idPlan);
     if (plan) {
-      document.getElementById('plan-tipo-int').value    = plan.Tipo_Intervencion;
-      document.getElementById('plan-periodicidad').value = plan.Periodicidad;
-      document.getElementById('plan-operacion').value   = plan.Operacion;
+      document.getElementById('plan-tipo-int').value      = plan.Tipo_Intervencion;
+      document.getElementById('plan-periodicidad').value  = plan.Periodicidad;
+      document.getElementById('plan-operacion').value     = plan.Operacion;
+      document.getElementById('plan-instrucciones').value = plan.Instrucciones || '';
     }
   } else {
-    document.getElementById('plan-tipo-int').value    = 'Interno';
-    document.getElementById('plan-periodicidad').value = 'Anual';
-    document.getElementById('plan-operacion').value   = '';
+    document.getElementById('plan-tipo-int').value      = 'Interno';
+    document.getElementById('plan-periodicidad').value  = 'Anual';
+    document.getElementById('plan-operacion').value     = '';
+    document.getElementById('plan-instrucciones').value = '';
   }
   openModal('modal-gestionar-plan');
 }
 
 async function guardarPlan() {
-  const tipo      = document.getElementById('plan-tipo-int').value;
-  const period    = document.getElementById('plan-periodicidad').value;
-  const operacion = document.getElementById('plan-operacion').value.trim();
-  if (!operacion) { showToast('Describe la operación a realizar', 'error'); return; }
+  const tipo         = document.getElementById('plan-tipo-int').value;
+  const period       = document.getElementById('plan-periodicidad').value;
+  const operacion    = document.getElementById('plan-operacion').value.trim();
+  const instrucciones= document.getElementById('plan-instrucciones').value.trim();
+  if (!operacion) { showToast('Escribe el título de la operación', 'error'); return; }
 
   showLoading('Guardando...');
   try {
     if (_planEditingId) {
-      // Update existing
       const idx = DATA.planesMantenimiento.findIndex(p => p.ID_Plan === _planEditingId);
       if (idx !== -1) {
-        const row = [_planEditingId, _planEditingEquipoId, tipo, period, operacion, 'TRUE'];
-        await sheetsUpdate(`Planes_Mantenimiento!A${idx + 2}:F${idx + 2}`, row);
+        const row = [_planEditingId, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones];
+        await sheetsUpdate(`Planes_Mantenimiento!A${idx + 2}:G${idx + 2}`, row);
         DATA.planesMantenimiento[idx] = rowToObj(row, 'planesMantenimiento');
       }
     } else {
       const id  = genId('PM');
-      const row = [id, _planEditingEquipoId, tipo, period, operacion, 'TRUE'];
+      const row = [id, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones];
       await sheetsAppend('Planes_Mantenimiento', row);
       DATA.planesMantenimiento.push(rowToObj(row, 'planesMantenimiento'));
     }
@@ -384,17 +401,22 @@ function renderMantenimiento() {
             </tr></thead>
             <tbody>${pendientesList.map(s => {
               const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
+              const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
+              const instrRow = s.plan.Instrucciones
+                ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
+                : '';
               return `<tr>
                 <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
                 <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
                 <td>${s.plan.Periodicidad}</td>
                 <td>${labelPeriodo(s.periodo)}</td>
-                <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
-                <td>${canLog
-                  ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
-                      onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>`
-                  : ''}</td>
-              </tr>`;
+                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
+                <td style="white-space:nowrap">
+                  ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
+                  ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
+                      onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
+                </td>
+              </tr>${instrRow}`;
             }).join('')}</tbody>
           </table>`}
     </div>
@@ -444,6 +466,12 @@ function _renderFilasPlanesTabla(filtro = '') {
 function filtrarPlanesTabla(val) {
   const tbody = document.querySelector('#tabla-planes-mant tbody');
   if (tbody) tbody.innerHTML = _renderFilasPlanesTabla(val);
+}
+
+function toggleMantInstr(key) {
+  const el = document.getElementById(`mant-instr-${key}`);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? '' : 'none';
 }
 
 // ============================================================
@@ -501,7 +529,7 @@ function exportarModeloCalidad(cursoAcademico) {
         <td>${eq.Responsable || ''}</td>
         <td>${plan.Tipo_Intervencion || ''}</td>
         <td>${plan.Periodicidad || ''}${periodo ? ' · ' + labelPeriodo(periodo) : ''}</td>
-        <td style="max-width:300px">${plan.Operacion || ''}</td>
+        <td style="max-width:300px;white-space:pre-line">${plan.Instrucciones || plan.Operacion || ''}</td>
         <td>${periodo ? labelPeriodo(periodo) : ''}</td>
         <td>${reg ? formatDate(reg.Fecha_Realizacion) : ''}</td>
         <td>${reg ? (reg.Supervisado_Por || reg.Realizado_Por || '') : ''}</td>

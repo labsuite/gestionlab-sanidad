@@ -69,8 +69,13 @@
           </select>
         </div>
         <div class="form-group full">
-          <label>Operación a realizar *</label>
-          <textarea id="plan-operacion" rows="4" placeholder="Describe detalladamente la operación de mantenimiento..."></textarea>
+          <label>Título de la operación *</label>
+          <input id="plan-operacion" type="text" placeholder="Ej: Limpieza de componentes ópticos">
+        </div>
+        <div class="form-group full">
+          <label>Instrucciones paso a paso</label>
+          <textarea id="plan-instrucciones" rows="8" placeholder="Escribe los pasos que debe seguir el responsable para realizar este mantenimiento. Puedes usar líneas separadas para cada paso.&#10;&#10;Ej:&#10;1. Apagar el equipo y desenchufarlo.&#10;2. Limpiar la superficie con paño húmedo y jabón neutro.&#10;3. ..."></textarea>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Estas instrucciones aparecerán en la app cuando toque registrar el mantenimiento.</div>
         </div>
       </div>
       <div class="form-footer">
