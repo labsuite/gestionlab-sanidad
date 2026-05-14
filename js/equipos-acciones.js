@@ -327,6 +327,9 @@ async function guardarPlanificacion() {
 function openModalRegistrarActuacion(intIdx) {
   _pendingActFileBase64 = null;
   removeActFile();
+  sv('act-equipo-directo', '');
+  const tipoGrp = document.getElementById('act-tipo-int-group');
+  if (tipoGrp) tipoGrp.style.display = 'none';
   const i = DATA.intervenciones[intIdx];
   sv('act-int-id',  i.ID_Intervencion);
   sv('act-int-idx', String(intIdx));
@@ -378,18 +381,56 @@ function toggleActResultado(val) {
 }
 
 async function guardarActuacion() {
-  const intIdx   = parseInt(v('act-int-idx'));
+  const equipoDirecto = v('act-equipo-directo');
   const fechaReal = v('act-fecha-real');
   const desc      = v('act-descripcion');
   if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
   if (!desc)      { showToast('La descripción es obligatoria', 'error'); return; }
 
-  const tipoEjec = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
+  const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
   const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
   const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
-  const resultado = v('act-resultado');
-  const operativo = v('act-operativo');
+  const resultado    = v('act-resultado');
+  const operativo    = v('act-operativo');
+  const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
 
+  // ── MODO DIRECTO: crear nueva intervención desde el equipo ───────────────
+  if (equipoDirecto) {
+    const tipoInt = v('act-tipo-int') || 'Correctivo';
+    const nuevoId = genId('INT-');
+    let urlAdjunto = '', nombreAdjunto = '';
+    if (_pendingActFileBase64) {
+      showLoading('Subiendo documento...');
+      try {
+        urlAdjunto    = await uploadFileToDrive(_pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
+        nombreAdjunto = _pendingActFileBase64.name;
+      } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
+      _pendingActFileBase64 = null;
+    }
+    const nuevoEstado = (tipoEjec === 'Externa' && resultado === 'Resuelto') ? 'Pendiente factura' : 'Cerrada';
+    const row = [
+      nuevoId, equipoDirecto, tipoInt, 'Manual', '',
+      fechaReal, realizadoPor, '', proveedorExt, desc,
+      resultado, operativo, urlAdjunto, '', '',
+      v('act-observaciones'), nombreAdjunto, nuevoEstado, '', coste
+    ];
+    showLoading('Guardando intervención...');
+    try {
+      await sheetsAppend('Intervenciones', row);
+      DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
+      if (resultado === 'Resuelto') {
+        try { await actualizarEstadoEquipo(equipoDirecto, operativo === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
+      }
+      closeModal('modal-registrar-actuacion');
+      showToast(`Intervención ${nuevoId} registrada`, 'success');
+      renderAll();
+    } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+    hideLoading();
+    return;
+  }
+
+  // ── MODO VINCULADO: actualizar intervención existente ───────────────────
+  const intIdx = parseInt(v('act-int-idx'));
   const i = DATA.intervenciones[intIdx];
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
 
@@ -429,7 +470,6 @@ async function guardarActuacion() {
     ? descAnterior + '\n── ' + fechaReal + ' ──\n' + desc
     : desc;
 
-  const coste = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
   const updatedRow = [
     i.ID_Intervencion,           // A
     i.Equipo,                    // B
@@ -797,6 +837,51 @@ async function cambiarEstadoIncidencia(idx) {
 // ALIAS
 // ============================================================
 function openModalActuacionDerivada(intIdx) { openModalRegistrarActuacion(intIdx); }
+
+function openModalRegistrarActuacionDirecta(equipoId) {
+  _pendingActFileBase64 = null;
+  removeActFile();
+
+  const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
+  const eqLabel = e ? [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ') : equipoId;
+
+  sv('act-equipo-directo', equipoId);
+  sv('act-int-id',  '');
+  sv('act-int-idx', '');
+
+  const label = document.getElementById('act-int-label');
+  const eqLbl = document.getElementById('act-equipo-label');
+  if (label) label.textContent = '(nueva)';
+  if (eqLbl) eqLbl.textContent = eqLabel;
+
+  const tipoGrp = document.getElementById('act-tipo-int-group');
+  if (tipoGrp) tipoGrp.style.display = '';
+
+  sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
+  sv('act-descripcion',   '');
+  sv('act-observaciones', '');
+  sv('act-resultado',     'Resuelto');
+  sv('act-operativo',     'Sí');
+  sv('act-coste',         '');
+  sv('act-pdf-url',       '');
+
+  poblarSelects();
+  const selUser = document.getElementById('act-realizado-por');
+  if (selUser) {
+    selUser.innerHTML = '<option value="">Seleccionar usuario...</option>' +
+      DATA.usuarios.filter(u => u.Activo !== 'FALSE').map(u => `<option value="${u.Nombre}">${u.Nombre}</option>`).join('');
+  }
+  const selProv = document.getElementById('act-proveedor-ext');
+  if (selProv) {
+    selProv.innerHTML = '<option value="">Seleccionar proveedor...</option>' +
+      DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
+  }
+
+  const radInterna = document.getElementById('act-ejec-interna');
+  if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
+
+  openModal('modal-registrar-actuacion');
+}
 
 // ============================================================
 // ADJUNTAR FACTURA Y CERRAR (intervenciones "Pendiente factura")

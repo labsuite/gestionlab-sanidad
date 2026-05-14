@@ -189,7 +189,7 @@ function renderEquipos(filtro, filtroEstado) {
       <td onclick="event.stopPropagation()"><div class="row-actions">
         ${manualLink}
         ${puedeEditarEste ? `<button class="icon-btn" onclick="editEquipo(${DATA.equipos.indexOf(e)})" title="Editar">✏️</button>` : ''}
-        ${puedeIntervenir ? `<button class="icon-btn" onclick="openModalIntervencionEquipo('${e.ID_Activo}')" title="Nueva intervención">🔧</button>` : ''}
+        ${puedeIntervenir ? `<button class="icon-btn" onclick="openModalRegistrarActuacionDirecta('${e.ID_Activo}')" title="Registrar actuación">🔧</button>` : ''}
         ${puedeHacer('crearIncidencias') ? `<button class="icon-btn" onclick="openModalIncidenciaEquipo('${e.ID_Activo}')" title="Reportar incidencia">⚠️</button>` : ''}
       </div></td>
     </tr>
