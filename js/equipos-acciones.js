@@ -171,12 +171,8 @@ function openModalIntervencion() {
   const srch = document.getElementById('int-equipo-search'); if (srch) srch.value = '';
   const sel2 = document.getElementById('int-equipo-selected'); if (sel2) sel2.style.display = 'none';
   const ac = document.getElementById('int-equipo-autocomplete'); if (ac) ac.classList.remove('open');
-  sv('int-tipo','Preventivo'); sv('int-origen','Planificado'); sv('int-resultado','Resuelto');
-  sv('int-operativo','Sí'); sv('int-actualiza-preventivo','Sí'); sv('int-estado-manual','Planificada');
-  const origenSel = document.getElementById('int-origen');
-  if (origenSel) origenSel.disabled = false;
-  const origenNota = document.getElementById('int-origen-nota');
-  if (origenNota) origenNota.style.display = 'none';
+  sv('int-tipo','Correctivo'); sv('int-resultado','Resuelto');
+  sv('int-operativo','Sí'); sv('int-estado-manual','Planificada');
   const grp = document.getElementById('int-equipo-group');
   if (grp) grp.style.display = '';
   poblarSelects(); openModal('modal-intervencion');
@@ -212,12 +208,12 @@ function editIntervencion(idx) {
     if (sel2) sel2.style.display = 'flex';
     if (txt2) txt2.textContent = i.Equipo;
   }
-  sv('int-tipo',i.Tipo); sv('int-origen',i.Origen);
+  sv('int-tipo',i.Tipo);
   sv('int-fecha-plan',i.Fecha_Planificada); sv('int-fecha-real',i.Fecha_Realizacion);
   sv('int-realizado-por',i.Realizado_Por); sv('int-tecnico-ext',i.Tecnico_Externo);
   sv('int-proveedor',i.Proveedor); sv('int-descripcion',i.Descripcion_Actuacion||i.Descripcion_Planificada||'');
   sv('int-resultado',i.Resultado); sv('int-operativo',i.Equipo_Operativo_Tras_Intervencion);
-  sv('int-actualiza-preventivo',i.Actualiza_Proximo_Preventivo); sv('int-observaciones',i.Observaciones);
+  sv('int-observaciones',i.Observaciones);
   sv('int-estado-manual',i.Estado||'Planificada');
   sv('int-pdf-url',i.URL_Adjunto||'');
   if (i.URL_Adjunto) { document.getElementById('int-pdf-preview').style.display = 'flex'; document.getElementById('int-pdf-name').textContent = i.Nombre_Adjunto || 'Documento adjunto'; }
@@ -712,7 +708,7 @@ async function guardarIntervencion() {
 
   const tipo    = v('int-tipo');
   const estado  = v('int-estado-manual') || 'Planificada';
-  const row     = [editingRow ? DATA.intervenciones[editingRow.rowIndex].ID_Intervencion : genId('INT-'), equipo, tipo, v('int-origen'), v('int-fecha-plan'), fechaReal, v('int-realizado-por'), v('int-tecnico-ext'), v('int-proveedor'), desc, v('int-resultado'), v('int-operativo'), urlAdjunto, '', v('int-actualiza-preventivo'), v('int-observaciones'), nombreAdjunto, estado];
+  const row     = [editingRow ? DATA.intervenciones[editingRow.rowIndex].ID_Intervencion : genId('INT-'), equipo, tipo, '', v('int-fecha-plan'), fechaReal, v('int-realizado-por'), v('int-tecnico-ext'), v('int-proveedor'), desc, v('int-resultado'), v('int-operativo'), urlAdjunto, '', '', v('int-observaciones'), nombreAdjunto, estado];
 
   showLoading('Guardando...');
   try {
