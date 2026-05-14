@@ -635,7 +635,13 @@ async function exportarModeloCalidad(cursoAcademico) {
 
   const totalFilas = Object.keys(porLab).reduce((n, l) => n + porLab[l].length, 0);
   if (totalFilas === 0) {
-    showToast('No hay planes activos asignados a ningún laboratorio', 'error');
+    if (planesActivos.length === 0) {
+      showToast('No se cargaron planes desde la hoja Planes_Mantenimiento. Recarga la página.', 'error');
+    } else {
+      const labs = [...new Set(DATA.equipos.map(eq => _detectarLabEquipo(eq)).filter(Boolean))];
+      showToast(`${planesActivos.length} planes activos cargados, pero ningún equipo está en labs reconocidos. Labs detectados: ${labs.join(', ') || 'ninguno'}`, 'error');
+    }
+    console.warn('[exportar] planesActivos:', planesActivos.length, '| porLab:', JSON.stringify(Object.fromEntries(Object.entries(porLab).map(([k,v])=>[k,v.length]))));
     return;
   }
 
