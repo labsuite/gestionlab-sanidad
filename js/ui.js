@@ -6,7 +6,8 @@ async function loadModales() {
     'html/modales-equipos.html',
     'html/modales-catalogo.html',
     'html/modales-material.html',
-    'html/modales-pedidos.html'
+    'html/modales-pedidos.html',
+    'html/modales-mantenimiento.html'
   ];
   try {
     const htmls = await Promise.all(archivos.map(f => fetch(f).then(r => {
@@ -71,6 +72,24 @@ function updateBadges() {
   if (badgeSol) { badgeSol.textContent = pendientes; badgeSol.style.display = pendientes > 0 ? '' : 'none'; }
 }
 
+function _updateBadgeMantenimiento() {
+  const badgeMant = document.getElementById('badge-mantenimiento');
+  if (!badgeMant) return;
+  const curso = getCursoAcademico();
+  let pendientes = 0;
+  DATA.equipos.forEach(eq => {
+    DATA.planesMantenimiento
+      .filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE')
+      .forEach(plan => {
+        getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
+          if (!getRegistroMant(plan.ID_Plan, curso, periodo)) pendientes++;
+        });
+      });
+  });
+  badgeMant.textContent = pendientes;
+  badgeMant.style.display = pendientes > 0 ? '' : 'none';
+}
+
 // ============================================================
 // PERMISOS POR ROL
 // ============================================================
@@ -88,7 +107,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias',
           'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios'],
+          'ubicaciones', 'usuarios', 'mantenimiento'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
@@ -106,7 +125,7 @@ const PERMISOS = {
     configuracion: false, dashboard: true, verTareas: true,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -115,7 +134,7 @@ const PERMISOS = {
     usuarios: true, crearUsuarios: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -147,7 +166,7 @@ function showPage(page) {
     incidencias: 'Incidencias', material: 'Material fungible', movimientos: 'Movimientos de material',
     solicitudes: 'Solicitudes de material', pedidos: 'Pedidos', 'pedido-detalle': 'Detalle del pedido',
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
-    contabilidad: 'Contabilidad'
+    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 }
@@ -250,6 +269,8 @@ function renderAll() {
   aplicarPermisosUI();
   // Auto-archivar solicitudes "Recibido" con más de 1 semana de antigüedad
   if (typeof checkAutoArchivarRecibidas === 'function') checkAutoArchivarRecibidas();
+  renderMantenimiento();
+  _updateBadgeMantenimiento();
 }
 
 // ============================================================

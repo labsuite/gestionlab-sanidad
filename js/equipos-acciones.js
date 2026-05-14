@@ -92,8 +92,9 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
     eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion,
     eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, nuevoEstado,
     eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo,
-    eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||''];
-  await sheetsUpdate(`Equipos!A${eqIdx + 2}:S${eqIdx + 2}`, eqRow);
+    eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||'',
+    eq.Protocolo_Uso||'', eq.Tipo_Mantenimiento||'', eq.Mes_Inicio_Temporada||'', eq.Mes_Fin_Temporada||''];
+  await sheetsUpdate(`Equipos!A${eqIdx + 2}:W${eqIdx + 2}`, eqRow);
 }
 
 // ============================================================
@@ -106,10 +107,11 @@ function openModalEquipo() {
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
   sv('eq-estado','Operativo'); sv('eq-periodicidad','Anual'); sv('eq-pdf-url','');
+  sv('eq-protocolo-uso',''); sv('eq-tipo-mant','Periódico'); sv('eq-mes-inicio',''); sv('eq-mes-fin','');
   document.getElementById('eq-pdf-preview').style.display = 'none';
   document.getElementById('eq-pdf-name').textContent = '';
   if (document.getElementById('eq-pdf-input')) document.getElementById('eq-pdf-input').value = '';
-  togglePeriodicidadCustom('Anual');
+  togglePeriodicidadCustom('Anual'); toggleTipoMant('Periódico');
   // Limpiar autocomplete ubicación
   clearUbicacionEquipo();
   poblarSelects(); openModal('modal-equipo');
@@ -131,6 +133,11 @@ function editEquipo(idx) {
   sv('eq-ultimo-preventivo',e.Fecha_Ultimo_Preventivo); sv('eq-observaciones',e.Observaciones);
   sv('eq-coste', e.Coste||'');
   sv('eq-pdf-url',e.Manual_Ficha_Tecnica||'');
+  sv('eq-protocolo-uso', e.Protocolo_Uso||'');
+  sv('eq-tipo-mant', e.Tipo_Mantenimiento||'Periódico');
+  sv('eq-mes-inicio', e.Mes_Inicio_Temporada||'');
+  sv('eq-mes-fin', e.Mes_Fin_Temporada||'');
+  toggleTipoMant(e.Tipo_Mantenimiento||'Periódico');
   // Restaurar autocomplete de ubicación
   document.getElementById('eq-ubicacion').value = e.Ubicacion || '';
   document.getElementById('eq-ubicacion-search').value = '';
@@ -152,6 +159,11 @@ function editEquipo(idx) {
 function togglePeriodicidadCustom(val) {
   const group = document.getElementById('eq-periodicidad-custom-group');
   if (group) group.style.display = val === 'Personalizada' ? 'flex' : 'none';
+}
+
+function toggleTipoMant(val) {
+  const group = document.getElementById('eq-temporada-group');
+  if (group) group.style.display = val === 'Estacional' ? 'flex' : 'none';
 }
 
 // ============================================================
@@ -695,12 +707,15 @@ async function guardarEquipo() {
     pendingEqFileBase64 = null;
   }
 
-  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), periodicidad, periodicidadCustom, ultimo, proximo, manualUrl, v('eq-observaciones'), v('eq-coste')];
+  const tipoMant = v('eq-tipo-mant');
+  const mesInicio = tipoMant === 'Estacional' ? v('eq-mes-inicio') : '';
+  const mesFin    = tipoMant === 'Estacional' ? v('eq-mes-fin')   : '';
+  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), periodicidad, periodicidadCustom, ultimo, proximo, manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), tipoMant, mesInicio, mesFin];
 
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Equipos') {
-      await sheetsUpdate(`Equipos!A${editingRow.rowIndex + 2}:S${editingRow.rowIndex + 2}`, row);
+      await sheetsUpdate(`Equipos!A${editingRow.rowIndex + 2}:W${editingRow.rowIndex + 2}`, row);
       DATA.equipos[editingRow.rowIndex] = rowToObj(row, 'equipos');
       showToast('Equipo actualizado', 'success');
     } else {

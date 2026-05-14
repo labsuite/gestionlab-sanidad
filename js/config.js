@@ -21,14 +21,15 @@ let DATA = {
   proveedores: [], ubicaciones: [], usuarios: [],
   material: [], movimientos: [], solicitudes: [],
   pedidos: [], lineasPedido: [], ciclosModulos: [],
-  materialUbicaciones: [], historicoPrecio: [], tareas: []
+  materialUbicaciones: [], historicoPrecio: [], tareas: [],
+  planesMantenimiento: [], registroMantenimientos: []
 };
 
 // ============================================================
 // MAPAS DE COLUMNAS
 // ============================================================
 const COLS = {
-  equipos:            ['ID_Activo','Tipo_Equipo','Marca','Modelo','Numero_Serie','Ubicacion','Responsable','Fecha_Adquisicion','Origen_Financiacion','Proveedor_Compra','Proveedor_Servicio_Tecnico','Estado_Operativo','Periodicidad_Mantenimiento','Periodicidad_Custom','Fecha_Ultimo_Preventivo','Fecha_Proximo_Preventivo','Manual_Ficha_Tecnica','Observaciones','Coste'],
+  equipos:            ['ID_Activo','Tipo_Equipo','Marca','Modelo','Numero_Serie','Ubicacion','Responsable','Fecha_Adquisicion','Origen_Financiacion','Proveedor_Compra','Proveedor_Servicio_Tecnico','Estado_Operativo','Periodicidad_Mantenimiento','Periodicidad_Custom','Fecha_Ultimo_Preventivo','Fecha_Proximo_Preventivo','Manual_Ficha_Tecnica','Observaciones','Coste','Protocolo_Uso','Tipo_Mantenimiento','Mes_Inicio_Temporada','Mes_Fin_Temporada'],
   intervenciones:     ['ID_Intervencion','Equipo','Tipo','Origen','Fecha_Planificada','Fecha_Realizacion','Realizado_Por','Tecnico_Externo','Proveedor','Descripcion_Actuacion','Resultado','Equipo_Operativo_Tras_Intervencion','URL_Adjunto','Factura_Asociada','Actualiza_Proximo_Preventivo','Observaciones','Nombre_Adjunto','Estado'],
   incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
@@ -42,7 +43,9 @@ const COLS = {
   ciclosModulos:      ['Ciclo','Modulo'],
   materialUbicaciones:['ID','ID_Material','ID_Ubicacion','Stock_Local','Stock_Minimo_Local','Stock_Optimo_Local'],
   historicoPrecio:    ['ID_Historico','Nombre_Material','ID_Pedido','Proveedor','Fecha','Precio_Unitario'],
-  tareas:             ['ID_Tarea','Email','Texto','Fecha_Limite','Completada','Fecha_Creacion']
+  tareas:             ['ID_Tarea','Email','Texto','Fecha_Limite','Completada','Fecha_Creacion'],
+  planesMantenimiento:    ['ID_Plan','ID_Equipo','Tipo_Intervencion','Periodicidad','Operacion','Activo'],
+  registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones']
 };
 
 function rowToObj(row, type) {

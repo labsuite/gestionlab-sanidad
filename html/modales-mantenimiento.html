@@ -1,0 +1,82 @@
+<!-- Modal Registrar Mantenimiento -->
+<div class="modal-overlay" id="modal-registrar-mant">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Registrar mantenimiento realizado</div>
+      <button class="modal-close" onclick="closeModal('modal-registrar-mant')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="mant-info-plan"></div>
+      <input type="hidden" id="mant-id-plan">
+      <input type="hidden" id="mant-id-equipo">
+      <input type="hidden" id="mant-periodo">
+      <input type="hidden" id="mant-curso">
+      <div class="form-grid form-grid-2">
+        <div class="form-group">
+          <label>Fecha de realización *</label>
+          <input id="mant-fecha" type="date">
+        </div>
+        <div class="form-group">
+          <label>Realizado por *</label>
+          <input id="mant-realizado-por" placeholder="Nombre del responsable">
+        </div>
+        <div class="form-group">
+          <label>Supervisado por</label>
+          <input id="mant-supervisado-por" placeholder="Nombre del supervisor (opcional)">
+        </div>
+        <div class="form-group full">
+          <label>Observaciones</label>
+          <textarea id="mant-observaciones" rows="3" placeholder="Incidencias, estado observado, notas..."></textarea>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-registrar-mant')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarRegistroMant()">Guardar registro</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gestionar Plan de Mantenimiento -->
+<div class="modal-overlay" id="modal-gestionar-plan">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Plan de mantenimiento</div>
+      <button class="modal-close" onclick="closeModal('modal-gestionar-plan')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px">
+        Equipo: <strong id="modal-plan-equipo-nombre"></strong>
+      </div>
+      <div class="form-grid form-grid-2">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="plan-tipo-int">
+            <option>Interno</option>
+            <option>Externo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Periodicidad</label>
+          <select id="plan-periodicidad">
+            <option>Mensual</option>
+            <option>Trimestral</option>
+            <option>Semestral</option>
+            <option>Anual</option>
+            <option>Bianual</option>
+            <option>Pretemporada</option>
+            <option>Posttemporada</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>Operación a realizar *</label>
+          <textarea id="plan-operacion" rows="4" placeholder="Describe detalladamente la operación de mantenimiento..."></textarea>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-gestionar-plan')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarPlan()">Guardar plan</button>
+      </div>
+    </div>
+  </div>
+</div>

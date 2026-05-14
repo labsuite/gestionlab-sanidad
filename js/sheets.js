@@ -121,8 +121,9 @@ async function loadAllData() {
   try {
     const [equipos, intervenciones, incidencias, proveedores, ubicaciones, usuarios,
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
-           materialUbicaciones, historicoPrecio, tareas] = await Promise.all([
-      sheetsGet('Equipos!A2:S'),
+           materialUbicaciones, historicoPrecio, tareas,
+           planesMantenimiento, registroMantenimientos] = await Promise.all([
+      sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:R'),
       sheetsGet('Incidencias!A2:I'),
       sheetsGet('Proveedores!A2:I'),
@@ -136,7 +137,9 @@ async function loadAllData() {
       sheetsGet('Ciclos_Modulos!A2:B'),
       sheetsGet('Material_Ubicaciones!A2:F'),
       sheetsGet('Historico_Precios!A2:F').catch(() => []),
-      sheetsGet('Tareas_Usuario!A2:F').catch(() => [])
+      sheetsGet('Tareas_Usuario!A2:F').catch(() => []),
+      sheetsGet('Planes_Mantenimiento!A2:F').catch(() => []),
+      sheetsGet('Registro_Mantenimientos!A2:I').catch(() => [])
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -161,8 +164,10 @@ async function loadAllData() {
       if (cm.Ciclo) { ultimoCiclo = cm.Ciclo; } else { cm.Ciclo = ultimoCiclo; }
     });
     DATA.materialUbicaciones = toObj(materialUbicaciones, 'materialUbicaciones');
-    DATA.historicoPrecio     = toObj(historicoPrecio || [], 'historicoPrecio');
-    DATA.tareas              = toObj(tareas          || [], 'tareas');
+    DATA.historicoPrecio        = toObj(historicoPrecio        || [], 'historicoPrecio');
+    DATA.tareas                 = toObj(tareas                 || [], 'tareas');
+    DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
+    DATA.registroMantenimientos = toObj(registroMantenimientos || [], 'registroMantenimientos');
 
     renderAll();
   } catch(e) {
