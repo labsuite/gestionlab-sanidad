@@ -483,12 +483,16 @@ function _renderFilasPlanesTabla(filtro = '') {
   const canEdit = puedeHacer('editarEquipos');
   return DATA.planesMantenimiento.map(plan => {
     const eq = DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo);
-    const label = eq ? `${eq.ID_Activo} – ${eq.Tipo_Equipo || ''} ${eq.Marca || ''}`.trim() : plan.ID_Equipo;
+    const label = eq
+      ? `${eq.ID_Activo} – ${eq.Tipo_Equipo || ''} ${eq.Marca || ''}`.trim()
+      : `${plan.ID_Equipo} ⚠️ ID no encontrado en inventario`;
     if (filtro && !label.toLowerCase().includes(filtro.toLowerCase()) &&
         !plan.Operacion.toLowerCase().includes(filtro.toLowerCase())) return '';
     const tipoBadge = plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
-    return `<tr>
-      <td><strong>${label}</strong></td>
+    const rowStyle = eq ? '' : 'background:#fff5f5';
+    const idStyle  = eq ? '' : 'color:#dc2626';
+    return `<tr style="${rowStyle}">
+      <td><strong style="${idStyle}">${label}</strong></td>
       <td><span class="badge ${tipoBadge}" style="font-size:10px">${plan.Tipo_Intervencion}</span></td>
       <td>${plan.Periodicidad}</td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</td>
