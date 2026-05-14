@@ -540,68 +540,86 @@ async function exportarModeloCalidad(cursoAcademico) {
     });
   });
 
-  // Cargar plantilla xlsx
-  if (typeof XLSX === 'undefined') {
-    showToast('La librería Excel no está cargada. Recarga la página.', 'error');
-    return;
-  }
+  // Cargar plantilla con JSZip para editar el XML interno directamente
+  // (preserva 100% del formato original: estilos, gráficas, colores, merges)
   showToast('Generando documento…', 'info');
-  let wb;
+  let zip;
   try {
     const resp = await fetch('./assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx');
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const buf = await resp.arrayBuffer();
-    wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellStyles: true });
+    zip = await JSZip.loadAsync(await resp.arrayBuffer());
   } catch (e) {
     showToast('No se pudo cargar la plantilla: ' + e.message, 'error');
     return;
   }
 
-  const DATA_ROW = 11; // fila 10 = cabecera, fila 11 = primer dato
+  // Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5
+  const SHEET_FILES = {
+    'LAB 201': 'xl/worksheets/sheet2.xml',
+    'LAB 203': 'xl/worksheets/sheet3.xml',
+    'LAB 205': 'xl/worksheets/sheet4.xml',
+    'LAB 207': 'xl/worksheets/sheet5.xml',
+  };
 
-  LAB_SHEETS.forEach(labKey => {
+  function xmlEsc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // Rellena una celda preservando su estilo s="X". Usa inline strings para no
+  // tocar sharedStrings.xml. Celdas vacías se dejan sin modificar.
+  function fillCell(xml, cellRef, value) {
+    if (!value) return xml;
+    const v = xmlEsc(value);
+    return xml.replace(
+      new RegExp(`<c r="${cellRef}"([^>]*?)(?:\\s*/>|>[\\s\\S]*?<\\/c>)`),
+      (match) => {
+        const s = (match.match(/\bs="([^"]*)"/) || [])[1];
+        const styleAttr = s ? ` s="${s}"` : '';
+        return `<c r="${cellRef}"${styleAttr} t="inlineStr"><is><t>${v}</t></is></c>`;
+      }
+    );
+  }
+
+  const DATA_ROW = 11; // fila 10 = cabecera, 11 = primer dato
+
+  for (const [labKey, sheetFile] of Object.entries(SHEET_FILES)) {
     const items = porLab[labKey] || [];
-    const ws = wb.Sheets[labKey];
-    if (!ws) return;
+    let xml = await zip.file(sheetFile).async('string');
 
-    // Actualizar contadores (J3/J4/J5)
-    const total      = items.length;
-    const realizados = items.filter(x => x.ultimoReg).length;
-    const pendentes  = total - realizados;
-    ws['J3'] = { v: total,      t: 'n' };
-    ws['J4'] = { v: realizados, t: 'n' };
-    ws['J5'] = { v: pendentes,  t: 'n' };
-
-    // Rellenar filas de datos
     items.forEach(({ eq, tipo, operaciones, periodicidades, prevista, regs, ultimoReg }, i) => {
       const r = DATA_ROW + i;
       const realizada   = regs.map(x => formatDate(x.Fecha_Realizacion)).filter(Boolean).join(', ');
       const supervisado = ultimoReg ? (ultimoReg.Supervisado_Por || '') : '';
       const observacions = ultimoReg ? (ultimoReg.Observaciones || '') : '';
 
-      const s = v => ({ v: v || '', t: 's' });
-      ws[`A${r}`] = s(nombreEquipo(eq));
-      ws[`B${r}`] = s(nombreUbicacion(eq.Ubicacion));
-      ws[`C${r}`] = s(eq.Responsable || '');
-      ws[`D${r}`] = s(tipo);
-      ws[`E${r}`] = s(periodicidades);
-      ws[`F${r}`] = s(operaciones);
-      ws[`G${r}`] = s(prevista);
-      ws[`H${r}`] = s(realizada);
-      ws[`I${r}`] = s(supervisado);
-      ws[`J${r}`] = s(observacions);
+      xml = fillCell(xml, `A${r}`, nombreEquipo(eq));
+      xml = fillCell(xml, `B${r}`, nombreUbicacion(eq.Ubicacion));
+      xml = fillCell(xml, `C${r}`, eq.Responsable || '');
+      xml = fillCell(xml, `D${r}`, tipo);
+      xml = fillCell(xml, `E${r}`, periodicidades);
+      xml = fillCell(xml, `F${r}`, operaciones);
+      xml = fillCell(xml, `G${r}`, prevista);
+      xml = fillCell(xml, `H${r}`, realizada);
+      xml = fillCell(xml, `I${r}`, supervisado);
+      xml = fillCell(xml, `J${r}`, observacions);
     });
 
-    // Ampliar el rango declarado de la hoja
-    if (items.length > 0) {
-      const lastRow = DATA_ROW + items.length - 1;
-      const ref = XLSX.utils.decode_range(ws['!ref'] || 'A1:L10');
-      ref.e.r = Math.max(ref.e.r, lastRow - 1); // 0-indexed
-      ref.e.c = Math.max(ref.e.c, 11);           // hasta col L (índice 11)
-      ws['!ref'] = XLSX.utils.encode_range(ref);
-    }
+    zip.file(sheetFile, xml);
+  }
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    compression: 'DEFLATE',
   });
 
-  XLSX.writeFile(wb, `MD84MAN01_Plan_mantemento_${curso}.xlsx`);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `MD84MAN01_Plan_mantemento_${curso}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
   showToast('Documento generado correctamente', 'success');
 }
