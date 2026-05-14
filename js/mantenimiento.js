@@ -346,6 +346,19 @@ async function eliminarPlan(idPlan) {
 // ============================================================
 // PÁGINA DE MANTENIMIENTO
 // ============================================================
+let _pendientesCache = []; // para que filtrarPendientes() pueda acceder sin re-calcular
+
+function _detectarLabEquipo(eq) {
+  const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === eq.Ubicacion);
+  if (!u) return 'Otros';
+  const txt = [u.ID_Ubicacion, u.Laboratorio_Aula, u.Zona, u.Subzona, u.Descripcion_Completa].join(' ').toLowerCase();
+  if (txt.includes('207')) return 'LAB 207';
+  if (txt.includes('205')) return 'LAB 205';
+  if (txt.includes('203')) return 'LAB 203';
+  if (txt.includes('201')) return 'LAB 201';
+  return 'Otros';
+}
+
 function renderMantenimiento() {
   const container = document.getElementById('mantenimiento-contenido');
   if (!container) return;
@@ -372,7 +385,10 @@ function renderMantenimiento() {
   const pendientes= total - hechos;
   const pct       = total > 0 ? Math.round(hechos / total * 100) : 0;
 
-  const pendientesList = todoStatus.filter(s => !s.hecho);
+  _pendientesCache = todoStatus.filter(s => !s.hecho).map(s => ({
+    ...s, lab: _detectarLabEquipo(s.equipo)
+  }));
+  const pendientesList = _pendientesCache;
 
   container.innerHTML = `
     <!-- Resumen -->
@@ -403,33 +419,29 @@ function renderMantenimiento() {
     <!-- Tab: Pendientes -->
     <div id="tab-pendientes">
       <div class="card">
-        <div class="card-header"><div class="card-title">Mantenimientos pendientes — Curso ${curso}</div></div>
-        ${pendientesList.length === 0
-          ? `<div style="padding:20px;text-align:center;color:var(--text-muted)">✅ Sin mantenimientos pendientes por el momento.</div>`
-          : `<table>
-              <thead><tr>
-                <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Período</th><th>Operación</th><th></th>
-              </tr></thead>
-              <tbody>${pendientesList.map(s => {
-                const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
-                const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
-                const instrRow = s.plan.Instrucciones
-                  ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
-                  : '';
-                return `<tr>
-                  <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
-                  <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
-                  <td>${s.plan.Periodicidad}</td>
-                  <td>${labelPeriodo(s.periodo)}</td>
-                  <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
-                  <td style="white-space:nowrap">
-                    ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
-                    ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
-                        onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
-                  </td>
-                </tr>${instrRow}`;
-              }).join('')}</tbody>
-            </table>`}
+        <div class="card-header">
+          <div class="card-title">Mantenimientos pendientes — Curso ${curso}</div>
+          <div class="card-actions">
+            <select id="filter-pend-lab" onchange="filtrarPendientes()" style="font-size:12px">
+              <option value="">Todos los labs</option>
+              ${['LAB 201','LAB 203','LAB 205','LAB 207','Otros']
+                .filter(l => pendientesList.some(s => s.lab === l))
+                .map(l => `<option value="${l}">${l}</option>`).join('')}
+            </select>
+            <select id="filter-pend-periodo" onchange="filtrarPendientes()" style="font-size:12px">
+              <option value="">Todos los períodos</option>
+              ${[...new Set(pendientesList.map(s => s.periodo))].sort()
+                .map(p => `<option value="${p}">${labelPeriodo(p)}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Período</th><th>Operación</th><th></th>
+          </tr></thead>
+          <tbody id="tbody-pendientes">${_renderFilasPendientes(pendientesList, canLog)}</tbody>
+        </table>
+        <div id="pend-empty" style="display:none;padding:20px;text-align:center;color:var(--text-muted)">✅ Sin mantenimientos pendientes con estos filtros.</div>
       </div>
     </div>
 
@@ -475,6 +487,44 @@ function _renderFilasPlanesTabla(filtro = '') {
       </td>
     </tr>`;
   }).join('');
+}
+
+function _renderFilasPendientes(lista, canLog) {
+  if (!lista.length) return '';
+  return lista.map(s => {
+    const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
+    const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
+    const instrRow = s.plan.Instrucciones
+      ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
+      : '';
+    return `<tr>
+      <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
+      <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
+      <td>${s.plan.Periodicidad}</td>
+      <td>${labelPeriodo(s.periodo)}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
+      <td style="white-space:nowrap">
+        ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
+        ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
+            onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
+      </td>
+    </tr>${instrRow}`;
+  }).join('');
+}
+
+function filtrarPendientes() {
+  const lab    = document.getElementById('filter-pend-lab')?.value || '';
+  const periodo= document.getElementById('filter-pend-periodo')?.value || '';
+  const canLog = puedeHacer('crearIntervenciones');
+
+  let lista = _pendientesCache;
+  if (lab)     lista = lista.filter(s => s.lab === lab);
+  if (periodo) lista = lista.filter(s => s.periodo === periodo);
+
+  const tbody = document.getElementById('tbody-pendientes');
+  const empty = document.getElementById('pend-empty');
+  if (tbody) tbody.innerHTML = _renderFilasPendientes(lista, canLog);
+  if (empty) empty.style.display = lista.length ? 'none' : '';
 }
 
 function filtrarPlanesTabla(val) {
