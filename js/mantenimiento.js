@@ -351,12 +351,13 @@ let _pendientesCache = []; // para que filtrarPendientes() pueda acceder sin re-
 function _detectarLabEquipo(eq) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === eq.Ubicacion);
   if (u && u.Laboratorio_Aula) return u.Laboratorio_Aula; // "201", "205", "205 - Zona común"…
-  // Fallback: inferir del ID de ubicación si no se encontró la fila
-  const id = (eq.Ubicacion || '').toLowerCase();
-  if (id.startsWith('207')) return '207';
-  if (id.startsWith('205')) return '205';
-  if (id.startsWith('203')) return '203';
-  if (id.startsWith('201')) return '201';
+  // Fallback: buscar el número de lab en cualquier parte del campo Ubicacion
+  // (cubre "Laboratorio 205", "Lab-207", "205 - Zona común", "207", etc.)
+  const id = String(eq.Ubicacion || '').toLowerCase();
+  if (id.includes('207')) return '207';
+  if (id.includes('205')) return '205';
+  if (id.includes('203')) return '203';
+  if (id.includes('201')) return '201';
   return 'Otros';
 }
 
