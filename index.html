@@ -63,6 +63,10 @@
         <span class="nav-icon">🛡️</span> Mantenimiento
         <span class="nav-badge" id="badge-mantenimiento" style="display:none">0</span>
       </div>
+      <div class="nav-item" id="nav-residuos" onclick="showPage('residuos')">
+        <span class="nav-icon">♻️</span> Residuos
+        <span class="nav-badge" id="badge-residuos" style="display:none">0</span>
+      </div>
       <!-- RENOMBRADO: "Catálogo" en vez de "Configuración" -->
       <div class="nav-section-label" style="margin-top:12px">Material fungible</div>
       <div class="nav-item" onclick="showPage('material')">
@@ -501,6 +505,9 @@
         </div>
       </div>
 
+      <!-- RESIDUOS -->
+      <div class="page" id="page-residuos"></div>
+
       <!-- USUARIOS -->
       <div class="page" id="page-usuarios">
         <div class="card">
@@ -548,6 +555,7 @@
 <script src="js/generador.js"></script>
 <script src="js/contabilidad.js"></script>
 <script src="js/tareas.js"></script>
+<script src="js/residuos.js"></script>
 <script>
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional

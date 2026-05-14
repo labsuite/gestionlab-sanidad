@@ -1,0 +1,67 @@
+<!-- MODAL: Actualizar nivel de contenedor -->
+<div class="modal-overlay" id="modal-res-nivel">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">Actualizar nivel — <span id="modal-nivel-titulo" style="font-weight:400"></span></div>
+      <button class="modal-close" onclick="closeModal('modal-res-nivel')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nivel actual del contenedor</label>
+        <select id="res-nivel" class="form-input">
+          <option value="vacío">Vacío</option>
+          <option value="25%">25% — casi vacío</option>
+          <option value="50%">50% — por la mitad</option>
+          <option value="75%">75% — casi lleno</option>
+          <option value="lleno">Lleno — hay que vaciarlo</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-res-nivel')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarNivel()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Añadir / editar contenedor -->
+<div class="modal-overlay" id="modal-contenedor-res">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Contenedor de residuo</div>
+      <button class="modal-close" onclick="closeModal('modal-contenedor-res')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Tipo de residuo *</label>
+        <select id="cont-tipo" class="form-input">
+          <option value="">— Selecciona —</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Laboratorio *</label>
+          <input id="cont-lab" class="form-input" placeholder="ej. 207">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zona</label>
+          <input id="cont-zona" class="form-input" placeholder="ej. Almacén residuos">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nivel actual</label>
+        <select id="cont-nivel-ini" class="form-input">
+          <option value="vacío">Vacío</option>
+          <option value="25%">25%</option>
+          <option value="50%">50%</option>
+          <option value="75%">75%</option>
+          <option value="lleno">Lleno</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-contenedor-res')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarContenedor()">Guardar</button>
+    </div>
+  </div>
+</div>

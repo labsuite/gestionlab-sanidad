@@ -122,7 +122,8 @@ async function loadAllData() {
     const [equipos, intervenciones, incidencias, proveedores, ubicaciones, usuarios,
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
            materialUbicaciones, historicoPrecio, tareas,
-           planesMantenimiento, registroMantenimientos] = await Promise.all([
+           planesMantenimiento, registroMantenimientos,
+           tiposResiduo, contenedoresResiduo] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:I'),
@@ -139,7 +140,9 @@ async function loadAllData() {
       sheetsGet('Historico_Precios!A2:F').catch(() => []),
       sheetsGet('Tareas_Usuario!A2:F').catch(() => []),
       sheetsGet('Planes_Mantenimiento!A2:G').catch(() => []),
-      sheetsGet('Registro_Mantenimientos!A2:I').catch(() => [])
+      sheetsGet('Registro_Mantenimientos!A2:I').catch(() => []),
+      sheetsGet('Tipos_Residuo!A2:G').catch(() => []),
+      sheetsGet('Contenedores_Residuo!A2:G').catch(() => [])
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -168,6 +171,8 @@ async function loadAllData() {
     DATA.tareas                 = toObj(tareas                 || [], 'tareas');
     DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
     DATA.registroMantenimientos = toObj(registroMantenimientos || [], 'registroMantenimientos');
+    DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
+    DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
 
     renderAll();
   } catch(e) {

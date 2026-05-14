@@ -7,7 +7,8 @@ async function loadModales() {
     'html/modales-catalogo.html',
     'html/modales-material.html',
     'html/modales-pedidos.html',
-    'html/modales-mantenimiento.html'
+    'html/modales-mantenimiento.html',
+    'html/modales-residuos.html'
   ];
   try {
     const htmls = await Promise.all(archivos.map(f => fetch(f).then(r => {
@@ -72,6 +73,14 @@ function updateBadges() {
   if (badgeSol) { badgeSol.textContent = pendientes; badgeSol.style.display = pendientes > 0 ? '' : 'none'; }
 }
 
+function _updateBadgeResiduos() {
+  const badge = document.getElementById('badge-residuos');
+  if (!badge) return;
+  const n = DATA.contenedoresResiduo.filter(c => c.Nivel === '75%' || c.Nivel === 'lleno').length;
+  badge.textContent = n;
+  badge.style.display = n > 0 ? '' : 'none';
+}
+
 function _updateBadgeMantenimiento() {
   const badgeMant = document.getElementById('badge-mantenimiento');
   if (!badgeMant) return;
@@ -95,7 +104,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'residuos'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     crearIncidencias: false,
     gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,
@@ -107,7 +116,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias',
           'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios'],
+          'ubicaciones', 'usuarios', 'residuos'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
@@ -125,7 +134,7 @@ const PERMISOS = {
     configuracion: false, dashboard: true, verTareas: true,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -134,7 +143,7 @@ const PERMISOS = {
     usuarios: true, crearUsuarios: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -166,7 +175,8 @@ function showPage(page) {
     incidencias: 'Incidencias', material: 'Material fungible', movimientos: 'Movimientos de material',
     solicitudes: 'Solicitudes de material', pedidos: 'Pedidos', 'pedido-detalle': 'Detalle del pedido',
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
-    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo'
+    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo',
+    residuos: 'Gestión de residuos'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 }
@@ -271,6 +281,8 @@ function renderAll() {
   if (typeof checkAutoArchivarRecibidas === 'function') checkAutoArchivarRecibidas();
   renderMantenimiento();
   _updateBadgeMantenimiento();
+  renderResiduos();
+  _updateBadgeResiduos();
 }
 
 // ============================================================
