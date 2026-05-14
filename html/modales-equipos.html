@@ -13,8 +13,8 @@
         </div>
         <div class="form-group">
           <label>Tipo de equipo *</label>
-          <select id="eq-tipo" onchange="toggleTipoEquipoLibre(this.value); autoIdEquipo(this.value)">
-            <option value="">Seleccionar...</option>
+          <input id="eq-tipo" list="eq-tipo-list" placeholder="Escribe o elige un tipo…" autocomplete="off">
+          <datalist id="eq-tipo-list">
             <option>Agitador / Vórtex</option>
             <option>Autoclave</option>
             <option>Balanza</option>
@@ -37,18 +37,14 @@
             <option>Microscopio</option>
             <option>Microtomo</option>
             <option>Nevera</option>
+            <option>Pipetor automático</option>
             <option>Placa calefactora</option>
             <option>Placa fría</option>
             <option>Sistema de imagen / documentación</option>
             <option>Termociclador</option>
             <option>Termobloque</option>
             <option>Transiluminador UV</option>
-            <option>Otro</option>
-          </select>
-        </div>
-        <div class="form-group" id="eq-tipo-libre-group" style="display:none">
-          <label>Especifica el tipo *</label>
-          <input id="eq-tipo-libre" placeholder="Describe el tipo de equipo...">
+          </datalist>
         </div>
         <div class="form-group">
           <label>Marca *</label>

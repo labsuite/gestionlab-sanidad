@@ -103,7 +103,9 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
 function openModalEquipo() {
   editingRow = null; pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Nuevo equipo';
-  ['eq-id','eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-observaciones'].forEach(id => sv(id,''));
+  const idFieldN = document.getElementById('eq-id');
+  idFieldN.value = ''; idFieldN.readOnly = false; idFieldN.style.opacity = '';
+  ['eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-observaciones'].forEach(id => sv(id,''));
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
   sv('eq-estado','Operativo'); sv('eq-pdf-url','');
@@ -122,7 +124,11 @@ function editEquipo(idx) {
   pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Editar equipo';
   poblarSelects();
-  sv('eq-id',e.ID_Activo); sv('eq-tipo',e.Tipo_Equipo); sv('eq-marca',e.Marca);
+  const idField = document.getElementById('eq-id');
+  idField.value = e.ID_Activo;
+  idField.readOnly = true;
+  idField.style.opacity = '0.6';
+  sv('eq-tipo',e.Tipo_Equipo); sv('eq-marca',e.Marca);
   sv('eq-modelo',e.Modelo); sv('eq-serie',e.Numero_Serie); sv('eq-ubicacion',e.Ubicacion);
   _initResponsables(e.Responsable); sv('eq-fecha-adq',e.Fecha_Adquisicion);
   sv('eq-financiacion',e.Origen_Financiacion); sv('eq-proveedor-compra',e.Proveedor_Compra);
