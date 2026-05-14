@@ -388,57 +388,71 @@ function renderMantenimiento() {
       <button class="btn btn-secondary" onclick="exportarModeloCalidad('${curso}')">📄 Exportar modelo de calidad ${curso}</button>
     </div>
 
-    <!-- Pendientes -->
-    <div class="card" style="margin-bottom:20px">
-      <div class="card-header">
-        <div class="card-title">Mantenimientos pendientes — Curso ${curso}</div>
-      </div>
-      ${pendientesList.length === 0
-        ? `<div style="padding:20px;text-align:center;color:var(--text-muted)">✅ Sin mantenimientos pendientes por el momento.</div>`
-        : `<table>
-            <thead><tr>
-              <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Período</th><th>Operación</th><th></th>
-            </tr></thead>
-            <tbody>${pendientesList.map(s => {
-              const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
-              const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
-              const instrRow = s.plan.Instrucciones
-                ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
-                : '';
-              return `<tr>
-                <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
-                <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
-                <td>${s.plan.Periodicidad}</td>
-                <td>${labelPeriodo(s.periodo)}</td>
-                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
-                <td style="white-space:nowrap">
-                  ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
-                  ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
-                      onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
-                </td>
-              </tr>${instrRow}`;
-            }).join('')}</tbody>
-          </table>`}
+    <!-- Pestañas -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
+      <button id="tab-btn-pendientes" onclick="switchMantTab('pendientes')"
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);margin-bottom:-2px;color:var(--primary)">
+        Pendientes <span style="font-size:11px;background:var(--danger);color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${pendientes}</span>
+      </button>
+      ${canEdit ? `<button id="tab-btn-planes" onclick="switchMantTab('planes')"
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted)">
+        Planes configurados <span style="font-size:11px;background:var(--border);color:var(--text-muted);border-radius:99px;padding:1px 7px;margin-left:4px">${DATA.planesMantenimiento.length}</span>
+      </button>` : ''}
     </div>
 
-    <!-- Todos los planes (Admin/Gestor) -->
+    <!-- Tab: Pendientes -->
+    <div id="tab-pendientes">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Mantenimientos pendientes — Curso ${curso}</div></div>
+        ${pendientesList.length === 0
+          ? `<div style="padding:20px;text-align:center;color:var(--text-muted)">✅ Sin mantenimientos pendientes por el momento.</div>`
+          : `<table>
+              <thead><tr>
+                <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Período</th><th>Operación</th><th></th>
+              </tr></thead>
+              <tbody>${pendientesList.map(s => {
+                const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
+                const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
+                const instrRow = s.plan.Instrucciones
+                  ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
+                  : '';
+                return `<tr>
+                  <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
+                  <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
+                  <td>${s.plan.Periodicidad}</td>
+                  <td>${labelPeriodo(s.periodo)}</td>
+                  <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
+                  <td style="white-space:nowrap">
+                    ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
+                    ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
+                        onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
+                  </td>
+                </tr>${instrRow}`;
+              }).join('')}</tbody>
+            </table>`}
+      </div>
+    </div>
+
+    <!-- Tab: Planes (solo Admin/Gestor) -->
     ${canEdit ? `
-    <div class="card">
-      <div class="card-header">
-        <div class="card-title">Planes de mantenimiento configurados</div>
-        <div class="card-actions">
-          <div class="search-input">
-            <span>🔍</span>
-            <input type="text" placeholder="Buscar equipo..." oninput="filtrarPlanesTabla(this.value)" id="filter-planes">
+    <div id="tab-planes" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Planes de mantenimiento configurados</div>
+          <div class="card-actions">
+            <div class="search-input">
+              <span>🔍</span>
+              <input type="text" placeholder="Buscar equipo u operación..." oninput="filtrarPlanesTabla(this.value)" id="filter-planes">
+            </div>
           </div>
         </div>
+        <table id="tabla-planes-mant">
+          <thead><tr>
+            <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Operación</th><th></th>
+          </tr></thead>
+          <tbody>${_renderFilasPlanesTabla()}</tbody>
+        </table>
       </div>
-      <table id="tabla-planes-mant">
-        <thead><tr>
-          <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Operación</th><th></th>
-        </tr></thead>
-        <tbody>${_renderFilasPlanesTabla()}</tbody>
-      </table>
     </div>` : ''}`;
 }
 
@@ -466,6 +480,21 @@ function _renderFilasPlanesTabla(filtro = '') {
 function filtrarPlanesTabla(val) {
   const tbody = document.querySelector('#tabla-planes-mant tbody');
   if (tbody) tbody.innerHTML = _renderFilasPlanesTabla(val);
+}
+
+function switchMantTab(tab) {
+  const tabs = ['pendientes', 'planes'];
+  tabs.forEach(t => {
+    const panel = document.getElementById(`tab-${t}`);
+    const btn   = document.getElementById(`tab-btn-${t}`);
+    if (!panel) return;
+    const active = t === tab;
+    panel.style.display = active ? '' : 'none';
+    if (btn) {
+      btn.style.borderBottomColor = active ? 'var(--primary)' : 'transparent';
+      btn.style.color = active ? 'var(--primary)' : 'var(--text-muted)';
+    }
+  });
 }
 
 function toggleMantInstr(key) {
