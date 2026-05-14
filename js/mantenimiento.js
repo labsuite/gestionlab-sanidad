@@ -506,47 +506,67 @@ function exportarModeloCalidad(cursoAcademico) {
     return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ') || idUbicacion;
   }
 
-  // Construir filas: todos los planes × todos los periodos esperados
+  // Construir filas: máximo 2 filas por equipo (último Interno + último Externo)
   const LAB_ORDER = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207', 'Otros'];
   const porLab = {};
   LAB_ORDER.forEach(l => porLab[l] = []);
 
+  // Agrupar planes por equipo
+  const planesPorEquipo = {};
   planesActivos.forEach(plan => {
-    const eq = DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo);
+    if (!planesPorEquipo[plan.ID_Equipo]) planesPorEquipo[plan.ID_Equipo] = [];
+    planesPorEquipo[plan.ID_Equipo].push(plan);
+  });
+
+  Object.entries(planesPorEquipo).forEach(([equipoId, planes]) => {
+    const eq = DATA.equipos.find(e => e.ID_Activo === equipoId);
     if (!eq) return;
     const lab = detectarLab(eq.Ubicacion);
-    const periodos = getPeriodosEsperados(plan, eq, curso);
-    if (!periodos.length) {
-      porLab[lab].push({ eq, plan, periodo: null, reg: null });
-    } else {
-      periodos.forEach(periodo => {
-        const reg = registros.find(r => r.ID_Plan === plan.ID_Plan && r.Periodo === periodo);
-        porLab[lab].push({ eq, plan, periodo, reg });
-      });
-    }
+
+    // Para cada tipo (Interno / Externo), una sola fila con el último registro
+    ['Interno', 'Externo'].forEach(tipo => {
+      const planesDelTipo = planes.filter(p => p.Tipo_Intervencion === tipo);
+      if (!planesDelTipo.length) return;
+
+      // Operaciones y periodicidades del tipo (para columnas descriptivas)
+      const operaciones  = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
+      const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
+
+      // Último registro de cualquier plan de este tipo
+      const regsDelTipo = registros.filter(r => planesDelTipo.some(p => p.ID_Plan === r.ID_Plan));
+      const ultimoReg = regsDelTipo.sort((a, b) =>
+        new Date(b.Fecha_Realizacion) - new Date(a.Fecha_Realizacion)
+      )[0] || null;
+
+      // Data prevista: próximo periodo esperado del plan más frecuente del tipo
+      const planRef = planesDelTipo[0];
+      const periodos = getPeriodosEsperados(planRef, eq, curso);
+      const prevista = periodos.length ? labelPeriodo(periodos[periodos.length - 1]) : '';
+
+      porLab[lab].push({ eq, tipo, operaciones, periodicidades, prevista, reg: ultimoReg });
+    });
   });
 
   // Generar una sección HTML por laboratorio
   function seccionLab(labKey, items) {
     if (!items.length) return '';
-    const total     = items.length;
+    const total      = items.length;
     const realizados = items.filter(x => x.reg).length;
     const pendentes = total - realizados;
     const pct = total > 0 ? ((realizados / total) * 100).toFixed(0) : 0;
     const hoy = new Date().toLocaleDateString('es-ES');
 
-    const filas = items.map(({ eq, plan, periodo, reg }) => {
-      const prevista = periodo ? labelPeriodo(periodo) : '';
-      const realizada = reg ? formatDate(reg.Fecha_Realizacion) : '';
+    const filas = items.map(({ eq, tipo, operaciones, periodicidades, prevista, reg }) => {
+      const realizada   = reg ? formatDate(reg.Fecha_Realizacion) : '';
       const supervisado = reg ? (reg.Supervisado_Por || '') : '';
       const observacions = reg ? (reg.Observaciones || '') : '';
       return `<tr>
         <td>${nombreEquipo(eq)}</td>
         <td>${nombreUbicacion(eq.Ubicacion)}</td>
         <td>${eq.Responsable || ''}</td>
-        <td>${plan.Tipo_Intervencion || ''}</td>
-        <td>${plan.Periodicidad || ''}</td>
-        <td>${plan.Operacion || ''}</td>
+        <td>${tipo}</td>
+        <td>${periodicidades}</td>
+        <td>${operaciones}</td>
         <td>${prevista}</td>
         <td>${realizada}</td>
         <td>${supervisado}</td>
