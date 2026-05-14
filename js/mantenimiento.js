@@ -454,7 +454,19 @@ function exportarModeloCalidad(cursoAcademico) {
   const [añoInicio, añoFin] = curso.split('-').map(Number);
 
   const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso);
-  const planes    = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
+
+  const PERIOD_RANK = {
+    'Mensual': 1, 'Trimestral': 3, 'Semestral': 6,
+    'Anual': 12, 'Bianual': 24, 'Cada 2 años': 24,
+    'Pretemporada': 6, 'Posttemporada': 6
+  };
+  const _todosPlanes = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
+  const _porEquipo   = {};
+  _todosPlanes.forEach(p => { (_porEquipo[p.ID_Equipo] = _porEquipo[p.ID_Equipo] || []).push(p); });
+  const planes = Object.values(_porEquipo).flatMap(ps => {
+    const maxRank = Math.max(...ps.map(p => PERIOD_RANK[p.Periodicidad] || 0));
+    return ps.filter(p => (PERIOD_RANK[p.Periodicidad] || 0) === maxRank);
+  });
   const total     = planes.reduce((acc, plan) => {
     const eq = DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo);
     return acc + (eq ? getPeriodosEsperados(plan, eq, curso).length : 0);
