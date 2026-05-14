@@ -103,15 +103,15 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
 function openModalEquipo() {
   editingRow = null; pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Nuevo equipo';
-  ['eq-id','eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-ultimo-preventivo','eq-observaciones','eq-periodicidad-custom'].forEach(id => sv(id,''));
+  ['eq-id','eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-observaciones'].forEach(id => sv(id,''));
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
-  sv('eq-estado','Operativo'); sv('eq-periodicidad','Anual'); sv('eq-pdf-url','');
+  sv('eq-estado','Operativo'); sv('eq-pdf-url','');
   sv('eq-protocolo-uso',''); sv('eq-tipo-mant','Periódico'); sv('eq-mes-inicio',''); sv('eq-mes-fin','');
   document.getElementById('eq-pdf-preview').style.display = 'none';
   document.getElementById('eq-pdf-name').textContent = '';
   if (document.getElementById('eq-pdf-input')) document.getElementById('eq-pdf-input').value = '';
-  togglePeriodicidadCustom('Anual'); toggleTipoMant('Periódico');
+  toggleTipoMant('Periódico');
   // Limpiar autocomplete ubicación
   clearUbicacionEquipo();
   poblarSelects(); openModal('modal-equipo');
@@ -128,16 +128,14 @@ function editEquipo(idx) {
   _initResponsables(e.Responsable); sv('eq-fecha-adq',e.Fecha_Adquisicion);
   sv('eq-financiacion',e.Origen_Financiacion); sv('eq-proveedor-compra',e.Proveedor_Compra);
   sv('eq-proveedor-sat',e.Proveedor_Servicio_Tecnico); sv('eq-estado',e.Estado_Operativo);
-  sv('eq-periodicidad',e.Periodicidad_Mantenimiento); sv('eq-periodicidad-custom',e.Periodicidad_Custom||'');
-  togglePeriodicidadCustom(e.Periodicidad_Mantenimiento);
-  sv('eq-ultimo-preventivo',e.Fecha_Ultimo_Preventivo); sv('eq-observaciones',e.Observaciones);
+  sv('eq-observaciones',e.Observaciones);
   sv('eq-coste', e.Coste||'');
-  sv('eq-pdf-url',e.Manual_Ficha_Tecnica||'');
+  sv('eq-pdf-url', e.Manual_Ficha_Tecnica||'');
   sv('eq-protocolo-uso', e.Protocolo_Uso||'');
-  sv('eq-tipo-mant', e.Tipo_Mantenimiento||'Periódico');
+  sv('eq-tipo-mant', e.Tipo_Mantenimiento || 'Periódico');
   sv('eq-mes-inicio', e.Mes_Inicio_Temporada||'');
   sv('eq-mes-fin', e.Mes_Fin_Temporada||'');
-  toggleTipoMant(e.Tipo_Mantenimiento||'Periódico');
+  toggleTipoMant(e.Tipo_Mantenimiento || 'Periódico');
   // Restaurar autocomplete de ubicación
   document.getElementById('eq-ubicacion').value = e.Ubicacion || '';
   document.getElementById('eq-ubicacion-search').value = '';
@@ -154,11 +152,6 @@ function editEquipo(idx) {
   if (e.Manual_Ficha_Tecnica) { document.getElementById('eq-pdf-preview').style.display = 'flex'; document.getElementById('eq-pdf-name').textContent = 'Manual adjunto (ver 📄)'; }
   else document.getElementById('eq-pdf-preview').style.display = 'none';
   openModal('modal-equipo');
-}
-
-function togglePeriodicidadCustom(val) {
-  const group = document.getElementById('eq-periodicidad-custom-group');
-  if (group) group.style.display = val === 'Personalizada' ? 'flex' : 'none';
 }
 
 function toggleTipoMant(val) {
@@ -469,20 +462,6 @@ async function guardarActuacion() {
       try { await actualizarEstadoEquipo(i.Equipo, operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
     }
 
-    // ── Actualizar preventivo si Preventivo + Resuelto ─────────────────────
-    if (resultado === 'Resuelto' && i.Tipo === 'Preventivo') {
-      const eqIdx = DATA.equipos.findIndex(e => e.ID_Activo === equipoId);
-      if (eqIdx !== -1) {
-        const eq  = DATA.equipos[eqIdx];
-        const nuevo = calcProximoPreventivo(fechaReal, eq.Periodicidad_Mantenimiento);
-        if (nuevo) {
-          eq.Fecha_Ultimo_Preventivo  = fechaReal;
-          eq.Fecha_Proximo_Preventivo = nuevo;
-          const eqRow = [eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.Numero_Serie, eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion, eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, eq.Estado_Operativo, eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo, eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones];
-          await sheetsUpdate(`Equipos!A${eqIdx + 2}:R${eqIdx + 2}`, eqRow);
-        }
-      }
-    }
 
     // ── Si el resultado NO es definitivo: crear nueva intervención de seguimiento ──
     // Así cada actuación queda como registro histórico independiente y la cadena
@@ -671,33 +650,18 @@ function autoIdEquipo(tipo) {
 // ============================================================
 // GUARDAR EQUIPO
 // ============================================================
-function calcProximoPreventivo(ultimoPreventivo, periodicidad) {
-  if (!ultimoPreventivo || periodicidad === 'Personalizada') return '';
-  const d = new Date(ultimoPreventivo);
-  const meses = {'Mensual':1,'Trimestral':3,'Semestral':6,'Anual':12}[periodicidad];
-  if (!meses) return '';
-  d.setMonth(d.getMonth() + meses);
-  return d.toISOString().split('T')[0];
-}
-
 async function guardarEquipo() {
   let id = v('eq-id');
   const tipo  = v('eq-tipo');
   const marca = v('eq-marca');
   if (!tipo)  { showToast('El tipo de equipo es obligatorio', 'error'); return; }
   if (!marca) { showToast('La marca es obligatoria', 'error'); return; }
-  // Auto-generar ID si el campo está vacío (solo en creación)
   if (!id && !editingRow) {
     id = generarIdEquipo(tipo);
     if (!id) { showToast('No se pudo generar ID automático. Indícalo manualmente.', 'error'); return; }
     sv('eq-id', id);
   }
   if (!id) { showToast('El ID del equipo es obligatorio', 'error'); return; }
-
-  const ultimo = v('eq-ultimo-preventivo');
-  const periodicidad = v('eq-periodicidad');
-  const periodicidadCustom = periodicidad === 'Personalizada' ? v('eq-periodicidad-custom') : '';
-  const proximo = calcProximoPreventivo(ultimo, periodicidad);
 
   let manualUrl = v('eq-pdf-url') || '';
   if (pendingEqFileBase64) {
@@ -710,7 +674,9 @@ async function guardarEquipo() {
   const tipoMant = v('eq-tipo-mant');
   const mesInicio = tipoMant === 'Estacional' ? v('eq-mes-inicio') : '';
   const mesFin    = tipoMant === 'Estacional' ? v('eq-mes-fin')   : '';
-  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), periodicidad, periodicidadCustom, ultimo, proximo, manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), tipoMant, mesInicio, mesFin];
+  // Columnas M-P (Periodicidad_Mantenimiento, Periodicidad_Custom, Fecha_Ultimo_Preventivo, Fecha_Proximo_Preventivo)
+  // gestionadas ahora por Planes_Mantenimiento + Registro_Mantenimientos — se mantienen vacías
+  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), '', '', '', '', manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), tipoMant, mesInicio, mesFin];
 
   showLoading('Guardando...');
   try {
@@ -785,21 +751,7 @@ async function guardarIntervencion() {
     }
   }
 
-  // Actualizar preventivo si aplica
-    if (v('int-actualiza-preventivo') === 'Sí' && tipo === 'Preventivo') {
-      const equipoId = equipo.split(' – ')[0];
-      const eqIdx = DATA.equipos.findIndex(e => e.ID_Activo === equipoId);
-      if (eqIdx !== -1) {
-        const eq = DATA.equipos[eqIdx];
-        const nuevo = calcProximoPreventivo(fechaReal, eq.Periodicidad_Mantenimiento);
-        if (nuevo) {
-          eq.Fecha_Ultimo_Preventivo = fechaReal; eq.Fecha_Proximo_Preventivo = nuevo;
-          const eqRow = [eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.Numero_Serie, eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion, eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, eq.Estado_Operativo, eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo, eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||''];
-          await sheetsUpdate(`Equipos!A${eqIdx + 2}:S${eqIdx + 2}`, eqRow);
-        }
-      }
-    }
-    pendingFileBase64 = null;
+  pendingFileBase64 = null;
     closeModal('modal-intervencion'); renderAll();
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading(); editingRow = null;

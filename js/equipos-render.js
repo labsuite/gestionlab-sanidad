@@ -15,8 +15,14 @@ function renderDashboard() {
     : esAlumno
       ? DATA.equipos.filter(e => getUbicacionesAlumno().includes(e.Ubicacion))
       : DATA.equipos;
-  const preventivos = misEquipos.filter(e => e.Fecha_Proximo_Preventivo && new Date(e.Fecha_Proximo_Preventivo) <= en30);
-  setText('stat-preventivos', preventivos.length);
+  const curso = getCursoAcademico();
+  let pendientesMant = 0;
+  misEquipos.forEach(eq => {
+    DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
+      getPeriodosEsperados(plan, eq, curso).forEach(p => { if (!getRegistroMant(plan.ID_Plan, curso, p)) pendientesMant++; });
+    });
+  });
+  setText('stat-preventivos', pendientesMant);
 
   const incAbiertas = DATA.incidencias.filter(i => i.Estado === 'Abierta' || i.Estado === 'En gestión');
   setText('stat-incidencias', incAbiertas.length);
@@ -25,11 +31,10 @@ function renderDashboard() {
   if (!alertas) return;
   alertas.innerHTML = '';
 
-  const vencidos  = DATA.equipos.filter(e => e.Fecha_Proximo_Preventivo && new Date(e.Fecha_Proximo_Preventivo) < hoy);
   const averiados = DATA.equipos.filter(e => e.Estado_Operativo === 'Averiado' || e.Estado_Operativo === 'Fuera de servicio');
 
   if (averiados.length) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
-  if (vencidos.length)  alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${vencidos.length} equipo(s) con mantenimiento preventivo vencido</div><div class="alert-text">${vencidos.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
+  if (pendientesMant > 0) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
   if (incAbiertas.length) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incAbiertas.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incAbiertas.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
 
   const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
@@ -85,21 +90,27 @@ function renderDashboard() {
     alertasStock.innerHTML += `<div class="alert-banner" style="border-left:3px solid var(--accent);background:var(--accent-light)"><div class="alert-icon">🏬</div><div class="alert-content"><div class="alert-title" style="color:var(--accent)">${alertasZC.length} material(es) bajo mínimo en la zona común (almacén)</div><div class="alert-text" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px">${itemsZC}${alertasZC.length > 6 ? ' y ' + (alertasZC.length-6) + ' más...' : ''}</div></div></div>`;
   }
 
-  const proximos = misEquipos
-    .filter(e => e.Fecha_Proximo_Preventivo && new Date(e.Fecha_Proximo_Preventivo) <= en30)
-    .sort((a,b) => new Date(a.Fecha_Proximo_Preventivo) - new Date(b.Fecha_Proximo_Preventivo))
-    .slice(0, 8);
   const tbody = document.getElementById('tabla-proximos');
-  if (!proximos.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin preventivos en los próximos 30 días</div></div></td></tr>`; return; }
-  tbody.innerHTML = proximos.map(e => {
-    const f = new Date(e.Fecha_Proximo_Preventivo);
-    const diffDias = Math.ceil((f - hoy) / 86400000);
-    let badge, estado;
-    if (diffDias < 0)      { badge = 'badge-red';    estado = 'Vencido hace ' + Math.abs(diffDias) + 'd'; }
-    else if (diffDias <= 7) { badge = 'badge-red';    estado = 'En ' + diffDias + ' días'; }
-    else if (diffDias <= 30){ badge = 'badge-orange'; estado = 'En ' + diffDias + ' días'; }
-    else                   { badge = 'badge-green';  estado = 'En ' + diffDias + ' días'; }
-    return `<tr><td><strong>${e.ID_Activo}</strong></td><td>${e.Tipo_Equipo||'—'} ${e.Marca ? '· ' + e.Marca : ''}</td><td>${e.Ubicacion||'—'}</td><td>${formatDate(e.Fecha_Proximo_Preventivo)}</td><td><span class="badge ${badge}">${estado}</span></td></tr>`;
+  const pendientesList = [];
+  misEquipos.forEach(eq => {
+    DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
+      getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
+        if (!getRegistroMant(plan.ID_Plan, curso, periodo)) pendientesList.push({ eq, plan, periodo });
+      });
+    });
+  });
+  if (!pendientesList.length) {
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin mantenimientos pendientes</div></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = pendientesList.slice(0, 8).map(({ eq, plan, periodo }) => {
+    const tipoBadge = plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
+    return `<tr>
+      <td><strong>${eq.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${eq.Tipo_Equipo||''} ${eq.Marca||''}</span></td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</td>
+      <td><span class="badge ${tipoBadge}" style="font-size:10px">${plan.Tipo_Intervencion}</span></td>
+      <td>${labelPeriodo(periodo)}</td>
+    </tr>`;
   }).join('');
 }
 
@@ -146,12 +157,20 @@ function renderEquipos(filtro, filtroEstado) {
         impactoBadge = `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">📅 ${formatDate(intPlan.Fecha_Planificada)}</span>`;
       }
     }
-    const proxPreventivo = e.Fecha_Proximo_Preventivo ? (() => {
-      const diffDias = Math.ceil((new Date(e.Fecha_Proximo_Preventivo) - new Date()) / 86400000);
-      if (diffDias < 0)    return `<span class="badge badge-red">Vencido</span>`;
-      if (diffDias <= 30)  return `<span class="badge badge-orange">${formatDate(e.Fecha_Proximo_Preventivo)}</span>`;
-      return `<span class="text-muted">${formatDate(e.Fecha_Proximo_Preventivo)}</span>`;
-    })() : '<span class="text-muted">—</span>';
+    const planStatus = (() => {
+      const planes = DATA.planesMantenimiento.filter(p => p.ID_Equipo === e.ID_Activo && p.Activo !== 'FALSE');
+      if (!planes.length) return '<span class="text-muted">—</span>';
+      const curso = getCursoAcademico();
+      let pendientes = 0, total = 0;
+      planes.forEach(plan => {
+        const periodos = getPeriodosEsperados(plan, e, curso);
+        total += periodos.length;
+        periodos.forEach(p => { if (!getRegistroMant(plan.ID_Plan, curso, p)) pendientes++; });
+      });
+      if (total === 0) return '<span class="text-muted">Sin periodos aún</span>';
+      if (pendientes === 0) return `<span class="badge badge-green">✓ Al día</span>`;
+      return `<span class="badge badge-orange">${pendientes} pendiente${pendientes > 1 ? 's' : ''}</span>`;
+    })();
     const expandId = 'eq-expand-' + e.ID_Activo.replace(/[^a-zA-Z0-9]/g,'_');
     const manualLink = e.Manual_Ficha_Tecnica ? `<a href="${e.Manual_Ficha_Tecnica}" target="_blank" class="icon-btn" title="Ver manual">📄</a>` : '';
     // Profesor puede editar e intervenir solo en equipos donde es responsable
@@ -166,7 +185,7 @@ function renderEquipos(filtro, filtroEstado) {
       <td>${e.Ubicacion||'—'}</td>
       <td>${e.Responsable||'—'}</td>
       <td><span class="badge ${estadoBadge}"><span class="dot"></span>${e.Estado_Operativo||'—'}</span>${impactoBadge}</td>
-      <td>${proxPreventivo}</td>
+      <td>${planStatus}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
         ${manualLink}
         ${puedeEditarEste ? `<button class="icon-btn" onclick="editEquipo(${DATA.equipos.indexOf(e)})" title="Editar">✏️</button>` : ''}

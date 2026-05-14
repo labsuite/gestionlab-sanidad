@@ -132,21 +132,6 @@
             <option>Fuera de servicio</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>Periodicidad mantenimiento</label>
-          <select id="eq-periodicidad" onchange="togglePeriodicidadCustom(this.value)">
-            <option>Mensual</option><option>Trimestral</option>
-            <option>Semestral</option><option>Anual</option><option>Personalizada</option>
-          </select>
-        </div>
-        <div class="form-group" id="eq-periodicidad-custom-group">
-          <label>Descripción periodicidad personalizada</label>
-          <input id="eq-periodicidad-custom" placeholder="Ej: Cada 18 meses, o según fabricante...">
-        </div>
-        <div class="form-group">
-          <label>Fecha último preventivo</label>
-          <input id="eq-ultimo-preventivo" type="date">
-        </div>
         <div class="form-group full">
           <label>Observaciones</label>
           <textarea id="eq-observaciones" placeholder="Notas adicionales..."></textarea>
@@ -440,12 +425,6 @@
         <div class="form-group">
           <label>¿Equipo operativo tras intervención?</label>
           <select id="int-operativo">
-            <option value="Sí">Sí</option><option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>¿Actualizar próximo preventivo?</label>
-          <select id="int-actualiza-preventivo">
             <option value="Sí">Sí</option><option value="No">No</option>
           </select>
         </div>
