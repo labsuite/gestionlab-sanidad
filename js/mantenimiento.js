@@ -479,109 +479,147 @@ function toggleMantInstr(key) {
 // ============================================================
 function exportarModeloCalidad(cursoAcademico) {
   const curso = cursoAcademico || getCursoAcademico();
-  const [añoInicio, añoFin] = curso.split('-').map(Number);
-
   const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso);
+  const planesActivos = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
 
-  const PERIOD_RANK = {
-    'Mensual': 1, 'Trimestral': 3, 'Semestral': 6,
-    'Anual': 12, 'Bianual': 24, 'Cada 2 años': 24,
-    'Pretemporada': 6, 'Posttemporada': 6
-  };
-  const _todosPlanes = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
-  const _porEquipo   = {};
-  _todosPlanes.forEach(p => { (_porEquipo[p.ID_Equipo] = _porEquipo[p.ID_Equipo] || []).push(p); });
-  const planes = Object.values(_porEquipo).flatMap(ps => {
-    const maxRank = Math.max(...ps.map(p => PERIOD_RANK[p.Periodicidad] || 0));
-    return ps.filter(p => (PERIOD_RANK[p.Periodicidad] || 0) === maxRank);
-  });
-  const total     = planes.reduce((acc, plan) => {
-    const eq = DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo);
-    return acc + (eq ? getPeriodosEsperados(plan, eq, curso).length : 0);
-  }, 0);
-  const realizados = registros.length;
-  const pct = total > 0 ? ((realizados / total) * 100).toFixed(0) : 0;
+  // Detecta el laboratorio de una ubicación por su texto descriptivo
+  function detectarLab(idUbicacion) {
+    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
+    if (!u) return 'Otros';
+    const txt = [u.ID_Ubicacion, u.Laboratorio_Aula, u.Zona, u.Subzona, u.Descripcion_Completa].join(' ').toLowerCase();
+    if (txt.includes('207')) return 'LAB 207';
+    if (txt.includes('205')) return 'LAB 205'; // incluye zona común del 205
+    if (txt.includes('203')) return 'LAB 203';
+    if (txt.includes('201')) return 'LAB 201';
+    return 'Otros';
+  }
 
-  // Agrupar por laboratorio
+  // Nombre del equipo para la columna Denominación
+  function nombreEquipo(eq) {
+    return [eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
+  }
+
+  // Nombre de ubicación legible
+  function nombreUbicacion(idUbicacion) {
+    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
+    if (!u) return idUbicacion || '—';
+    return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ') || idUbicacion;
+  }
+
+  // Construir filas: todos los planes × todos los periodos esperados
+  const LAB_ORDER = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207', 'Otros'];
   const porLab = {};
-  planes.forEach(plan => {
+  LAB_ORDER.forEach(l => porLab[l] = []);
+
+  planesActivos.forEach(plan => {
     const eq = DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo);
     if (!eq) return;
-    const lab = eq.Ubicacion || 'Sin ubicación';
-    if (!porLab[lab]) porLab[lab] = [];
+    const lab = detectarLab(eq.Ubicacion);
     const periodos = getPeriodosEsperados(plan, eq, curso);
-    const labPeriodoItems = periodos.map(periodo => {
-      const reg = registros.find(r => r.ID_Plan === plan.ID_Plan && r.Periodo === periodo);
-      return { eq, plan, periodo, reg };
-    });
     if (!periodos.length) {
       porLab[lab].push({ eq, plan, periodo: null, reg: null });
     } else {
-      labPeriodoItems.forEach(item => porLab[lab].push(item));
+      periodos.forEach(periodo => {
+        const reg = registros.find(r => r.ID_Plan === plan.ID_Plan && r.Periodo === periodo);
+        porLab[lab].push({ eq, plan, periodo, reg });
+      });
     }
   });
 
-  const filasPorLab = Object.entries(porLab).sort(([a], [b]) => a.localeCompare(b)).map(([lab, items]) => {
-    const filas = items.map(({ eq, plan, periodo, reg }) => `
-      <tr>
-        <td>${eq.Tipo_Equipo || ''} ${eq.Marca || ''} ${eq.Modelo || ''}</td>
-        <td>${lab}</td>
+  // Generar una sección HTML por laboratorio
+  function seccionLab(labKey, items) {
+    if (!items.length) return '';
+    const total     = items.length;
+    const realizados = items.filter(x => x.reg).length;
+    const pendentes = total - realizados;
+    const pct = total > 0 ? ((realizados / total) * 100).toFixed(0) : 0;
+    const hoy = new Date().toLocaleDateString('es-ES');
+
+    const filas = items.map(({ eq, plan, periodo, reg }) => {
+      const prevista = periodo ? labelPeriodo(periodo) : '';
+      const realizada = reg ? formatDate(reg.Fecha_Realizacion) : '';
+      const supervisado = reg ? (reg.Supervisado_Por || '') : '';
+      const observacions = reg ? (reg.Observaciones || '') : '';
+      return `<tr>
+        <td>${nombreEquipo(eq)}</td>
+        <td>${nombreUbicacion(eq.Ubicacion)}</td>
         <td>${eq.Responsable || ''}</td>
         <td>${plan.Tipo_Intervencion || ''}</td>
-        <td>${plan.Periodicidad || ''}${periodo ? ' · ' + labelPeriodo(periodo) : ''}</td>
-        <td style="max-width:300px;white-space:pre-line">${plan.Instrucciones || plan.Operacion || ''}</td>
-        <td>${periodo ? labelPeriodo(periodo) : ''}</td>
-        <td>${reg ? formatDate(reg.Fecha_Realizacion) : ''}</td>
-        <td>${reg ? (reg.Supervisado_Por || reg.Realizado_Por || '') : ''}</td>
-        <td>${reg ? (reg.Observaciones || '') : ''}</td>
-      </tr>`).join('');
-    return `<tr style="background:#f0f4ff"><td colspan="10"><strong>${lab}</strong></td></tr>${filas}`;
-  }).join('');
+        <td>${plan.Periodicidad || ''}</td>
+        <td>${plan.Operacion || ''}</td>
+        <td>${prevista}</td>
+        <td>${realizada}</td>
+        <td>${supervisado}</td>
+        <td>${observacions}</td>
+      </tr>`;
+    }).join('');
+
+    return `
+<div class="lab-section">
+  <div class="lab-header">
+    <div class="lab-title">Plan de Mantemento Preventivo · ${labKey} · CIFP Manuel Antonio · Curso ${curso}</div>
+    <div class="lab-meta">
+      <span><strong>MD84MAN01</strong></span>
+      <span>Data de actualización: ${hoy}</span>
+      <span>Total: <strong>${total}</strong></span>
+      <span>Realizados: <strong>${realizados}</strong></span>
+      <span>Pendentes: <strong>${pendentes}</strong></span>
+      <span>% realizado: <strong>${pct}%</strong></span>
+    </div>
+    <div class="purpose">
+      <strong>Serve para:</strong> Definir as instalacións, equipos e servizos de apoio sometidos ao procedemento de mantemento.
+      Designar responsables específicos. Determinar as frecuencias de control.<br>
+      <em>No caso do mantemento externalizado, o Responsable de mantemento limítase a xestionar a tarefa.</em>
+    </div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Denominación<br><small>(instalación, equipo, servizo de apoio)</small></th>
+      <th>Ubicación do equipo</th>
+      <th>Responsable<br>Mantemento</th>
+      <th>Mantemento<br>Interno/Externo</th>
+      <th>Periodicidade</th>
+      <th>Operación a realizar</th>
+      <th>Data prevista de realización</th>
+      <th>Data de realización</th>
+      <th>Supervisado por</th>
+      <th>Observacións</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+</div>`;
+  }
+
+  const secciones = LAB_ORDER
+    .filter(lab => porLab[lab] && porLab[lab].length)
+    .map(lab => seccionLab(lab, porLab[lab]))
+    .join('<div class="page-break"></div>');
 
   const html = `<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8">
+<html lang="gl"><head><meta charset="UTF-8">
 <title>Plan de Mantemento Preventivo – ${curso} – CIFP Manuel Antonio</title>
 <style>
-  body { font-family: Arial, sans-serif; font-size: 11px; margin: 20px; color: #222; }
-  h1 { font-size: 16px; margin-bottom: 4px; }
-  h2 { font-size: 13px; color: #444; margin-top: 0; }
-  .stats { display: flex; gap: 30px; margin: 12px 0; font-size: 12px; }
-  .stat-item strong { display: block; font-size: 20px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-  th { background: #2b4c9b; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; }
-  td { border: 1px solid #ddd; padding: 5px 7px; vertical-align: top; }
-  tr:nth-child(even) { background: #f9f9f9; }
-  .purpose { font-size: 10px; color: #555; border: 1px solid #ddd; padding: 8px; margin: 10px 0; }
-  @media print { body { margin: 0; } }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 10px; margin: 16px; color: #111; }
+  .lab-section { margin-bottom: 32px; }
+  .lab-header { margin-bottom: 8px; }
+  .lab-title { font-size: 13px; font-weight: bold; margin-bottom: 6px; }
+  .lab-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 10px; margin-bottom: 6px; color: #333; }
+  .purpose { font-size: 9px; color: #555; border: 1px solid #ccc; padding: 6px 8px; margin-top: 6px; background: #fafafa; }
+  table { width: 100%; border-collapse: collapse; }
+  thead tr { background: #1a3a6e; color: #fff; }
+  th { padding: 5px 6px; text-align: left; font-size: 9px; border: 1px solid #1a3a6e; }
+  th small { font-weight: normal; opacity: .85; }
+  td { border: 1px solid #bbb; padding: 4px 6px; vertical-align: top; font-size: 9px; }
+  tr:nth-child(even) td { background: #f5f7fb; }
+  .page-break { page-break-after: always; margin: 0; }
+  @media print {
+    body { margin: 0; font-size: 9px; }
+    .lab-section { page-break-inside: avoid; }
+    .page-break { display: block; page-break-after: always; }
+  }
 </style></head><body>
-<h1>Plan de Mantemento Preventivo</h1>
-<h2>CIFP Manuel Antonio · Vigo · Curso ${curso}</h2>
-<div class="purpose">
-  <strong>Serve para:</strong> Definir as instalacións, equipos e servizos de apoio sometidos ao procedemento de mantemento.
-  Designar responsables específicos. Determinar as frecuencias de control.<br>
-  <em>No caso do mantemento externalizado, o Responsable de mantemento limítase a xestionar a tarefa.</em>
-</div>
-<div class="stats">
-  <div class="stat-item"><strong>${pct}%</strong>% realizado</div>
-  <div class="stat-item"><strong>${total}</strong>Total mantenementos</div>
-  <div class="stat-item"><strong>${realizados}</strong>Realizados</div>
-  <div class="stat-item"><strong>${total - realizados}</strong>Pendentes</div>
-</div>
-<table>
-  <thead><tr>
-    <th>Denominación (instalación, equipo)</th>
-    <th>Ubicación</th>
-    <th>Responsable</th>
-    <th>Mant. Interno/Externo</th>
-    <th>Periodicidade</th>
-    <th>Operación a realizar</th>
-    <th>Data prevista</th>
-    <th>Data realización</th>
-    <th>Supervisado por</th>
-    <th>Observacións</th>
-  </tr></thead>
-  <tbody>${filasPorLab}</tbody>
-</table>
+${secciones}
 </body></html>`;
 
   const win = window.open('', '_blank');
