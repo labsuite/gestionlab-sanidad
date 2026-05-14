@@ -107,7 +107,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias',
           'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios', 'mantenimiento'],
+          'ubicaciones', 'usuarios'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
