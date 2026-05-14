@@ -561,63 +561,54 @@ async function exportarModeloCalidad(cursoAcademico) {
   const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso);
   const planesActivos = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
 
-  function detectarLab(idUbicacion) {
-    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
-    if (!u) return null;
-    const txt = [u.ID_Ubicacion, u.Laboratorio_Aula, u.Zona, u.Subzona, u.Descripcion_Completa].join(' ').toLowerCase();
-    if (txt.includes('207')) return 'LAB 207';
-    if (txt.includes('205')) return 'LAB 205';
-    if (txt.includes('203')) return 'LAB 203';
-    if (txt.includes('201')) return 'LAB 201';
-    return null;
+  // Devuelve TODOS los periodos del curso (incluidos futuros), para el documento anual
+  function getPeriodosCursoCompleto(plan, equipo) {
+    const [añoInicio, añoFin] = curso.split('-').map(Number);
+    const todosMeses = getMesesCurso(curso);
+    switch (plan.Periodicidad) {
+      case 'Mensual':    return todosMeses.map(m => m.str);
+      case 'Trimestral': return todosMeses.filter((_, i) => i % 3 === 0).map(m => m.str);
+      case 'Semestral':  return todosMeses.filter((_, i) => i % 6 === 0).map(m => m.str);
+      case 'Anual': case 'Bianual': case 'Cada 2 años':
+        return [todosMeses[0].str];
+      case 'Pretemporada':  return [`pretemporada-${curso}`];
+      case 'Posttemporada': return [`posttemporada-${curso}`];
+      default: return [];
+    }
   }
 
-  function nombreEquipo(eq) {
+  function denominacion(eq) {
     return [eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
   }
 
-  function nombreUbicacion(idUbicacion) {
+  function ubicacionTexto(idUbicacion) {
     const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
     if (!u) return idUbicacion || '';
-    return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ') || idUbicacion;
+    return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(', ');
   }
 
-  // Construir filas: máximo 2 por equipo (Interno + Externo)
+  // Una fila por plan × periodo, todos los equipos con planes activos
   const LAB_SHEETS = ['LAB 201', 'LAB 203', 'LAB 205', 'LAB 207'];
   const porLab = {};
   LAB_SHEETS.forEach(l => porLab[l] = []);
 
-  const planesPorEquipo = {};
-  planesActivos.forEach(plan => {
-    if (!planesPorEquipo[plan.ID_Equipo]) planesPorEquipo[plan.ID_Equipo] = [];
-    planesPorEquipo[plan.ID_Equipo].push(plan);
-  });
-
-  Object.entries(planesPorEquipo).forEach(([equipoId, planes]) => {
-    const eq = DATA.equipos.find(e => e.ID_Activo === equipoId);
-    if (!eq) return;
-    const lab = detectarLab(eq.Ubicacion);
-    if (!lab) return;
-
-    ['Interno', 'Externo'].forEach(tipo => {
-      const planesDelTipo = planes.filter(p => p.Tipo_Intervencion === tipo);
-      if (!planesDelTipo.length) return;
-
-      const operaciones    = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
-      const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
-
-      const regsDelTipo = registros
-        .filter(r => planesDelTipo.some(p => p.ID_Plan === r.ID_Plan))
-        .sort((a, b) => new Date(a.Fecha_Realizacion) - new Date(b.Fecha_Realizacion));
-      const ultimoReg = regsDelTipo[regsDelTipo.length - 1] || null;
-
-      const planRef = planesDelTipo[0];
-      const periodos = getPeriodosEsperados(planRef, eq, curso);
-      const prevista = periodos.length ? labelPeriodo(periodos[periodos.length - 1]) : '';
-
-      porLab[lab].push({ eq, tipo, operaciones, periodicidades, prevista, regs: regsDelTipo, ultimoReg });
+  DATA.equipos.forEach(eq => {
+    const lab = _detectarLabEquipo(eq);
+    if (!LAB_SHEETS.includes(lab)) return;
+    const planesEq = planesActivos.filter(p => p.ID_Equipo === eq.ID_Activo);
+    planesEq.forEach(plan => {
+      getPeriodosCursoCompleto(plan, eq).forEach(periodo => {
+        const reg = getRegistroMant(plan.ID_Plan, curso, periodo);
+        porLab[lab].push({ eq, plan, periodo, reg });
+      });
     });
   });
+
+  const totalFilas = LAB_SHEETS.reduce((n, l) => n + porLab[l].length, 0);
+  if (totalFilas === 0) {
+    showToast('No hay planes activos asignados a ningún laboratorio', 'error');
+    return;
+  }
 
   // Cargar plantilla con JSZip para editar el XML interno directamente
   // (preserva 100% del formato original: estilos, gráficas, colores, merges)
@@ -665,22 +656,18 @@ async function exportarModeloCalidad(cursoAcademico) {
     const items = porLab[labKey] || [];
     let xml = await zip.file(sheetFile).async('string');
 
-    items.forEach(({ eq, tipo, operaciones, periodicidades, prevista, regs, ultimoReg }, i) => {
+    items.forEach(({ eq, plan, periodo, reg }, i) => {
       const r = DATA_ROW + i;
-      const realizada   = regs.map(x => formatDate(x.Fecha_Realizacion)).filter(Boolean).join(', ');
-      const supervisado = ultimoReg ? (ultimoReg.Supervisado_Por || '') : '';
-      const observacions = ultimoReg ? (ultimoReg.Observaciones || '') : '';
-
-      xml = fillCell(xml, `A${r}`, nombreEquipo(eq));
-      xml = fillCell(xml, `B${r}`, nombreUbicacion(eq.Ubicacion));
+      xml = fillCell(xml, `A${r}`, denominacion(eq));
+      xml = fillCell(xml, `B${r}`, ubicacionTexto(eq.Ubicacion));
       xml = fillCell(xml, `C${r}`, eq.Responsable || '');
-      xml = fillCell(xml, `D${r}`, tipo);
-      xml = fillCell(xml, `E${r}`, periodicidades);
-      xml = fillCell(xml, `F${r}`, operaciones);
-      xml = fillCell(xml, `G${r}`, prevista);
-      xml = fillCell(xml, `H${r}`, realizada);
-      xml = fillCell(xml, `I${r}`, supervisado);
-      xml = fillCell(xml, `J${r}`, observacions);
+      xml = fillCell(xml, `D${r}`, plan.Tipo_Intervencion);
+      xml = fillCell(xml, `E${r}`, plan.Periodicidad);
+      xml = fillCell(xml, `F${r}`, plan.Operacion);
+      xml = fillCell(xml, `G${r}`, labelPeriodo(periodo));
+      xml = fillCell(xml, `H${r}`, reg ? formatDate(reg.Fecha_Realizacion) : '');
+      // I (Supervisado por): siempre en blanco
+      xml = fillCell(xml, `J${r}`, reg ? (reg.Observaciones || '') : '');
     });
 
     zip.file(sheetFile, xml);
