@@ -63,10 +63,6 @@
         <span class="nav-icon">🛡️</span> Mantenimiento
         <span class="nav-badge" id="badge-mantenimiento" style="display:none">0</span>
       </div>
-      <div class="nav-item" id="nav-residuos" onclick="showPage('residuos')">
-        <span class="nav-icon">♻️</span> Residuos
-        <span class="nav-badge" id="badge-residuos" style="display:none">0</span>
-      </div>
       <!-- RENOMBRADO: "Catálogo" en vez de "Configuración" -->
       <div class="nav-section-label" style="margin-top:12px">Material fungible</div>
       <div class="nav-item" onclick="showPage('material')">
@@ -84,6 +80,14 @@
       </div>
       <div class="nav-item" onclick="showPage('contabilidad')" id="nav-contabilidad">
         <span class="nav-icon">📊</span> Contabilidad
+      </div>
+      <div class="nav-section-label" style="margin-top:12px">Residuos</div>
+      <div class="nav-item" onclick="showPage('residuos-guia')">
+        <span class="nav-icon">♻️</span> Guía de residuos
+      </div>
+      <div class="nav-item" id="nav-residuos-cont" onclick="showPage('residuos-contenedores')">
+        <span class="nav-icon">🗑️</span> Contenedores
+        <span class="nav-badge" id="badge-residuos" style="display:none">0</span>
       </div>
       <div class="nav-section-label" style="margin-top:12px" id="label-catalogo">Catálogo</div>
       <div class="nav-item" onclick="showPage('proveedores')" id="nav-proveedores">
@@ -506,7 +510,8 @@
       </div>
 
       <!-- RESIDUOS -->
-      <div class="page" id="page-residuos"></div>
+      <div class="page" id="page-residuos-guia"></div>
+      <div class="page" id="page-residuos-contenedores"></div>
 
       <!-- USUARIOS -->
       <div class="page" id="page-usuarios">

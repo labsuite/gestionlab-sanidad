@@ -15,66 +15,20 @@ function _nivelBadge(nivel) {
   return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;background:${color}20;color:${color};border:1px solid ${color}40">${nivel || '—'}</span>`;
 }
 
-function renderResiduos() {
-  const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
-  const alertas = DATA.contenedoresResiduo.filter(c => c.Nivel === '75%' || c.Nivel === 'lleno').length;
-
-  document.getElementById('page-residuos').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
-      <div>
-        <h2 style="margin:0;font-size:20px">Gestión de residuos</h2>
-        <div style="color:var(--text-muted);font-size:13px;margin-top:2px">
-          ${alertas > 0
-            ? `<span style="color:#f97316;font-weight:600">${alertas} contenedor${alertas > 1 ? 'es' : ''} requiere${alertas > 1 ? 'n' : ''} atención</span>`
-            : 'Todos los contenedores en niveles normales'}
-        </div>
-      </div>
-      ${canEdit ? `<button class="btn btn-primary" onclick="openModalContenedor()">+ Añadir contenedor</button>` : ''}
+// ── Página: Guía de residuos ─────────────────────────────────
+function renderResiduosGuia() {
+  const el = document.getElementById('page-residuos-guia');
+  if (!el) return;
+  el.innerHTML = `
+    <div style="margin-bottom:20px">
+      <input type="text" id="res-search" class="form-input"
+        placeholder="Buscar residuo, riesgo o contenedor…"
+        oninput="filtrarGuia()" style="max-width:340px">
     </div>
-
-    <div style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border)">
-      <button id="tab-res-guia" onclick="switchResTab('guia')"
-        style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px">
-        Guía de residuos
-      </button>
-      <button id="tab-res-cont" onclick="switchResTab('contenedores')"
-        style="padding:8px 20px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:500;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px">
-        Contenedores
-      </button>
-    </div>
-
-    <div id="restab-guia">
-      <div style="margin-bottom:16px">
-        <input type="text" id="res-search" class="form-input" placeholder="Buscar residuo, riesgo o contenedor…" oninput="filtrarGuia()" style="max-width:340px">
-      </div>
-      <div id="res-guia-lista">${_renderGuia(DATA.tiposResiduo, '')}</div>
-    </div>
-
-    <div id="restab-cont" style="display:none">
-      <div id="res-cont-tabla">${_renderContenedores(DATA.contenedoresResiduo, canEdit)}</div>
-    </div>
+    <div id="res-guia-lista">${_renderGuia(DATA.tiposResiduo, '')}</div>
   `;
 }
 
-function switchResTab(tab) {
-  const isGuia = tab === 'guia';
-  document.getElementById('restab-guia').style.display = isGuia ? '' : 'none';
-  document.getElementById('restab-cont').style.display  = isGuia ? 'none' : '';
-
-  const tGuia = document.getElementById('tab-res-guia');
-  const tCont = document.getElementById('tab-res-cont');
-  if (!tGuia || !tCont) return;
-
-  tGuia.style.color        = isGuia ? 'var(--primary)' : 'var(--text-muted)';
-  tGuia.style.borderBottom = isGuia ? '2px solid var(--primary)' : '2px solid transparent';
-  tGuia.style.fontWeight   = isGuia ? '600' : '500';
-
-  tCont.style.color        = isGuia ? 'var(--text-muted)' : 'var(--primary)';
-  tCont.style.borderBottom = isGuia ? '2px solid transparent' : '2px solid var(--primary)';
-  tCont.style.fontWeight   = isGuia ? '500' : '600';
-}
-
-// ── Guía ────────────────────────────────────────────────────
 function _renderGuia(tipos, filtro) {
   const f = filtro.toLowerCase();
   const lista = tipos.filter(t =>
@@ -106,7 +60,27 @@ function filtrarGuia() {
   document.getElementById('res-guia-lista').innerHTML = _renderGuia(DATA.tiposResiduo, filtro);
 }
 
-// ── Contenedores ────────────────────────────────────────────
+// ── Página: Contenedores ─────────────────────────────────────
+function renderResiduosContenedores() {
+  const el = document.getElementById('page-residuos-contenedores');
+  if (!el) return;
+
+  const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
+  const alertas = DATA.contenedoresResiduo.filter(c => c.Nivel === '75%' || c.Nivel === 'lleno').length;
+
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <div style="font-size:13px;color:var(--text-muted)">
+        ${alertas > 0
+          ? `<span style="color:#f97316;font-weight:600">${alertas} contenedor${alertas > 1 ? 'es' : ''} requiere${alertas > 1 ? 'n' : ''} atención</span>`
+          : 'Todos los contenedores en niveles normales'}
+      </div>
+      ${canEdit ? `<button class="btn btn-primary" onclick="openModalContenedor()">+ Añadir contenedor</button>` : ''}
+    </div>
+    ${_renderContenedores(DATA.contenedoresResiduo, canEdit)}
+  `;
+}
+
 function _renderContenedores(contenedores, canEdit) {
   if (!contenedores.length) {
     return `<div style="color:var(--text-muted);padding:32px;text-align:center">No hay contenedores registrados</div>`;
@@ -122,8 +96,9 @@ function _renderContenedores(contenedores, canEdit) {
       <td style="font-size:12px;color:var(--text-muted)">${c.Actualizado_Por || '—'}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-sm btn-secondary" onclick="openModalNivel(${i})">Actualizar nivel</button>
-        ${canEdit ? `<button class="btn btn-sm" onclick="openModalContenedor(${i})" style="margin-left:4px">✏️</button>
-        <button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${i})" style="margin-left:4px">✕</button>` : ''}
+        ${canEdit ? `
+          <button class="btn btn-sm" onclick="openModalContenedor(${i})" style="margin-left:4px">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${i})" style="margin-left:4px">✕</button>` : ''}
       </td>
     </tr>`;
   }).join('');
@@ -171,7 +146,7 @@ async function guardarNivel() {
     c.Fecha_Actualizacion = fecha;
     c.Actualizado_Por = usuario;
     closeModal('modal-res-nivel');
-    renderResiduos();
+    renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Nivel actualizado', 'success');
   } catch(e) {
@@ -229,7 +204,7 @@ async function guardarContenedor() {
       DATA.contenedoresResiduo.push(rowToObj(row, 'contenedoresResiduo'));
     }
     closeModal('modal-contenedor-res');
-    renderResiduos();
+    renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Contenedor guardado', 'success');
   } catch(e) {
@@ -242,7 +217,7 @@ async function eliminarContenedor(idx) {
   try {
     await sheetsDeleteRow('Contenedores_Residuo', idx);
     DATA.contenedoresResiduo.splice(idx, 1);
-    renderResiduos();
+    renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Contenedor eliminado', 'success');
   } catch(e) {
