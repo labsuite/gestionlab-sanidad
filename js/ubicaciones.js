@@ -52,7 +52,10 @@ function renderUbicaciones() {
         <span style="font-size:12px;color:var(--text-muted)">${u.Subzona||u.Descripcion_Completa||'—'}</span>
         <div>${matCell}</div>
         <div>${u.Activa !== 'FALSE' ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-gray">Inactiva</span>'}</div>
-        <div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUbicacion(${DATA.ubicaciones.indexOf(u)})">✏️</button>` : ''}</div>
+        <div class="row-actions">
+          ${puedeEditar ? `<button class="icon-btn" onclick="mostrarUrlNfc('${u.ID_Ubicacion.replace(/'/g,"\\'")}')" title="URL para etiqueta NFC">🔗</button>` : ''}
+          ${puedeEditar ? `<button class="icon-btn" onclick="editUbicacion(${DATA.ubicaciones.indexOf(u)})">✏️</button>` : ''}
+        </div>
       </div>`;
     }).join('');
     return `<div class="ubi-grupo">
@@ -69,6 +72,37 @@ function renderUbicaciones() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ============================================================
+// NFC — Generador de URL para etiquetas
+// Visible solo para Gestor y Administrador (botón 🔗 en cada fila)
+// ============================================================
+function mostrarUrlNfc(ubicacionId) {
+  const base = window.location.origin + window.location.pathname;
+  const url  = `${base}?armario=${encodeURIComponent(ubicacionId)}&action=transfer`;
+  document.getElementById('nfc-url-ubi-label').textContent = getNombreUbicacion(ubicacionId);
+  document.getElementById('nfc-url-text').textContent      = url;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(url)}`;
+  const qrImg = document.getElementById('nfc-url-qr');
+  qrImg.src = '';
+  qrImg.src = qrSrc;
+  openModal('modal-nfc-url');
+}
+
+async function copiarUrlNfc() {
+  const url = document.getElementById('nfc-url-text').textContent;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('URL copiada al portapapeles ✓', 'success');
+  } catch {
+    const el = document.createElement('textarea');
+    el.value = url; el.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(el);
+    el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('URL copiada al portapapeles ✓', 'success');
+  }
 }
 
 function toggleUbiGrupo(id) {

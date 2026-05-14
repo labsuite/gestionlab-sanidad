@@ -168,6 +168,72 @@
   </div>
 </div>
 
+<!-- Modal URL NFC (Gestor/Admin) — genera URL y QR para programar etiqueta NFC -->
+<div class="modal-overlay" id="modal-nfc-url">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <div class="modal-title">🔗 Etiqueta NFC</div>
+      <button class="modal-close" onclick="closeModal('modal-nfc-url')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:12px">
+        📍 <span id="nfc-url-ubi-label"></span>
+      </div>
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">URL a programar en la etiqueta</div>
+        <code id="nfc-url-text" style="font-size:11px;color:var(--accent);word-break:break-all;line-height:1.5;display:block"></code>
+      </div>
+      <button class="btn btn-secondary" style="width:100%;margin-bottom:16px" onclick="copiarUrlNfc()">
+        📋 Copiar URL
+      </button>
+      <div style="text-align:center;margin-bottom:12px">
+        <img id="nfc-url-qr" src="" alt="QR de la URL NFC"
+             style="width:180px;height:180px;border-radius:var(--radius-sm);border:1px solid var(--border)"
+             onerror="this.style.display='none'">
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:0">
+        Graba esta URL en la etiqueta NFC con <strong>NFC Tools</strong> u otra app de escritura NFC.
+        Al escanear, la app se abrirá directamente en el modal de transferencia para este armario.
+        El QR sirve como alternativa si no tienes etiquetas NFC.
+      </p>
+      <div class="form-footer" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="closeModal('modal-nfc-url')">Listo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Transferencia desde Armario (NFC) -->
+<div class="modal-overlay" id="modal-nfc-transfer">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">📦 ¿Qué te llevas?</div>
+      <button class="modal-close" onclick="closeModal('modal-nfc-transfer')">✕</button>
+    </div>
+    <div class="modal-body" style="padding-bottom:16px">
+      <input type="hidden" id="nfc-transfer-origen-id">
+      <div id="nfc-transfer-info"
+           style="background:var(--accent-light);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--accent);font-weight:500">
+        📍 <span id="nfc-transfer-nombre-ubi"></span>
+      </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">
+        Introduce la cantidad que te llevas (deja en 0 lo que no cojas)
+      </div>
+      <div id="nfc-transfer-items"
+           style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:16px">
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label>¿A dónde los llevas? *</label>
+        <select id="nfc-transfer-destino"></select>
+      </div>
+      <div class="form-footer" style="margin-top:16px">
+        <button class="btn btn-secondary" onclick="closeModal('modal-nfc-transfer')">Cancelar</button>
+        <button class="btn btn-primary" onclick="confirmarTransferenciaArmario()">✅ Confirmar traslado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Traslado entre ubicaciones -->
 <div class="modal-overlay" id="modal-traslado">
   <div class="modal" style="max-width:420px">

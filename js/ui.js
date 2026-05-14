@@ -204,6 +204,7 @@ function showApp() {
 
   showPage(p.dashboard ? 'dashboard' : (p.nav[0] || 'equipos'));
   scheduleTokenRenewal();
+  _checkPendingNfcAction();
 }
 
 function aplicarPermisosUI() {
@@ -272,6 +273,24 @@ function poblarSelects() {
   ['eq-proveedor-compra', 'eq-proveedor-sat', 'int-proveedor'].forEach(id => setOptions(id, proveedoresNames));
   ['int-realizado-por'].forEach(id => setOptions(id, usuariosNames));
   ['int-equipo-dummy', 'inc-equipo'].forEach(id => setOptions(id, equiposIds));
+}
+
+// ============================================================
+// NFC — Detección de acción pendiente desde URL
+// ============================================================
+function _checkPendingNfcAction() {
+  const params  = new URLSearchParams(window.location.search);
+  const armario = params.get('armario');
+  const action  = params.get('action');
+  if (!armario || action !== 'transfer') return;
+  history.replaceState({}, '', window.location.pathname);
+  setTimeout(() => {
+    if (typeof openModalTransferenciaArmario === 'function') {
+      openModalTransferenciaArmario(armario);
+    } else {
+      console.warn('NFC: openModalTransferenciaArmario no está definida todavía');
+    }
+  }, 400);
 }
 
 // ============================================================

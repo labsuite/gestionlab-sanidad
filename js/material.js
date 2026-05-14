@@ -819,6 +819,127 @@ async function guardarEntrada() {
 // toggleGestionAutoStock eliminado — gestión por lote
 
 // ============================================================
+// TRANSFERENCIA DESDE ARMARIO — modal NFC
+// ============================================================
+function openModalTransferenciaArmario(ubicacionId) {
+  const ubi = DATA.ubicaciones.find(u => u.ID_Ubicacion === ubicacionId);
+  if (!ubi) { showToast(`Armario "${ubicacionId}" no encontrado en la base de datos`, 'error'); return; }
+  sv('nfc-transfer-origen-id', ubicacionId);
+  document.getElementById('nfc-transfer-nombre-ubi').textContent = getNombreUbicacion(ubicacionId);
+  const itemsLote = DATA.materialUbicaciones
+    .filter(l => l.ID_Ubicacion === ubicacionId && (parseFloat(l.Stock_Local) || 0) > 0)
+    .map(l => {
+      const mat = DATA.material.find(m => m.ID_Material === l.ID_Material);
+      return mat ? { mat, stockOrigen: parseFloat(l.Stock_Local) || 0, isLote: true } : null;
+    }).filter(Boolean);
+  const idsConLote = new Set(itemsLote.map(i => i.mat.ID_Material));
+  const itemsSingle = DATA.material
+    .filter(m => m.Ubicacion === ubicacionId && !idsConLote.has(m.ID_Material) &&
+      getMatUbics(m.ID_Material).length === 0 && (parseFloat(m.Stock_Actual) || 0) > 0)
+    .map(m => ({ mat: m, stockOrigen: parseFloat(m.Stock_Actual) || 0, isLote: false }));
+  const todos = [...itemsLote, ...itemsSingle];
+  const container = document.getElementById('nfc-transfer-items');
+  if (!todos.length) {
+    container.innerHTML = `<div style="text-align:center;padding:28px 16px;color:var(--text-muted);font-size:13px">
+      🈳 Este armario no tiene material con stock disponible en este momento.</div>`;
+  } else {
+    container.innerHTML = todos.map(({ mat, stockOrigen, isLote }) => `
+      <div class="nfc-item-row"
+           data-mat-id="${mat.ID_Material}" data-is-lote="${isLote}" data-stock-origen="${stockOrigen}"
+           style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <div style="flex:1;min-width:130px">
+          <div style="font-size:13px;font-weight:500;line-height:1.3">${mat.Nombre}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+            <span class="badge badge-gray" style="font-size:10px">${mat.Categoria || '—'}</span>&nbsp;
+            Disponible: <strong>${stockOrigen}</strong> ${mat.Unidad || ''}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+          <input type="number" class="nfc-item-cant"
+                 min="0" max="${stockOrigen}" step="1" value="0"
+                 style="width:72px;font-size:15px;padding:6px 8px;text-align:center;border-radius:var(--radius-sm);border:1px solid var(--border)"
+                 oninput="_validarCantNfc(this,${stockOrigen})">
+          <span style="font-size:12px;color:var(--text-muted);min-width:32px">${mat.Unidad || ''}</span>
+        </div>
+      </div>`).join('');
+  }
+  const selDest = document.getElementById('nfc-transfer-destino');
+  selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
+    DATA.ubicaciones
+      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== ubicacionId)
+      .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
+      .join('');
+  openModal('modal-nfc-transfer');
+}
+
+function _validarCantNfc(input, max) {
+  const val = parseFloat(input.value);
+  if (isNaN(val) || val < 0) { input.value = 0; return; }
+  if (val > max) input.value = max;
+}
+
+async function confirmarTransferenciaArmario() {
+  const destino = v('nfc-transfer-destino');
+  if (!destino) { showToast('Selecciona el destino', 'error'); return; }
+  const origen = document.getElementById('nfc-transfer-origen-id').value;
+  const items = [];
+  document.querySelectorAll('#nfc-transfer-items .nfc-item-row').forEach(row => {
+    const cant = parseFloat(row.querySelector('.nfc-item-cant').value) || 0;
+    if (cant <= 0) return;
+    const stockOrigen = parseFloat(row.dataset.stockOrigen) || 0;
+    if (cant > stockOrigen) return;
+    items.push({ matId: row.dataset.matId, cant, isLote: row.dataset.isLote === 'true', stockOrigen });
+  });
+  if (!items.length) { showToast('Introduce la cantidad de al menos un material', 'error'); return; }
+  showLoading('Trasladando...');
+  try {
+    const fecha = new Date().toISOString().split('T')[0];
+    for (const item of items) {
+      const mat = DATA.material.find(m => m.ID_Material === item.matId);
+      if (!mat) continue;
+      if (item.isLote) {
+        const loteOrigenIdx = DATA.materialUbicaciones.findIndex(
+          l => l.ID_Material === item.matId && l.ID_Ubicacion === origen);
+        if (loteOrigenIdx === -1) continue;
+        await actualizarStockLocal(loteOrigenIdx, item.stockOrigen - item.cant);
+        const loteDestinoIdx = DATA.materialUbicaciones.findIndex(
+          l => l.ID_Material === item.matId && l.ID_Ubicacion === destino);
+        if (loteDestinoIdx !== -1) {
+          const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
+          await actualizarStockLocal(loteDestinoIdx, stockDest + item.cant);
+        } else {
+          await añadirLote(item.matId, destino, item.cant, 0, 0);
+        }
+      } else {
+        const matIdx = DATA.material.indexOf(mat);
+        const nuevoStockOrig = item.stockOrigen - item.cant;
+        mat.Stock_Actual = '0';
+        await sheetsUpdate(`Material!H${matIdx + 2}`, [0]);
+        if (nuevoStockOrig > 0) await añadirLote(item.matId, origen, nuevoStockOrig, 0, 0);
+        const loteDestinoIdx = DATA.materialUbicaciones.findIndex(
+          l => l.ID_Material === item.matId && l.ID_Ubicacion === destino);
+        if (loteDestinoIdx !== -1) {
+          const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
+          await actualizarStockLocal(loteDestinoIdx, stockDest + item.cant);
+        } else {
+          await añadirLote(item.matId, destino, item.cant, 0, 0);
+        }
+      }
+      const movRow = [genId('MOV-'), mat.Nombre, 'Traslado', item.cant,
+        currentUser?.name || 'Usuario', fecha,
+        `NFC · De: ${getNombreUbicacion(origen)} → ${getNombreUbicacion(destino)}`, ''];
+      await sheetsAppend('Movimientos', movRow);
+      DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
+    }
+    const n = items.length;
+    showToast(`${n} ítem${n>1?'s':''} trasladado${n>1?'s':''} → ${getNombreUbicacion(destino)}`, 'success');
+    closeModal('modal-nfc-transfer');
+    renderMaterial(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error en el traslado. Revisa la consola.', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
 // TRASLADO entre ubicaciones (zona común → laboratorio y viceversa)
 // ============================================================
 function openModalTrasladoLote(matId, idUbicacionOrigen) {
