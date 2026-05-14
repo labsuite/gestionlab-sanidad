@@ -141,14 +141,7 @@
           <textarea id="eq-protocolo-uso" rows="4" placeholder="Instrucciones de uso que se mostrarán en la tarjeta del equipo (no genera alertas de mantenimiento)..."></textarea>
         </div>
         <div class="form-group">
-          <label>Tipo de mantenimiento</label>
-          <select id="eq-tipo-mant" onchange="toggleTipoMant(this.value)">
-            <option value="Periódico">Periódico</option>
-            <option value="Estacional">Estacional (solo parte del año)</option>
-          </select>
-        </div>
-        <div class="form-group" id="eq-temporada-group" style="display:none">
-          <label>Temporada</label>
+          <label>Temporada (si aplica)</label>
           <div style="display:flex;gap:8px;align-items:center">
             <div style="flex:1">
               <label style="font-size:11px;color:var(--text-muted)">Mes inicio (1-12)</label>
@@ -159,6 +152,7 @@
               <input id="eq-mes-fin" type="number" min="1" max="12" placeholder="Ej: 5 (may)">
             </div>
           </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Solo necesario si algún plan tiene periodicidad Pretemporada / Posttemporada</div>
         </div>
         <div class="form-group full">
           <label>Manual / instrucciones (PDF)</label>

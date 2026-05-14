@@ -107,11 +107,10 @@ function openModalEquipo() {
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
   sv('eq-estado','Operativo'); sv('eq-pdf-url','');
-  sv('eq-protocolo-uso',''); sv('eq-tipo-mant','Periódico'); sv('eq-mes-inicio',''); sv('eq-mes-fin','');
+  sv('eq-protocolo-uso',''); sv('eq-mes-inicio',''); sv('eq-mes-fin','');
   document.getElementById('eq-pdf-preview').style.display = 'none';
   document.getElementById('eq-pdf-name').textContent = '';
   if (document.getElementById('eq-pdf-input')) document.getElementById('eq-pdf-input').value = '';
-  toggleTipoMant('Periódico');
   // Limpiar autocomplete ubicación
   clearUbicacionEquipo();
   poblarSelects(); openModal('modal-equipo');
@@ -132,10 +131,8 @@ function editEquipo(idx) {
   sv('eq-coste', e.Coste||'');
   sv('eq-pdf-url', e.Manual_Ficha_Tecnica||'');
   sv('eq-protocolo-uso', e.Protocolo_Uso||'');
-  sv('eq-tipo-mant', e.Tipo_Mantenimiento || 'Periódico');
   sv('eq-mes-inicio', e.Mes_Inicio_Temporada||'');
   sv('eq-mes-fin', e.Mes_Fin_Temporada||'');
-  toggleTipoMant(e.Tipo_Mantenimiento || 'Periódico');
   // Restaurar autocomplete de ubicación
   document.getElementById('eq-ubicacion').value = e.Ubicacion || '';
   document.getElementById('eq-ubicacion-search').value = '';
@@ -154,10 +151,6 @@ function editEquipo(idx) {
   openModal('modal-equipo');
 }
 
-function toggleTipoMant(val) {
-  const group = document.getElementById('eq-temporada-group');
-  if (group) group.style.display = val === 'Estacional' ? 'flex' : 'none';
-}
 
 // ============================================================
 // MODAL INTERVENCIÓN (modo manual / edición directa)
@@ -717,12 +710,10 @@ async function guardarEquipo() {
     pendingEqFileBase64 = null;
   }
 
-  const tipoMant = v('eq-tipo-mant');
-  const mesInicio = tipoMant === 'Estacional' ? v('eq-mes-inicio') : '';
-  const mesFin    = tipoMant === 'Estacional' ? v('eq-mes-fin')   : '';
   // Columnas M-P (Periodicidad_Mantenimiento, Periodicidad_Custom, Fecha_Ultimo_Preventivo, Fecha_Proximo_Preventivo)
   // gestionadas ahora por Planes_Mantenimiento + Registro_Mantenimientos — se mantienen vacías
-  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), '', '', '', '', manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), tipoMant, mesInicio, mesFin];
+  // Columna U (Tipo_Mantenimiento) eliminada del modal — se deja vacía
+  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), '', '', '', '', manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), '', v('eq-mes-inicio'), v('eq-mes-fin')];
 
   showLoading('Guardando...');
   try {
