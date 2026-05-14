@@ -254,6 +254,7 @@ function abrirPlanificacion(incId, equipo) {
   if (label) label.textContent = incId + ' (' + equipo + ')';
   sv('plan-tipo', 'Correctivo');
   sv('plan-fecha', new Date().toISOString().split('T')[0]);
+  sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
   openModal('modal-planificar-intervencion');
 }
@@ -280,10 +281,12 @@ async function guardarPlanificacion() {
     '',            // L Equipo_Operativo
     '',            // M URL_Adjunto
     '',            // N Factura_Asociada
-    '',            // O Actualiza_Proximo_Preventivo
-    v('plan-descripcion'), // P Observaciones (usamos para guardar descripción planificada)
+    '',            // O (legacy)
+    v('plan-descripcion'), // P Observaciones
     '',            // Q Nombre_Adjunto
-    'Planificada'  // R Estado
+    'Planificada', // R Estado
+    v('plan-fecha-estimada') || '', // S Fecha_Estimada_Resolucion
+    ''             // T Coste_Intervencion
   ];
 
   showLoading('Guardando...');
@@ -338,6 +341,7 @@ function openModalRegistrarActuacion(intIdx) {
   sv('act-observaciones', '');
   sv('act-resultado', 'Resuelto');
   sv('act-operativo', 'Sí');
+  sv('act-coste', '');
   sv('act-pdf-url', '');
 
   // Poblar selects
@@ -361,10 +365,12 @@ function openModalRegistrarActuacion(intIdx) {
 }
 
 function toggleActEjecucion(tipo) {
-  const intGrp = document.getElementById('act-interna-group');
-  const extGrp = document.getElementById('act-externa-group');
-  if (intGrp) intGrp.style.display = tipo === 'Interna' ? '' : 'none';
-  if (extGrp) extGrp.style.display = tipo === 'Externa' ? '' : 'none';
+  const intGrp   = document.getElementById('act-interna-group');
+  const extGrp   = document.getElementById('act-externa-group');
+  const costeGrp = document.getElementById('act-coste-group');
+  if (intGrp)   intGrp.style.display   = tipo === 'Interna' ? '' : 'none';
+  if (extGrp)   extGrp.style.display   = tipo === 'Externa' ? '' : 'none';
+  if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
 }
 
 function toggleActResultado(val) {
@@ -423,7 +429,7 @@ async function guardarActuacion() {
     ? descAnterior + '\n── ' + fechaReal + ' ──\n' + desc
     : desc;
 
-  // Actualizar fila en Sheets — mantenemos ID, Equipo, Tipo, Origen y Fecha_Planificada
+  const coste = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
   const updatedRow = [
     i.ID_Intervencion,           // A
     i.Equipo,                    // B
@@ -432,23 +438,25 @@ async function guardarActuacion() {
     i.Fecha_Planificada || '',   // E
     fechaReal,                   // F Fecha_Realizacion
     realizadoPor,                // G Realizado_Por
-    proveedorExt ? '' : '',      // H Tecnico_Externo
+    '',                          // H Tecnico_Externo
     proveedorExt,                // I Proveedor
     descAcumulada,               // J Descripcion_Actuacion (acumulada)
     resultado,                   // K Resultado
     operativo,                   // L Equipo_Operativo
     urlAdjunto,                  // M URL_Adjunto
     '',                          // N Factura_Asociada
-    'No',                        // O Actualiza_Proximo_Preventivo
+    '',                          // O (legacy)
     v('act-observaciones'),      // P Observaciones
     nombreAdjunto,               // Q Nombre_Adjunto
-    nuevoEstadoInt               // R Estado
+    nuevoEstadoInt,              // R Estado
+    i.Fecha_Estimada_Resolucion || '', // S Fecha_Estimada_Resolucion (se preserva)
+    coste                        // T Coste_Intervencion
   ];
 
   showLoading('Guardando actuación...');
   try {
     // ── Guardar datos de la actuación en la intervención actual ────────────
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:R${intIdx + 2}`, updatedRow);
+    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
     DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
 
     // ── Estado operativo del equipo según resultado + campo operativo ─────
@@ -475,7 +483,9 @@ async function guardarActuacion() {
         '', '', '', '', '',               // K-O
         '',                               // P Observaciones
         '',                               // Q Nombre_Adjunto
-        'En gestión'                      // R Estado
+        'En gestión',                     // R Estado
+        i.Fecha_Estimada_Resolucion || '', // S (heredada del padre)
+        ''                                // T Coste
       ];
       await sheetsAppend('Intervenciones', nuevaRow);
       const nuevaObj = rowToObj(nuevaRow, 'intervenciones');
@@ -708,12 +718,23 @@ async function guardarIntervencion() {
 
   const tipo    = v('int-tipo');
   const estado  = v('int-estado-manual') || 'Planificada';
-  const row     = [editingRow ? DATA.intervenciones[editingRow.rowIndex].ID_Intervencion : genId('INT-'), equipo, tipo, '', v('int-fecha-plan'), fechaReal, v('int-realizado-por'), v('int-tecnico-ext'), v('int-proveedor'), desc, v('int-resultado'), v('int-operativo'), urlAdjunto, '', '', v('int-observaciones'), nombreAdjunto, estado];
+  const existente = editingRow ? DATA.intervenciones[editingRow.rowIndex] : null;
+  const row     = [
+    existente ? existente.ID_Intervencion : genId('INT-'),
+    equipo, tipo, '',
+    v('int-fecha-plan'), fechaReal,
+    v('int-realizado-por'), v('int-tecnico-ext'), v('int-proveedor'),
+    desc, v('int-resultado'), v('int-operativo'),
+    urlAdjunto, '', '',
+    v('int-observaciones'), nombreAdjunto, estado,
+    existente ? (existente.Fecha_Estimada_Resolucion || '') : '', // S
+    existente ? (existente.Coste_Intervencion || '') : ''         // T
+  ];
 
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Intervenciones') {
-      await sheetsUpdate(`Intervenciones!A${editingRow.rowIndex + 2}:R${editingRow.rowIndex + 2}`, row);
+      await sheetsUpdate(`Intervenciones!A${editingRow.rowIndex + 2}:T${editingRow.rowIndex + 2}`, row);
       DATA.intervenciones[editingRow.rowIndex] = rowToObj(row, 'intervenciones');
       showToast('Intervención actualizada', 'success');
     } else {
@@ -722,7 +743,7 @@ async function guardarIntervencion() {
       showToast('Intervención guardada', 'success');
     }
 
-    // Actualizar Estado_Operativo del equipo según resultado indicado
+    // Actualizar Estado_Operativo del equipo según resultado
     const resultadoInt = v('int-resultado');
     const operativoInt = v('int-operativo');
     if (resultadoInt === 'Resuelto') {
@@ -730,24 +751,10 @@ async function guardarIntervencion() {
     } else if (resultadoInt === 'Pendiente' || resultadoInt === 'Resuelto parcialmente') {
       try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
     }
+    // Nota: el cierre de incidencias solo se gestiona desde el flujo guiado (guardarActuacion)
+    // para evitar cerrar incidencias equivocadas en equipos con múltiples incidencias abiertas.
 
-      // Cerrar incidencia abierta vinculada al equipo cuando resultado=Resuelto
-  if (resultadoInt === 'Resuelto') {
-    const eqId = equipo.split(' – ')[0].trim();
-    const incVinculadaIdx = DATA.incidencias.findIndex(inc =>
-      (inc.Equipo||'').startsWith(eqId) &&
-      !['Resuelta','Cerrada','Archivada'].includes(inc.Estado)
-    );
-    if (incVinculadaIdx !== -1) {
-      const inc = DATA.incidencias[incVinculadaIdx];
-      inc.Estado = 'Archivada';
-      const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora,
-        inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Archivada', inc.Intervencion_Generada];
-      try { await sheetsUpdate(`Incidencias!A${incVinculadaIdx+2}:I${incVinculadaIdx+2}`, incRow); } catch(e) { console.warn(e); }
-    }
-  }
-
-  pendingFileBase64 = null;
+    pendingFileBase64 = null;
     closeModal('modal-intervencion'); renderAll();
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading(); editingRow = null;
@@ -765,9 +772,8 @@ async function guardarIncidencia() {
   try {
     await sheetsAppend('Incidencias', row);
     DATA.incidencias.push(rowToObj(row, 'incidencias'));
-    // Marcar equipo como "En mantenimiento" siempre que se abra una incidencia
-    // (el impacto real se muestra en el badge de la tabla de equipos)
-    try { await actualizarEstadoEquipo(equipo, 'En revisión'); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
+    const estadoXImpacto = v('inc-impacto') === 'Equipo fuera de servicio' ? 'En revisión' : 'Operativo con fallos';
+    try { await actualizarEstadoEquipo(equipo, estadoXImpacto); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
     showToast('Incidencia reportada', 'success');
     closeModal('modal-incidencia'); renderAll();
   } catch(e) { showToast('Error guardando', 'error'); }
@@ -788,15 +794,96 @@ async function cambiarEstadoIncidencia(idx) {
 }
 
 // ============================================================
-// ALIAS — compatibilidad con llamadas existentes en index.html
+// ALIAS
 // ============================================================
-// El botón "+ Nueva intervención" en index.html llama openModalIntervencion()
-// ya definida arriba — no hace falta alias.
-// crearIntervencionDesdeIncidencia() sustituida por abrirPlanificacion()
-
-// Bug 3: "Ver/Actuar" en incidencias llama a openModalActuacionDerivada
-// que es lo mismo que openModalRegistrarActuacion
 function openModalActuacionDerivada(intIdx) { openModalRegistrarActuacion(intIdx); }
+
+// ============================================================
+// ADJUNTAR FACTURA Y CERRAR (intervenciones "Pendiente factura")
+// ============================================================
+let _pendingFacturaBase64 = null;
+
+function openModalAdjuntarFactura(intIdx) {
+  _pendingFacturaBase64 = null;
+  sv('factura-int-idx', String(intIdx));
+  sv('factura-pdf-url', '');
+  document.getElementById('factura-pdf-preview').style.display = 'none';
+  const inp = document.getElementById('factura-pdf-input');
+  if (inp) inp.value = '';
+  openModal('modal-adjuntar-factura');
+}
+
+function handleFacturaFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    _pendingFacturaBase64 = { data: e.target.result.split(',')[1], name: file.name, type: file.type };
+    document.getElementById('factura-pdf-preview').style.display = 'flex';
+    document.getElementById('factura-pdf-name').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFacturaFile() {
+  _pendingFacturaBase64 = null;
+  sv('factura-pdf-url', '');
+  document.getElementById('factura-pdf-preview').style.display = 'none';
+  const inp = document.getElementById('factura-pdf-input');
+  if (inp) inp.value = '';
+}
+
+async function guardarFactura() {
+  const intIdx = parseInt(v('factura-int-idx'));
+  const i = DATA.intervenciones[intIdx];
+  if (!i) { showToast('Intervención no encontrada', 'error'); return; }
+
+  let urlAdjunto = i.URL_Adjunto || '', nombreAdjunto = i.Nombre_Adjunto || '';
+  if (_pendingFacturaBase64) {
+    showLoading('Subiendo factura...');
+    try {
+      urlAdjunto    = await uploadFileToDrive(_pendingFacturaBase64.data, _pendingFacturaBase64.name, _pendingFacturaBase64.type);
+      nombreAdjunto = _pendingFacturaBase64.name;
+    } catch(e) { showToast('Error subiendo la factura', 'error'); hideLoading(); return; }
+    _pendingFacturaBase64 = null;
+  }
+
+  showLoading('Cerrando intervención...');
+  try {
+    const updatedRow = [
+      i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen,
+      i.Fecha_Planificada, i.Fecha_Realizacion,
+      i.Realizado_Por, i.Tecnico_Externo, i.Proveedor,
+      i.Descripcion_Actuacion, i.Resultado, i.Equipo_Operativo_Tras_Intervencion,
+      urlAdjunto, i.Factura_Asociada, '',
+      i.Observaciones, nombreAdjunto, 'Cerrada',
+      i.Fecha_Estimada_Resolucion || '', i.Coste_Intervencion || ''
+    ];
+    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
+    DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
+
+    // Cerrar incidencia vinculada
+    const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
+    if (incIdx !== -1) {
+      const inc = DATA.incidencias[incIdx];
+      if (!['Resuelta','Cerrada','Archivada'].includes(inc.Estado)) {
+        inc.Estado = 'Archivada';
+        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora,
+          inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Archivada', inc.Intervencion_Generada];
+        await sheetsUpdate(`Incidencias!A${incIdx + 2}:I${incIdx + 2}`, incRow);
+      }
+    }
+
+    // Restaurar estado del equipo
+    const operativo = i.Equipo_Operativo_Tras_Intervencion;
+    try { await actualizarEstadoEquipo(i.Equipo, operativo === 'No' ? 'No operativo' : 'Operativo'); } catch(e) { console.warn(e); }
+
+    closeModal('modal-adjuntar-factura');
+    showToast('Intervención cerrada. Factura adjunta.', 'success');
+    renderAll();
+  } catch(e) { showToast('Error cerrando la intervención', 'error'); console.error(e); }
+  hideLoading();
+}
 
 // ============================================================
 // AUTOCOMPLETE UBICACIÓN — MODAL EQUIPO

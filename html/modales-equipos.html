@@ -215,6 +215,10 @@
           <label>Fecha planificada *</label>
           <input id="plan-fecha" type="date">
         </div>
+        <div class="form-group">
+          <label>Fecha estimada de resolución</label>
+          <input id="plan-fecha-estimada" type="date">
+        </div>
         <div class="form-group full">
           <label>Descripción planificada</label>
           <textarea id="plan-descripcion" placeholder="Qué se prevé hacer..." style="min-height:80px"></textarea>
@@ -269,6 +273,10 @@
         <div class="form-group" id="act-externa-group" style="display:none">
           <label>Empresa / proveedor *</label>
           <select id="act-proveedor-ext"><option value="">Seleccionar proveedor...</option></select>
+        </div>
+        <div class="form-group" id="act-coste-group" style="display:none">
+          <label>Coste (€, sin IVA)</label>
+          <input id="act-coste" type="number" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="form-group full">
           <label>Descripción de la actuación *</label>
@@ -491,6 +499,42 @@
 </div>
 
 <!-- ============================================================ -->
+<!-- Modal Adjuntar Factura y Cerrar                             -->
+<!-- ============================================================ -->
+<div class="modal-overlay" id="modal-adjuntar-factura">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Adjuntar factura y cerrar</div>
+      <button class="modal-close" onclick="closeModal('modal-adjuntar-factura')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="factura-int-idx">
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">
+        La intervención pasará a <strong>Cerrada</strong> y la incidencia vinculada se archivará.
+      </p>
+      <div class="form-group">
+        <label>Factura / informe del SAT</label>
+        <div class="upload-area" onclick="document.getElementById('factura-pdf-input').click()">
+          <div>📎 Haz clic para adjuntar</div>
+          <div class="upload-area-text">PDF de la factura o informe técnico del servicio</div>
+          <input type="file" id="factura-pdf-input" accept=".pdf,image/*" onchange="handleFacturaFileSelect(this)">
+        </div>
+        <div id="factura-pdf-preview" style="display:none" class="upload-preview">
+          <span>📄</span>
+          <span id="factura-pdf-name"></span>
+          <span class="remove-file" onclick="removeFacturaFile()">✕</span>
+        </div>
+        <input type="hidden" id="factura-pdf-url" value="">
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-adjuntar-factura')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarFactura()">Cerrar intervención</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
 <!-- Modal Ficha de Intervención — solo lectura + acciones       -->
 <!-- ============================================================ -->
 <div class="modal-overlay" id="modal-ficha-intervencion">
@@ -517,16 +561,16 @@
           <div id="ficha-int-estado"></div>
         </div>
         <div>
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Origen</div>
-          <div id="ficha-int-origen" style="font-size:13px"></div>
-        </div>
-        <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Incidencia vinculada</div>
           <div id="ficha-int-incidencia" style="font-size:13px"></div>
         </div>
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Fecha planificada</div>
           <div id="ficha-int-fecha-plan" style="font-size:13px"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Fecha estimada resolución</div>
+          <div id="ficha-int-fecha-estimada" style="font-size:13px"></div>
         </div>
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Fecha realización</div>
@@ -545,16 +589,24 @@
           <div id="ficha-int-operativo"></div>
         </div>
         <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Coste (€ sin IVA)</div>
+          <div id="ficha-int-coste" style="font-size:13px"></div>
+        </div>
+        <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Documento adjunto</div>
           <div id="ficha-int-doc"></div>
         </div>
         <div style="grid-column:1/-1">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Descripción</div>
-          <div id="ficha-int-descripcion" style="font-size:13px;color:var(--text-soft);line-height:1.5"></div>
+          <div id="ficha-int-descripcion" style="font-size:13px;color:var(--text-soft);line-height:1.5;white-space:pre-line"></div>
         </div>
         <div style="grid-column:1/-1">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Observaciones</div>
           <div id="ficha-int-observaciones" style="font-size:13px;color:var(--text-soft);line-height:1.5"></div>
+        </div>
+        <div id="ficha-int-historial-wrap" style="grid-column:1/-1;display:none">
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Historial de intervenciones</div>
+          <div id="ficha-int-historial"></div>
         </div>
       </div>
       <div class="form-footer" style="justify-content:flex-end">
