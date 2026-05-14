@@ -109,11 +109,7 @@ Para cada equipo actualizar via modal de edición:
 - `Tipo_Mantenimiento` — Periódico o Estacional
 - `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — solo si Estacional
 
-### 3. Archivo huérfano
-- `js/equipos.js` — archivo antiguo, NO está cargado en index.html, puede eliminarse
-  (verificar que no hay referencias antes de borrar)
-
-### 4. Modelo de calidad
+### 3. Modelo de calidad
 - Probar `exportarModeloCalidad()` cuando haya datos en Registro_Mantenimientos
 - Verificar que el formato generado coincide con el documento oficial
   (referencia: `inventario/MD84MAN01_Plan_mantemento_Sanidade (1).xlsx`)
