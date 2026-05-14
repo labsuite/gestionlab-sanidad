@@ -633,7 +633,7 @@ async function exportarModeloCalidad(cursoAcademico) {
     });
   });
 
-  const totalFilas = LAB_SHEETS.reduce((n, l) => n + porLab[l].length, 0);
+  const totalFilas = Object.keys(porLab).reduce((n, l) => n + porLab[l].length, 0);
   if (totalFilas === 0) {
     showToast('No hay planes activos asignados a ningún laboratorio', 'error');
     return;
