@@ -65,7 +65,7 @@ function renderUbicaciones() {
         <span class="ubi-grupo-count"><span class="badge badge-gray">${items.length} zona(s)</span>${totalMat > 0 ? `<span class="badge badge-blue" style="margin-left:4px">${totalMat} ítem(s)</span>` : ''}</span>
       </div>
       <div class="ubi-grupo-rows" id="${grupoId}">
-        <div style="display:grid;grid-template-columns:140px 1fr 1fr 80px 80px auto;gap:8px;padding:6px 20px;background:var(--surface2);font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">
+        <div class="ubi-table-header">
           <span>ID</span><span>Zona</span><span>Subzona / Descripción</span><span>Material</span><span>Estado</span><span></span>
         </div>
         ${rows}

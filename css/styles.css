@@ -857,6 +857,19 @@
     .ubi-grupo-count { margin-left: auto; }
     .ubi-grupo-rows { display: none; }
     .ubi-grupo-rows.open { display: block; }
+    .ubi-table-header {
+      display: grid;
+      grid-template-columns: 140px 1fr 1fr 80px 80px auto;
+      gap: 8px;
+      padding: 6px 20px;
+      background: var(--surface2);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
     .ubi-row {
       display: grid;
       grid-template-columns: 140px 1fr 1fr 80px 80px auto;
@@ -1111,6 +1124,11 @@
   .alert-icon { font-size: 16px; }
   .alert-title { font-size: 12px; }
   .alert-text { font-size: 11px; }
+
+  /* Ubicaciones: scroll horizontal en móvil */
+  .ubi-grupo-rows.open { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .ubi-table-header,
+  .ubi-row { min-width: 560px; }
 
   /* Intervenciones mini en equipo: apiladas */
   .intervenciones-mini-header { display: none; }
