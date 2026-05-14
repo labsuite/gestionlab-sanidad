@@ -13,14 +13,16 @@ Stack: JS vanilla + HTML/CSS, Google Sheets como base de datos vía REST API, Go
 - `js/sheets.js` — helpers sheetsGet/sheetsAppend/sheetsUpdate/sheetsDeleteRow + loadAllData()
 - `js/ui.js` — navegación, renderAll(), badges, carga de modales
 - `js/mantenimiento.js` — sistema completo de mantenimiento preventivo
+- `js/residuos.js` — módulo de gestión de residuos
 - `js/equipos-render.js` — renderDashboard(), renderEquipos()
 - `js/equipos-acciones.js` — guardarEquipo(), guardarIntervencion(), guardarActuacion()…
 - `html/modales-equipos.html` — modales de equipo, intervención, actuación
 - `html/modales-mantenimiento.html` — modales de registrar mantenimiento y gestionar plan
+- `html/modales-residuos.html` — modales de residuos (actualizar nivel, añadir contenedor)
 - `css/styles.css`
 
 **Orden de carga de scripts en index.html:**
-config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → …
+config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js
 
 ---
 
@@ -59,7 +61,7 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 ## Sistema de mantenimiento preventivo – COMPLETADO
 
 ### Hojas nuevas en Sheets (ya creadas)
-- **Planes_Mantenimiento** — columnas A-F: `ID_Plan, ID_Equipo, Tipo_Intervencion, Periodicidad, Operacion, Activo`
+- **Planes_Mantenimiento** — columnas A-G: `ID_Plan, ID_Equipo, Tipo_Intervencion, Periodicidad, Operacion, Activo, Instrucciones`
 - **Registro_Mantenimientos** — columnas A-I: `ID_Registro, ID_Plan, ID_Equipo, Curso_Academico, Periodo, Fecha_Realizacion, Realizado_Por, Supervisado_Por, Observaciones`
 
 ### Lógica de periodos (mantenimiento.js)
@@ -75,8 +77,10 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - `buildMantenimientoEquipo(equipoId)` — sección en card de equipo: protocolo de uso + filas de plan con botón Registrar
 - `openModalRegistrarMant / guardarRegistroMant` — modal y guardado de registro
 - `openModalPlan / guardarPlan / eliminarPlan` — CRUD de planes
-- `renderMantenimiento()` — página completa: stats, tabla pendientes, tabla gestión de planes
-- `exportarModeloCalidad(cursoAcademico)` — genera documento HTML imprimible en formato modelo de calidad oficial
+- `renderMantenimiento()` — página completa con tabs: Pendientes (filtros lab+período) y Planes configurados
+- `exportarModeloCalidad(cursoAcademico)` — genera xlsx usando JSZip sobre la plantilla `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`, preservando 100% del formato original. Una fila por equipo × tipo (Interno/Externo), todas las fechas previstas separadas por comas. Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5.
+- `_detectarLabEquipo(eq)` — devuelve el lab de un equipo buscando en tabla Ubicaciones o inferiendo del campo Ubicacion (busca "201"/"203"/"205"/"207" con includes)
+- `_labAHoja(labAula)` — mapea el lab detectado al nombre del sheet Excel
 
 ### Limpieza del sistema legado (COMPLETADO)
 - Eliminadas funciones: `calcProximoPreventivo`, `togglePeriodicidadCustom`
@@ -86,33 +90,51 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
+## Módulo de residuos – COMPLETADO (2025-05-14)
+
+### Hojas nuevas en Sheets (ya creadas)
+- **Tipos_Residuo** — columnas A-G: `ID_Residuo, Nombre, Descripcion, Riesgo, Contenedor_Tipo, Lab, Zona`
+- **Contenedores_Residuo** — columnas A-G: `ID_Contenedor, ID_Residuo, Lab, Zona, Nivel, Fecha_Actualizacion, Actualizado_Por`
+
+### Niveles de contenedor
+`vacío` / `25%` / `50%` / `75%` / `lleno`. Badge en nav cuando hay alguno al 75% o lleno.
+
+### Roles
+- Todos los roles (incluido Alumno): pueden ver la Guía y actualizar el nivel de contenedores
+- Solo Gestor/Administrador: pueden añadir, editar y eliminar contenedores
+
+### Código implementado (`js/residuos.js`)
+- `renderResiduosGuia()` — página con buscador de tipos de residuo (tarjetas con riesgo, contenedor, ubicación)
+- `renderResiduosContenedores()` — tabla con nivel actual y badge de alerta
+- `openModalNivel / guardarNivel` — actualizar nivel de un contenedor
+- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores (Gestor/Admin)
+- `_updateBadgeResiduos()` — badge en nav
+
+### Navegación
+Sección "Residuos" independiente en el sidebar (entre "Material fungible" y "Catálogo"), con dos items: "Guía de residuos" y "Contenedores".
+
+---
+
 ## Pendiente de hacer
 
 ### 1. Datos – Planes_Mantenimiento (entrada de datos, no código)
-Hay que introducir los planes diseñados en la app. Se diseñaron tres grupos:
-
-**Grupo A – Equipos periódicos comunes** (centrífugas, balanzas, autoclaves, microscopios, etc.)
-- Planes mensual, trimestral, semestral o anual según tipo
-- Tipo_Mantenimiento = Periódico
-
-**Grupo B – Equipos estacionales** (microtomos, criostatos, procesadores de tejidos, densitómetros, etc.)
-- Pretemporada + posttemporada
-- Tipo_Mantenimiento = Estacional; ajustar Mes_Inicio y Mes_Fin según realidad del centro
-
-**Grupo C – Equipos varios** (micropipetas, pipetores, agitadores magnéticos, vórtex, glucómetro,
-cubetas de electroforesis, transiluminador UV, cuentacolonias, neveras, microondas)
-- Planes diseñados en sesión; introducir en la app
+Ya introducidos 272 planes. Revisar cobertura completa de todos los equipos.
 
 ### 2. Datos – Campos nuevos en equipos existentes (entrada de datos, en la app)
 Para cada equipo actualizar via modal de edición:
 - `Protocolo_Uso` — texto con instrucciones de uso básicas
 - `Tipo_Mantenimiento` — Periódico o Estacional
 - `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — solo si Estacional
+- `Ubicacion` — actualizar al ID correcto de la tabla Ubicaciones (necesario para que el modelo de calidad los asigne al lab correcto)
 
-### 3. Modelo de calidad
-- Probar `exportarModeloCalidad()` cuando haya datos en Registro_Mantenimientos
-- Verificar que el formato generado coincide con el documento oficial
-  (referencia: `inventario/MD84MAN01_Plan_mantemento_Sanidade (1).xlsx`)
+### 3. Modelo de calidad – FUNCIONAL
+- `exportarModeloCalidad()` genera xlsx con JSZip sobre la plantilla oficial
+- Pendiente: verificar formato con más registros reales en Registro_Mantenimientos
+- Pendiente: actualizar las ubicaciones de los equipos al formato correcto de la BD para que aparezcan todos en el xlsx (actualmente detecta labs por includes de "201"/"203"/"205"/"207" en el campo Ubicacion)
+
+### 4. Datos – Residuos (entrada de datos, en la app)
+- Introducir los tipos de residuo en la hoja Tipos_Residuo
+- Introducir los contenedores físicos en Contenedores_Residuo con su nivel inicial
 
 ---
 
