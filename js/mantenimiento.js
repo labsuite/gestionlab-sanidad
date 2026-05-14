@@ -532,18 +532,18 @@ function exportarModeloCalidad(cursoAcademico) {
       const operaciones  = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
       const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
 
-      // Último registro de cualquier plan de este tipo
-      const regsDelTipo = registros.filter(r => planesDelTipo.some(p => p.ID_Plan === r.ID_Plan));
-      const ultimoReg = regsDelTipo.sort((a, b) =>
-        new Date(b.Fecha_Realizacion) - new Date(a.Fecha_Realizacion)
-      )[0] || null;
+      // Todos los registros de este tipo, ordenados por fecha
+      const regsDelTipo = registros
+        .filter(r => planesDelTipo.some(p => p.ID_Plan === r.ID_Plan))
+        .sort((a, b) => new Date(a.Fecha_Realizacion) - new Date(b.Fecha_Realizacion));
+      const ultimoReg = regsDelTipo[regsDelTipo.length - 1] || null;
 
-      // Data prevista: próximo periodo esperado del plan más frecuente del tipo
+      // Data prevista: último periodo esperado del plan de referencia
       const planRef = planesDelTipo[0];
       const periodos = getPeriodosEsperados(planRef, eq, curso);
       const prevista = periodos.length ? labelPeriodo(periodos[periodos.length - 1]) : '';
 
-      porLab[lab].push({ eq, tipo, operaciones, periodicidades, prevista, reg: ultimoReg });
+      porLab[lab].push({ eq, tipo, operaciones, periodicidades, prevista, regs: regsDelTipo, ultimoReg });
     });
   });
 
@@ -556,10 +556,10 @@ function exportarModeloCalidad(cursoAcademico) {
     const pct = total > 0 ? ((realizados / total) * 100).toFixed(0) : 0;
     const hoy = new Date().toLocaleDateString('es-ES');
 
-    const filas = items.map(({ eq, tipo, operaciones, periodicidades, prevista, reg }) => {
-      const realizada   = reg ? formatDate(reg.Fecha_Realizacion) : '';
-      const supervisado = reg ? (reg.Supervisado_Por || '') : '';
-      const observacions = reg ? (reg.Observaciones || '') : '';
+    const filas = items.map(({ eq, tipo, operaciones, periodicidades, prevista, regs, ultimoReg }) => {
+      const realizada   = regs.map(r => formatDate(r.Fecha_Realizacion)).filter(Boolean).join(', ');
+      const supervisado = ultimoReg ? (ultimoReg.Supervisado_Por || '') : '';
+      const observacions = ultimoReg ? (ultimoReg.Observaciones || '') : '';
       return `<tr>
         <td>${nombreEquipo(eq)}</td>
         <td>${nombreUbicacion(eq.Ubicacion)}</td>
