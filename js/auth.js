@@ -251,4 +251,3 @@ function scheduleTokenRenewal() {
 function renewTokenPromise() {
   return Promise.reject(new Error('Usar signIn() para renovar'));
 }
-óá
