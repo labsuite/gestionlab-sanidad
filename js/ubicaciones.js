@@ -405,9 +405,9 @@ function _populateModalUsuarioAlumno(modulosStr, ubicStr) {
 }
 
 function _refreshModuloCheckboxes(preselectedStr) {
-  const preselected = (preselectedStr || '').split(',').map(m => m.trim()).filter(Boolean);
+  // Initialise the JS array — this is the source of truth for what will be saved
+  _selectedModulosArray = (preselectedStr || '').split(',').map(m => m.trim()).filter(Boolean);
 
-  // Agrupar módulos por ciclo
   const grupos = {};
   DATA.ciclosModulos.forEach(cm => {
     if (!cm.Modulo) return;
@@ -427,10 +427,9 @@ function _refreshModuloCheckboxes(preselectedStr) {
     .sort(([a],[b]) => a.localeCompare(b,'es'))
     .map(([ciclo, mods]) => {
       const checks = [...mods].sort((a,b) => a.localeCompare(b,'es')).map(m => {
-        const checked = preselected.includes(m) ? 'checked' : '';
-        const safeVal = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+        const checked = _selectedModulosArray.includes(m) ? 'checked' : '';
         return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
-          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_syncChipsModulos()"> ${m}
+          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_onModuloChange(this)"> ${m}
         </label>`;
       }).join('');
       return `<div style="margin-bottom:10px">
@@ -438,6 +437,15 @@ function _refreshModuloCheckboxes(preselectedStr) {
         <div style="display:flex;flex-wrap:wrap;gap:6px">${checks}</div>
       </div>`;
     }).join('');
+  _syncChipsModulos();
+}
+
+function _onModuloChange(cb) {
+  if (cb.checked) {
+    if (!_selectedModulosArray.includes(cb.value)) _selectedModulosArray.push(cb.value);
+  } else {
+    _selectedModulosArray = _selectedModulosArray.filter(m => m !== cb.value);
+  }
   _syncChipsModulos();
 }
 
@@ -459,14 +467,17 @@ function _syncChipsModulos() {
 }
 
 function _desmarcarModulo(nombre) {
+  _selectedModulosArray = _selectedModulosArray.filter(m => m !== nombre);
   document.querySelectorAll('.usr-modulo-check').forEach(cb => {
     if (cb.value === nombre) cb.checked = false;
   });
   _syncChipsModulos();
 }
 
+let _selectedModulosArray = [];
+
 function _getModulosSeleccionados() {
-  return Array.from(document.querySelectorAll('.usr-modulo-check:checked')).map(cb => cb.value);
+  return [..._selectedModulosArray];
 }
 
 function _getLabsSeleccionados() {
@@ -610,6 +621,8 @@ async function guardarUsuario() {
   if (rol === 'Alumno') {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');
+    console.log('[guardarUsuario] módulos a guardar:', modulo || '(vacío)');
+    showToast(`Guardando módulos: ${modulo || '(ninguno)'}`, 'info');
   }
   const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo];
   showLoading('Guardando...');
