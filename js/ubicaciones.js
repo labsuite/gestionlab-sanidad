@@ -38,7 +38,8 @@ function renderUbicaciones() {
   if (!DATA.ubicaciones.length) { cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📍</div><div class="empty-state-title">Sin ubicaciones registradas</div></div>`; return; }
 
   const grupos = {};
-  DATA.ubicaciones.forEach(u => { const lab = u.Laboratorio_Aula||'Sin asignar'; if (!grupos[lab]) grupos[lab] = []; grupos[lab].push(u); });
+  [...DATA.ubicaciones].sort((a,b) => (a.ID_Ubicacion||'').localeCompare(b.ID_Ubicacion||'', 'es', {numeric:true}))
+    .forEach(u => { const lab = u.Laboratorio_Aula||'Sin asignar'; if (!grupos[lab]) grupos[lab] = []; grupos[lab].push(u); });
 
   cont.innerHTML = Object.entries(grupos).map(([lab, items], gi) => {
     const totalMat = items.reduce((s,u) => s + DATA.material.filter(m => m.Ubicacion === u.ID_Ubicacion).length, 0);
@@ -216,8 +217,12 @@ function renderUsuarios() {
   const alumnos = DATA.usuarios.filter(u => u.Rol === 'Alumno');
 
   cont.innerHTML = `
-    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
-      ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <input id="search-usuarios" type="search" placeholder="Buscar por nombre o email..." oninput="buscarUsuario(this.value)"
+        style="flex:1;min-width:200px;max-width:360px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
+      <div style="margin-left:auto">
+        ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
+      </div>
     </div>
     ${_renderSeccionUsuarios('Administradores y gestores', admins, rolActual)}
     ${_renderSeccionUsuarios('Profesores', profes, rolActual)}
@@ -296,10 +301,19 @@ function _renderSeccionAlumnos(lista, rolActual) {
 }
 
 function filtrarAlumnos(modulo) {
+  const q = (document.getElementById('search-usuarios')?.value || '').toLowerCase().trim();
   document.querySelectorAll('#tabla-alumnos tr').forEach(tr => {
-    if (!modulo) { tr.style.display = ''; return; }
-    const mods = (tr.getAttribute('data-modulos') || '').split(',').map(m => m.trim());
-    tr.style.display = mods.includes(modulo) ? '' : 'none';
+    const textoFila = tr.textContent.toLowerCase();
+    const pasaBusqueda = !q || textoFila.includes(q);
+    const pasFiltro = !modulo || (tr.getAttribute('data-modulos') || '').split(',').map(m => m.trim()).includes(modulo);
+    tr.style.display = pasaBusqueda && pasFiltro ? '' : 'none';
+  });
+}
+
+function buscarUsuario(q) {
+  q = (q || '').toLowerCase().trim();
+  document.querySelectorAll('#usuarios-contenido tbody tr').forEach(tr => {
+    tr.style.display = !q || tr.textContent.toLowerCase().includes(q) ? '' : 'none';
   });
 }
 
