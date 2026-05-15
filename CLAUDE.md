@@ -92,28 +92,51 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
-## Módulo de residuos – COMPLETADO (2025-05-15)
+## Módulo de residuos – COMPLETADO (2026-05-15)
 
 ### Hojas en Sheets
 - **Tipos_Residuo** — columnas A-G: `ID_Residuo, Nombre, Descripcion, Riesgo, Contenedor_Tipo, Lab, Zona`
   - `Lab` y `Zona` existen en el sheet pero ya no se usan en la UI (los residuos se generan en cualquier sitio)
-- **Contenedores_Residuo** — columnas A-H: `ID_Contenedor, ID_Residuo, Lab, Zona, Nivel, Fecha_Actualizacion, Actualizado_Por, Tipo_Contenedor`
+- **Contenedores_Residuo** — columnas A-K: `ID_Contenedor, Categoria, Lab, Zona, Nivel, Estado, Fecha_Apertura, Fecha_Cierre, Fecha_Actualizacion, Actualizado_Por, Formato`
+  - `Estado`: `activo` / `cerrado` (listo para recogida) / `recogido` (eliminado físicamente)
+- **Adiciones_Residuo** — columnas A-F: `ID_Adicion, ID_Contenedor, ID_Residuo, Fecha, Usuario, Observaciones`
 
 ### Niveles de contenedor
-`vacío` / `25%` / `50%` / `75%` / `lleno`. Badge en nav cuando hay alguno al 75% o lleno.
+`vacío` / `25%` / `50%` / `75%` / `lleno`. Badge en nav cuando hay alguno al 75%, lleno o cerrado.
+
+### Ciclo de vida de un contenedor
+1. Se crea como `activo` con nivel inicial.
+2. Se registran adiciones (cada una actualiza el nivel).
+3. Al cerrarlo: `Estado=cerrado`, `Fecha_Cierre` registrada, se crea automáticamente un contenedor nuevo vacío de la misma categoría+lab.
+4. Al registrar la recogida de Consenur: `Estado=recogido`, la fila se elimina físicamente del sheet.
 
 ### Roles
-- Todos los roles (incluido Alumno): pueden ver la Guía y actualizar el nivel de contenedores
-- Admin / Gestor / **Profesor**: pueden crear, editar y eliminar tipos de residuo y contenedores
+- Todos los roles (incluido Alumno): pueden ver la Guía y registrar adiciones en contenedores
+- Admin / Gestor / **Profesor**: pueden crear, editar, cerrar y eliminar tipos de residuo y contenedores
 
 ### Código implementado (`js/residuos.js`)
 - `renderResiduosGuia()` — página con buscador y tabla agrupada por **Contenedor_Tipo** (categorías dinámicas)
-- `openModalTipoResiduo / guardarTipoResiduo / eliminarTipoResiduo` — CRUD de tipos de residuo (Admin/Gestor/Profesor). El campo Contenedor_Tipo usa `<datalist>` con autocompletado de los tipos ya existentes — crear un nombre nuevo crea una nueva categoría automáticamente. No se puede eliminar un tipo si tiene contenedores asociados.
-- `renderResiduosContenedores()` — tabla con nivel actual y badge de alerta
-- `openModalNivel / guardarNivel` — actualizar nivel de un contenedor
-- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores
-- `anadirGarrafa / registrarRecogida` — gestión de contenedores rotativos (garrafas 5L)
+- `openModalTipoResiduo / guardarTipoResiduo / eliminarTipoResiduo` — CRUD de tipos de residuo (Admin/Gestor/Profesor). El campo Contenedor_Tipo usa `<datalist>` — crear un nombre nuevo crea una nueva categoría automáticamente. No se puede eliminar un tipo si tiene contenedores asociados.
+- `renderResiduosContenedores()` — dos tabs: **Activos** (cards con historial expandible) y **Pendientes de recogida** (tabla)
+- `openModalAdicion / guardarAdicion` — registrar adición a un contenedor (filtra tipos de residuo por Categoria del contenedor)
+- `cerrarContenedor` — marca Estado=cerrado y crea contenedor nuevo vacío automáticamente
+- `registrarRecogida` — marca Estado=recogido y elimina la fila del sheet
+- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores (incluye campo Formato)
+- `mostrarUrlNfcContenedor(idx)` — genera URL con `?cont-cat=X&cont-lab=Y&action=adicion` para etiqueta NFC/QR
+- `_abrirAdicionPorNfc(categoria, lab)` — localiza el contenedor activo por categoría+lab y abre el modal de adición
+- `_WARNINGS_FORMATO / _getWarningFormato(formato)` — mapa de avisos de seguridad por formato físico; se muestran como banner amarillo en las cards y en el modal de adición (también vía NFC)
 - `_updateBadgeResiduos()` — badge en nav (definida en ui.js)
+
+### Avisos de seguridad por formato (`_WARNINGS_FORMATO`)
+| Formato (matching parcial) | Aviso |
+|---|---|
+| bidón azul | Líquidos en bote propio, cerrado y rotulado dentro del bidón |
+| cubo con tapa / contenedor rígido | NO cerrar tapa hasta que esté lleno y listo para Consenur |
+| bolsa plástica | Solo envases vacíos de plástico/aluminio; nada a granel |
+| garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
+
+### Etiquetas NFC/QR
+La URL codifica **categoría + lab** (no el ID del contenedor), por lo que la etiqueta nunca necesita reprogramarse al cerrar un contenedor. `_checkPendingNfcAction()` en `ui.js` detecta los parámetros tras el login y redirige al modal de adición correcto.
 
 ### Navegación
 Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residuos" y "Contenedores".
@@ -174,6 +197,32 @@ Para cada equipo actualizar via modal de edición:
 ### 5. Datos – Usuarios (entrada de datos, en la app)
 - Alumnos existentes: al editarlos, seleccionar el `Ciclo_Principal` en el nuevo dropdown y guardar para que queden correctamente agrupados.
 - Verificar que la columna H (`Ciclo_Principal`) existe en el sheet Usuarios con ese encabezado.
+
+---
+
+## Tipos de intervención – lista canónica
+
+Aplica a los tres selects: `int-tipo` (modal intervención), `plan-tipo` (plan desde incidencia) y `act-tipo-int` (modal actuación). **No incluir "Preventivo"** — el mantenimiento preventivo se gestiona íntegramente desde Planes_Mantenimiento.
+
+`Correctivo` / `Calibración` / `Verificación funcional` / `Validación` / `Limpieza` / `Descontaminación` / `Sustitución de pieza` / `Cambio de consumibles` / `Control de temperatura` / `Puesta en marcha` / `Actualización de software`
+
+---
+
+## Categorías de material – lista canónica
+
+Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye ejemplos descriptivos:
+
+- Reactivo químico — ácidos, disolventes, bases, sales...
+- Solución y tampón — formol, PBS, fijadores, diluciones...
+- Colorante y tinción — HE, Giemsa, Papanicolaou, Diff-Quick...
+- Medio de cultivo — agares, caldos, medios selectivos...
+- Kit diagnóstico — ELISA, pruebas rápidas, tiras...
+- Material de vidrio — portas, cubreobjetos, matraces, pipetas...
+- Material fungible — puntas, tubos, placas, Eppendorf...
+- Papel y filtración — papel de filtro, membranas, papel secante...
+- EPI y seguridad — guantes, gafas, batas, mascarillas...
+- Equipamiento menor — aparatos pequeños no inventariados como activo fijo
+- Otro
 
 ---
 
