@@ -70,7 +70,7 @@ function _renderGuia(tipos, filtro) {
         return `<tr>
           <td><strong>${t.Nombre}</strong></td>
           <td style="font-size:13px;color:var(--text-soft)">${t.Descripcion || '—'}</td>
-          <td>${t.Riesgo ? `<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:10px;font-size:12px">⚠️ ${t.Riesgo}</span>` : '—'}</td>
+          <td style="white-space:nowrap">${t.Riesgo ? `<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:10px;font-size:12px">⚠️ ${t.Riesgo}</span>` : '—'}</td>
           ${canEdit ? `<td><div class="row-actions">
             <button class="icon-btn" onclick="openModalTipoResiduo(${idx})">✏️</button>
             <button class="icon-btn" onclick="eliminarTipoResiduo(${idx})">🗑️</button>
