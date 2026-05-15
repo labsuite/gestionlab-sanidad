@@ -14,9 +14,20 @@ function getMesesCurso(cursoAcademico) {
   const meses = [];
   for (let m = 9; m <= 12; m++)
     meses.push({ año: añoInicio, mes: m, str: `${añoInicio}-${String(m).padStart(2, '0')}` });
-  for (let m = 1; m <= 8; m++)
+  for (let m = 1; m <= 6; m++)
     meses.push({ año: añoFin, mes: m, str: `${añoFin}-${String(m).padStart(2, '0')}` });
-  return meses;
+  return meses; // 10 meses: Sep–Jun
+}
+
+// Devuelve true si la operación es de limpieza/conservación (→ fin de periodo)
+// y false si es calibración/verificación/puesta en marcha (→ inicio de periodo)
+function _esMomentoFin(plan) {
+  const op = (plan.Operacion || '').toLowerCase().trim();
+  return op.startsWith('limpieza') ||
+         op.startsWith('vaciado') ||
+         op.startsWith('descongelaci') ||
+         op.startsWith('cambio de agua') ||
+         op.startsWith('inspecci') && op.includes('limpieza');
 }
 
 function getPeriodosEsperados(plan, equipo, cursoAcademico) {
@@ -28,14 +39,21 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   switch (plan.Periodicidad) {
     case 'Mensual':
       return mesesPasados.map(m => m.str);
-    case 'Trimestral':
-      return mesesPasados.filter((_, i) => i % 3 === 0).map(m => m.str);
-    case 'Semestral':
-      return mesesPasados.filter((_, i) => i % 6 === 0).map(m => m.str);
+    case 'Trimestral': {
+      // T1: Sep(0)–Dic(3), T2: Ene(4)–Mar(6), T3: Abr(7)–Jun(9)
+      const idx = _esMomentoFin(plan) ? [3, 6, 9] : [0, 4, 7];
+      return mesesPasados.filter((_, i) => idx.includes(i)).map(m => m.str);
+    }
+    case 'Semestral': {
+      const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
+      return mesesPasados.filter((_, i) => idx.includes(i)).map(m => m.str);
+    }
     case 'Anual':
     case 'Bianual':
-    case 'Cada 2 años':
-      return mesesPasados.length > 0 ? [todosMeses[0].str] : [];
+    case 'Cada 2 años': {
+      const mes = _esMomentoFin(plan) ? todosMeses[todosMeses.length - 1] : todosMeses[0];
+      return mesesPasados.some(m => m.str === mes.str) ? [mes.str] : [];
+    }
     case 'Pretemporada': {
       const mesInicio = parseInt(equipo.Mes_Inicio_Temporada) || 9;
       const dueYear = mesInicio >= 9 ? añoInicio : añoFin;
@@ -583,10 +601,18 @@ async function exportarModeloCalidad(cursoAcademico) {
     const todosMeses = getMesesCurso(curso);
     switch (plan.Periodicidad) {
       case 'Mensual':    return todosMeses.map(m => m.str);
-      case 'Trimestral': return todosMeses.filter((_, i) => i % 3 === 0).map(m => m.str);
-      case 'Semestral':  return todosMeses.filter((_, i) => i % 6 === 0).map(m => m.str);
-      case 'Anual': case 'Bianual': case 'Cada 2 años':
-        return [todosMeses[0].str];
+      case 'Trimestral': {
+        const idx = _esMomentoFin(plan) ? [3, 6, 9] : [0, 4, 7];
+        return todosMeses.filter((_, i) => idx.includes(i)).map(m => m.str);
+      }
+      case 'Semestral': {
+        const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
+        return todosMeses.filter((_, i) => idx.includes(i)).map(m => m.str);
+      }
+      case 'Anual': case 'Bianual': case 'Cada 2 años': {
+        const mes = _esMomentoFin(plan) ? todosMeses[todosMeses.length - 1] : todosMeses[0];
+        return [mes.str];
+      }
       case 'Pretemporada':  return [`pretemporada-${curso}`];
       case 'Posttemporada': return [`posttemporada-${curso}`];
       default: return [];
