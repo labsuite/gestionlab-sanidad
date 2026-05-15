@@ -25,11 +25,13 @@ function _contadoBadge(cantidad) {
 function renderResiduosGuia() {
   const el = document.getElementById('page-residuos-guia');
   if (!el) return;
+  const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
   el.innerHTML = `
-    <div style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <input type="text" id="res-search" class="form-input"
-        placeholder="Buscar residuo, riesgo o contenedor…"
-        oninput="filtrarGuia()" style="max-width:340px">
+        placeholder="Buscar residuo, descripción o contenedor…"
+        oninput="filtrarGuia()" style="flex:1;min-width:200px;max-width:360px">
+      ${canEdit ? `<button class="btn btn-primary" onclick="openModalTipoResiduo()">+ Nuevo tipo de residuo</button>` : ''}
     </div>
     <div id="res-guia-lista">${_renderGuia(DATA.tiposResiduo, '')}</div>
   `;
@@ -46,24 +48,101 @@ function _renderGuia(tipos, filtro) {
   );
   if (!lista.length) return `<div style="color:var(--text-muted);padding:32px;text-align:center">No se encontraron residuos</div>`;
 
-  return `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px">
-    ${lista.map(t => `
-      <div class="card" style="padding:16px">
-        <div style="font-weight:600;font-size:15px;margin-bottom:4px">${t.Nombre}</div>
-        ${t.Descripcion ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:8px;line-height:1.4">${t.Descripcion}</div>` : ''}
-        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
-          ${t.Riesgo ? `<span style="background:#fee2e220;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:10px;font-size:12px">⚠️ ${t.Riesgo}</span>` : ''}
-          ${t.Contenedor_Tipo ? `<span style="background:var(--bg-muted);border:1px solid var(--border);padding:2px 8px;border-radius:10px;font-size:12px">🗑️ ${t.Contenedor_Tipo}</span>` : ''}
-          ${t.Lab ? `<span style="background:var(--bg-muted);border:1px solid var(--border);padding:2px 8px;border-radius:10px;font-size:12px">📍 Lab ${t.Lab}${t.Zona ? ' · ' + t.Zona : ''}</span>` : ''}
+  const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
+
+  // Agrupar por Riesgo
+  const grupos = {};
+  lista.forEach(t => {
+    const g = t.Riesgo || 'Sin clasificar';
+    if (!grupos[g]) grupos[g] = [];
+    grupos[g].push(t);
+  });
+
+  return Object.entries(grupos)
+    .sort(([a],[b]) => a.localeCompare(b,'es'))
+    .map(([riesgo, items]) => {
+      const filas = items.map(t => {
+        const idx = DATA.tiposResiduo.indexOf(t);
+        return `<tr>
+          <td><strong>${t.Nombre}</strong></td>
+          <td style="font-size:13px;color:var(--text-soft)">${t.Descripcion || '—'}</td>
+          <td>${t.Contenedor_Tipo ? `<span style="background:var(--bg-muted);border:1px solid var(--border);padding:2px 8px;border-radius:10px;font-size:12px">🗑️ ${t.Contenedor_Tipo}</span>` : '—'}</td>
+          <td style="font-size:13px">${t.Lab ? `Lab ${t.Lab}${t.Zona ? ' · ' + t.Zona : ''}` : '—'}</td>
+          ${canEdit ? `<td><div class="row-actions">
+            <button class="icon-btn" onclick="openModalTipoResiduo(${idx})">✏️</button>
+            <button class="icon-btn" onclick="eliminarTipoResiduo(${idx})">🗑️</button>
+          </div></td>` : '<td></td>'}
+        </tr>`;
+      }).join('');
+      return `<div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title" style="display:flex;align-items:center;gap:8px">
+            <span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 10px;border-radius:10px;font-size:13px">⚠️ ${riesgo}</span>
+            <span style="font-weight:400;font-size:13px;color:var(--text-muted)">${items.length} tipo${items.length !== 1 ? 's' : ''}</span>
+          </div>
         </div>
-      </div>
-    `).join('')}
-  </div>`;
+        <table>
+          <thead><tr><th>Nombre</th><th>Descripción</th><th>Contenedor</th><th>Ubicación habitual</th><th></th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`;
+    }).join('');
 }
 
 function filtrarGuia() {
   const filtro = document.getElementById('res-search')?.value || '';
   document.getElementById('res-guia-lista').innerHTML = _renderGuia(DATA.tiposResiduo, filtro);
+}
+
+// ── CRUD tipos de residuo ────────────────────────────────────
+function openModalTipoResiduo(idx = null) {
+  editingRow = idx !== null ? { sheet: 'Tipos_Residuo', rowIndex: idx } : null;
+  const t = idx !== null ? DATA.tiposResiduo[idx] : null;
+  sv('tr-nombre',    t?.Nombre        || '');
+  sv('tr-descripcion', t?.Descripcion || '');
+  sv('tr-riesgo',    t?.Riesgo        || '');
+  sv('tr-contenedor', t?.Contenedor_Tipo || '');
+  sv('tr-lab',       t?.Lab           || '');
+  sv('tr-zona',      t?.Zona          || '');
+  document.getElementById('modal-tipo-residuo-title').textContent = idx !== null ? 'Editar tipo de residuo' : 'Nuevo tipo de residuo';
+  openModal('modal-tipo-residuo');
+}
+
+async function guardarTipoResiduo() {
+  const nombre = v('tr-nombre');
+  if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
+  const row = [
+    editingRow ? DATA.tiposResiduo[editingRow.rowIndex].ID_Residuo : genId('RES'),
+    nombre, v('tr-descripcion'), v('tr-riesgo'), v('tr-contenedor'), v('tr-lab'), v('tr-zona')
+  ];
+  showLoading('Guardando...');
+  try {
+    if (editingRow) {
+      await sheetsUpdate(`Tipos_Residuo!A${editingRow.rowIndex+2}:G${editingRow.rowIndex+2}`, row);
+      DATA.tiposResiduo[editingRow.rowIndex] = rowToObj(row, 'tiposResiduo');
+      showToast('Tipo de residuo actualizado', 'success');
+    } else {
+      await sheetsAppend('Tipos_Residuo', row);
+      DATA.tiposResiduo.push(rowToObj(row, 'tiposResiduo'));
+      showToast('Tipo de residuo guardado', 'success');
+    }
+    closeModal('modal-tipo-residuo');
+    renderResiduosGuia();
+  } catch(e) { showToast('Error al guardar', 'error'); }
+  hideLoading(); editingRow = null;
+}
+
+async function eliminarTipoResiduo(idx) {
+  const t = DATA.tiposResiduo[idx];
+  const enUso = DATA.contenedoresResiduo.some(c => c.ID_Residuo === t.ID_Residuo);
+  if (enUso) { showToast('No se puede eliminar: hay contenedores asociados a este tipo', 'error'); return; }
+  if (!confirm(`¿Eliminar el tipo de residuo "${t.Nombre}"?`)) return;
+  try {
+    await sheetsDeleteRow('Tipos_Residuo', idx);
+    DATA.tiposResiduo.splice(idx, 1);
+    renderResiduosGuia();
+    showToast('Tipo de residuo eliminado', 'success');
+  } catch(e) { showToast('Error al eliminar', 'error'); }
 }
 
 // ── Página: Contenedores ─────────────────────────────────────

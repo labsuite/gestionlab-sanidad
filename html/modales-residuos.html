@@ -1,3 +1,51 @@
+<!-- MODAL: Nuevo / editar tipo de residuo -->
+<div class="modal-overlay" id="modal-tipo-residuo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-tipo-residuo-title">Nuevo tipo de residuo</div>
+      <button class="modal-close" onclick="closeModal('modal-tipo-residuo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid form-grid-2">
+        <div class="form-group full">
+          <label class="form-label">Nombre *</label>
+          <input id="tr-nombre" class="form-input" placeholder="Ej: Alcohol etílico">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Descripción</label>
+          <textarea id="tr-descripcion" class="form-input" placeholder="Tipo de residuo, procedencia habitual…" rows="2"></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Riesgo / Clasificación</label>
+          <input id="tr-riesgo" class="form-input" placeholder="Ej: Inflamable, Corrosivo…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de contenedor</label>
+          <input id="tr-contenedor" class="form-input" placeholder="Ej: Bidón 30L, Garrafa 5L…">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Laboratorio habitual</label>
+          <select id="tr-lab" class="form-input">
+            <option value="">— Cualquiera —</option>
+            <option>201</option>
+            <option>203</option>
+            <option>205</option>
+            <option>207</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Zona habitual</label>
+          <input id="tr-zona" class="form-input" placeholder="Ej: Almacén residuos">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-tipo-residuo')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarTipoResiduo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Actualizar nivel de contenedor -->
 <div class="modal-overlay" id="modal-res-nivel">
   <div class="modal" style="max-width:400px">
