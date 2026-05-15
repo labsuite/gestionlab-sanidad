@@ -16,26 +16,14 @@
           <textarea id="tr-descripcion" class="form-input" placeholder="Tipo de residuo, procedencia habitual…" rows="2"></textarea>
         </div>
         <div class="form-group">
-          <label class="form-label">Riesgo / Clasificación</label>
-          <input id="tr-riesgo" class="form-input" placeholder="Ej: Inflamable, Corrosivo…">
+          <label class="form-label">Peligrosidad / Clasificación</label>
+          <input id="tr-riesgo" class="form-input" placeholder="Ej: Inflamable, Corrosivo, Citotóxico…">
         </div>
         <div class="form-group">
-          <label class="form-label">Tipo de contenedor</label>
-          <input id="tr-contenedor" class="form-input" placeholder="Ej: Bidón 30L, Garrafa 5L…">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Laboratorio habitual</label>
-          <select id="tr-lab" class="form-input">
-            <option value="">— Cualquiera —</option>
-            <option>201</option>
-            <option>203</option>
-            <option>205</option>
-            <option>207</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Zona habitual</label>
-          <input id="tr-zona" class="form-input" placeholder="Ej: Almacén residuos">
+          <label class="form-label">Tipo de contenedor *</label>
+          <input id="tr-contenedor" class="form-input" list="datalist-contenedor-tipos"
+            placeholder="Ej: Bidón 30L solventes, Garrafa 5L…">
+          <datalist id="datalist-contenedor-tipos"></datalist>
         </div>
       </div>
     </div>

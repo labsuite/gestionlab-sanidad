@@ -50,24 +50,27 @@ function _renderGuia(tipos, filtro) {
 
   const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
 
-  // Agrupar por Riesgo
+  // Agrupar por Contenedor_Tipo
   const grupos = {};
   lista.forEach(t => {
-    const g = t.Riesgo || 'Sin clasificar';
+    const g = t.Contenedor_Tipo || 'Sin contenedor asignado';
     if (!grupos[g]) grupos[g] = [];
     grupos[g].push(t);
   });
 
   return Object.entries(grupos)
-    .sort(([a],[b]) => a.localeCompare(b,'es'))
-    .map(([riesgo, items]) => {
+    .sort(([a],[b]) => {
+      if (a === 'Sin contenedor asignado') return 1;
+      if (b === 'Sin contenedor asignado') return -1;
+      return a.localeCompare(b,'es');
+    })
+    .map(([contenedor, items]) => {
       const filas = items.map(t => {
         const idx = DATA.tiposResiduo.indexOf(t);
         return `<tr>
           <td><strong>${t.Nombre}</strong></td>
           <td style="font-size:13px;color:var(--text-soft)">${t.Descripcion || '—'}</td>
-          <td>${t.Contenedor_Tipo ? `<span style="background:var(--bg-muted);border:1px solid var(--border);padding:2px 8px;border-radius:10px;font-size:12px">🗑️ ${t.Contenedor_Tipo}</span>` : '—'}</td>
-          <td style="font-size:13px">${t.Lab ? `Lab ${t.Lab}${t.Zona ? ' · ' + t.Zona : ''}` : '—'}</td>
+          <td>${t.Riesgo ? `<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:10px;font-size:12px">⚠️ ${t.Riesgo}</span>` : '—'}</td>
           ${canEdit ? `<td><div class="row-actions">
             <button class="icon-btn" onclick="openModalTipoResiduo(${idx})">✏️</button>
             <button class="icon-btn" onclick="eliminarTipoResiduo(${idx})">🗑️</button>
@@ -77,12 +80,12 @@ function _renderGuia(tipos, filtro) {
       return `<div class="card" style="margin-bottom:16px">
         <div class="card-header">
           <div class="card-title" style="display:flex;align-items:center;gap:8px">
-            <span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 10px;border-radius:10px;font-size:13px">⚠️ ${riesgo}</span>
+            🗑️ ${contenedor}
             <span style="font-weight:400;font-size:13px;color:var(--text-muted)">${items.length} tipo${items.length !== 1 ? 's' : ''}</span>
           </div>
         </div>
         <table>
-          <thead><tr><th>Nombre</th><th>Descripción</th><th>Contenedor</th><th>Ubicación habitual</th><th></th></tr></thead>
+          <thead><tr><th>Nombre</th><th>Descripción</th><th>Peligrosidad</th><th></th></tr></thead>
           <tbody>${filas}</tbody>
         </table>
       </div>`;
@@ -98,12 +101,20 @@ function filtrarGuia() {
 function openModalTipoResiduo(idx = null) {
   editingRow = idx !== null ? { sheet: 'Tipos_Residuo', rowIndex: idx } : null;
   const t = idx !== null ? DATA.tiposResiduo[idx] : null;
-  sv('tr-nombre',    t?.Nombre        || '');
-  sv('tr-descripcion', t?.Descripcion || '');
-  sv('tr-riesgo',    t?.Riesgo        || '');
-  sv('tr-contenedor', t?.Contenedor_Tipo || '');
-  sv('tr-lab',       t?.Lab           || '');
-  sv('tr-zona',      t?.Zona          || '');
+  sv('tr-nombre',      t?.Nombre         || '');
+  sv('tr-descripcion', t?.Descripcion    || '');
+  sv('tr-riesgo',      t?.Riesgo         || '');
+  sv('tr-contenedor',  t?.Contenedor_Tipo || '');
+
+  // Poblar datalist con tipos de contenedor ya existentes
+  const dl = document.getElementById('datalist-contenedor-tipos');
+  if (dl) {
+    const unicos = [...new Set(
+      DATA.tiposResiduo.map(x => x.Contenedor_Tipo).filter(Boolean)
+    )].sort((a,b) => a.localeCompare(b,'es'));
+    dl.innerHTML = unicos.map(c => `<option value="${c}">`).join('');
+  }
+
   document.getElementById('modal-tipo-residuo-title').textContent = idx !== null ? 'Editar tipo de residuo' : 'Nuevo tipo de residuo';
   openModal('modal-tipo-residuo');
 }
@@ -111,9 +122,11 @@ function openModalTipoResiduo(idx = null) {
 async function guardarTipoResiduo() {
   const nombre = v('tr-nombre');
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
+  const existing = editingRow ? DATA.tiposResiduo[editingRow.rowIndex] : null;
   const row = [
-    editingRow ? DATA.tiposResiduo[editingRow.rowIndex].ID_Residuo : genId('RES'),
-    nombre, v('tr-descripcion'), v('tr-riesgo'), v('tr-contenedor'), v('tr-lab'), v('tr-zona')
+    existing?.ID_Residuo || genId('RES'),
+    nombre, v('tr-descripcion'), v('tr-riesgo'), v('tr-contenedor'),
+    existing?.Lab || '', existing?.Zona || ''
   ];
   showLoading('Guardando...');
   try {
