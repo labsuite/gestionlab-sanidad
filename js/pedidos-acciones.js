@@ -373,20 +373,55 @@ async function _actualizarSolicitudOrigen(l, pedidoId) {
 // ── Orquestador principal de recepción ───────────────────────
 
 async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, obs, idUbicacion = null) {
-  l.Cantidad_Recibida = String(cantRec);
-  l.Estado_Linea = cantRec >= cantPed ? 'Recibido' : (cantRec > 0 ? 'Recibido parcialmente' : 'Pendiente');
+  // Guardar estado previo para revertir si el primer paso falla
+  const cantRecAntes  = l.Cantidad_Recibida;
+  const estadoAntes   = l.Estado_Linea;
+  const obsAntes      = l.Observaciones;
+
+  // Acumular sobre lo ya recibido
+  const cantRecTotal = (parseFloat(l.Cantidad_Recibida) || 0) + cantRec;
+  l.Cantidad_Recibida = String(cantRecTotal);
+  l.Estado_Linea = cantRecTotal >= cantPed ? 'Recibido' : (cantRecTotal > 0 ? 'Recibido parcialmente' : 'Pendiente');
   if (obs) l.Observaciones = obs;
+
   showLoading('Registrando recepción...');
+
+  // Paso 1 — crítico: si falla, revertir memoria y abortar sin haber cambiado nada
   try {
     await _persistirLinea(idx, l);
-    if (mat && cantRec > 0) await _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion);
+  } catch(e) {
+    l.Cantidad_Recibida = cantRecAntes;
+    l.Estado_Linea      = estadoAntes;
+    l.Observaciones     = obsAntes;
+    showToast('Error al guardar la recepción. No se modificó nada.', 'error');
+    console.error('[recepción] fallo en _persistirLinea', e);
+    hideLoading(); return;
+  }
+
+  // Pasos siguientes — si fallan, la línea ya está guardada correctamente;
+  // avisamos con precisión para que el gestor pueda corregir lo que falta.
+  if (mat && cantRec > 0) {
+    try {
+      await _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion);
+    } catch(e) {
+      showToast('⚠️ Recepción guardada, pero el stock no se actualizó. Corrígelo manualmente en el inventario.', 'error');
+      console.error('[recepción] fallo en _actualizarStockMaterial', e);
+    }
+  }
+
+  try {
     await _actualizarEstadoPedidoPostRecepcion(pedidoId);
-    if (l.Estado_Linea === 'Recibido') await _actualizarSolicitudOrigen(l, pedidoId);
-    showToast('Recepción registrada', 'success');
-    closeModal('modal-recepcion-linea');
-    renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
-    verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) {
+    showToast('⚠️ Recepción guardada, pero el estado del pedido no se actualizó. Cámbialo manualmente.', 'error');
+    console.error('[recepción] fallo en _actualizarEstadoPedidoPostRecepcion', e);
+  }
+
+  if (l.Estado_Linea === 'Recibido') await _actualizarSolicitudOrigen(l, pedidoId);
+
+  showToast('Recepción registrada', 'success');
+  closeModal('modal-recepcion-linea');
+  renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+  verDetallePedido(pedidoId);
   hideLoading();
 }
 

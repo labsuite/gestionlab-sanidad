@@ -371,8 +371,19 @@ function openModalEstadoPedido(pedidoId) {
 }
 
 function openModalRecepcion(lineaId, pedidoId) {
-  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs','');
+  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
-  if (l) { document.getElementById('rec-material-nombre').textContent = l.Material; document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida; sv('rec-cantidad', l.Cantidad_Pedida); }
+  if (l) {
+    document.getElementById('rec-material-nombre').textContent = l.Material;
+    document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida;
+    const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+    const grupoYaRec = document.getElementById('rec-ya-recibida-group');
+    if (yaRec > 0) {
+      document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec;
+      grupoYaRec.style.display = '';
+    } else {
+      grupoYaRec.style.display = 'none';
+    }
+  }
   openModal('modal-recepcion-linea');
 }
