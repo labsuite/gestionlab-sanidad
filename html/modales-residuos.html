@@ -34,62 +34,72 @@
   </div>
 </div>
 
-<!-- MODAL: Actualizar nivel de contenedor -->
-<div class="modal-overlay" id="modal-res-nivel">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-header">
-      <div class="modal-title">Actualizar nivel — <span id="modal-nivel-titulo" style="font-weight:400"></span></div>
-      <button class="modal-close" onclick="closeModal('modal-res-nivel')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-group">
-        <label class="form-label">Nivel actual del contenedor</label>
-        <select id="res-nivel" class="form-input">
-          <option value="vacío">Vacío</option>
-          <option value="25%">25% — casi vacío</option>
-          <option value="50%">50% — por la mitad</option>
-          <option value="75%">75% — casi lleno</option>
-          <option value="lleno">Lleno — hay que vaciarlo</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="closeModal('modal-res-nivel')">Cancelar</button>
-      <button class="btn btn-primary" onclick="guardarNivel()">Guardar</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL: Añadir / editar contenedor -->
-<div class="modal-overlay" id="modal-contenedor-res">
+<!-- MODAL: Añadir residuo a contenedor -->
+<div class="modal-overlay" id="modal-adicion-res">
   <div class="modal" style="max-width:480px">
     <div class="modal-header">
-      <div class="modal-title">Contenedor de residuo</div>
-      <button class="modal-close" onclick="closeModal('modal-contenedor-res')">✕</button>
+      <div class="modal-title">Añadir residuo</div>
+      <button class="modal-close" onclick="closeModal('modal-adicion-res')">✕</button>
     </div>
     <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-muted);margin-bottom:16px;padding:8px 12px;background:var(--bg-soft,#f9f9f9);border-radius:6px">
+        Contenedor: <strong id="adic-contenedor-titulo"></strong>
+      </div>
       <div class="form-group">
-        <label class="form-label">Tipo de residuo *</label>
-        <select id="cont-tipo" class="form-input">
+        <label class="form-label">Tipo de residuo añadido *</label>
+        <select id="adic-tipo-residuo" class="form-input">
           <option value="">— Selecciona —</option>
         </select>
       </div>
       <div class="form-group">
+        <label class="form-label">Nivel del contenedor tras la adición *</label>
+        <select id="adic-nivel" class="form-input">
+          <option value="vacío">Vacío</option>
+          <option value="25%">25% — casi vacío</option>
+          <option value="50%">50% — por la mitad</option>
+          <option value="75%">75% — casi lleno</option>
+          <option value="lleno">Lleno</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <input id="adic-observaciones" class="form-input" placeholder="Práctica, cantidad aproximada…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-adicion-res')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarAdicion()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Nuevo / editar contenedor -->
+<div class="modal-overlay" id="modal-contenedor-res">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-contenedor-res-title">Nuevo contenedor</div>
+      <button class="modal-close" onclick="closeModal('modal-contenedor-res')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Categoría de contenedor *</label>
+        <input id="cont-categoria" class="form-input" list="cont-datalist-cat"
+          placeholder="Ej: Bidón 30L solventes, Garrafa 5L…">
+        <datalist id="cont-datalist-cat"></datalist>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Selecciona una existente o escribe una nueva.</div>
+      </div>
+      <div class="form-group">
         <label class="form-label">Laboratorio *</label>
-        <input id="cont-lab" class="form-input" placeholder="ej. 207">
+        <select id="cont-lab" class="form-input">
+          <option value="">— Seleccionar —</option>
+          <option>201</option><option>203</option><option>205</option><option>207</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Zona</label>
         <input id="cont-zona" class="form-input" placeholder="ej. Almacén residuos">
       </div>
       <div class="form-group">
-        <label class="form-label">Tipo de contenedor</label>
-        <select id="cont-tipo-cont" class="form-input" onchange="_toggleContTipo()">
-          <option value="fijo">Fijo (bidón o cubo permanente)</option>
-          <option value="rotativo">Rotativo (garrafas 5 L)</option>
-        </select>
-      </div>
-      <div id="cont-nivel-wrap" class="form-group">
         <label class="form-label">Nivel inicial</label>
         <select id="cont-nivel-ini" class="form-input">
           <option value="vacío">Vacío</option>

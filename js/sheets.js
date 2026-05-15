@@ -123,7 +123,7 @@ async function loadAllData() {
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
            materialUbicaciones, historicoPrecio, tareas,
            planesMantenimiento, registroMantenimientos,
-           tiposResiduo, contenedoresResiduo] = await Promise.all([
+           tiposResiduo, contenedoresResiduo, adicionesResiduo] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:I'),
@@ -142,7 +142,8 @@ async function loadAllData() {
       sheetsGet('Planes_Mantenimiento!A2:G').catch(e => { console.warn('Planes_Mantenimiento no cargó:', e); return []; }),
       sheetsGet('Registro_Mantenimientos!A2:I').catch(e => { console.warn('Registro_Mantenimientos no cargó:', e); return []; }),
       sheetsGet('Tipos_Residuo!A2:G').catch(() => []),
-      sheetsGet('Contenedores_Residuo!A2:G').catch(() => [])
+      sheetsGet('Contenedores_Residuo!A2:J').catch(() => []),
+      sheetsGet('Adiciones_Residuo!A2:F').catch(() => [])
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -173,6 +174,7 @@ async function loadAllData() {
     DATA.registroMantenimientos = toObj(registroMantenimientos || [], 'registroMantenimientos');
     DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
     DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
+    DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
 
     renderAll();
   } catch(e) {

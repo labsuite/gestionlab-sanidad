@@ -23,7 +23,7 @@ let DATA = {
   pedidos: [], lineasPedido: [], ciclosModulos: [],
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [],
-  tiposResiduo: [], contenedoresResiduo: []
+  tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: []
 };
 
 // ============================================================
@@ -48,7 +48,8 @@ const COLS = {
   planesMantenimiento:    ['ID_Plan','ID_Equipo','Tipo_Intervencion','Periodicidad','Operacion','Activo','Instrucciones','Con_Alumnado'],
   registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones'],
   tiposResiduo:           ['ID_Residuo','Nombre','Descripcion','Riesgo','Contenedor_Tipo','Lab','Zona'],
-  contenedoresResiduo:    ['ID_Contenedor','ID_Residuo','Lab','Zona','Nivel','Fecha_Actualizacion','Actualizado_Por','Tipo_Contenedor']
+  contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por'],
+  adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones']
 };
 
 function rowToObj(row, type) {
