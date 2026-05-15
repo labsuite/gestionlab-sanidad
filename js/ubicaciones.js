@@ -290,18 +290,27 @@ function _renderTablaUsuarios(lista, rolActual) {
   </div>`;
 }
 
+// "Ciclo|Módulo" helpers — el separador | evita ambigüedad cuando varios ciclos comparten nombre de módulo
+function _moduloCiclo(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(0, i) : null; }
+function _moduloNombre(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(i + 1) : m; }
+
 function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
 
-  // Agrupar por ciclo — un alumno puede aparecer en varios si tiene módulos de varios ciclos
+  // Agrupar por ciclo usando el prefijo embebido ("Ciclo|Módulo"), con fallback a lookup para entradas antiguas
   const grupos = {};
   lista.forEach(u => {
     const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
     const ciclosU = new Set();
     mods.forEach(m => {
-      const cm = DATA.ciclosModulos.find(c => c.Modulo === m);
-      if (cm?.Ciclo) ciclosU.add(cm.Ciclo);
+      const ciclo = _moduloCiclo(m);
+      if (ciclo) {
+        ciclosU.add(ciclo);
+      } else {
+        const cm = DATA.ciclosModulos.find(c => c.Modulo === m);
+        if (cm?.Ciclo) ciclosU.add(cm.Ciclo);
+      }
     });
     if (!ciclosU.size) ciclosU.add('Sin ciclo asignado');
     ciclosU.forEach(ciclo => {
@@ -314,8 +323,9 @@ function _renderSeccionAlumnos(lista, rolActual) {
     a === 'Sin ciclo asignado' ? 1 : b === 'Sin ciclo asignado' ? -1 : a.localeCompare(b, 'es')
   );
 
+  // Para el filtro y data-modulos usar solo el nombre (sin prefijo de ciclo)
   const todosModulos = [...new Set(
-    lista.flatMap(u => (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean))
+    lista.flatMap(u => (u.Modulo||'').split(',').map(m => _moduloNombre(m.trim())).filter(Boolean))
   )].sort((a,b) => a.localeCompare(b,'es'));
 
   const filtroOpts = todosModulos.map(m => `<option value="${m}">${m}</option>`).join('');
@@ -325,10 +335,11 @@ function _renderSeccionAlumnos(lista, rolActual) {
     const filas = usrs.map(u => {
       const idx = DATA.usuarios.indexOf(u);
       const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
-      const modBadges = mods.map(m => `<span class="badge badge-blue" style="margin-right:2px">${m}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+      const modNombres = mods.map(_moduloNombre);
+      const modBadges = modNombres.map(n => `<span class="badge badge-blue" style="margin-right:2px">${n}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
       const labs = _getLabsDeUbics(u.Ubicaciones_Asignadas||'');
       const labBadges = labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
-      return `<tr data-modulos="${mods.join(',')}">
+      return `<tr data-modulos="${modNombres.join(',')}">
         <td><strong>${u.Nombre||'—'}</strong></td>
         <td>${u.Email||'—'}</td>
         <td>${modBadges}</td>
@@ -427,9 +438,11 @@ function _refreshModuloCheckboxes(preselectedStr) {
     .sort(([a],[b]) => a.localeCompare(b,'es'))
     .map(([ciclo, mods]) => {
       const checks = [...mods].sort((a,b) => a.localeCompare(b,'es')).map(m => {
-        const checked = _selectedModulosArray.includes(m) ? 'checked' : '';
+        const val = `${ciclo}|${m}`;
+        // retrocompat: también marcar si el array tiene el nombre sin prefijo
+        const checked = (_selectedModulosArray.includes(val) || _selectedModulosArray.includes(m)) ? 'checked' : '';
         return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
-          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_onModuloChange(this)"> ${m}
+          <input type="checkbox" class="usr-modulo-check" value="${val}" ${checked} onchange="_onModuloChange(this)"> ${m}
         </label>`;
       }).join('');
       return `<div style="margin-bottom:10px">
@@ -458,9 +471,10 @@ function _syncChipsModulos() {
     return;
   }
   cont.innerHTML = selected.map(m => {
+    const nombre = _moduloNombre(m);
     const safe = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--primary,#4f46e5);color:#fff;border-radius:99px;font-size:11px;font-weight:500">
-      ${m}
+      ${nombre}
       <button type="button" onclick="_desmarcarModulo('${safe}')" style="background:none;border:none;color:#fff;cursor:pointer;padding:0;font-size:14px;line-height:1;opacity:0.8">×</button>
     </span>`;
   }).join('');
@@ -621,8 +635,6 @@ async function guardarUsuario() {
   if (rol === 'Alumno') {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');
-    console.log('[guardarUsuario] módulos a guardar:', modulo || '(vacío)');
-    showToast(`Guardando módulos: ${modulo || '(ninguno)'}`, 'info');
   }
   const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo];
   showLoading('Guardando...');
