@@ -173,12 +173,74 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ---
 
-## Pendiente de hacer
+## Módulo de pedidos/solicitudes – estado del código (2026-05-16)
 
-### 1. Datos – Planes_Mantenimiento (entrada de datos, no código)
+### Archivos activos
+- `js/pedidos-render.js` — render de solicitudes y pedidos, `openModalRecepcion`
+- `js/pedidos-acciones.js` — toda la lógica de guardado
+- `js/material.js` — búsquedas de material y autocompletado
+- `js/contabilidad.js` — cálculo de precios históricos
+- `html/modales-pedidos.html` — todos los modales del módulo
+- **`js/pedidos.js` ELIMINADO** — era código obsoleto sin cargar, ya no existe
+
+### Estados de solicitud (canónicos)
+`Pendiente` → `Añadida a pedido` → `En espera de recepción` → `Recibido` / `Rechazado` / `Cancelado`
+- Transición a "En espera de recepción": automática al aprobar el presupuesto del pedido vinculado
+- Transición a "Recibido": automática al registrar recepción completa de la línea
+
+### Estados de pedido (canónicos)
+`Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
+- "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales
+- Archivado: solo posible cuando Estado=Recepción completa Y los tres checks de documentación están marcados
+
+### Recepción de líneas — lógica clave
+- `_completarRecepcionLinea(idx, l, cantRec, ...)` es el orquestador, dividido en 4 subfunciones:
+  - `_persistirLinea` — actualiza la línea en Sheets (paso crítico: si falla, revierte memoria y aborta)
+  - `_actualizarStockMaterial` — actualiza stock global y lotes; registra movimiento
+  - `_actualizarEstadoPedidoPostRecepcion` — pasa pedido a Recepción parcial/completa
+  - `_actualizarSolicitudOrigen` — busca la solicitud vinculada (2 intentos) y la marca Recibida
+- **`cantRec` es incremental** (lo que viene en el albarán), se acumula sobre `Cantidad_Recibida` anterior
+- Si un paso posterior a `_persistirLinea` falla, el toast indica exactamente qué no se guardó
+- La búsqueda de solicitud origen usa 2 intentos: por ID en Observaciones ("Desde solicitud SOL-xxx"), luego por pedidoId+nombre normalizado. **No hay intento 3** (se eliminó por riesgo de vincular la solicitud equivocada)
+
+### Documentación de pedido — checkboxes en detalle de pedido
+- `Doc_Hoja_Generada` (col N) — hoja de pedido generada
+- ~~`Doc_Hoja_Completada`~~ — **PENDIENTE ELIMINAR**: este checkbox sobra porque la hoja ya se genera con los datos de factura. Ver tarea pendiente abajo.
+- `Doc_Enviada_Jefatura` (col P) — hoja enviada a jefatura
+- `toggleDocPedido(pedidoId, campo, valor)` — actualiza el campo en Sheets col por col
+
+---
+
+## Pendiente de hacer – CÓDIGO
+
+### A. Novedades en solicitudes para el profesor (PRIORIDAD ALTA)
+El profesor no sabe que su solicitud fue aprobada/rechazada/recibida hasta que entra a mirar.
+- Añadir badge/contador visible al entrar: "X solicitudes tuyas cambiaron de estado"
+- Implementación sugerida: comparar estado actual de las solicitudes del usuario vs. la última vez que se conectó (guardar timestamp en localStorage). Mostrar banner en dashboard o badge en sidebar.
+
+### B. Recepción masiva de albarán (PRIORIDAD ALTA)
+Ahora cada línea requiere abrir un modal individual. Con pedidos de 15+ líneas es tedioso.
+- Añadir botón "Recibir albarán" en el detalle del pedido
+- Abre una vista/modal con todas las líneas pendientes en tabla editable (cantidad recibida + obs por fila)
+- Al confirmar, llama a `_completarRecepcionLinea` para cada línea con cantidad > 0
+- El modal de recepción individual (`modal-recepcion-linea`) se mantiene para casos puntuales
+
+### C. Flujo de documentación — eliminar checkbox "Hoja completada con factura"
+- La hoja de pedido ya se genera con los datos de factura → el checkbox `Doc_Hoja_Completada` es redundante
+- **Qué hacer:**
+  1. En `html/modales-pedidos.html` y en `js/pedidos-render.js` (detalle del pedido): eliminar el checkbox `Doc_Hoja_Completada`
+  2. En el modal de generación de hoja (`modal-generar-hoja`): hacer obligatorios los campos de factura (Nº factura, Fecha factura) antes de poder generar
+  3. En `archivarPedido()` en `pedidos-acciones.js`: quitar `Doc_Hoja_Completada` de la condición de archivado
+  4. La columna O del sheet Pedidos puede quedar vacía (no eliminar para no desplazar P)
+
+---
+
+## Pendiente de hacer – DATOS
+
+### 1. Datos – Planes_Mantenimiento
 Ya introducidos 272 planes. Revisar cobertura completa de todos los equipos.
 
-### 2. Datos – Campos nuevos en equipos existentes (entrada de datos, en la app)
+### 2. Datos – Campos nuevos en equipos existentes
 Para cada equipo actualizar via modal de edición:
 - `Protocolo_Uso` — texto con instrucciones de uso básicas
 - `Tipo_Mantenimiento` — Periódico o Estacional
@@ -190,11 +252,11 @@ Para cada equipo actualizar via modal de edición:
 - Pendiente: verificar formato con más registros reales en Registro_Mantenimientos
 - Pendiente: actualizar las ubicaciones de los equipos al formato correcto de la BD para que aparezcan todos en el xlsx
 
-### 4. Datos – Residuos (entrada de datos, en la app) – EN CURSO
+### 4. Datos – Residuos
 - Tipos de residuo: ya introducidos. Revisar que todos tengan `Contenedor_Tipo` relleno (es el campo que agrupa la guía).
 - Contenedores físicos: introducir en Contenedores_Residuo con su nivel inicial.
 
-### 5. Datos – Usuarios (entrada de datos, en la app)
+### 5. Datos – Usuarios
 - Alumnos existentes: al editarlos, seleccionar el `Ciclo_Principal` en el nuevo dropdown y guardar para que queden correctamente agrupados.
 - Verificar que la columna H (`Ciclo_Principal`) existe en el sheet Usuarios con ese encabezado.
 
