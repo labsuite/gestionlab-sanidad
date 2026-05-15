@@ -15,6 +15,12 @@ function _nivelBadge(nivel) {
   return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;background:${color}20;color:${color};border:1px solid ${color}40">${nivel || '—'}</span>`;
 }
 
+function _contadoBadge(cantidad) {
+  const n = parseInt(cantidad) || 0;
+  const color = n === 0 ? '#94a3b8' : n < 5 ? '#22c55e' : n < 10 ? '#f97316' : '#ef4444';
+  return `<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;background:${color}20;color:${color};border:1px solid ${color}40">${n} garrafa${n !== 1 ? 's' : ''}</span>`;
+}
+
 // ── Página: Guía de residuos ─────────────────────────────────
 function renderResiduosGuia() {
   const el = document.getElementById('page-residuos-guia');
@@ -66,7 +72,9 @@ function renderResiduosContenedores() {
   if (!el) return;
 
   const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
-  const alertas = DATA.contenedoresResiduo.filter(c => c.Nivel === '75%' || c.Nivel === 'lleno').length;
+  const alertasFijo = DATA.contenedoresResiduo.filter(c => c.Tipo_Contenedor !== 'rotativo' && (c.Nivel === '75%' || c.Nivel === 'lleno')).length;
+  const alertasRotativo = DATA.contenedoresResiduo.filter(c => c.Tipo_Contenedor === 'rotativo' && (parseInt(c.Nivel) || 0) >= 5).length;
+  const alertas = alertasFijo + alertasRotativo;
 
   el.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
@@ -88,14 +96,20 @@ function _renderContenedores(contenedores, canEdit) {
 
   const rows = contenedores.map((c, i) => {
     const tipo = DATA.tiposResiduo.find(t => t.ID_Residuo === c.ID_Residuo);
+    const esRotativo = c.Tipo_Contenedor === 'rotativo';
+    const badgeCol = esRotativo ? _contadoBadge(c.Nivel) : _nivelBadge(c.Nivel);
+    const accionBtn = esRotativo
+      ? `<button class="btn btn-sm btn-secondary" onclick="anadirGarrafa(${i})">+1 sellada</button>
+         <button class="btn btn-sm" onclick="registrarRecogida(${i})" style="margin-left:4px" title="Registrar recogida">♻️</button>`
+      : `<button class="btn btn-sm btn-secondary" onclick="openModalNivel(${i})">Actualizar nivel</button>`;
     return `<tr>
       <td><strong>${tipo?.Nombre || c.ID_Residuo}</strong></td>
       <td>Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}</td>
-      <td>${_nivelBadge(c.Nivel)}</td>
+      <td>${badgeCol}</td>
       <td style="font-size:12px;color:var(--text-muted)">${formatDate(c.Fecha_Actualizacion) || '—'}</td>
       <td style="font-size:12px;color:var(--text-muted)">${c.Actualizado_Por || '—'}</td>
       <td style="white-space:nowrap">
-        <button class="btn btn-sm btn-secondary" onclick="openModalNivel(${i})">Actualizar nivel</button>
+        ${accionBtn}
         ${canEdit ? `
           <button class="btn btn-sm" onclick="openModalContenedor(${i})" style="margin-left:4px">✏️</button>
           <button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${i})" style="margin-left:4px">✕</button>` : ''}
@@ -155,6 +169,11 @@ async function guardarNivel() {
 }
 
 // ── Modal: añadir / editar contenedor ───────────────────────
+function _toggleContTipo() {
+  const esRotativo = v('cont-tipo-cont') === 'rotativo';
+  document.getElementById('cont-nivel-wrap').style.display = esRotativo ? 'none' : '';
+}
+
 function openModalContenedor(idx = null) {
   editingRow = idx;
   const opts = DATA.tiposResiduo.map(t =>
@@ -167,13 +186,16 @@ function openModalContenedor(idx = null) {
     sv('cont-tipo', c.ID_Residuo);
     sv('cont-lab', c.Lab);
     sv('cont-zona', c.Zona);
+    sv('cont-tipo-cont', c.Tipo_Contenedor || 'fijo');
     sv('cont-nivel-ini', c.Nivel || 'vacío');
   } else {
     sv('cont-tipo', '');
     sv('cont-lab', '');
     sv('cont-zona', '');
+    sv('cont-tipo-cont', 'fijo');
     sv('cont-nivel-ini', 'vacío');
   }
+  _toggleContTipo();
   openModal('modal-contenedor-res');
 }
 
@@ -181,7 +203,8 @@ async function guardarContenedor() {
   const idResiduo = v('cont-tipo');
   const lab = v('cont-lab');
   const zona = v('cont-zona');
-  const nivel = v('cont-nivel-ini') || 'vacío';
+  const tipoCont = v('cont-tipo-cont') || 'fijo';
+  const nivel = tipoCont === 'rotativo' ? '0' : (v('cont-nivel-ini') || 'vacío');
   if (!idResiduo || !lab) {
     showToast('Tipo de residuo y laboratorio son obligatorios', 'error');
     return;
@@ -194,12 +217,12 @@ async function guardarContenedor() {
     if (editingRow !== null) {
       const c = DATA.contenedoresResiduo[editingRow];
       const fila = editingRow + 2;
-      await sheetsUpdate(`Contenedores_Residuo!A${fila}:G${fila}`,
-        [c.ID_Contenedor, idResiduo, lab, zona, nivel, fecha, usuario]);
-      Object.assign(c, { ID_Residuo: idResiduo, Lab: lab, Zona: zona, Nivel: nivel, Fecha_Actualizacion: fecha, Actualizado_Por: usuario });
+      await sheetsUpdate(`Contenedores_Residuo!A${fila}:H${fila}`,
+        [c.ID_Contenedor, idResiduo, lab, zona, nivel, fecha, usuario, tipoCont]);
+      Object.assign(c, { ID_Residuo: idResiduo, Lab: lab, Zona: zona, Nivel: nivel, Fecha_Actualizacion: fecha, Actualizado_Por: usuario, Tipo_Contenedor: tipoCont });
     } else {
       const id = genId('RC');
-      const row = [id, idResiduo, lab, zona, nivel, fecha, usuario];
+      const row = [id, idResiduo, lab, zona, nivel, fecha, usuario, tipoCont];
       await sheetsAppend('Contenedores_Residuo', row);
       DATA.contenedoresResiduo.push(rowToObj(row, 'contenedoresResiduo'));
     }
@@ -210,6 +233,40 @@ async function guardarContenedor() {
   } catch(e) {
     showToast('Error al guardar', 'error');
   }
+}
+
+// ── Contenedores rotativos (garrafas 5L) ────────────────────
+async function anadirGarrafa(idx) {
+  const c = DATA.contenedoresResiduo[idx];
+  const nuevo = String((parseInt(c.Nivel) || 0) + 1);
+  const fila = idx + 2;
+  const usuario = currentUser?.name || currentUser?.email || '';
+  const fecha = new Date().toISOString().split('T')[0];
+  try {
+    await sheetsUpdate(`Contenedores_Residuo!E${fila}:G${fila}`, [nuevo, fecha, usuario]);
+    c.Nivel = nuevo; c.Fecha_Actualizacion = fecha; c.Actualizado_Por = usuario;
+    renderResiduosContenedores();
+    _updateBadgeResiduos();
+    showToast(`Garrafa sellada registrada (${nuevo} en total)`, 'success');
+  } catch(e) { showToast('Error al guardar', 'error'); }
+}
+
+async function registrarRecogida(idx) {
+  const c = DATA.contenedoresResiduo[idx];
+  const n = parseInt(c.Nivel) || 0;
+  if (!n) { showToast('No hay garrafas pendientes de recogida', 'error'); return; }
+  const tipo = DATA.tiposResiduo.find(t => t.ID_Residuo === c.ID_Residuo);
+  if (!confirm(`¿Confirmar recogida de ${n} garrafa${n !== 1 ? 's' : ''} de "${tipo?.Nombre || c.ID_Residuo}"?`)) return;
+  const fila = idx + 2;
+  const usuario = currentUser?.name || currentUser?.email || '';
+  const fecha = new Date().toISOString().split('T')[0];
+  try {
+    await sheetsUpdate(`Contenedores_Residuo!E${fila}:G${fila}`, ['0', fecha, usuario]);
+    c.Nivel = '0'; c.Fecha_Actualizacion = fecha; c.Actualizado_Por = usuario;
+    renderResiduosContenedores();
+    _updateBadgeResiduos();
+    showToast('Recogida registrada. Contador a cero.', 'success');
+  } catch(e) { showToast('Error al guardar', 'error'); }
 }
 
 async function eliminarContenedor(idx) {

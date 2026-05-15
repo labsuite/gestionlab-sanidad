@@ -47,7 +47,14 @@
         <input id="cont-zona" class="form-input" placeholder="ej. Almacén residuos">
       </div>
       <div class="form-group">
-        <label class="form-label">Nivel actual</label>
+        <label class="form-label">Tipo de contenedor</label>
+        <select id="cont-tipo-cont" class="form-input" onchange="_toggleContTipo()">
+          <option value="fijo">Fijo (bidón o cubo permanente)</option>
+          <option value="rotativo">Rotativo (garrafas 5 L)</option>
+        </select>
+      </div>
+      <div id="cont-nivel-wrap" class="form-group">
+        <label class="form-label">Nivel inicial</label>
         <select id="cont-nivel-ini" class="form-input">
           <option value="vacío">Vacío</option>
           <option value="25%">25%</option>
