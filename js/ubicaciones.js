@@ -209,6 +209,13 @@ function renderDetalleProveedor(p) {
 function renderUsuarios() {
   const cont = document.getElementById('usuarios-contenido');
   if (!cont) return;
+
+  // Preserve active tab across re-renders
+  const tabActiva = ['staff','profes','alumnos'].find(t => {
+    const p = document.getElementById(`usr-tab-${t}`);
+    return p && p.style.display !== 'none';
+  }) || 'staff';
+
   const rolActual = getUserRole();
   const puedeCrear = rolActual === 'Administrador' || rolActual === 'Gestor';
 
@@ -244,6 +251,7 @@ function renderUsuarios() {
     <div id="usr-tab-profes"  style="display:none">${_renderTablaUsuarios(profes, rolActual)}</div>
     <div id="usr-tab-alumnos" style="display:none">${_renderSeccionAlumnos(alumnos, rolActual)}</div>
   `;
+  switchUsuariosTab(tabActiva);
 }
 
 function switchUsuariosTab(tab) {
@@ -388,35 +396,44 @@ function _getUbicacionesDeLabs(labsList) {
 }
 
 function _populateModalUsuarioAlumno(modulosStr, ubicStr) {
-  const cicloSel = document.getElementById('usr-ciclo');
-  if (!cicloSel) return;
-  const ciclos = [...new Set(DATA.ciclosModulos.map(c => c.Ciclo).filter(Boolean))].sort();
-  cicloSel.innerHTML = `<option value="">— Todos los ciclos —</option>` +
-    ciclos.map(c => `<option value="${c}">${c}</option>`).join('');
   _refreshModuloCheckboxes(modulosStr);
   const labs = _getLabsDeUbics(ubicStr);
   document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
 }
 
 function _refreshModuloCheckboxes(preselectedStr) {
-  const ciclo = document.getElementById('usr-ciclo')?.value || '';
-  const preselected = preselectedStr != null
-    ? (preselectedStr).split(',').map(m => m.trim()).filter(Boolean)
-    : Array.from(document.querySelectorAll('.usr-modulo-check:checked')).map(cb => cb.value);
+  const preselected = (preselectedStr || '').split(',').map(m => m.trim()).filter(Boolean);
 
-  let modEntries = DATA.ciclosModulos;
-  if (ciclo) modEntries = modEntries.filter(c => c.Ciclo === ciclo);
-  const nombres = [...new Set(modEntries.map(c => c.Modulo).filter(Boolean))].sort();
+  // Agrupar módulos por ciclo
+  const grupos = {};
+  DATA.ciclosModulos.forEach(cm => {
+    if (!cm.Modulo) return;
+    const ciclo = cm.Ciclo || 'Sin ciclo';
+    if (!grupos[ciclo]) grupos[ciclo] = new Set();
+    grupos[ciclo].add(cm.Modulo);
+  });
 
   const cont = document.getElementById('usr-modulos-checks');
   if (!cont) return;
-  if (!nombres.length) { cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos${ciclo ? ' para este ciclo' : ''}</span>`; return; }
-  cont.innerHTML = nombres.map(m => {
-    const checked = preselected.includes(m) ? 'checked' : '';
-    return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
-      <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked}> ${m}
-    </label>`;
-  }).join('');
+  if (!Object.keys(grupos).length) {
+    cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos registrados en Ciclos_Modulos</span>`;
+    return;
+  }
+
+  cont.innerHTML = Object.entries(grupos)
+    .sort(([a],[b]) => a.localeCompare(b,'es'))
+    .map(([ciclo, mods]) => {
+      const checks = [...mods].sort((a,b) => a.localeCompare(b,'es')).map(m => {
+        const checked = preselected.includes(m) ? 'checked' : '';
+        return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
+          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked}> ${m}
+        </label>`;
+      }).join('');
+      return `<div style="margin-bottom:10px">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">${ciclo}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${checks}</div>
+      </div>`;
+    }).join('');
 }
 
 function _getModulosSeleccionados() {
