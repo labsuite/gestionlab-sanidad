@@ -234,7 +234,7 @@ function buildIntervencionesEquipo(equipoId) {
   const mantSection = buildMantenimientoEquipo(equipoId);
 
   if (!ints.length) return panelDetalles + mantSection + `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
-  const tipoBadge    = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
+  const tipoBadge    = {'Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Validación':'badge-blue','Limpieza':'badge-gray','Descontaminación':'badge-gray','Sustitución de pieza':'badge-orange','Cambio de consumibles':'badge-orange','Control de temperatura':'badge-blue','Puesta en marcha':'badge-green','Actualización de software':'badge-blue'};
   const estadoBadgeI = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   return panelDetalles + mantSection + `<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
     <div class="intervenciones-mini-header"><span>Tipo</span><span>Estado</span><span>Fecha</span><span>Quién</span><span>Descripción</span><span>Resultado</span><span></span></div>
