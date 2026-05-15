@@ -88,10 +88,17 @@ function _updateBadgeMantenimiento() {
   const badgeMant = document.getElementById('badge-mantenimiento');
   if (!badgeMant) return;
   const curso = getCursoAcademico();
+  const esAlumno = getUserRole() === 'Alumno';
+  const mesActual = new Date().getMonth() + 1;
+  const enPeriodoAlumno = mesActual >= 10 || mesActual <= 5;
   let pendientes = 0;
   DATA.equipos.forEach(eq => {
     DATA.planesMantenimiento
-      .filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE')
+      .filter(p => {
+        if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
+        if (esAlumno && (p.Con_Alumnado !== 'Sí' || !enPeriodoAlumno)) return false;
+        return true;
+      })
       .forEach(plan => {
         getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
           if (!getRegistroMant(plan.ID_Plan, curso, periodo)) pendientes++;
@@ -107,7 +114,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'residuos-guia', 'residuos-contenedores'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     crearIncidencias: false,
     gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,

@@ -299,12 +299,14 @@ function openModalPlan(equipoId, idPlan = null) {
       document.getElementById('plan-periodicidad').value  = plan.Periodicidad;
       document.getElementById('plan-operacion').value     = plan.Operacion;
       document.getElementById('plan-instrucciones').value = plan.Instrucciones || '';
+      document.getElementById('plan-con-alumnado').checked = plan.Con_Alumnado === 'Sí';
     }
   } else {
     document.getElementById('plan-tipo-int').value      = 'Interno';
     document.getElementById('plan-periodicidad').value  = 'Anual';
     document.getElementById('plan-operacion').value     = '';
     document.getElementById('plan-instrucciones').value = '';
+    document.getElementById('plan-con-alumnado').checked = false;
   }
   openModal('modal-gestionar-plan');
 }
@@ -314,6 +316,7 @@ async function guardarPlan() {
   const period       = document.getElementById('plan-periodicidad').value;
   const operacion    = document.getElementById('plan-operacion').value.trim();
   const instrucciones= document.getElementById('plan-instrucciones').value.trim();
+  const conAlumnado  = document.getElementById('plan-con-alumnado').checked ? 'Sí' : 'No';
   if (!operacion) { showToast('Escribe el título de la operación', 'error'); return; }
 
   showLoading('Guardando...');
@@ -321,13 +324,13 @@ async function guardarPlan() {
     if (_planEditingId) {
       const idx = DATA.planesMantenimiento.findIndex(p => p.ID_Plan === _planEditingId);
       if (idx !== -1) {
-        const row = [_planEditingId, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones];
-        await sheetsUpdate(`Planes_Mantenimiento!A${idx + 2}:G${idx + 2}`, row);
+        const row = [_planEditingId, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones, conAlumnado];
+        await sheetsUpdate(`Planes_Mantenimiento!A${idx + 2}:H${idx + 2}`, row);
         DATA.planesMantenimiento[idx] = rowToObj(row, 'planesMantenimiento');
       }
     } else {
       const id  = genId('PM');
-      const row = [id, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones];
+      const row = [id, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones, conAlumnado];
       await sheetsAppend('Planes_Mantenimiento', row);
       DATA.planesMantenimiento.push(rowToObj(row, 'planesMantenimiento'));
     }
@@ -396,11 +399,19 @@ function renderMantenimiento() {
   const curso = getCursoAcademico();
   const canEdit = puedeHacer('editarEquipos');
   const canLog  = puedeHacer('crearIntervenciones');
+  const esAlumno = getUserRole() === 'Alumno';
 
   // Calcular todos los status del curso actual
+  // Alumnos solo ven planes marcados Con_Alumnado=Sí y dentro de su período (oct-may)
+  const mesActual = new Date().getMonth() + 1; // 1-12
+  const enPeriodoAlumno = mesActual >= 10 || mesActual <= 5;
   const todoStatus = [];
   DATA.equipos.forEach(eq => {
-    const planes = DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE');
+    const planes = DATA.planesMantenimiento.filter(p => {
+      if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
+      if (esAlumno && (p.Con_Alumnado !== 'Sí' || !enPeriodoAlumno)) return false;
+      return true;
+    });
     planes.forEach(plan => {
       const periodos = getPeriodosEsperados(plan, eq, curso);
       periodos.forEach(periodo => {
@@ -531,9 +542,12 @@ function _renderFilasPendientes(lista, canLog) {
     const instrRow = s.plan.Instrucciones
       ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
       : '';
+    const alumBadge = s.plan.Con_Alumnado === 'Sí'
+      ? `<span title="Se puede realizar con alumnado" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0">👨‍🎓 alumnado</span>`
+      : '';
     return `<tr>
       <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
-      <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span></td>
+      <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span>${alumBadge}</td>
       <td>${s.plan.Periodicidad}</td>
       <td>${labelPeriodo(s.periodo)}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
