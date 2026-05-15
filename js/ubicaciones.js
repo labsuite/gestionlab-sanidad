@@ -203,23 +203,165 @@ function renderDetalleProveedor(p) {
 }
 
 // ============================================================
-// USUARIOS — RENDER
+// USUARIOS — RENDER (3 secciones: admins/gestores, profesores, alumnos)
 // ============================================================
 function renderUsuarios() {
-  const tbody = document.getElementById('tabla-usuarios');
-  if (!DATA.usuarios.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state"><div class="empty-state-icon">👥</div><div class="empty-state-title">Sin usuarios registrados</div></div></td></tr>`; return; }
-  const rolActual  = getUserRole();
-  const rolBadge   = {'Administrador':'badge-red','Gestor':'badge-orange','Profesor':'badge-blue','Alumno':'badge-gray'};
-  tbody.innerHTML = DATA.usuarios.map(u => {
-    // Profesor: solo puede editar cuentas con rol Alumno
-    const puedeEditarEsteUser = rolActual !== 'Profesor' || u.Rol === 'Alumno';
-    return `<tr>
-    <td><strong>${u.Nombre||'—'}</strong></td>
-    <td>${u.Email||'—'}</td>
-    <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
-    <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-    <td><div class="row-actions">${puedeEditarEsteUser ? `<button class="icon-btn" onclick="editUsuario(${DATA.usuarios.indexOf(u)})">✏️</button>` : ''}</div></td>
-  </tr>`; }).join('');
+  const cont = document.getElementById('usuarios-contenido');
+  if (!cont) return;
+  const rolActual = getUserRole();
+  const puedeCrear = rolActual === 'Administrador' || rolActual === 'Gestor';
+
+  const admins  = DATA.usuarios.filter(u => u.Rol === 'Administrador' || u.Rol === 'Gestor');
+  const profes  = DATA.usuarios.filter(u => u.Rol === 'Profesor');
+  const alumnos = DATA.usuarios.filter(u => u.Rol === 'Alumno');
+
+  cont.innerHTML = `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:16px">
+      ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
+    </div>
+    ${_renderSeccionUsuarios('Administradores y gestores', admins, rolActual)}
+    ${_renderSeccionUsuarios('Profesores', profes, rolActual)}
+    ${_renderSeccionAlumnos(alumnos, rolActual)}
+  `;
+}
+
+function _renderSeccionUsuarios(titulo, lista, rolActual) {
+  const rolBadge = {'Administrador':'badge-red','Gestor':'badge-orange','Profesor':'badge-blue','Alumno':'badge-gray'};
+  const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor';
+  const rows = lista.length
+    ? lista.map(u => {
+        const idx = DATA.usuarios.indexOf(u);
+        return `<tr>
+          <td><strong>${u.Nombre||'—'}</strong></td>
+          <td>${u.Email||'—'}</td>
+          <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
+          <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
+          <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px">Sin usuarios en esta categoría</td></tr>`;
+
+  return `<div class="card" style="margin-bottom:16px">
+    <div class="card-header">
+      <div class="card-title">${titulo} <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
+    </div>
+    <table>
+      <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function _renderSeccionAlumnos(lista, rolActual) {
+  const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
+  const todosModulos = [...new Set(
+    lista.flatMap(u => (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean))
+  )].sort();
+
+  const rows = lista.length
+    ? lista.map(u => {
+        const idx = DATA.usuarios.indexOf(u);
+        const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
+        const modBadges = mods.map(m => `<span class="badge badge-blue" style="margin-right:2px">${m}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+        const labs = _getLabsDeUbics(u.Ubicaciones_Asignadas||'');
+        const labBadges = labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+        return `<tr data-modulos="${mods.join(',')}">
+          <td><strong>${u.Nombre||'—'}</strong></td>
+          <td>${u.Email||'—'}</td>
+          <td>${modBadges}</td>
+          <td>${labBadges}</td>
+          <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
+          <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">Sin alumnos registrados</td></tr>`;
+
+  const filtroOpts = todosModulos.map(m => `<option value="${m}">${m}</option>`).join('');
+
+  return `<div class="card">
+    <div class="card-header">
+      <div class="card-title">Alumnos <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
+      ${todosModulos.length > 0 ? `<div class="card-actions">
+        <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
+          <option value="">— Todos los módulos —</option>
+          ${filtroOpts}
+        </select>
+      </div>` : ''}
+    </div>
+    <table>
+      <thead><tr><th>Nombre</th><th>Email</th><th>Módulo(s)</th><th>Labs</th><th>Activo</th><th></th></tr></thead>
+      <tbody id="tabla-alumnos">${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function filtrarAlumnos(modulo) {
+  document.querySelectorAll('#tabla-alumnos tr').forEach(tr => {
+    if (!modulo) { tr.style.display = ''; return; }
+    const mods = (tr.getAttribute('data-modulos') || '').split(',').map(m => m.trim());
+    tr.style.display = mods.includes(modulo) ? '' : 'none';
+  });
+}
+
+function _getLabsDeUbics(ubicStr) {
+  if (!ubicStr) return [];
+  const ids = ubicStr.split(',').map(s => s.trim()).filter(Boolean);
+  const labs = new Set();
+  ids.forEach(id => {
+    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === id);
+    if (!u) return;
+    const lab = u.Laboratorio_Aula || '';
+    ['201','203','205','207'].forEach(n => { if (lab.includes(n)) labs.add(n); });
+  });
+  return [...labs].sort();
+}
+
+function _getUbicacionesDeLabs(labsList) {
+  if (!labsList.length) return '';
+  return DATA.ubicaciones
+    .filter(u => labsList.some(n => (u.Laboratorio_Aula || '').includes(n)))
+    .map(u => u.ID_Ubicacion)
+    .join(',');
+}
+
+function _populateModalUsuarioAlumno(modulosStr, ubicStr) {
+  const cicloSel = document.getElementById('usr-ciclo');
+  if (!cicloSel) return;
+  const ciclos = [...new Set(DATA.ciclosModulos.map(c => c.Ciclo).filter(Boolean))].sort();
+  cicloSel.innerHTML = `<option value="">— Todos los ciclos —</option>` +
+    ciclos.map(c => `<option value="${c}">${c}</option>`).join('');
+  _refreshModuloCheckboxes(modulosStr);
+  const labs = _getLabsDeUbics(ubicStr);
+  document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
+}
+
+function _refreshModuloCheckboxes(preselectedStr) {
+  const ciclo = document.getElementById('usr-ciclo')?.value || '';
+  const preselected = preselectedStr != null
+    ? (preselectedStr).split(',').map(m => m.trim()).filter(Boolean)
+    : Array.from(document.querySelectorAll('.usr-modulo-check:checked')).map(cb => cb.value);
+
+  let modEntries = DATA.ciclosModulos;
+  if (ciclo) modEntries = modEntries.filter(c => c.Ciclo === ciclo);
+  const nombres = [...new Set(modEntries.map(c => c.Modulo).filter(Boolean))].sort();
+
+  const cont = document.getElementById('usr-modulos-checks');
+  if (!cont) return;
+  if (!nombres.length) { cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos${ciclo ? ' para este ciclo' : ''}</span>`; return; }
+  cont.innerHTML = nombres.map(m => {
+    const checked = preselected.includes(m) ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
+      <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked}> ${m}
+    </label>`;
+  }).join('');
+}
+
+function _getModulosSeleccionados() {
+  return Array.from(document.querySelectorAll('.usr-modulo-check:checked')).map(cb => cb.value);
+}
+
+function _getLabsSeleccionados() {
+  return Array.from(document.querySelectorAll('.usr-lab-check:checked')).map(cb => cb.value);
 }
 
 // ============================================================
@@ -227,9 +369,9 @@ function renderUsuarios() {
 // ============================================================
 function openModalProveedor() { editingRow = null; ['prov-nombre','prov-contacto','prov-email','prov-telefono','prov-web','prov-observaciones'].forEach(id => sv(id,'')); clearTiposProveedor(); openModal('modal-proveedor'); }
 function openModalUbicacion() { editingRow = null; ['ubi-id','ubi-lab','ubi-zona','ubi-subzona','ubi-desc'].forEach(id => sv(id,'')); openModal('modal-ubicacion'); }
-function openModalUsuario()   {
+function openModalUsuario() {
   editingRow = null;
-  ['usr-nombre','usr-email','usr-ubicaciones-asignadas'].forEach(id => sv(id,''));
+  ['usr-nombre','usr-email'].forEach(id => sv(id,''));
   sv('usr-rol','Profesor');
   toggleUbicacionesAsignadasField('Profesor');
   const selRol = document.getElementById('usr-rol');
@@ -238,8 +380,14 @@ function openModalUsuario()   {
 }
 
 function toggleUbicacionesAsignadasField(rol) {
-  const grp = document.getElementById('usr-ubicaciones-group');
-  if (grp) grp.style.display = rol === 'Alumno' ? '' : 'none';
+  const grp = document.getElementById('usr-alumno-fields');
+  if (!grp) return;
+  if (rol === 'Alumno') {
+    grp.style.display = '';
+    _populateModalUsuarioAlumno('', '');
+  } else {
+    grp.style.display = 'none';
+  }
 }
 
 function editProveedor(idx) {
@@ -264,9 +412,9 @@ function editUsuario(idx) {
   }
   editingRow = { sheet: 'Usuarios', rowIndex: idx };
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
-  sv('usr-ubicaciones-asignadas', u.Ubicaciones_Asignadas||'');
-  toggleUbicacionesAsignadasField(u.Rol);
-  // Profesor no puede cambiar el rol: bloqueamos el select
+  const grp = document.getElementById('usr-alumno-fields');
+  if (grp) grp.style.display = u.Rol === 'Alumno' ? '' : 'none';
+  if (u.Rol === 'Alumno') _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'');
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
   openModal('modal-usuario');
@@ -335,7 +483,6 @@ async function guardarUsuario() {
   const nombre = v('usr-nombre'), email = v('usr-email');
   if (!nombre || !email) { showToast('Nombre y email son obligatorios', 'error'); return; }
 
-  // Restricción para Profesor: solo puede editar Alumnos, y el rol queda fijo
   if (getUserRole() === 'Profesor') {
     if (editingRow) {
       const uExist = DATA.usuarios[editingRow.rowIndex];
@@ -343,17 +490,23 @@ async function guardarUsuario() {
     } else {
       showToast('No tienes permiso para crear nuevos usuarios', 'error'); return;
     }
-    sv('usr-rol', 'Alumno'); // forzar rol aunque alguien manipule el select
+    sv('usr-rol', 'Alumno');
   }
 
-  const id = genId('USR-');
+  const existingU = editingRow ? DATA.usuarios[editingRow.rowIndex] : null;
+  const id = existingU ? existingU.ID_Usuario : genId('USR-');
+  const activo = existingU ? existingU.Activo : 'TRUE';
   const rol = v('usr-rol') || 'Alumno';
-  const ubicAsignadas = rol === 'Alumno' ? v('usr-ubicaciones-asignadas') : '';
-  const row = [id, nombre, email, rol, 'TRUE', ubicAsignadas];
+  let ubicAsignadas = '', modulo = '';
+  if (rol === 'Alumno') {
+    ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
+    modulo = _getModulosSeleccionados().join(',');
+  }
+  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo];
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Usuarios') {
-      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:F${editingRow.rowIndex+2}`, row);
+      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:G${editingRow.rowIndex+2}`, row);
       DATA.usuarios[editingRow.rowIndex] = rowToObj(row, 'usuarios');
       showToast('Usuario actualizado', 'success');
     } else {

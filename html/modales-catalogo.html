@@ -123,10 +123,28 @@
             <option>Profesor</option><option>Alumno</option>
           </select>
         </div>
-        <div class="form-group full" id="usr-ubicaciones-group" style="display:none">
-          <label>Ubicaciones asignadas</label>
-          <input id="usr-ubicaciones-asignadas" placeholder="Ej: UBI-001, UBI-003">
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">IDs de ubicación separados por comas. La zona común (205) se incluye siempre automáticamente.</div>
+        <div class="form-group full" id="usr-alumno-fields" style="display:none">
+          <div style="margin-bottom:12px">
+            <label style="font-weight:500;font-size:13px">Ciclo (filtro)</label>
+            <select id="usr-ciclo" onchange="_refreshModuloCheckboxes()" style="margin-top:6px;width:100%;max-width:300px;padding:8px 10px;border-radius:6px;border:1px solid var(--border)">
+              <option value="">— Todos los ciclos —</option>
+            </select>
+          </div>
+          <div style="margin-bottom:12px">
+            <label style="font-weight:500;font-size:13px">Módulos</label>
+            <div id="usr-modulos-checks" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;min-height:32px"></div>
+          </div>
+          <div>
+            <label style="font-weight:500;font-size:13px">Labs accesibles</label>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="201"> Lab 201</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="203"> Lab 203</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="205"> Lab 205</label>
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="207"> Lab 207</label>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:4px">La zona común se incluye siempre automáticamente.</div>
+          </div>
+          <input type="hidden" id="usr-ubicaciones-asignadas">
         </div>
       </div>
       <div class="form-footer">
