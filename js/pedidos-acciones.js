@@ -287,108 +287,104 @@ async function guardarRecepcionLinea() {
   await _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, v('rec-obs'));
 }
 
+// ── Subfunciones de recepción ─────────────────────────────────
+
+async function _persistirLinea(idx, l) {
+  const row = [l.ID_Linea, l.Pedido, l.Material, l.Cantidad_Pedida, l.Cantidad_Recibida, l.Estado_Linea, l.Observaciones];
+  await sheetsUpdate(`Lineas_Pedido!A${idx+2}:G${idx+2}`, row);
+}
+
+async function _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion) {
+  const lotesDelMat = DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material);
+  if (lotesDelMat.length > 0) {
+    const loteTarget = idUbicacion
+      ? DATA.materialUbicaciones.find(lu => lu.ID_Material === mat.ID_Material && lu.ID_Ubicacion === idUbicacion)
+      : lotesDelMat[0];
+    if (loteTarget) {
+      const loteIdx = DATA.materialUbicaciones.indexOf(loteTarget);
+      const nuevoLocal = (parseFloat(loteTarget.Stock_Local) || 0) + cantRec;
+      loteTarget.Stock_Local = String(nuevoLocal);
+      await sheetsUpdate(`Material_Ubicaciones!D${loteIdx+2}`, [nuevoLocal]);
+    }
+  }
+  const nuevoStock = lotesDelMat.length > 0
+    ? DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material).reduce((s, lu) => s + (parseFloat(lu.Stock_Local)||0), 0)
+    : (parseFloat(mat.Stock_Actual)||0) + cantRec;
+  const idxMat = DATA.material.indexOf(mat);
+  mat.Stock_Actual = String(nuevoStock);
+  await sheetsUpdate(`Material!H${idxMat+2}`, [nuevoStock]);
+  const movRow = [genId('MOV-'), mat.Nombre, 'Entrada', cantRec, currentUser?.name||'Usuario', new Date().toISOString().split('T')[0], 'Recepción pedido ' + pedidoId, ''];
+  await sheetsAppend('Movimientos', movRow);
+  DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
+}
+
+async function _actualizarEstadoPedidoPostRecepcion(pedidoId) {
+  const pedIdx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
+  if (pedIdx === -1) return;
+  const p = DATA.pedidos[pedIdx];
+  const todasLineas    = DATA.lineasPedido.filter(x => x.Pedido === pedidoId);
+  const todasRecibidas = todasLineas.every(x => x.Estado_Linea === 'Recibido');
+  if (todasRecibidas && p.Estado !== 'Recepción completa' && p.Estado !== 'Factura recibida') {
+    p.Estado = 'Recepción completa';
+    p.Fecha_Recepcion_Completa = new Date().toISOString().split('T')[0];
+    const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, p.Estado, p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones, p.Doc_Hoja_Generada||'', p.Doc_Hoja_Completada||'', p.Doc_Enviada_Jefatura||''];
+    await sheetsUpdate(`Pedidos!A${pedIdx+2}:P${pedIdx+2}`, rowP);
+    showToast('¡Pedido completo! Estado actualizado automáticamente', 'success');
+  } else if (!todasRecibidas && p.Estado === 'Presupuesto aprobado') {
+    p.Estado = 'Recepción parcial';
+    const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, 'Recepción parcial', p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones];
+    await sheetsUpdate(`Pedidos!A${pedIdx+2}:M${pedIdx+2}`, rowP);
+  }
+}
+
+async function _actualizarSolicitudOrigen(l, pedidoId) {
+  const normNombre = n => (n || '').normalize('NFC').replace(/\s*\[.*?\]/g, '').trim().toLowerCase();
+  // Intento 1 — match por ID embebido en Observaciones ("Desde solicitud SOL-xxx")
+  const solIdMatch = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
+  let solOrigen = solIdMatch
+    ? DATA.solicitudes.find(s => s.ID_Solicitud === solIdMatch[1] && s.Estado !== 'Recibido')
+    : null;
+  // Intento 2 — match por pedidoId + nombre normalizado (cubre líneas añadidas sin solicitud previa)
+  if (!solOrigen) {
+    solOrigen = DATA.solicitudes.find(s =>
+      s.Lista_Pedido === pedidoId &&
+      normNombre(s.Material) === normNombre(l.Material) &&
+      s.Estado !== 'Recibido'
+    );
+  }
+  if (!solOrigen) {
+    console.warn('[pedidos] No se encontró solicitud origen para línea', l.ID_Linea, '— estado de solicitud no actualizado');
+    return;
+  }
+  const solIdx = DATA.solicitudes.indexOf(solOrigen);
+  if (!solOrigen.Lista_Pedido) solOrigen.Lista_Pedido = pedidoId;
+  const fechaHoy = new Date().toISOString().split('T')[0];
+  const obsSinFecha = (solOrigen.Observaciones || '').replace(/\[Recibido:\d{4}-\d{2}-\d{2}\]\s*/g, '').trim();
+  solOrigen.Observaciones = (obsSinFecha ? obsSinFecha + ' ' : '') + `[Recibido:${fechaHoy}]`;
+  solOrigen.Estado = 'Recibido';
+  const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Recibido', solOrigen.Lista_Pedido, solOrigen.Observaciones];
+  try {
+    await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
+  } catch(e) {
+    console.warn('[pedidos] No se pudo actualizar solicitud a Recibido', solOrigen.ID_Solicitud, e);
+  }
+}
+
+// ── Orquestador principal de recepción ───────────────────────
+
 async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, obs, idUbicacion = null) {
   l.Cantidad_Recibida = String(cantRec);
   l.Estado_Linea = cantRec >= cantPed ? 'Recibido' : (cantRec > 0 ? 'Recibido parcialmente' : 'Pendiente');
   if (obs) l.Observaciones = obs;
-  const row = [l.ID_Linea, l.Pedido, l.Material, l.Cantidad_Pedida, l.Cantidad_Recibida, l.Estado_Linea, l.Observaciones];
   showLoading('Registrando recepción...');
   try {
-    await sheetsUpdate(`Lineas_Pedido!A${idx+2}:G${idx+2}`, row);
-    if (mat && cantRec > 0) {
-      // Actualizar lote si el material tiene multi-ubicación
-      const lotesDelMat = DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material);
-      if (lotesDelMat.length > 0) {
-        const loteTarget = idUbicacion
-          ? DATA.materialUbicaciones.find(lu => lu.ID_Material === mat.ID_Material && lu.ID_Ubicacion === idUbicacion)
-          : lotesDelMat[0]; // primer lote por defecto
-        if (loteTarget) {
-          const loteIdx = DATA.materialUbicaciones.indexOf(loteTarget);
-          const nuevoLocal = (parseFloat(loteTarget.Stock_Local) || 0) + cantRec;
-          loteTarget.Stock_Local = String(nuevoLocal);
-          await sheetsUpdate(`Material_Ubicaciones!D${loteIdx+2}`, [nuevoLocal]);
-        }
-      }
-      // Actualizar stock global (suma de lotes o directo)
-      const nuevoStock = lotesDelMat.length > 0
-        ? DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material).reduce((s, lu) => s + (parseFloat(lu.Stock_Local)||0), 0)
-        : (parseFloat(mat.Stock_Actual)||0) + cantRec;
-      const idxMat = DATA.material.indexOf(mat);
-      mat.Stock_Actual = String(nuevoStock);
-      await sheetsUpdate(`Material!H${idxMat+2}`, [nuevoStock]);
-      const movRow = [genId('MOV-'), mat.Nombre, 'Entrada', cantRec, currentUser?.name||'Usuario', new Date().toISOString().split('T')[0], 'Recepción pedido ' + pedidoId, ''];
-      await sheetsAppend('Movimientos', movRow);
-      DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-    }
-    const todasLineas    = DATA.lineasPedido.filter(x => x.Pedido === pedidoId);
-    const todasRecibidas = todasLineas.every(x => x.Estado_Linea === 'Recibido');
-    if (todasRecibidas) {
-      const pedIdx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
-      if (pedIdx !== -1 && DATA.pedidos[pedIdx].Estado !== 'Recepción completa' && DATA.pedidos[pedIdx].Estado !== 'Factura recibida') {
-        DATA.pedidos[pedIdx].Estado = 'Recepción completa';
-        DATA.pedidos[pedIdx].Fecha_Recepcion_Completa = new Date().toISOString().split('T')[0];
-        const p = DATA.pedidos[pedIdx];
-        const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, p.Estado, p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones, p.Doc_Hoja_Generada||'', p.Doc_Hoja_Completada||'', p.Doc_Enviada_Jefatura||''];
-        await sheetsUpdate(`Pedidos!A${pedIdx+2}:P${pedIdx+2}`, rowP);
-        showToast('¡Pedido completo! Estado actualizado automáticamente', 'success');
-      }
-    } else {
-      const pedIdx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
-      if (pedIdx !== -1 && DATA.pedidos[pedIdx].Estado === 'Presupuesto aprobado') {
-        DATA.pedidos[pedIdx].Estado = 'Recepción parcial';
-        const p = DATA.pedidos[pedIdx];
-        const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, 'Recepción parcial', p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones];
-        await sheetsUpdate(`Pedidos!A${pedIdx+2}:M${pedIdx+2}`, rowP);
-      }
-    }
-    // Actualizar estado de la solicitud de origen si la línea queda como Recibido
-    if (l.Estado_Linea === 'Recibido') {
-      const normNombre = n => (n || '').normalize('NFC').replace(/\s*\[.*?\]/g, '').trim().toLowerCase();
-      // Intento 1 — match directo por ID: la línea guarda "Desde solicitud SOL-xxx" en Observaciones
-      const solIdMatch = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
-      let solOrigen = solIdMatch
-        ? DATA.solicitudes.find(s => s.ID_Solicitud === solIdMatch[1] && s.Estado !== 'Recibido' && s.Estado !== 'Archivado')
-        : null;
-      // Intento 2 — match por pedidoId + nombre normalizado
-      if (!solOrigen) {
-        solOrigen = DATA.solicitudes.find(s =>
-          s.Lista_Pedido === pedidoId &&
-          normNombre(s.Material) === normNombre(l.Material) &&
-          s.Estado !== 'Recibido' && s.Estado !== 'Archivado'
-        );
-      }
-      // Intento 3 (último recurso) — solo por nombre + estado activo
-      if (!solOrigen) {
-        solOrigen = DATA.solicitudes.find(s =>
-          normNombre(s.Material) === normNombre(l.Material) &&
-          (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción' || s.Estado === 'Pendiente')
-        );
-      }
-      if (solOrigen) {
-        const solIdx = DATA.solicitudes.indexOf(solOrigen);
-        if (!solOrigen.Lista_Pedido) solOrigen.Lista_Pedido = pedidoId;
-        // Guardar fecha de recepción en Observaciones para auto-archivo posterior
-        const fechaHoy = new Date().toISOString().split('T')[0];
-        const obsActual = solOrigen.Observaciones || '';
-        // Eliminar etiqueta previa si existía y añadir la nueva
-        const obsSinFecha = obsActual.replace(/\[Recibido:\d{4}-\d{2}-\d{2}\]\s*/g, '').trim();
-        solOrigen.Observaciones = (obsSinFecha ? obsSinFecha + ' ' : '') + `[Recibido:${fechaHoy}]`;
-        solOrigen.Estado = 'Recibido';
-        const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Recibido', solOrigen.Lista_Pedido, solOrigen.Observaciones];
-        try {
-          await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
-        } catch(e) { console.warn('No se pudo actualizar solicitud a Recibido', e); }
-        // Archivar inmediatamente solo si el SOLICITANTE es Gestor/Admin
-        // Si es Profesor/Alumno → queda en "Recibido" y se archiva automáticamente en 7 días
-      }
-    }
+    await _persistirLinea(idx, l);
+    if (mat && cantRec > 0) await _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion);
+    await _actualizarEstadoPedidoPostRecepcion(pedidoId);
+    if (l.Estado_Linea === 'Recibido') await _actualizarSolicitudOrigen(l, pedidoId);
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');
-    renderMaterial();
-    renderSolicitudes();
-    renderPedidos();
-    renderDashboard();
-    updateBadges();
+    renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
     verDetallePedido(pedidoId);
   } catch(e) { showToast('Error', 'error'); console.error(e); }
   hideLoading();
@@ -507,11 +503,7 @@ async function guardarProveedorPedido() {
   hideLoading();
 }
 
-// checkAutoArchivarRecibidas: eliminado — ya no existe estado Archivado en solicitudes
-function checkAutoArchivarRecibidas() { return; }
-
 // ============================================================
-// EDITAR SOLICITUD// ============================================================
 // EDITAR SOLICITUD (solo Profesor, solo en estado Pendiente)
 // ============================================================
 function openModalEditarSolicitud(solId) {

@@ -287,8 +287,6 @@ function renderAll() {
   poblarSelects();
   updateBadges();
   aplicarPermisosUI();
-  // Auto-archivar solicitudes "Recibido" con más de 1 semana de antigüedad
-  if (typeof checkAutoArchivarRecibidas === 'function') checkAutoArchivarRecibidas();
   renderMantenimiento();
   _updateBadgeMantenimiento();
   renderResiduosGuia();
