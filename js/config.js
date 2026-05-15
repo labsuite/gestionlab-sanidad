@@ -131,14 +131,21 @@ function esResponsableDeEquipo(equipo) {
 }
 
 /**
- * Devuelve los ID_Ubicacion accesibles para el Alumno actual:
- * - Los de su campo Ubicaciones_Asignadas (columna F en hoja Usuarios)
- * - Más todas las ubicaciones cuyo Laboratorio_Aula === '205 - Zona común'
+ * Devuelve los ID_Ubicacion accesibles para el Alumno actual.
+ * Ubicaciones_Asignadas puede contener números de lab ("201","203") o IDs de zona.
+ * Los números de lab se expanden a todos los IDs de zona de ese lab.
+ * La zona común se incluye siempre automáticamente.
  */
 function getUbicacionesAlumno() {
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
-  const asignadas = (u?.Ubicaciones_Asignadas || '').split(',').map(s => s.trim()).filter(Boolean);
+  const raw = (u?.Ubicaciones_Asignadas || '').split(',').map(s => s.trim()).filter(Boolean);
+  const asignadas = raw.flatMap(val => {
+    if (/^\d{3}$/.test(val)) {
+      return DATA.ubicaciones.filter(ub => (ub.Laboratorio_Aula || '').includes(val)).map(ub => ub.ID_Ubicacion);
+    }
+    return [val];
+  });
   const zonasComun = DATA.ubicaciones
     .filter(ub => (ub.Laboratorio_Aula || '').trim() === '205 - Zona común')
     .map(ub => ub.ID_Ubicacion);

@@ -318,24 +318,24 @@ function buscarUsuario(q) {
 }
 
 function _getLabsDeUbics(ubicStr) {
+  // Ubicaciones_Asignadas now stores lab numbers directly ("201","203",...)
+  // Backwards compat: also detect lab numbers from old zone-ID format via Laboratorio_Aula
   if (!ubicStr) return [];
-  const ids = ubicStr.split(',').map(s => s.trim()).filter(Boolean);
+  const vals = ubicStr.split(',').map(s => s.trim()).filter(Boolean);
   const labs = new Set();
-  ids.forEach(id => {
-    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === id);
-    if (!u) return;
-    const lab = u.Laboratorio_Aula || '';
-    ['201','203','205','207'].forEach(n => { if (lab.includes(n)) labs.add(n); });
+  vals.forEach(val => {
+    if (/^\d{3}$/.test(val)) {
+      labs.add(val);
+    } else {
+      const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === val);
+      if (u) ['201','203','205','207'].forEach(n => { if ((u.Laboratorio_Aula||'').includes(n)) labs.add(n); });
+    }
   });
   return [...labs].sort();
 }
 
 function _getUbicacionesDeLabs(labsList) {
-  if (!labsList.length) return '';
-  return DATA.ubicaciones
-    .filter(u => labsList.some(n => (u.Laboratorio_Aula || '').includes(n)))
-    .map(u => u.ID_Ubicacion)
-    .join(',');
+  return labsList.join(',');
 }
 
 function _populateModalUsuarioAlumno(modulosStr, ubicStr) {
