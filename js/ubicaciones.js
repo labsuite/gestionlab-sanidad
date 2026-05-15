@@ -359,7 +359,25 @@ function _renderSeccionAlumnos(lista, rolActual) {
     </div>`;
   }).join('');
 
+  // Diagnóstico: muestra qué ciclo tiene cada módulo en DATA.ciclosModulos
+  const diagGrupos = {};
+  DATA.ciclosModulos.forEach(cm => {
+    if (!cm.Modulo) return;
+    const c = cm.Ciclo || '(sin ciclo)';
+    if (!diagGrupos[c]) diagGrupos[c] = [];
+    diagGrupos[c].push(cm.Modulo);
+  });
+  const diagHtml = Object.entries(diagGrupos).sort(([a],[b]) => a.localeCompare(b,'es')).map(([c, ms]) =>
+    `<div style="margin-bottom:6px"><strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted)">${c}</strong><div style="font-size:11px;color:var(--text-soft);margin-top:2px">${ms.join(', ')}</div></div>`
+  ).join('');
+
   return `
+    <details style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--bg-soft,#f9f9f9)">
+      <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted);user-select:none">
+        🔍 Diagnóstico: ciclos cargados desde la hoja Ciclos_Modulos (${DATA.ciclosModulos.length} filas)
+      </summary>
+      <div style="margin-top:10px">${diagHtml || '<span style="font-size:12px;color:var(--text-muted)">Sin datos</span>'}</div>
+    </details>
     ${todosModulos.length > 0 ? `<div style="margin-bottom:16px">
       <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)"
         style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
