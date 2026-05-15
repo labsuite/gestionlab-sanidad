@@ -294,17 +294,20 @@ function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
 
-  // Agrupar por ciclo (primer ciclo encontrado en sus módulos)
+  // Agrupar por ciclo — un alumno puede aparecer en varios si tiene módulos de varios ciclos
   const grupos = {};
   lista.forEach(u => {
     const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
-    let ciclo = 'Sin ciclo asignado';
-    for (const m of mods) {
+    const ciclosU = new Set();
+    mods.forEach(m => {
       const cm = DATA.ciclosModulos.find(c => c.Modulo === m);
-      if (cm?.Ciclo) { ciclo = cm.Ciclo; break; }
-    }
-    if (!grupos[ciclo]) grupos[ciclo] = [];
-    grupos[ciclo].push(u);
+      if (cm?.Ciclo) ciclosU.add(cm.Ciclo);
+    });
+    if (!ciclosU.size) ciclosU.add('Sin ciclo asignado');
+    ciclosU.forEach(ciclo => {
+      if (!grupos[ciclo]) grupos[ciclo] = [];
+      grupos[ciclo].push(u);
+    });
   });
 
   const ciclosOrdenados = Object.keys(grupos).sort((a, b) =>
@@ -425,8 +428,9 @@ function _refreshModuloCheckboxes(preselectedStr) {
     .map(([ciclo, mods]) => {
       const checks = [...mods].sort((a,b) => a.localeCompare(b,'es')).map(m => {
         const checked = preselected.includes(m) ? 'checked' : '';
+        const safeVal = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
         return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
-          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked}> ${m}
+          <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_syncChipsModulos()"> ${m}
         </label>`;
       }).join('');
       return `<div style="margin-bottom:10px">
@@ -434,6 +438,31 @@ function _refreshModuloCheckboxes(preselectedStr) {
         <div style="display:flex;flex-wrap:wrap;gap:6px">${checks}</div>
       </div>`;
     }).join('');
+  _syncChipsModulos();
+}
+
+function _syncChipsModulos() {
+  const cont = document.getElementById('usr-modulos-seleccionados');
+  if (!cont) return;
+  const selected = _getModulosSeleccionados();
+  if (!selected.length) {
+    cont.innerHTML = `<span style="font-size:11px;color:var(--text-muted);font-style:italic">Ningún módulo seleccionado</span>`;
+    return;
+  }
+  cont.innerHTML = selected.map(m => {
+    const safe = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--primary,#4f46e5);color:#fff;border-radius:99px;font-size:11px;font-weight:500">
+      ${m}
+      <button type="button" onclick="_desmarcarModulo('${safe}')" style="background:none;border:none;color:#fff;cursor:pointer;padding:0;font-size:14px;line-height:1;opacity:0.8">×</button>
+    </span>`;
+  }).join('');
+}
+
+function _desmarcarModulo(nombre) {
+  document.querySelectorAll('.usr-modulo-check').forEach(cb => {
+    if (cb.value === nombre) cb.checked = false;
+  });
+  _syncChipsModulos();
 }
 
 function _getModulosSeleccionados() {
