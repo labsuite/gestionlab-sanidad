@@ -411,14 +411,12 @@ function _getUbicacionesDeLabs(labsList) {
 }
 
 function _populateModalUsuarioAlumno(modulosStr, ubicStr, cicloPrincipal) {
-  _refreshModuloCheckboxes(modulosStr);
+  _refreshModuloCheckboxes(modulosStr, cicloPrincipal);
   const labs = _getLabsDeUbics(ubicStr);
   document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
-  const cicloSel = document.getElementById('usr-ciclo-principal');
-  if (cicloSel && cicloPrincipal) cicloSel.value = cicloPrincipal;
 }
 
-function _refreshModuloCheckboxes(preselectedStr) {
+function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal) {
   // Source of truth: plain module names (no ciclo prefix)
   _selectedModulosArray = (preselectedStr || '').split(',')
     .map(m => _moduloNombre(m.trim()))  // strip "Ciclo|" prefix from old format
@@ -432,28 +430,48 @@ function _refreshModuloCheckboxes(preselectedStr) {
     )].sort((a,b) => a.localeCompare(b,'es'));
     const optsHtml = ciclosUnicos.map(c => `<option value="${c}">${c}</option>`).join('');
     cicloSel.innerHTML = `<option value="">— Seleccionar ciclo —</option>${optsHtml}`;
+    if (cicloPrincipal) cicloSel.value = cicloPrincipal;
   }
 
-  // Flat deduped module list — no grouping by ciclo to avoid duplicate confusion
-  const todosModulos = [...new Set(
-    DATA.ciclosModulos.filter(cm => cm.Modulo).map(cm => cm.Modulo)
-  )].sort((a,b) => a.localeCompare(b,'es'));
+  _renderModuloCheckboxesPorCiclo(cicloPrincipal || '');
+}
 
+function _renderModuloCheckboxesPorCiclo(ciclo) {
   const cont = document.getElementById('usr-modulos-checks');
   if (!cont) return;
-  if (!todosModulos.length) {
-    cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos registrados en Ciclos_Modulos</span>`;
+
+  if (!ciclo) {
+    cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted);font-style:italic">Selecciona primero el ciclo formativo.</span>`;
+    return;
+  }
+
+  const modulos = DATA.ciclosModulos
+    .filter(cm => cm.Ciclo === ciclo && cm.Modulo)
+    .map(cm => cm.Modulo)
+    .sort((a,b) => a.localeCompare(b,'es'));
+
+  if (!modulos.length) {
+    cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos registrados para este ciclo.</span>`;
     return;
   }
 
   cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px">` +
-    todosModulos.map(m => {
+    modulos.map(m => {
       const checked = _selectedModulosArray.includes(m) ? 'checked' : '';
       return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
         <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_onModuloChange(this)"> ${m}
       </label>`;
     }).join('') + `</div>`;
   _syncChipsModulos();
+}
+
+function _onCicloPrincipalChange(ciclo) {
+  // Remove selected modules that don't belong to the new ciclo
+  const modsDelCiclo = new Set(
+    DATA.ciclosModulos.filter(cm => cm.Ciclo === ciclo && cm.Modulo).map(cm => cm.Modulo)
+  );
+  _selectedModulosArray = _selectedModulosArray.filter(m => modsDelCiclo.has(m));
+  _renderModuloCheckboxesPorCiclo(ciclo);
 }
 
 function _onModuloChange(cb) {
