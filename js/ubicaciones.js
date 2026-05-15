@@ -298,25 +298,26 @@ function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
 
-  // Agrupar por ciclo usando el prefijo embebido ("Ciclo|Módulo"), con fallback a lookup para entradas antiguas
+  // Agrupar por Ciclo_Principal (columna H). Fallback: prefijo embebido "Ciclo|Módulo" o lookup.
   const grupos = {};
   lista.forEach(u => {
-    const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
-    const ciclosU = new Set();
-    mods.forEach(m => {
-      const ciclo = _moduloCiclo(m);
-      if (ciclo) {
-        ciclosU.add(ciclo);
-      } else {
-        const cm = DATA.ciclosModulos.find(c => c.Modulo === m);
-        if (cm?.Ciclo) ciclosU.add(cm.Ciclo);
-      }
-    });
-    if (!ciclosU.size) ciclosU.add('Sin ciclo asignado');
-    ciclosU.forEach(ciclo => {
-      if (!grupos[ciclo]) grupos[ciclo] = [];
-      grupos[ciclo].push(u);
-    });
+    let ciclo = (u.Ciclo_Principal || '').trim();
+    if (!ciclo) {
+      // Fallback para registros anteriores: leer el prefijo embebido en Modulo
+      const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
+      const ciclosU = new Set();
+      mods.forEach(m => {
+        const c = _moduloCiclo(m);
+        if (c) { ciclosU.add(c); }
+        else {
+          const cm = DATA.ciclosModulos.find(x => x.Modulo === m);
+          if (cm?.Ciclo) ciclosU.add(cm.Ciclo);
+        }
+      });
+      ciclo = ciclosU.size ? [...ciclosU][0] : 'Sin ciclo asignado';
+    }
+    if (!grupos[ciclo]) grupos[ciclo] = [];
+    grupos[ciclo].push(u);
   });
 
   const ciclosOrdenados = Object.keys(grupos).sort((a, b) =>
@@ -359,25 +360,7 @@ function _renderSeccionAlumnos(lista, rolActual) {
     </div>`;
   }).join('');
 
-  // Diagnóstico: muestra qué ciclo tiene cada módulo en DATA.ciclosModulos
-  const diagGrupos = {};
-  DATA.ciclosModulos.forEach(cm => {
-    if (!cm.Modulo) return;
-    const c = cm.Ciclo || '(sin ciclo)';
-    if (!diagGrupos[c]) diagGrupos[c] = [];
-    diagGrupos[c].push(cm.Modulo);
-  });
-  const diagHtml = Object.entries(diagGrupos).sort(([a],[b]) => a.localeCompare(b,'es')).map(([c, ms]) =>
-    `<div style="margin-bottom:6px"><strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted)">${c}</strong><div style="font-size:11px;color:var(--text-soft);margin-top:2px">${ms.join(', ')}</div></div>`
-  ).join('');
-
   return `
-    <details style="margin-bottom:16px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--bg-soft,#f9f9f9)">
-      <summary style="cursor:pointer;font-size:12px;font-weight:600;color:var(--text-muted);user-select:none">
-        🔍 Diagnóstico: ciclos cargados desde la hoja Ciclos_Modulos (${DATA.ciclosModulos.length} filas)
-      </summary>
-      <div style="margin-top:10px">${diagHtml || '<span style="font-size:12px;color:var(--text-muted)">Sin datos</span>'}</div>
-    </details>
     ${todosModulos.length > 0 ? `<div style="margin-bottom:16px">
       <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)"
         style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
@@ -427,51 +410,54 @@ function _getUbicacionesDeLabs(labsList) {
   return labsList.join(',');
 }
 
-function _populateModalUsuarioAlumno(modulosStr, ubicStr) {
+function _populateModalUsuarioAlumno(modulosStr, ubicStr, cicloPrincipal) {
   _refreshModuloCheckboxes(modulosStr);
   const labs = _getLabsDeUbics(ubicStr);
   document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
+  const cicloSel = document.getElementById('usr-ciclo-principal');
+  if (cicloSel && cicloPrincipal) cicloSel.value = cicloPrincipal;
 }
 
 function _refreshModuloCheckboxes(preselectedStr) {
-  // Initialise the JS array — this is the source of truth for what will be saved
-  _selectedModulosArray = (preselectedStr || '').split(',').map(m => m.trim()).filter(Boolean);
+  // Source of truth: plain module names (no ciclo prefix)
+  _selectedModulosArray = (preselectedStr || '').split(',')
+    .map(m => _moduloNombre(m.trim()))  // strip "Ciclo|" prefix from old format
+    .filter(Boolean);
 
-  const grupos = {};
-  DATA.ciclosModulos.forEach(cm => {
-    if (!cm.Modulo) return;
-    const ciclo = cm.Ciclo || 'Sin ciclo';
-    if (!grupos[ciclo]) grupos[ciclo] = new Set();
-    grupos[ciclo].add(cm.Modulo);
-  });
+  // Populate ciclo dropdown
+  const cicloSel = document.getElementById('usr-ciclo-principal');
+  if (cicloSel) {
+    const ciclosUnicos = [...new Set(
+      DATA.ciclosModulos.filter(cm => cm.Ciclo && cm.Modulo).map(cm => cm.Ciclo)
+    )].sort((a,b) => a.localeCompare(b,'es'));
+    const optsHtml = ciclosUnicos.map(c => `<option value="${c}">${c}</option>`).join('');
+    cicloSel.innerHTML = `<option value="">— Seleccionar ciclo —</option>${optsHtml}`;
+  }
+
+  // Flat deduped module list — no grouping by ciclo to avoid duplicate confusion
+  const todosModulos = [...new Set(
+    DATA.ciclosModulos.filter(cm => cm.Modulo).map(cm => cm.Modulo)
+  )].sort((a,b) => a.localeCompare(b,'es'));
 
   const cont = document.getElementById('usr-modulos-checks');
   if (!cont) return;
-  if (!Object.keys(grupos).length) {
+  if (!todosModulos.length) {
     cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted)">Sin módulos registrados en Ciclos_Modulos</span>`;
     return;
   }
 
-  cont.innerHTML = Object.entries(grupos)
-    .sort(([a],[b]) => a.localeCompare(b,'es'))
-    .map(([ciclo, mods]) => {
-      const checks = [...mods].sort((a,b) => a.localeCompare(b,'es')).map(m => {
-        const val = `${ciclo}|${m}`;
-        // retrocompat: también marcar si el array tiene el nombre sin prefijo
-        const checked = (_selectedModulosArray.includes(val) || _selectedModulosArray.includes(m)) ? 'checked' : '';
-        return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
-          <input type="checkbox" class="usr-modulo-check" value="${val}" ${checked} onchange="_onModuloChange(this)"> ${m}
-        </label>`;
-      }).join('');
-      return `<div style="margin-bottom:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px">${ciclo}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px">${checks}</div>
-      </div>`;
-    }).join('');
+  cont.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px">` +
+    todosModulos.map(m => {
+      const checked = _selectedModulosArray.includes(m) ? 'checked' : '';
+      return `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:4px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
+        <input type="checkbox" class="usr-modulo-check" value="${m}" ${checked} onchange="_onModuloChange(this)"> ${m}
+      </label>`;
+    }).join('') + `</div>`;
   _syncChipsModulos();
 }
 
 function _onModuloChange(cb) {
+  // cb.value is now a plain module name (no ciclo prefix)
   if (cb.checked) {
     if (!_selectedModulosArray.includes(cb.value)) _selectedModulosArray.push(cb.value);
   } else {
@@ -489,10 +475,10 @@ function _syncChipsModulos() {
     return;
   }
   cont.innerHTML = selected.map(m => {
-    const nombre = _moduloNombre(m);
+    // m is a plain module name now
     const safe = m.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
     return `<span style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;background:var(--primary,#4f46e5);color:#fff;border-radius:99px;font-size:11px;font-weight:500">
-      ${nombre}
+      ${m}
       <button type="button" onclick="_desmarcarModulo('${safe}')" style="background:none;border:none;color:#fff;cursor:pointer;padding:0;font-size:14px;line-height:1;opacity:0.8">×</button>
     </span>`;
   }).join('');
@@ -525,6 +511,8 @@ function openModalUsuario() {
   editingRow = null;
   ['usr-nombre','usr-email'].forEach(id => sv(id,''));
   sv('usr-rol','Profesor');
+  const cicloSel = document.getElementById('usr-ciclo-principal');
+  if (cicloSel) cicloSel.value = '';
   toggleUbicacionesAsignadasField('Profesor');
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = false;
@@ -566,7 +554,7 @@ function editUsuario(idx) {
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
   const grp = document.getElementById('usr-alumno-fields');
   if (grp) grp.style.display = u.Rol === 'Alumno' ? '' : 'none';
-  if (u.Rol === 'Alumno') _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'');
+  if (u.Rol === 'Alumno') _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
   openModal('modal-usuario');
@@ -649,16 +637,18 @@ async function guardarUsuario() {
   const id = existingU ? existingU.ID_Usuario : genId('USR-');
   const activo = existingU ? existingU.Activo : 'TRUE';
   const rol = v('usr-rol') || 'Alumno';
-  let ubicAsignadas = '', modulo = '';
+  let ubicAsignadas = '', modulo = '', cicloPrincipal = '';
   if (rol === 'Alumno') {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
-    modulo = _getModulosSeleccionados().join(',');
+    modulo = _getModulosSeleccionados().join(',');  // plain module names
+    cicloPrincipal = (document.getElementById('usr-ciclo-principal')?.value || '').trim();
+    if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); hideLoading(); return; }
   }
-  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo];
+  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo, cicloPrincipal];
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Usuarios') {
-      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:G${editingRow.rowIndex+2}`, row);
+      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:H${editingRow.rowIndex+2}`, row);
       DATA.usuarios[editingRow.rowIndex] = rowToObj(row, 'usuarios');
       showToast('Usuario actualizado', 'success');
     } else {
