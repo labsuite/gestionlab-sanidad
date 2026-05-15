@@ -204,7 +204,7 @@ function renderDetalleProveedor(p) {
 }
 
 // ============================================================
-// USUARIOS — RENDER (3 secciones: admins/gestores, profesores, alumnos)
+// USUARIOS — RENDER con pestañas (staff | profesores | alumnos)
 // ============================================================
 function renderUsuarios() {
   const cont = document.getElementById('usuarios-contenido');
@@ -216,93 +216,142 @@ function renderUsuarios() {
   const profes  = DATA.usuarios.filter(u => u.Rol === 'Profesor');
   const alumnos = DATA.usuarios.filter(u => u.Rol === 'Alumno');
 
+  const tabBtn = (id, label, count, active) => {
+    const base = 'padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;';
+    const style = active
+      ? base + 'border-bottom:2px solid var(--primary);color:var(--primary)'
+      : base + 'border-bottom:2px solid transparent;color:var(--text-muted)';
+    return `<button id="usr-tab-btn-${id}" onclick="switchUsuariosTab('${id}')" style="${style}">
+      ${label} <span style="font-size:11px;background:var(--border);color:var(--text-muted);border-radius:99px;padding:1px 7px;margin-left:4px">${count}</span>
+    </button>`;
+  };
+
   cont.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
-      <input id="search-usuarios" type="search" placeholder="Buscar por nombre o email..." oninput="buscarUsuario(this.value)"
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <input id="search-usuarios" type="search" placeholder="Buscar por nombre o email..."
+        oninput="buscarUsuario(this.value)"
         style="flex:1;min-width:200px;max-width:360px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
       <div style="margin-left:auto">
         ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
       </div>
     </div>
-    ${_renderSeccionUsuarios('Administradores y gestores', admins, rolActual)}
-    ${_renderSeccionUsuarios('Profesores', profes, rolActual)}
-    ${_renderSeccionAlumnos(alumnos, rolActual)}
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
+      ${tabBtn('staff',   'Admins y gestores', admins.length,  true)}
+      ${tabBtn('profes',  'Profesores',        profes.length,  false)}
+      ${tabBtn('alumnos', 'Alumnos',           alumnos.length, false)}
+    </div>
+    <div id="usr-tab-staff">${_renderTablaUsuarios(admins, rolActual)}</div>
+    <div id="usr-tab-profes"  style="display:none">${_renderTablaUsuarios(profes, rolActual)}</div>
+    <div id="usr-tab-alumnos" style="display:none">${_renderSeccionAlumnos(alumnos, rolActual)}</div>
   `;
 }
 
-function _renderSeccionUsuarios(titulo, lista, rolActual) {
+function switchUsuariosTab(tab) {
+  ['staff','profes','alumnos'].forEach(t => {
+    const panel = document.getElementById(`usr-tab-${t}`);
+    const btn   = document.getElementById(`usr-tab-btn-${t}`);
+    if (panel) panel.style.display = t === tab ? '' : 'none';
+    if (btn) {
+      const active = t === tab;
+      btn.style.borderBottom = active ? '2px solid var(--primary)' : '2px solid transparent';
+      btn.style.color        = active ? 'var(--primary)' : 'var(--text-muted)';
+    }
+  });
+}
+
+function _renderTablaUsuarios(lista, rolActual) {
   const rolBadge = {'Administrador':'badge-red','Gestor':'badge-orange','Profesor':'badge-blue','Alumno':'badge-gray'};
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor';
-  const rows = lista.length
-    ? lista.map(u => {
-        const idx = DATA.usuarios.indexOf(u);
-        return `<tr>
-          <td><strong>${u.Nombre||'—'}</strong></td>
-          <td>${u.Email||'—'}</td>
-          <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
-          <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-          <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:16px">Sin usuarios en esta categoría</td></tr>`;
-
-  return `<div class="card" style="margin-bottom:16px">
-    <div class="card-header">
-      <div class="card-title">${titulo} <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
-    </div>
+  if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">👤</div><div class="empty-state-title">Sin usuarios en esta categoría</div></div>`;
+  return `<div class="card">
     <table>
       <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
-      <tbody>${rows}</tbody>
+      <tbody>
+        ${lista.map(u => {
+          const idx = DATA.usuarios.indexOf(u);
+          return `<tr>
+            <td><strong>${u.Nombre||'—'}</strong></td>
+            <td>${u.Email||'—'}</td>
+            <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
+            <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
+            <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
     </table>
   </div>`;
 }
 
 function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
+  if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
+
+  // Agrupar por ciclo (primer ciclo encontrado en sus módulos)
+  const grupos = {};
+  lista.forEach(u => {
+    const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
+    let ciclo = 'Sin ciclo asignado';
+    for (const m of mods) {
+      const cm = DATA.ciclosModulos.find(c => c.Modulo === m);
+      if (cm?.Ciclo) { ciclo = cm.Ciclo; break; }
+    }
+    if (!grupos[ciclo]) grupos[ciclo] = [];
+    grupos[ciclo].push(u);
+  });
+
+  const ciclosOrdenados = Object.keys(grupos).sort((a, b) =>
+    a === 'Sin ciclo asignado' ? 1 : b === 'Sin ciclo asignado' ? -1 : a.localeCompare(b, 'es')
+  );
+
   const todosModulos = [...new Set(
     lista.flatMap(u => (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean))
-  )].sort();
-
-  const rows = lista.length
-    ? lista.map(u => {
-        const idx = DATA.usuarios.indexOf(u);
-        const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
-        const modBadges = mods.map(m => `<span class="badge badge-blue" style="margin-right:2px">${m}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
-        const labs = _getLabsDeUbics(u.Ubicaciones_Asignadas||'');
-        const labBadges = labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
-        return `<tr data-modulos="${mods.join(',')}">
-          <td><strong>${u.Nombre||'—'}</strong></td>
-          <td>${u.Email||'—'}</td>
-          <td>${modBadges}</td>
-          <td>${labBadges}</td>
-          <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-          <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
-        </tr>`;
-      }).join('')
-    : `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:16px">Sin alumnos registrados</td></tr>`;
+  )].sort((a,b) => a.localeCompare(b,'es'));
 
   const filtroOpts = todosModulos.map(m => `<option value="${m}">${m}</option>`).join('');
 
-  return `<div class="card">
-    <div class="card-header">
-      <div class="card-title">Alumnos <span style="font-weight:400;color:var(--text-muted)">(${lista.length})</span></div>
-      ${todosModulos.length > 0 ? `<div class="card-actions">
-        <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)" style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
-          <option value="">— Todos los módulos —</option>
-          ${filtroOpts}
-        </select>
-      </div>` : ''}
-    </div>
-    <table>
-      <thead><tr><th>Nombre</th><th>Email</th><th>Módulo(s)</th><th>Labs</th><th>Activo</th><th></th></tr></thead>
-      <tbody id="tabla-alumnos">${rows}</tbody>
-    </table>
-  </div>`;
+  const gruposHtml = ciclosOrdenados.map(ciclo => {
+    const usrs = grupos[ciclo];
+    const filas = usrs.map(u => {
+      const idx = DATA.usuarios.indexOf(u);
+      const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
+      const modBadges = mods.map(m => `<span class="badge badge-blue" style="margin-right:2px">${m}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+      const labs = _getLabsDeUbics(u.Ubicaciones_Asignadas||'');
+      const labBadges = labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+      return `<tr data-modulos="${mods.join(',')}">
+        <td><strong>${u.Nombre||'—'}</strong></td>
+        <td>${u.Email||'—'}</td>
+        <td>${modBadges}</td>
+        <td>${labBadges}</td>
+        <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
+        <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+      </tr>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title">${ciclo} <span style="font-weight:400;color:var(--text-muted)">(${usrs.length})</span></div>
+      </div>
+      <table>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Módulo(s)</th><th>Labs</th><th>Activo</th><th></th></tr></thead>
+        <tbody class="tabla-alumnos-grupo">${filas}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+
+  return `
+    ${todosModulos.length > 0 ? `<div style="margin-bottom:16px">
+      <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)"
+        style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
+        <option value="">— Todos los módulos —</option>
+        ${filtroOpts}
+      </select>
+    </div>` : ''}
+    ${gruposHtml}
+  `;
 }
 
 function filtrarAlumnos(modulo) {
   const q = (document.getElementById('search-usuarios')?.value || '').toLowerCase().trim();
-  document.querySelectorAll('#tabla-alumnos tr').forEach(tr => {
+  document.querySelectorAll('.tabla-alumnos-grupo tr').forEach(tr => {
     const textoFila = tr.textContent.toLowerCase();
     const pasaBusqueda = !q || textoFila.includes(q);
     const pasFiltro = !modulo || (tr.getAttribute('data-modulos') || '').split(',').map(m => m.trim()).includes(modulo);
