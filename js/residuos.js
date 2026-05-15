@@ -2,6 +2,37 @@
 // RESIDUOS
 // ============================================================
 
+// Avisos específicos por formato físico de contenedor (matching parcial, minúsculas)
+const _WARNINGS_FORMATO = [
+  {
+    match: 'bidón azul',
+    texto: '⚠️ Los líquidos se pueden añadir, pero deben ir en su propio bote bien cerrado y rotulado dentro del bidón. No verter directamente.',
+  },
+  {
+    match: 'cubo con tapa',
+    texto: '⚠️ NO cerrar la tapa hasta que el contenedor esté lleno y listo para la recogida de Consenur. Mantener la tapa simplemente apoyada.',
+  },
+  {
+    match: 'contenedor rígido',
+    texto: '⚠️ NO cerrar la tapa hasta que el contenedor esté lleno y listo para la recogida de Consenur. Mantener la tapa simplemente apoyada.',
+  },
+  {
+    match: 'bolsa plástica',
+    texto: '⚠️ Solo envases vacíos de plástico o aluminio que hayan contenido sustancias peligrosas. No introducir residuos a granel ni envases con restos líquidos.',
+  },
+  {
+    match: 'garrafa',
+    texto: '⚠️ Mantener bien cerrada entre adiciones. Conservar en zona ventilada, alejada de focos de calor e ignición.',
+  },
+];
+
+function _getWarningFormato(formato) {
+  if (!formato) return null;
+  const f = formato.toLowerCase();
+  const found = _WARNINGS_FORMATO.find(w => f.includes(w.match));
+  return found ? found.texto : null;
+}
+
 const NIVEL_COLOR = {
   'vacío': '#94a3b8',
   '25%':   '#22c55e',
@@ -233,6 +264,11 @@ function _renderContenedoresActivos(lista, canEdit) {
       ? 'border-left:3px solid #f97316'
       : 'border-left:3px solid var(--border)';
 
+    const warning = _getWarningFormato(c.Formato);
+    const warningBanner = warning
+      ? `<div style="margin:0 18px 12px;padding:8px 12px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:12px;color:#713f12;line-height:1.5">${warning}</div>`
+      : '';
+
     return `<div class="card" style="margin-bottom:12px;${alertStyle}">
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px">
         <div style="flex:1;min-width:160px">
@@ -253,6 +289,7 @@ function _renderContenedoresActivos(lista, canEdit) {
           ${canEdit ? `<button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${idx})">✕</button>` : ''}
         </div>
       </div>
+      ${warningBanner}
       ${adiciones.length ? `
         <details style="padding:0 18px 12px">
           <summary style="font-size:12px;color:var(--text-muted);cursor:pointer;user-select:none">
@@ -301,6 +338,14 @@ function openModalAdicion(idx) {
     ? tiposFiltrados.map(t => `<option value="${t.ID_Residuo}">${t.Nombre}</option>`).join('')
     : DATA.tiposResiduo.map(t => `<option value="${t.ID_Residuo}">${t.Nombre}</option>`).join('');
   document.getElementById('adic-tipo-residuo').innerHTML = '<option value="">— Selecciona el residuo añadido —</option>' + opts;
+
+  // Warning por formato
+  const warnEl = document.getElementById('adic-warning-formato');
+  const warnTxt = _getWarningFormato(c.Formato);
+  if (warnEl) {
+    warnEl.textContent = warnTxt || '';
+    warnEl.style.display = warnTxt ? 'block' : 'none';
+  }
 
   openModal('modal-adicion-res');
 }
