@@ -248,6 +248,7 @@ function _renderContenedoresActivos(lista, canEdit) {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary" onclick="openModalAdicion(${idx})">+ Añadir residuo</button>
           ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="cerrarContenedor(${idx})" title="Marcar como lleno y crear uno nuevo">Cerrar</button>` : ''}
+          <button class="btn btn-sm" onclick="mostrarUrlNfcContenedor(${idx})" title="Generar URL / etiqueta NFC">🔗</button>
           ${canEdit ? `<button class="btn btn-sm" onclick="openModalContenedor(${idx})">✏️</button>` : ''}
           ${canEdit ? `<button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${idx})">✕</button>` : ''}
         </div>
@@ -456,4 +457,47 @@ async function eliminarContenedor(idx) {
     showToast('Contenedor eliminado', 'success');
   } catch(e) { showToast('Error al eliminar', 'error'); }
   hideLoading();
+}
+
+// ── NFC: generar URL para etiqueta de contenedor ─────────────
+function mostrarUrlNfcContenedor(idx) {
+  const c = DATA.contenedoresResiduo[idx];
+  const base = window.location.origin + window.location.pathname;
+  const url = `${base}?cont-cat=${encodeURIComponent(c.Categoria)}&cont-lab=${encodeURIComponent(c.Lab)}&action=adicion`;
+  document.getElementById('nfc-cont-label').textContent =
+    `${c.Categoria} · Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}${c.Formato ? ' · ' + c.Formato : ''}`;
+  document.getElementById('nfc-cont-url-text').textContent = url;
+  const qrImg = document.getElementById('nfc-cont-qr');
+  qrImg.src = '';
+  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(url)}`;
+  openModal('modal-nfc-contenedor');
+}
+
+async function copiarUrlNfcContenedor() {
+  const url = document.getElementById('nfc-cont-url-text').textContent;
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast('URL copiada ✓', 'success');
+  } catch {
+    const el = document.createElement('textarea');
+    el.value = url; el.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(el); el.select(); document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('URL copiada ✓', 'success');
+  }
+}
+
+// Llamado desde ui.js tras login cuando llega ?cont-cat=X&cont-lab=Y&action=adicion
+function _abrirAdicionPorNfc(categoria, lab) {
+  showPage('residuos-contenedores');
+  setTimeout(() => {
+    const c = DATA.contenedoresResiduo.find(x =>
+      x.Categoria === categoria && x.Lab === lab && (x.Estado || 'activo') === 'activo'
+    );
+    if (!c) {
+      showToast(`No se encontró un contenedor activo de "${categoria}" en Lab ${lab}`, 'error');
+      return;
+    }
+    openModalAdicion(DATA.contenedoresResiduo.indexOf(c));
+  }, 300);
 }

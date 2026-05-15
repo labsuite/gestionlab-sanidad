@@ -323,18 +323,31 @@ function poblarSelects() {
 // NFC — Detección de acción pendiente desde URL
 // ============================================================
 function _checkPendingNfcAction() {
-  const params  = new URLSearchParams(window.location.search);
-  const armario = params.get('armario');
-  const action  = params.get('action');
-  if (!armario || action !== 'transfer') return;
+  const params = new URLSearchParams(window.location.search);
+  const action = params.get('action');
+  if (!action) return;
   history.replaceState({}, '', window.location.pathname);
-  setTimeout(() => {
-    if (typeof openModalTransferenciaArmario === 'function') {
-      openModalTransferenciaArmario(armario);
-    } else {
-      console.warn('NFC: openModalTransferenciaArmario no está definida todavía');
-    }
-  }, 400);
+
+  if (action === 'transfer') {
+    const armario = params.get('armario');
+    if (!armario) return;
+    setTimeout(() => {
+      if (typeof openModalTransferenciaArmario === 'function') {
+        openModalTransferenciaArmario(armario);
+      }
+    }, 400);
+  }
+
+  if (action === 'adicion') {
+    const categoria = params.get('cont-cat');
+    const lab       = params.get('cont-lab');
+    if (!categoria || !lab) return;
+    setTimeout(() => {
+      if (typeof _abrirAdicionPorNfc === 'function') {
+        _abrirAdicionPorNfc(categoria, lab);
+      }
+    }, 400);
+  }
 }
 
 // ============================================================

@@ -1,3 +1,24 @@
+<!-- MODAL: NFC / QR de contenedor -->
+<div class="modal-overlay" id="modal-nfc-contenedor">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Etiqueta NFC / QR</div>
+      <button class="modal-close" onclick="closeModal('modal-nfc-contenedor')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">📍 <span id="nfc-cont-label"></span></div>
+      <img id="nfc-cont-qr" src="" alt="QR" style="width:200px;height:200px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px">
+      <div style="background:var(--bg-soft,#f9f9f9);border-radius:6px;padding:10px 12px;margin-bottom:14px;text-align:left">
+        <code id="nfc-cont-url-text" style="font-size:11px;color:var(--accent);word-break:break-all;line-height:1.5;display:block"></code>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+        Al escanear, la app abrirá directamente el registro de adición para el contenedor activo de esta categoría y laboratorio. La etiqueta no necesita actualizarse al cerrar el contenedor.
+      </div>
+      <button class="btn btn-secondary" onclick="copiarUrlNfcContenedor()">Copiar URL</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: Nuevo / editar tipo de residuo -->
 <div class="modal-overlay" id="modal-tipo-residuo">
   <div class="modal" style="max-width:520px">
