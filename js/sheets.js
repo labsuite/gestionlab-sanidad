@@ -142,7 +142,7 @@ async function loadAllData() {
       sheetsGet('Planes_Mantenimiento!A2:G').catch(e => { console.warn('Planes_Mantenimiento no cargó:', e); return []; }),
       sheetsGet('Registro_Mantenimientos!A2:I').catch(e => { console.warn('Registro_Mantenimientos no cargó:', e); return []; }),
       sheetsGet('Tipos_Residuo!A2:G').catch(() => []),
-      sheetsGet('Contenedores_Residuo!A2:J').catch(() => []),
+      sheetsGet('Contenedores_Residuo!A2:K').catch(() => []),
       sheetsGet('Adiciones_Residuo!A2:F').catch(() => [])
     ]);
 

@@ -237,7 +237,9 @@ function _renderContenedoresActivos(lista, canEdit) {
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px">
         <div style="flex:1;min-width:160px">
           <div style="font-weight:600;font-size:15px">${c.Categoria || '—'}</div>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}</div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+            Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}${c.Formato ? ' · ' + c.Formato : ''}
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           ${_nivelBadge(c.Nivel || 'vacío')}
@@ -267,7 +269,7 @@ function _renderContenedoresCerrados(lista, canEdit) {
   const rows = lista.map(c => {
     const idx = DATA.contenedoresResiduo.indexOf(c);
     return `<tr>
-      <td><strong>${c.Categoria || '—'}</strong></td>
+      <td><strong>${c.Categoria || '—'}</strong>${c.Formato ? `<div style="font-size:11px;color:var(--text-muted)">${c.Formato}</div>` : ''}</td>
       <td style="font-size:13px">Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}</td>
       <td>${_nivelBadge(c.Nivel || 'lleno')}</td>
       <td style="font-size:12px;color:var(--text-muted)">${formatDate(c.Fecha_Cierre) || '—'}</td>
@@ -406,6 +408,7 @@ function openModalContenedor(idx = null) {
   sv('cont-categoria', c?.Categoria || '');
   sv('cont-lab',       c?.Lab       || '');
   sv('cont-zona',      c?.Zona      || '');
+  sv('cont-formato',   c?.Formato   || '');
   sv('cont-nivel-ini', c?.Nivel     || 'vacío');
   document.getElementById('modal-contenedor-res-title').textContent = idx !== null ? 'Editar contenedor' : 'Nuevo contenedor';
   openModal('modal-contenedor-res');
@@ -421,15 +424,16 @@ async function guardarContenedor() {
 
   showLoading('Guardando...');
   try {
+    const formato = v('cont-formato');
     if (editingRow !== null) {
       const c = DATA.contenedoresResiduo[editingRow];
       const fila = editingRow + 2;
-      const row = [c.ID_Contenedor, categoria, lab, v('cont-zona'), c.Nivel || v('cont-nivel-ini'), c.Estado || 'activo', c.Fecha_Apertura || fecha, c.Fecha_Cierre || '', fecha, usuario];
-      await sheetsUpdate(`Contenedores_Residuo!A${fila}:J${fila}`, row);
+      const row = [c.ID_Contenedor, categoria, lab, v('cont-zona'), c.Nivel || v('cont-nivel-ini'), c.Estado || 'activo', c.Fecha_Apertura || fecha, c.Fecha_Cierre || '', fecha, usuario, formato];
+      await sheetsUpdate(`Contenedores_Residuo!A${fila}:K${fila}`, row);
       Object.assign(c, rowToObj(row, 'contenedoresResiduo'));
     } else {
       const id = genId('RC');
-      const row = [id, categoria, lab, v('cont-zona'), v('cont-nivel-ini') || 'vacío', 'activo', fecha, '', fecha, usuario];
+      const row = [id, categoria, lab, v('cont-zona'), v('cont-nivel-ini') || 'vacío', 'activo', fecha, '', fecha, usuario, formato];
       await sheetsAppend('Contenedores_Residuo', row);
       DATA.contenedoresResiduo.push(rowToObj(row, 'contenedoresResiduo'));
     }

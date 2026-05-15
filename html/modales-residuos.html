@@ -100,6 +100,19 @@
         <input id="cont-zona" class="form-input" placeholder="ej. Almacén residuos">
       </div>
       <div class="form-group">
+        <label class="form-label">Formato físico</label>
+        <input id="cont-formato" class="form-input" list="cont-datalist-formato"
+          placeholder="Ej: Garrafa 5L, Bidón azul 30L…">
+        <datalist id="cont-datalist-formato">
+          <option value="Bidón azul 30L (sólidos)">
+          <option value="Garrafa 20L">
+          <option value="Garrafa 5L">
+          <option value="Bolsa plástica">
+          <option value="Cubo con tapa">
+          <option value="Contenedor rígido">
+        </datalist>
+      </div>
+      <div class="form-group">
         <label class="form-label">Nivel inicial</label>
         <select id="cont-nivel-ini" class="form-input">
           <option value="vacío">Vacío</option>
