@@ -282,7 +282,7 @@ function renderFilaMaterial(m) {
         <td></td>
         <td style="padding-left:28px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
         <td></td>
-        <td style="font-size:11px;color:var(--text-muted)">${l.ID_Ubicacion}</td>
+        <td></td>
         <td style="font-size:12px">${m.Unidad || '—'}</td>
         <td>
           <div class="stock-bar-wrap">
