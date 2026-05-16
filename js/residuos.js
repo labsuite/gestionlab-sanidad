@@ -331,10 +331,14 @@ function _renderContenedoresCerrados(lista, canEdit) {
     </tr>`;
   }).join('');
 
-  return `<div class="card"><table>
-    <thead><tr><th>Categoría</th><th>Ubicación</th><th>Nivel al cerrar</th><th>Fecha cierre</th><th></th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table></div>`;
+  return `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-secondary" onclick="exportarInformeConsenur()">📄 Generar informe para Consenur</button>
+    </div>
+    <div class="card"><table>
+      <thead><tr><th>Categoría</th><th>Ubicación</th><th>Nivel al cerrar</th><th>Fecha cierre</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
 }
 
 // ── Modal: añadir residuo a contenedor ───────────────────────
@@ -618,6 +622,93 @@ async function copiarUrlNfcContenedor() {
     document.body.removeChild(el);
     showToast('URL copiada ✓', 'success');
   }
+}
+
+// ── Informe para Consenur ─────────────────────────────────────
+function exportarInformeConsenur() {
+  const cerrados = DATA.contenedoresResiduo.filter(c => c.Estado === 'cerrado');
+  if (!cerrados.length) { showToast('No hay contenedores pendientes de recogida', 'info'); return; }
+
+  const hoy = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fechaArchivo = new Date().toISOString().slice(0, 10);
+
+  // Agrupar por lab
+  const porLab = {};
+  cerrados.forEach(c => {
+    const lab = c.Lab || 'Sin lab';
+    if (!porLab[lab]) porLab[lab] = [];
+    porLab[lab].push(c);
+  });
+
+  function tiposDeContenedor(c) {
+    const ids = [...new Set(
+      DATA.adicionesResiduo
+        .filter(a => a.ID_Contenedor === c.ID_Contenedor)
+        .map(a => a.ID_Residuo)
+    )];
+    return ids.map(id => {
+      const t = DATA.tiposResiduo.find(t => t.ID_Residuo === id);
+      return t ? { nombre: t.Nombre, riesgo: t.Riesgo || '' } : null;
+    }).filter(Boolean);
+  }
+
+  const seccionesHtml = Object.keys(porLab).sort().map(lab => {
+    const filas = porLab[lab].map(c => {
+      const tipos = tiposDeContenedor(c);
+      const tiposHtml = tipos.length
+        ? tipos.map(t => `<li>${t.nombre}${t.riesgo ? ` <span class="riesgo">${t.riesgo}</span>` : ''}</li>`).join('')
+        : '<li style="color:#999;font-style:italic">Sin adiciones registradas</li>';
+      return `<tr>
+        <td><strong>${c.Categoria || '—'}</strong>${c.Formato ? `<br><span class="sub">${c.Formato}</span>` : ''}</td>
+        <td>${c.Zona || '—'}</td>
+        <td>${c.Nivel || '—'}</td>
+        <td>${formatDate(c.Fecha_Cierre) || '—'}</td>
+        <td><ul class="tipos">${tiposHtml}</ul></td>
+      </tr>`;
+    }).join('');
+    return `<h2>Laboratorio ${lab}</h2>
+      <table>
+        <thead><tr><th>Contenedor</th><th>Zona</th><th>Nivel</th><th>Fecha cierre</th><th>Residuos depositados</th></tr></thead>
+        <tbody>${filas}</tbody>
+      </table>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe Consenur ${fechaArchivo}</title>
+<style>
+  body { font-family: Arial, sans-serif; font-size: 13px; color: #1a1a1a; max-width: 900px; margin: 40px auto; padding: 0 24px; }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .meta { font-size: 12px; color: #666; margin-bottom: 32px; }
+  h2 { font-size: 14px; font-weight: 700; background: #f0f0f0; padding: 6px 12px; border-radius: 4px; margin: 28px 0 10px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  th { background: #1a1a1a; color: #fff; font-size: 12px; font-weight: 600; text-align: left; padding: 7px 10px; }
+  td { padding: 8px 10px; border-bottom: 1px solid #e5e5e5; vertical-align: top; font-size: 12px; }
+  tr:last-child td { border-bottom: none; }
+  .sub { color: #888; font-size: 11px; }
+  ul.tipos { margin: 0; padding-left: 16px; }
+  ul.tipos li { margin-bottom: 2px; }
+  .riesgo { background: #fef3c7; color: #92400e; border-radius: 3px; padding: 1px 5px; font-size: 10px; margin-left: 4px; }
+  @media print {
+    body { margin: 20px; }
+    h2 { break-before: auto; }
+    tr { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <h1>Listado de contenedores de residuos para recogida</h1>
+  <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${hoy} &nbsp;·&nbsp; ${cerrados.length} contenedor${cerrados.length > 1 ? 'es' : ''} pendiente${cerrados.length > 1 ? 's' : ''} de recogida</div>
+  ${seccionesHtml}
+</body>
+<script>window.onload = function() { window.print(); }<\/script>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else showToast('Activa las ventanas emergentes para generar el informe', 'error');
 }
 
 // Llamado desde ui.js tras login cuando llega ?cont-cat=X&cont-lab=Y&action=adicion
