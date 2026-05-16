@@ -693,6 +693,27 @@ function autoIdEquipo(tipo) {
 }
 
 // ============================================================
+// VALIDACIÓN DE FORMATO DE ID DE EQUIPO
+// ============================================================
+const _ID_DIGITOS = {
+  2: ['CEN','CAB','REF','PLA','FOT','BAT','EST','PHM','OSM'],
+  3: ['BAL','WAT','PIP','PIPR','AUT','AUTC','MICR','PRO']
+};
+
+function _validarFormatoIdEquipo(id) {
+  const match = (id || '').match(/^([A-Za-z]+)-(\d+)$/);
+  if (!match) return null;
+  const prefix = match[1].toUpperCase();
+  const nDigits = match[2].length;
+  for (const [esperados, prefijos] of Object.entries(_ID_DIGITOS)) {
+    if (prefijos.includes(prefix) && nDigits !== parseInt(esperados)) {
+      return `El ID "${id}" debería tener ${esperados} dígitos para la serie ${prefix} (ej: ${prefix}-${'0'.repeat(parseInt(esperados))}). ¿Guardarlo de todas formas?`;
+    }
+  }
+  return null;
+}
+
+// ============================================================
 // GUARDAR EQUIPO
 // ============================================================
 async function guardarEquipo() {
@@ -707,6 +728,11 @@ async function guardarEquipo() {
     sv('eq-id', id);
   }
   if (!id) { showToast('El ID del equipo es obligatorio', 'error'); return; }
+
+  if (!editingRow) {
+    const aviso = _validarFormatoIdEquipo(id);
+    if (aviso && !confirm(aviso)) return;
+  }
 
   let manualUrl = v('eq-pdf-url') || '';
   if (pendingEqFileBase64) {

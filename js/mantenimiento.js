@@ -19,6 +19,12 @@ function getMesesCurso(cursoAcademico) {
   return meses; // 10 meses: Sep–Jun
 }
 
+// Normaliza Con_Alumnado: acepta 'Sí', '1', '1.0', 'TRUE', 'Yes'
+function _esConAlumnado(plan) {
+  const v = (plan.Con_Alumnado || '').toString().trim();
+  return v === 'Sí' || v === '1' || v === '1.0' || v === 'TRUE' || v === 'Yes';
+}
+
 // Devuelve true si la operación es de limpieza/conservación (→ fin de periodo)
 // y false si es calibración/verificación/puesta en marcha (→ inicio de periodo)
 function _esMomentoFin(plan) {
@@ -34,7 +40,9 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   const [añoInicio, añoFin] = cursoAcademico.split('-').map(Number);
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const todosMeses = getMesesCurso(cursoAcademico);
-  const mesesPasados = todosMeses.filter(({ año, mes }) => new Date(año, mes - 1, 1) <= hoy);
+  // Planes con alumnado no se programan en septiembre (aún no han empezado las clases)
+  const mesesBase = _esConAlumnado(plan) ? todosMeses.filter(m => m.mes !== 9) : todosMeses;
+  const mesesPasados = mesesBase.filter(({ año, mes }) => new Date(año, mes - 1, 1) <= hoy);
 
   switch (plan.Periodicidad) {
     case 'Mensual':
@@ -51,7 +59,7 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
     case 'Anual':
     case 'Bianual':
     case 'Cada 2 años': {
-      const mes = _esMomentoFin(plan) ? todosMeses[todosMeses.length - 1] : todosMeses[0];
+      const mes = _esMomentoFin(plan) ? mesesBase[mesesBase.length - 1] : mesesBase[0];
       return mesesPasados.some(m => m.str === mes.str) ? [mes.str] : [];
     }
     case 'Pretemporada': {
@@ -299,7 +307,7 @@ function openModalPlan(equipoId, idPlan = null) {
       document.getElementById('plan-periodicidad').value  = plan.Periodicidad;
       document.getElementById('plan-operacion').value     = plan.Operacion;
       document.getElementById('plan-instrucciones').value = plan.Instrucciones || '';
-      document.getElementById('plan-con-alumnado').checked = plan.Con_Alumnado === 'Sí';
+      document.getElementById('plan-con-alumnado').checked = _esConAlumnado(plan);
     }
   } else {
     document.getElementById('plan-tipo-int').value      = 'Interno';
@@ -409,7 +417,7 @@ function renderMantenimiento() {
   DATA.equipos.forEach(eq => {
     const planes = DATA.planesMantenimiento.filter(p => {
       if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
-      if (esAlumno && (p.Con_Alumnado !== 'Sí' || !enPeriodoAlumno)) return false;
+      if (esAlumno && (!_esConAlumnado(p) || !enPeriodoAlumno)) return false;
       return true;
     });
     planes.forEach(plan => {
@@ -542,7 +550,7 @@ function _renderFilasPendientes(lista, canLog) {
     const instrRow = s.plan.Instrucciones
       ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
       : '';
-    const alumBadge = s.plan.Con_Alumnado === 'Sí'
+    const alumBadge = _esConAlumnado(s.plan)
       ? `<span title="Se puede realizar con alumnado" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0">👨‍🎓 alumnado</span>`
       : '';
     return `<tr>
