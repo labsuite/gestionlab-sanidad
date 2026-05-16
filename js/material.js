@@ -16,11 +16,170 @@ function _precioMedioLabel(m) {
   return `${conIVA.toFixed(2)} € <span style="font-size:10px;color:var(--text-muted)">(n=${hist.count})</span>`;
 }
 
+// ============================================================
+// REVISIONES DE INVENTARIO
+// ============================================================
+
+function _puedeRevisarInventario() {
+  if (getUserRole() !== 'Alumno') return false;
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  return u?.Puede_Revisar_Inventario === 'TRUE';
+}
+
+function renderPanelRevisiones() {
+  const contenedor = document.getElementById('panel-revisiones-inventario');
+  if (!contenedor) return;
+  const rol = getUserRole();
+  const puedeVer = rol === 'Administrador' || rol === 'Gestor' || rol === 'Profesor';
+  if (!puedeVer || !DATA.revisionesInventario.length) {
+    contenedor.style.display = 'none';
+    return;
+  }
+  contenedor.style.display = '';
+  contenedor.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        📋 Revisiones de inventario pendientes
+        <span class="badge badge-orange" style="font-size:11px">${DATA.revisionesInventario.length}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="color:var(--text-muted);text-align:left">
+            <th style="padding:4px 8px">Fecha</th>
+            <th style="padding:4px 8px">Material</th>
+            <th style="padding:4px 8px;text-align:center">App</th>
+            <th style="padding:4px 8px;text-align:center">Real</th>
+            <th style="padding:4px 8px;text-align:center">Dif.</th>
+            <th style="padding:4px 8px">Alumno</th>
+            <th style="padding:4px 8px">Obs.</th>
+            <th style="padding:4px 8px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${DATA.revisionesInventario.map(r => {
+            const dif = parseFloat(r.Diferencia) || 0;
+            const difColor = dif < 0 ? 'var(--danger)' : dif > 0 ? 'var(--warning)' : 'var(--success)';
+            const mat = DATA.material.find(m => m.ID_Material === r.ID_Material);
+            const unidad = mat?.Unidad || '';
+            return `<tr style="border-top:1px solid var(--border)">
+              <td style="padding:6px 8px;color:var(--text-muted)">${formatDate(r.Fecha)||r.Fecha||'—'}</td>
+              <td style="padding:6px 8px;font-weight:500">${r.Nombre_Material||'—'}</td>
+              <td style="padding:6px 8px;text-align:center">${r.Stock_App} ${unidad}</td>
+              <td style="padding:6px 8px;text-align:center">${r.Stock_Real} ${unidad}</td>
+              <td style="padding:6px 8px;text-align:center;font-weight:600;color:${difColor}">${dif > 0 ? '+' : ''}${dif}</td>
+              <td style="padding:6px 8px;color:var(--text-soft)">${r.Usuario||'—'}</td>
+              <td style="padding:6px 8px;color:var(--text-muted);font-style:italic">${r.Observaciones||'—'}</td>
+              <td style="padding:6px 8px;white-space:nowrap">
+                <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="aplicarRevisionInventario('${r.ID_Revision}')">Aplicar</button>
+                <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px;margin-left:4px" onclick="descartarRevisionInventario('${r.ID_Revision}')">Descartar</button>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function openModalContarStock(matId) {
+  const mat = DATA.material.find(m => m.ID_Material === matId);
+  if (!mat) return;
+  document.getElementById('contar-mat-id').value = matId;
+  document.getElementById('contar-mat-nombre').textContent = mat.Nombre;
+  const stock = getStockTotal(mat);
+  document.getElementById('contar-stock-app').textContent = stock + ' ' + (mat.Unidad || '');
+  document.getElementById('contar-stock-real').value = '';
+  document.getElementById('contar-obs').value = '';
+  openModal('modal-contar-stock');
+}
+
+async function guardarConteo() {
+  const matId = document.getElementById('contar-mat-id').value;
+  const realStr = document.getElementById('contar-stock-real').value;
+  if (!matId) return;
+  if (realStr === '' || isNaN(parseFloat(realStr)) || parseFloat(realStr) < 0) {
+    showToast('Introduce la cantidad real que has contado', 'error'); return;
+  }
+  const mat = DATA.material.find(m => m.ID_Material === matId);
+  if (!mat) return;
+  const stockApp = getStockTotal(mat);
+  const stockReal = parseFloat(realStr);
+  const diferencia = stockReal - stockApp;
+  const fecha = new Date().toISOString().split('T')[0];
+  const id = genId('REV-');
+  const obs = document.getElementById('contar-obs').value;
+  const row = [id, fecha, matId, mat.Nombre, String(stockApp), String(stockReal), String(diferencia), currentUser?.name || '', obs];
+  showLoading('Enviando revisión...');
+  try {
+    await sheetsAppend('Revisiones_Inventario', row);
+    DATA.revisionesInventario.push(rowToObj(row, 'revisionesInventario'));
+    showToast('Revisión enviada. El profesor la revisará pronto.', 'success');
+    closeModal('modal-contar-stock');
+  } catch(e) { showToast('Error al enviar la revisión', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function aplicarRevisionInventario(revId) {
+  const revIdx = DATA.revisionesInventario.findIndex(r => r.ID_Revision === revId);
+  if (revIdx === -1) return;
+  const rev = DATA.revisionesInventario[revIdx];
+  const mat = DATA.material.find(m => m.ID_Material === rev.ID_Material);
+  if (!mat) { showToast('Material no encontrado', 'error'); return; }
+  const stockReal = parseFloat(rev.Stock_Real);
+  const matIdx = DATA.material.indexOf(mat);
+  const lotes = getMatUbics(mat.ID_Material);
+  showLoading('Aplicando ajuste...');
+  try {
+    if (lotes.length > 0) {
+      // Material con ubicaciones: ajustar stock total repartiendo la diferencia en el primer lote
+      const diferencia = stockReal - getStockTotal(mat);
+      const primerLoteIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === mat.ID_Material);
+      if (primerLoteIdx !== -1) {
+        const nuevoLocal = Math.max(0, (parseFloat(DATA.materialUbicaciones[primerLoteIdx].Stock_Local) || 0) + diferencia);
+        await actualizarStockLocal(primerLoteIdx, nuevoLocal);
+      }
+      const nuevoTotal = getStockTotal(mat);
+      mat.Stock_Actual = String(nuevoTotal);
+      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoTotal]);
+    } else {
+      mat.Stock_Actual = String(stockReal);
+      await sheetsUpdate(`Material!H${matIdx + 2}`, [stockReal]);
+    }
+    // Movimiento de ajuste
+    const fecha = new Date().toISOString().split('T')[0];
+    const movRow = [genId('MOV-'), mat.Nombre, 'Ajuste', Math.abs(parseFloat(rev.Diferencia)||0),
+      currentUser?.name || '', fecha, `Ajuste por revisión de inventario (alumno: ${rev.Usuario})`, ''];
+    await sheetsAppend('Movimientos', movRow);
+    DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
+    // Eliminar revisión del sheet
+    await sheetsDeleteRow('Revisiones_Inventario', revIdx);
+    DATA.revisionesInventario.splice(revIdx, 1);
+    showToast('Ajuste aplicado correctamente', 'success');
+    renderPanelRevisiones(); renderMaterial();
+  } catch(e) { showToast('Error aplicando el ajuste', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function descartarRevisionInventario(revId) {
+  const revIdx = DATA.revisionesInventario.findIndex(r => r.ID_Revision === revId);
+  if (revIdx === -1) return;
+  showLoading('Descartando...');
+  try {
+    await sheetsDeleteRow('Revisiones_Inventario', revIdx);
+    DATA.revisionesInventario.splice(revIdx, 1);
+    showToast('Revisión descartada', 'success');
+    renderPanelRevisiones();
+  } catch(e) { showToast('Error descartando la revisión', 'error'); console.error(e); }
+  hideLoading();
+}
+
 function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   if (filtro    !== undefined) _filtroMaterial         = filtro;
   if (cat       !== undefined) _filtroMaterialCat      = cat;
   if (stockFiltro !== undefined) _filtroMaterialStock  = stockFiltro;
   if (ubicacion !== undefined) _filtroMaterialUbicacion = ubicacion;
+
+  renderPanelRevisiones();
 
   const dlUbi = document.getElementById('ubicaciones-datalist');
   if (dlUbi) {
@@ -109,6 +268,7 @@ function renderFilaMaterial(m) {
       ${!multiUbi ? `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>` : ''}
       ${puedeHacer('crearSolicitudes') ? `<button class="icon-btn" onclick="openModalSolicitudMaterial('${m.ID_Material}')" title="Solicitar">📋</button>` : ''}
       ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="editMaterial(${idx})" title="Editar">✏️</button>` : ''}
+      ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}')" title="Contar stock">🔢</button>` : ''}
     </div></td>
   </tr>`;
 

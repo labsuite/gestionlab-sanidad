@@ -23,7 +23,8 @@ let DATA = {
   pedidos: [], lineasPedido: [], ciclosModulos: [],
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [],
-  tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: []
+  tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
+  revisionesInventario: []
 };
 
 // ============================================================
@@ -35,7 +36,7 @@ const COLS = {
   incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
   ubicaciones:        ['ID_Ubicacion','Laboratorio_Aula','Zona','Subzona','Descripcion_Completa','Activa'],
-  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas','Modulo','Ciclo_Principal'],
+  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas','Modulo','Ciclo_Principal','Puede_Revisar_Inventario'],
   material:           ['ID_Material','Nombre','Categoria','Referencia_Proveedor','Proveedor','Unidad','Ubicacion','Stock_Actual','Stock_Minimo','Stock_Optimo','Observaciones','Gestion_Automatica'],
   movimientos:        ['ID_Movimiento','Material','Tipo','Cantidad','Usuario','Fecha','Motivo','Observaciones'],
   solicitudes:        ['ID_Solicitud','Material','Cantidad_Solicitada','Solicitante','Fecha','Motivo','Proveedor_Requerido','Estado','Lista_Pedido','Observaciones'],
@@ -49,7 +50,8 @@ const COLS = {
   registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones'],
   tiposResiduo:           ['ID_Residuo','Nombre','Descripcion','Riesgo','Contenedor_Tipo','Lab','Zona'],
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
-  adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones']
+  adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],
+  revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones']
 };
 
 function rowToObj(row, type) {

@@ -191,6 +191,7 @@ function renderEquipos(filtro, filtroEstado) {
         ${puedeEditarEste ? `<button class="icon-btn" onclick="editEquipo(${DATA.equipos.indexOf(e)})" title="Editar">✏️</button>` : ''}
         ${puedeIntervenir ? `<button class="icon-btn" onclick="openModalRegistrarActuacionDirecta('${e.ID_Activo}')" title="Registrar actuación">🔧</button>` : ''}
         ${puedeHacer('crearIncidencias') ? `<button class="icon-btn" onclick="openModalIncidenciaEquipo('${e.ID_Activo}')" title="Reportar incidencia">⚠️</button>` : ''}
+        ${getUserRole() === 'Alumno' ? `<button class="icon-btn" onclick="openModalAvisoAlumno('${e.ID_Activo}')" title="Notificar aviso">🚨</button>` : ''}
       </div></td>
     </tr>
     <tr class="equipo-row-expand" id="${expandId}"><td colspan="8"><div class="equipo-expand-inner">${buildIntervencionesEquipo(e.ID_Activo)}</div></td></tr>`;
@@ -325,7 +326,14 @@ function renderIncidencias(filtroEstado = '') {
   const tbody = document.getElementById('tabla-incidencias');
   const rol = getUserRole();
   let items = DATA.incidencias;
-  if (rol === 'Profesor') { const miNombre = currentUser?.name || ''; items = items.filter(i => i.Reportado_Por === miNombre); }
+  if (rol === 'Profesor') {
+    const miNombre = (currentUser?.name || '').toLowerCase().trim();
+    items = items.filter(i => {
+      if ((i.Reportado_Por || '').toLowerCase().trim() === miNombre) return true;
+      const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
+      return equipo ? esResponsableDeEquipo(equipo) : false;
+    });
+  }
   if (filtroEstado) items = items.filter(i => i.Estado === filtroEstado);
   // Ocultar incidencias archivadas a menos que se filtre explícitamente
   if (filtroEstado !== 'Archivada') items = items.filter(i => i.Estado !== 'Archivada');

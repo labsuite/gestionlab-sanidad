@@ -544,6 +544,8 @@ function toggleUbicacionesAsignadasField(rol) {
   if (rol === 'Alumno') {
     grp.style.display = '';
     _populateModalUsuarioAlumno('', '');
+    const cbRev = document.getElementById('usr-puede-revisar');
+    if (cbRev) cbRev.checked = false;
   } else {
     grp.style.display = 'none';
   }
@@ -573,7 +575,11 @@ function editUsuario(idx) {
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
   const grp = document.getElementById('usr-alumno-fields');
   if (grp) grp.style.display = u.Rol === 'Alumno' ? '' : 'none';
-  if (u.Rol === 'Alumno') _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
+  if (u.Rol === 'Alumno') {
+    _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
+    const cbRev = document.getElementById('usr-puede-revisar');
+    if (cbRev) cbRev.checked = u.Puede_Revisar_Inventario === 'TRUE';
+  }
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
   openModal('modal-usuario');
@@ -656,18 +662,19 @@ async function guardarUsuario() {
   const id = existingU ? existingU.ID_Usuario : genId('USR-');
   const activo = existingU ? existingU.Activo : 'TRUE';
   const rol = v('usr-rol') || 'Alumno';
-  let ubicAsignadas = '', modulo = '', cicloPrincipal = '';
+  let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = '';
   if (rol === 'Alumno') {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');  // plain module names
     cicloPrincipal = (document.getElementById('usr-ciclo-principal')?.value || '').trim();
     if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); hideLoading(); return; }
+    puedeRevisarInventario = document.getElementById('usr-puede-revisar')?.checked ? 'TRUE' : '';
   }
-  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo, cicloPrincipal];
+  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo, cicloPrincipal, puedeRevisarInventario];
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Usuarios') {
-      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:H${editingRow.rowIndex+2}`, row);
+      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:I${editingRow.rowIndex+2}`, row);
       DATA.usuarios[editingRow.rowIndex] = rowToObj(row, 'usuarios');
       showToast('Usuario actualizado', 'success');
     } else {

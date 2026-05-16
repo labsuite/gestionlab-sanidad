@@ -123,13 +123,14 @@ async function loadAllData() {
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
            materialUbicaciones, historicoPrecio, tareas,
            planesMantenimiento, registroMantenimientos,
-           tiposResiduo, contenedoresResiduo, adicionesResiduo] = await Promise.all([
+           tiposResiduo, contenedoresResiduo, adicionesResiduo,
+           revisionesInventario] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:I'),
       sheetsGet('Proveedores!A2:I'),
       sheetsGet('Ubicaciones!A2:F'),
-      sheetsGet('Usuarios!A2:H'),
+      sheetsGet('Usuarios!A2:I'),
       sheetsGet('Material!A2:L'),
       sheetsGet('Movimientos!A2:H'),
       sheetsGet('Solicitudes!A2:J'),
@@ -143,7 +144,8 @@ async function loadAllData() {
       sheetsGet('Registro_Mantenimientos!A2:I').catch(e => { console.warn('Registro_Mantenimientos no cargó:', e); return []; }),
       sheetsGet('Tipos_Residuo!A2:G').catch(() => []),
       sheetsGet('Contenedores_Residuo!A2:K').catch(() => []),
-      sheetsGet('Adiciones_Residuo!A2:F').catch(() => [])
+      sheetsGet('Adiciones_Residuo!A2:F').catch(() => []),
+      sheetsGet('Revisiones_Inventario!A2:I').catch(() => [])
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -175,6 +177,7 @@ async function loadAllData() {
     DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
     DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
     DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
+    DATA.revisionesInventario   = toObj(revisionesInventario   || [], 'revisionesInventario');
 
     renderAll();
   } catch(e) {

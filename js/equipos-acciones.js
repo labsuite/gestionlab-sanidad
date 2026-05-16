@@ -1060,3 +1060,44 @@ function limpiarEquipoIntervencion() {
   const list = document.getElementById('int-equipo-autocomplete'); if (list) list.classList.remove('open');
   document.getElementById('int-equipo-search')?.focus();
 }
+
+// ============================================================
+// AVISO DE ALUMNO — notificación de problema con equipo
+// ============================================================
+function openModalAvisoAlumno(equipoId) {
+  const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
+  document.getElementById('aviso-equipo-id').value = equipoId;
+  const label = e ? [e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' · ') : equipoId;
+  document.getElementById('aviso-equipo-label').textContent = label;
+  // Reset form
+  document.querySelectorAll('input[name="aviso-uso"]').forEach(r => { r.checked = false; });
+  sv('aviso-descripcion', '');
+  openModal('modal-aviso-alumno');
+}
+
+async function guardarAvisoAlumno() {
+  const equipoId  = document.getElementById('aviso-equipo-id').value;
+  const impacto   = document.querySelector('input[name="aviso-uso"]:checked')?.value;
+  const desc      = v('aviso-descripcion');
+  if (!impacto) { showToast('Indica cómo afecta al uso del equipo', 'error'); return; }
+  if (!desc)    { showToast('Describe el problema', 'error'); return; }
+
+  const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
+  const equipo = e ? equipoId + ' – ' + [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ') : equipoId;
+  const id  = genId('INC-');
+  const row = [id, equipo, currentUser?.name || 'Usuario',
+    new Date().toISOString().replace('T',' ').slice(0,16),
+    desc, impacto, 'Normal', 'Abierta', ''];
+
+  showLoading('Enviando aviso...');
+  try {
+    await sheetsAppend('Incidencias', row);
+    DATA.incidencias.push(rowToObj(row, 'incidencias'));
+    showToast('Aviso enviado. El profesorado será notificado.', 'success');
+    closeModal('modal-aviso-alumno');
+    renderIncidencias();
+    renderDashboard();
+    updateBadges();
+  } catch(e) { showToast('Error enviando el aviso', 'error'); console.error(e); }
+  hideLoading();
+}

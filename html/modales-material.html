@@ -266,3 +266,40 @@
     </div>
   </div>
 </div>
+
+<!-- Modal Contar Stock (alumnos con permiso de revisión de inventario) -->
+<div class="modal-overlay" id="modal-contar-stock">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Contar stock</div>
+      <button class="modal-close" onclick="closeModal('modal-contar-stock')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="contar-mat-id">
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>Material</label>
+          <div id="contar-mat-nombre" style="font-weight:500;font-size:13px;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm)"></div>
+        </div>
+        <div class="form-grid form-grid-2" style="width:100%">
+          <div class="form-group">
+            <label>Stock en la app</label>
+            <div id="contar-stock-app" style="font-size:15px;font-weight:600;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm)"></div>
+          </div>
+          <div class="form-group">
+            <label>Cantidad real que ves *</label>
+            <input id="contar-stock-real" type="number" min="0" step="0.01" placeholder="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Observaciones</label>
+          <input id="contar-obs" placeholder="Ej: faltan 2 cajas, hay un bote abierto...">
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-contar-stock')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarConteo()">Enviar revisión</button>
+      </div>
+    </div>
+  </div>
+</div>
