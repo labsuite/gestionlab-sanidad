@@ -185,7 +185,7 @@ async function guardarNuevoPedido() {
       }
       showToast(`Lista creada y "${matNombre}" añadido`, 'success');
     } else { showToast('Lista creada', 'success'); }
-    renderAll();
+    renderPedidos(); renderSolicitudes(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error', 'error'); }
   hideLoading();
 }
@@ -198,11 +198,22 @@ async function guardarLineaPedido() {
   const cant = v('linea-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
   const id = genId('LIN-');
-  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', v('linea-obs')];
-  showLoading('Guardando...');
-  try { await sheetsAppend('Lineas_Pedido', row); DATA.lineasPedido.push(rowToObj(row, 'lineasPedido')); showToast('Línea añadida', 'success'); closeModal('modal-nueva-linea'); verDetallePedido(pedidoId); }
-  catch(e) { showToast('Error', 'error'); }
-  hideLoading();
+  const obs = v('linea-obs');
+  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs];
+  const objLocal = rowToObj(row, 'lineasPedido');
+  // Optimista: actualizar UI sin esperar a Sheets
+  DATA.lineasPedido.push(objLocal);
+  closeModal('modal-nueva-linea');
+  verDetallePedido(pedidoId);
+  showToast('Línea añadida', 'success');
+  try { await sheetsAppend('Lineas_Pedido', row); }
+  catch(e) {
+    // Revertir si falla
+    const idx = DATA.lineasPedido.indexOf(objLocal);
+    if (idx !== -1) DATA.lineasPedido.splice(idx, 1);
+    showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
+    verDetallePedido(pedidoId);
+  }
 }
 
 async function guardarEstadoPedido() {
