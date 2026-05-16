@@ -202,6 +202,22 @@
   </div>
 </div>
 
+<!-- Modal historial de movimientos -->
+<div class="modal-overlay" id="modal-historial-material">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <div class="modal-title" id="historial-mat-titulo">Historial de movimientos</div>
+      <button class="modal-close" onclick="closeModal('modal-historial-material')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:60vh;overflow-y:auto">
+      <div id="historial-mat-contenido"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-historial-material')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Transferencia desde Armario (NFC) -->
 <div class="modal-overlay" id="modal-nfc-transfer">
   <div class="modal" style="max-width:520px">

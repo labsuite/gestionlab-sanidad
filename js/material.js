@@ -244,13 +244,10 @@ function renderFilaMaterial(m) {
 
   const rowId = `mat-row-${safeId}`;
 
-  // Fila principal:
-  //   - si multiUbi: clic en fila = toggle ubicaciones; clic en nombre = toggle movimientos
-  //   - si !multiUbi: clic en fila = toggle movimientos
-  //   - botones Consumo y Entrada sólo en fila principal si !multiUbi (en lotes si multiUbi)
-  let html = `<tr class="equipo-row${multiUbi ? ' expandable' : ''}" id="${rowId}" style="cursor:pointer" onclick="${multiUbi ? `toggleMatUbics('${m.ID_Material}')` : `toggleMatMovimientos('${m.ID_Material}')`}">
+  // Fila principal: clic en fila = toggle ubicaciones (solo si multiUbi)
+  let html = `<tr class="equipo-row${multiUbi ? ' expandable' : ''}" id="${rowId}" ${multiUbi ? `style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')"` : ''}>
     <td><strong>${m.ID_Material}</strong></td>
-    <td onclick="${multiUbi ? `event.stopPropagation();toggleMatMovimientos('${m.ID_Material}')` : 'event.preventDefault()'}">
+    <td>
       ${multiUbi ? `<span class="expand-icon" id="expand-mat-${safeId}">▶</span> ` : ''}${m.Nombre}
     </td>
     <td><span class="badge badge-gray">${m.Categoria || '—'}</span></td>
@@ -269,6 +266,7 @@ function renderFilaMaterial(m) {
       ${puedeHacer('crearSolicitudes') ? `<button class="icon-btn" onclick="openModalSolicitudMaterial('${m.ID_Material}')" title="Solicitar">📋</button>` : ''}
       ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="editMaterial(${idx})" title="Editar">✏️</button>` : ''}
       ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}')" title="Contar stock">🔢</button>` : ''}
+      <button class="icon-btn" onclick="openModalHistorialMaterial('${m.ID_Material}')" title="Ver historial">🕐</button>
     </div></td>
   </tr>`;
 
@@ -302,14 +300,6 @@ function renderFilaMaterial(m) {
     }).join('');
   }
 
-  // Fila desplegable de movimientos (oculta inicialmente)
-  html += `<tr class="mat-ubic-row" id="mat-mov-${safeId}" style="display:none;background:var(--surface2)">
-    <td colspan="8" style="padding:10px 16px 10px 28px">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">Últimos movimientos</div>
-      <div id="mat-mov-inner-${safeId}">${buildMovimientosMaterial(m.ID_Material, m.Nombre)}</div>
-    </td>
-  </tr>`;
-
   return html;
 }
 
@@ -333,35 +323,28 @@ function toggleMatUbics(idMaterial) {
   if (expandIcon) expandIcon.textContent = isOpen ? '▶' : '▼';
 }
 
-function toggleMatMovimientos(idMaterial) {
-  const safeId = idMaterial.replace(/[^a-zA-Z0-9]/g, '-');
-  const row    = document.getElementById(`mat-mov-${safeId}`);
-  if (!row) return;
-  const isOpen = row.style.display !== 'none';
-  row.style.display = isOpen ? 'none' : '';
-  // Refrescar contenido cada vez que se abre (datos pueden haber cambiado)
-  if (!isOpen) {
-    const inner = document.getElementById(`mat-mov-inner-${safeId}`);
-    const mat   = DATA.material.find(m => m.ID_Material === idMaterial);
-    if (inner && mat) inner.innerHTML = buildMovimientosMaterial(idMaterial, mat.Nombre);
-  }
-}
-
-function buildMovimientosMaterial(idMaterial, nombreMaterial) {
-  const nombre = nombreMaterial || (DATA.material.find(m => m.ID_Material === idMaterial)?.Nombre || '');
+function openModalHistorialMaterial(idMaterial) {
+  const mat = DATA.material.find(m => m.ID_Material === idMaterial);
+  const nombre = mat?.Nombre || idMaterial;
   const movs = DATA.movimientos
     .filter(m => m.Material === nombre)
-    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha))
-    .slice(0, 8);
-  if (!movs.length) return `<span style="font-size:12px;color:var(--text-muted)">Sin movimientos registrados para este ítem.</span>`;
-  return movs.map(m => `
-    <div style="display:grid;grid-template-columns:88px 100px 56px 1fr 100px;gap:8px;align-items:center;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="color:var(--text-muted)">${formatDate(m.Fecha)||'—'}</span>
-      <span>${m.Tipo === 'Entrada' ? '<span class="badge badge-green" style="font-size:10px">📥 Entrada</span>' : '<span class="badge badge-orange" style="font-size:10px">📦 Salida</span>'}</span>
-      <strong>${m.Cantidad||'—'}</strong>
-      <span style="color:var(--text-soft)">${m.Motivo||'—'}</span>
-      <span style="color:var(--text-muted)">${m.Usuario||'—'}</span>
-    </div>`).join('');
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+
+  document.getElementById('historial-mat-titulo').textContent = `Historial — ${nombre}`;
+
+  const contenido = document.getElementById('historial-mat-contenido');
+  if (!movs.length) {
+    contenido.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Sin movimientos registrados para este ítem.</div>`;
+  } else {
+    contenido.innerHTML = movs.map(m => `
+      <div style="display:grid;grid-template-columns:90px 110px 48px 1fr;gap:8px;align-items:center;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border-light,#f0f0f0)">
+        <span style="color:var(--text-muted)">${formatDate(m.Fecha)||'—'}</span>
+        <span>${m.Tipo === 'Entrada' ? '<span class="badge badge-green" style="font-size:10px">📥 Entrada</span>' : '<span class="badge badge-orange" style="font-size:10px">📦 Salida</span>'}</span>
+        <strong>${m.Cantidad||'—'}</strong>
+        <span style="color:var(--text-soft)">${m.Motivo||'—'}</span>
+      </div>`).join('');
+  }
+  openModal('modal-historial-material');
 }
 
 function filtrarMaterial(val)          { renderMaterial(val, undefined, undefined); }
