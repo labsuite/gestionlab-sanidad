@@ -80,7 +80,7 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - `openModalRegistrarMant / guardarRegistroMant` — modal y guardado de registro
 - `openModalPlan / guardarPlan / eliminarPlan` — CRUD de planes
 - `renderMantenimiento()` — página completa con tabs: Pendientes (filtros lab+período) y Planes configurados
-- `exportarModeloCalidad(cursoAcademico)` — genera xlsx usando JSZip sobre la plantilla `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`, preservando 100% del formato original. Una fila por equipo × tipo (Interno/Externo), todas las fechas previstas separadas por comas. Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5.
+- `exportarModeloCalidad(cursoAcademico)` — genera xlsx usando JSZip sobre la plantilla `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`, preservando 100% del formato original. Una fila por equipo × tipo (Interno/Externo), todas las fechas previstas separadas por comas. Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5. Columna I (Supervisado por) se rellena automáticamente con los gestores y admins activos de DATA.usuarios.
 - `_detectarLabEquipo(eq)` — devuelve el lab de un equipo buscando en tabla Ubicaciones o inferiendo del campo Ubicacion (busca "201"/"203"/"205"/"207" con includes)
 - `_labAHoja(labAula)` — mapea el lab detectado al nombre del sheet Excel
 
@@ -92,7 +92,7 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
-## Módulo de residuos – COMPLETADO (2026-05-15)
+## Módulo de residuos – COMPLETADO (2026-05-16)
 
 ### Hojas en Sheets
 - **Tipos_Residuo** — columnas A-G: `ID_Residuo, Nombre, Descripcion, Riesgo, Contenedor_Tipo, Lab, Zona`
@@ -126,6 +126,9 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - `_abrirAdicionPorNfc(categoria, lab)` — localiza el contenedor activo por categoría+lab y abre el modal de adición
 - `_WARNINGS_FORMATO / _getWarningFormato(formato)` — mapa de avisos de seguridad por formato físico; se muestran como banner amarillo en las cards y en el modal de adición (también vía NFC)
 - `_updateBadgeResiduos()` — badge en nav (definida en ui.js)
+- `exportarInformeConsenur()` — botón en pestaña "Pendientes de recogida"; abre nueva pestaña con informe HTML y dispara "Guardar como PDF". Agrupa por lab, incluye categoría/formato/zona/nivel/fecha cierre y lista de tipos de residuo con peligrosidad. Sin datos personales (sin usuario ni fechas individuales).
+- `openModalConsultaResiduo / guardarConsultaResiduo` — flujo para residuos desconocidos: el alumno describe el residuo y dónde lo dejó; se guarda en Consultas_Residuo
+- `renderPanelConsultasResiduo / resolverConsultaResiduo` — panel visible a Gestor/Admin con las consultas pendientes; botón "Resuelta" marca Estado=Resuelta
 
 ### Avisos de seguridad por formato (`_WARNINGS_FORMATO`)
 | Formato (matching parcial) | Aviso |
@@ -135,6 +138,13 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 | bolsa plástica | Solo envases vacíos de plástico/aluminio; nada a granel |
 | garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
 
+### Consultas de residuo desconocido
+- Hoja **Consultas_Residuo** — columnas A-F: `ID_Consulta, Fecha, Usuario, Descripcion, Ubicacion_Dejado, Estado`
+- Estado: `Pendiente` / `Resuelta`
+- Badge en nav (junto a contenedores) suma consultas pendientes + contenedores al 75%/lleno/cerrado
+- Banner en dashboard para Gestor/Admin cuando hay consultas pendientes
+- Cuando la búsqueda en la guía no encuentra resultados, aparece mensaje "No lo tires todavía" + botón "Avisar a la gestora"
+
 ### Etiquetas NFC/QR
 La URL codifica **categoría + lab** (no el ID del contenedor), por lo que la etiqueta nunca necesita reprogramarse al cerrar un contenedor. `_checkPendingNfcAction()` en `ui.js` detecta los parámetros tras el login y redirige al modal de adición correcto.
 
@@ -143,7 +153,7 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 
 ---
 
-## Módulo de usuarios – COMPLETADO (2025-05-15)
+## Módulo de usuarios – COMPLETADO (2026-05-16)
 
 ### Hoja Usuarios – columnas (A–H)
 | Col | Campo |
@@ -170,6 +180,9 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 
 ### Ciclos_Modulos — estructura crítica
 Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laboratorio" aparece en CS Lab Clínico, ZS Lab Clínico y CS Anatomía). Por eso el ciclo se guarda explícitamente en columna H y NO se infiere de los módulos. Los módulos se guardan como nombres planos.
+
+### Tolerancia a diferencias de nombre de ciclo
+`_normCiclo(s)` en `ubicaciones.js` normaliza tildes, mayúsculas, ñ y espacios antes de comparar. `_refreshModuloCheckboxes` intenta coincidencia exacta y cae a comparación normalizada si el valor guardado en Usuarios difiere ligeramente del nombre canónico en Ciclos_Modulos. Al guardar, el campo se sobreescribe con el nombre canónico del dropdown, eliminando la discrepancia.
 
 ---
 
@@ -213,52 +226,31 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Pendiente de hacer – CÓDIGO
 
-### A. Novedades en solicitudes para el profesor (PRIORIDAD ALTA)
-El profesor no sabe que su solicitud fue aprobada/rechazada/recibida hasta que entra a mirar.
-- Añadir badge/contador visible al entrar: "X solicitudes tuyas cambiaron de estado"
-- Implementación sugerida: comparar estado actual de las solicitudes del usuario vs. la última vez que se conectó (guardar timestamp en localStorage). Mostrar banner en dashboard o badge en sidebar.
-
-### B. Recepción masiva de albarán (PRIORIDAD ALTA)
-Ahora cada línea requiere abrir un modal individual. Con pedidos de 15+ líneas es tedioso.
-- Añadir botón "Recibir albarán" en el detalle del pedido
-- Abre una vista/modal con todas las líneas pendientes en tabla editable (cantidad recibida + obs por fila)
-- Al confirmar, llama a `_completarRecepcionLinea` para cada línea con cantidad > 0
-- El modal de recepción individual (`modal-recepcion-linea`) se mantiene para casos puntuales
-
-### C. Flujo de documentación — eliminar checkbox "Hoja completada con factura"
-- La hoja de pedido ya se genera con los datos de factura → el checkbox `Doc_Hoja_Completada` es redundante
-- **Qué hacer:**
-  1. En `html/modales-pedidos.html` y en `js/pedidos-render.js` (detalle del pedido): eliminar el checkbox `Doc_Hoja_Completada`
-  2. En el modal de generación de hoja (`modal-generar-hoja`): hacer obligatorios los campos de factura (Nº factura, Fecha factura) antes de poder generar
-  3. En `archivarPedido()` en `pedidos-acciones.js`: quitar `Doc_Hoja_Completada` de la condición de archivado
-  4. La columna O del sheet Pedidos puede quedar vacía (no eliminar para no desplazar P)
+*(Las tareas A, B y C fueron verificadas como completadas en 2026-05-16)*
 
 ---
 
 ## Pendiente de hacer – DATOS
 
-### 1. Datos – Planes_Mantenimiento
-Ya introducidos 272 planes. Revisar cobertura completa de todos los equipos.
+### 1. Datos – Planes_Mantenimiento ✓
+271 planes importados con Con_Alumnado en formato Sí/No correcto.
 
-### 2. Datos – Campos nuevos en equipos existentes
-Para cada equipo actualizar via modal de edición:
-- `Protocolo_Uso` — texto con instrucciones de uso básicas
-- `Tipo_Mantenimiento` — Periódico o Estacional
-- `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — solo si Estacional
-- `Ubicacion` — actualizar al ID correcto de la tabla Ubicaciones (necesario para que el modelo de calidad los asigne al lab correcto)
+### 2. Datos – Campos nuevos en equipos ✓ parcial
+- `Protocolo_Uso` y `Tipo_Mantenimiento` — importados via CSV auxiliar generado automáticamente (231 equipos)
+- `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — **PENDIENTE** para los 15 equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación)
+- `Ubicacion` — **PENDIENTE**: actualizar al ID correcto de la tabla Ubicaciones para que el modelo de calidad los asigne al lab correcto
 
-### 3. Modelo de calidad – FUNCIONAL
-- `exportarModeloCalidad()` genera xlsx con JSZip sobre la plantilla oficial
-- Pendiente: verificar formato con más registros reales en Registro_Mantenimientos
-- Pendiente: actualizar las ubicaciones de los equipos al formato correcto de la BD para que aparezcan todos en el xlsx
+### 3. Modelo de calidad – FUNCIONAL ✓
+- Verificado con registros reales; solo pequeños detalles a hablar con jefa
+- Columna "Supervisado por" se rellena automáticamente con gestores/admins activos
+- Pendiente: actualizar Ubicacion de equipos (ver punto 2)
 
 ### 4. Datos – Residuos
-- Tipos de residuo: ya introducidos. Revisar que todos tengan `Contenedor_Tipo` relleno (es el campo que agrupa la guía).
-- Contenedores físicos: introducir en Contenedores_Residuo con su nivel inicial.
+- Tipos de residuo: introducidos. Revisar que todos tengan `Contenedor_Tipo` relleno.
+- Contenedores físicos: **PENDIENTE** introducir en Contenedores_Residuo con su nivel inicial.
 
-### 5. Datos – Usuarios
-- Alumnos existentes: al editarlos, seleccionar el `Ciclo_Principal` en el nuevo dropdown y guardar para que queden correctamente agrupados.
-- Verificar que la columna H (`Ciclo_Principal`) existe en el sheet Usuarios con ese encabezado.
+### 5. Datos – Usuarios ✓ en curso
+- Alumnos editándose para asignar `Ciclo_Principal` correcto. El código ya tolera discrepancias de acento/caso y las corrige al guardar.
 
 ---
 
