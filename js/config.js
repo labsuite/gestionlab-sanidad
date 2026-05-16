@@ -24,7 +24,7 @@ let DATA = {
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
-  revisionesInventario: []
+  revisionesInventario: [], consultasResiduo: []
 };
 
 // ============================================================
@@ -51,7 +51,8 @@ const COLS = {
   tiposResiduo:           ['ID_Residuo','Nombre','Descripcion','Riesgo','Contenedor_Tipo','Lab','Zona'],
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
   adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],
-  revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones']
+  revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones'],
+  consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado']
 };
 
 function rowToObj(row, type) {

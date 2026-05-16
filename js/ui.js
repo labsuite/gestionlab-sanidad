@@ -76,10 +76,11 @@ function updateBadges() {
 function _updateBadgeResiduos() {
   const badge = document.getElementById('badge-residuos');
   if (!badge) return;
-  // Alerta si hay cerrados pendientes de recogida O activos al 75%/lleno
-  const n = DATA.contenedoresResiduo.filter(c =>
+  const nContenedores = DATA.contenedoresResiduo.filter(c =>
     c.Estado === 'cerrado' || c.Nivel === '75%' || c.Nivel === 'lleno'
   ).length;
+  const nConsultas = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente').length;
+  const n = nContenedores + nConsultas;
   badge.textContent = n;
   badge.style.display = n > 0 ? '' : 'none';
 }

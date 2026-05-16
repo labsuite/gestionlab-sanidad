@@ -151,3 +151,32 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL: Consulta de residuo desconocido -->
+<div class="modal-overlay" id="modal-consulta-residuo">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <div class="modal-title">Avisar a la gestora</div>
+      <button class="modal-close" onclick="closeModal('modal-consulta-residuo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--text-soft);line-height:1.5">
+        La gestora recibirá un aviso y se encargará de clasificarlo y añadirlo a la guía.
+      </div>
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>¿Qué quieres tirar? *</label>
+          <textarea id="consulta-descripcion" style="min-height:80px" placeholder="Describe el residuo con el mayor detalle posible: qué es, de qué está hecho, si tiene etiqueta..."></textarea>
+        </div>
+        <div class="form-group">
+          <label>¿Dónde lo has dejado? *</label>
+          <input id="consulta-ubicacion" placeholder="Ej: Bancada norte del lab 203, junto a las balanzas">
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-consulta-residuo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarConsultaResiduo()">Enviar aviso</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -42,6 +42,12 @@ function renderDashboard() {
     alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('solicitudes')"><div class="alert-icon">📋</div><div class="alert-content"><div class="alert-title">${solPendientes.length} solicitud(es) de material pendiente(s) de gestión</div><div class="alert-text">${solPendientes.slice(0,4).map(s => s.Material + ' · ' + s.Solicitante).join(' – ')}${solPendientes.length > 4 ? ' y ' + (solPendientes.length-4) + ' más...' : ''}</div></div></div>`;
   }
 
+  const consultasRes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente');
+  const rolDash = getUserRole();
+  if (consultasRes.length && (rolDash === 'Administrador' || rolDash === 'Gestor')) {
+    alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('residuos-guia')"><div class="alert-icon">♻️</div><div class="alert-content"><div class="alert-title">${consultasRes.length} consulta${consultasRes.length > 1 ? 's' : ''} de residuo pendiente${consultasRes.length > 1 ? 's' : ''} de clasificar</div><div class="alert-text">${consultasRes.slice(0,3).map(c => c.Usuario + ': ' + (c.Descripcion||'').slice(0,40)).join(' – ')}${consultasRes.length > 3 ? ' y ' + (consultasRes.length-3) + ' más...' : ''}</div></div></div>`;
+  }
+
   const bajominimo = DATA.material.filter(m => stockBajoMinimo(m));
   setText('stat-stock-bajo', bajominimo.length);
 

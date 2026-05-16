@@ -53,6 +53,7 @@ function renderResiduosGuia() {
   if (!el) return;
   const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
   el.innerHTML = `
+    <div id="panel-consultas-residuo"></div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <input type="text" id="res-search" class="form-input"
         placeholder="Buscar residuo, descripción o contenedor…"
@@ -61,6 +62,7 @@ function renderResiduosGuia() {
     </div>
     <div id="res-guia-lista">${_renderGuia(DATA.tiposResiduo, '')}</div>
   `;
+  renderPanelConsultasResiduo();
 }
 
 function _renderGuia(tipos, filtro) {
@@ -72,7 +74,18 @@ function _renderGuia(tipos, filtro) {
     (t.Riesgo || '').toLowerCase().includes(f) ||
     (t.Contenedor_Tipo || '').toLowerCase().includes(f)
   );
-  if (!lista.length) return `<div style="color:var(--text-muted);padding:32px;text-align:center">No se encontraron residuos</div>`;
+  if (!lista.length) {
+    if (!f) return `<div style="color:var(--text-muted);padding:32px;text-align:center">No hay tipos de residuo registrados aún.</div>`;
+    return `<div style="text-align:center;padding:36px 24px">
+      <div style="font-size:32px;margin-bottom:12px">♻️</div>
+      <div style="font-weight:600;font-size:15px;margin-bottom:8px">No hemos encontrado ese residuo</div>
+      <div style="font-size:13px;color:var(--text-muted);max-width:380px;margin:0 auto;line-height:1.6">
+        ¿No sabes dónde tirar esto? <strong style="color:var(--text)">No lo tires todavía.</strong><br>
+        Déjalo en un lugar seguro e informa a la gestora: dile qué es y dónde lo has dejado para que ella lo gestione y lo añada al catálogo.
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="openModalConsultaResiduo()">Avisar a la gestora</button>
+    </div>`;
+  }
 
   const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
 
@@ -501,6 +514,81 @@ async function eliminarContenedor(idx) {
     _updateBadgeResiduos();
     showToast('Contenedor eliminado', 'success');
   } catch(e) { showToast('Error al eliminar', 'error'); }
+  hideLoading();
+}
+
+// ── Consultas de residuo desconocido ────────────────────────
+
+function openModalConsultaResiduo() {
+  sv('consulta-descripcion', '');
+  sv('consulta-ubicacion', '');
+  openModal('modal-consulta-residuo');
+}
+
+async function guardarConsultaResiduo() {
+  const desc = v('consulta-descripcion');
+  const ubi  = v('consulta-ubicacion');
+  if (!desc) { showToast('Describe el residuo antes de enviar', 'error'); return; }
+  if (!ubi)  { showToast('Indica dónde lo has dejado', 'error'); return; }
+  const id   = genId('CR-');
+  const fecha = new Date().toISOString().split('T')[0];
+  const row  = [id, fecha, currentUser?.name || '', desc, ubi, 'Pendiente'];
+  showLoading('Enviando aviso...');
+  try {
+    await sheetsAppend('Consultas_Residuo', row);
+    DATA.consultasResiduo.push(rowToObj(row, 'consultasResiduo'));
+    _updateBadgeResiduos();
+    showToast('Aviso enviado. La gestora lo revisará pronto.', 'success');
+    closeModal('modal-consulta-residuo');
+  } catch(e) { showToast('Error al enviar el aviso', 'error'); console.error(e); }
+  hideLoading();
+}
+
+function renderPanelConsultasResiduo() {
+  const contenedor = document.getElementById('panel-consultas-residuo');
+  if (!contenedor) return;
+  const rol = getUserRole();
+  const pendientes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente');
+  if ((rol !== 'Administrador' && rol !== 'Gestor') || !pendientes.length) {
+    contenedor.style.display = 'none';
+    return;
+  }
+  contenedor.style.display = '';
+  contenedor.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        ♻️ Consultas de residuo pendientes de clasificar
+        <span class="badge badge-orange" style="font-size:11px">${pendientes.length}</span>
+      </div>
+      ${pendientes.map(c => {
+        const idx = DATA.consultasResiduo.indexOf(c);
+        return `<div style="border-top:1px solid var(--border);padding:10px 0;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
+          <div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:3px">${c.Descripcion}</div>
+            <div style="font-size:12px;color:var(--text-muted)">
+              📍 ${c.Ubicacion_Dejado || '—'} &nbsp;·&nbsp; 👤 ${c.Usuario || '—'} &nbsp;·&nbsp; 📅 ${formatDate(c.Fecha)||c.Fecha||'—'}
+            </div>
+          </div>
+          <button class="btn btn-secondary" style="font-size:11px;padding:4px 12px;white-space:nowrap"
+            onclick="resolverConsultaResiduo(${idx})">✓ Resuelta</button>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+async function resolverConsultaResiduo(idx) {
+  const c = DATA.consultasResiduo[idx];
+  if (!c) return;
+  showLoading('Marcando como resuelta...');
+  try {
+    const fila = idx + 2;
+    await sheetsUpdate(`Consultas_Residuo!F${fila}`, ['Resuelta']);
+    DATA.consultasResiduo[idx].Estado = 'Resuelta';
+    _updateBadgeResiduos();
+    renderPanelConsultasResiduo();
+    renderDashboard();
+    showToast('Consulta marcada como resuelta', 'success');
+  } catch(e) { showToast('Error al actualizar', 'error'); console.error(e); }
   hideLoading();
 }
 
