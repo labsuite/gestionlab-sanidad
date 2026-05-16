@@ -161,7 +161,8 @@ async function guardarNuevoPedido() {
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
   const id = genId('PED-');
   const fecha = new Date().toISOString().split('T')[0];
-  const row = [id, nombre, v('ped-proveedor'), fecha, '', '', '', '', '', 'Abierto', '', '', v('ped-obs'), '', '', ''];
+  const tipo = v('ped-tipo') || 'Material';
+  const row = [id, nombre, v('ped-proveedor'), fecha, '', '', '', '', '', 'Abierto', '', '', v('ped-obs'), '', '', '', '', '', tipo];
   showLoading('Creando lista...');
   try {
     await sheetsAppend('Pedidos', row);
@@ -192,14 +193,23 @@ async function guardarNuevoPedido() {
 
 async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
-  const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
-  let materialNombre = esLibre ? v('linea-material-libre') : (() => { const id = document.getElementById('linea-material-id').value; const mat = DATA.material.find(m => m.ID_Material === id); return mat ? mat.Nombre : ''; })();
-  if (!materialNombre) { showToast('Indica el material', 'error'); return; }
+  const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
+  const esServicio = pedido?.Tipo === 'Servicio';
+  let materialNombre = '', equipoId = '';
+  if (esServicio) {
+    materialNombre = v('linea-servicio-desc');
+    if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
+    equipoId = document.getElementById('linea-equipo-id').value;
+  } else {
+    const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
+    materialNombre = esLibre ? v('linea-material-libre') : (() => { const id = document.getElementById('linea-material-id').value; const mat = DATA.material.find(m => m.ID_Material === id); return mat ? mat.Nombre : ''; })();
+    if (!materialNombre) { showToast('Indica el material', 'error'); return; }
+  }
   const cant = v('linea-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
   const id = genId('LIN-');
   const obs = v('linea-obs');
-  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs];
+  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs, '', equipoId];
   const objLocal = rowToObj(row, 'lineasPedido');
   // Optimista: actualizar UI sin esperar a Sheets
   DATA.lineasPedido.push(objLocal);
@@ -326,11 +336,18 @@ async function guardarRecepcionMasiva() {
 
 async function guardarRecepcionLinea() {
   const lineaId = v('rec-linea-id'), pedidoId = v('rec-pedido-id');
-  const cantRec = parseFloat(v('rec-cantidad')) || 0;
   const idx = DATA.lineasPedido.findIndex(l => l.ID_Linea === lineaId);
   if (idx === -1) return;
   const l = DATA.lineasPedido[idx];
   const cantPed = parseFloat(l.Cantidad_Pedida) || 0;
+  // Servicios: confirmar realizado sin actualizar stock
+  const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
+  if (pedido?.Tipo === 'Servicio') {
+    const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+    await _completarRecepcionLinea(idx, l, cantPed - yaRec, cantPed, pedidoId, null, v('rec-obs'));
+    return;
+  }
+  const cantRec = parseFloat(v('rec-cantidad')) || 0;
   const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
   if (!mat && cantRec > 0) {
     closeModal('modal-recepcion-linea');

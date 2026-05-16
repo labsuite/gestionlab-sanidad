@@ -240,6 +240,7 @@ function renderPedidos(filtroEstado = '') {
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
         <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
+          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
           ${docBadges ? `<span style="font-size:14px" title="Documentación">${docBadges}</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${!['Archivado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Cambiar estado" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄</button>` : ''}
@@ -296,6 +297,7 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div><div class="card-title">${p.Nombre_Lista}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${p.ID_Pedido}</div></div>
         <div style="display:flex;gap:8px;align-items:center">
+          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${puedeEditar && !['Recepción parcial','Recepción completa','Archivado'].includes(p.Estado) ? `<button class="btn btn-secondary" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄 Estado</button>` : ''}
 
@@ -332,7 +334,7 @@ function verDetallePedido(pedidoId) {
     </div>
     <div class="card">
       <div class="card-header">
-        <div class="card-title">Líneas del pedido (${lineas.length})</div>
+        <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
         <div style="display:flex;gap:8px">
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
           ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
@@ -355,8 +357,9 @@ function verDetallePedido(pedidoId) {
             unidadLinea = unidadLinea ? ' ' + unidadLinea : '';
             const estadoLinea = {'Pendiente':'badge-orange','Recibido parcialmente':'badge-blue','Recibido':'badge-green'}[l.Estado_Linea] || 'badge-gray';
             const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
+            const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
             return `<div class="linea-row" style="grid-template-columns:1fr 80px 80px 110px auto">
-              <div style="font-weight:500;font-size:13px">${l.Material}</div>
+              <div style="font-weight:500;font-size:13px">${l.Material}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
               <div style="text-align:center;font-size:12px;color:var(--text-soft)">Ped: ${l.Cantidad_Pedida}${unidadLinea}</div>
               <div style="text-align:center;font-size:12px">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</div>
               <div><span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span></div>
@@ -374,6 +377,15 @@ function verDetallePedido(pedidoId) {
 // ============================================================
 // MODALES PEDIDOS / SOLICITUDES
 // ============================================================
+function setPedidoTipo(tipo) {
+  sv('ped-tipo', tipo);
+  document.getElementById('btn-ped-tipo-material').classList.toggle('active', tipo === 'Material');
+  document.getElementById('btn-ped-tipo-servicio').classList.toggle('active', tipo === 'Servicio');
+  document.getElementById('ped-nombre').placeholder = tipo === 'Servicio'
+    ? 'Ej: Revisión SAT mayo, Compra microscopio...'
+    : 'Ej: Consumibles mayo, Sigma junio...';
+}
+
 function setSourceSolicitud(source) {
   const esCatalogo = source === 'catalogo';
   document.getElementById('btn-source-catalogo').classList.toggle('active', esCatalogo);
@@ -405,18 +417,35 @@ function openModalSolicitud() {
 
 function openModalNuevoPedido() {
   sv('ped-nombre',''); sv('ped-obs','');
+  setPedidoTipo('Material');
   const sel = document.getElementById('ped-proveedor');
   sel.innerHTML = '<option value="">Sin asignar todavía</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
   openModal('modal-nuevo-pedido');
 }
 
 function openModalNuevaLinea(pedidoId) {
+  const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
+  const esServicio = pedido?.Tipo === 'Servicio';
   sv('linea-pedido-id', pedidoId);
-  setSourceLinea('catalogo');
-  document.getElementById('linea-material-id').value = '';
-  document.getElementById('linea-material-selected').style.display = 'none';
-  document.getElementById('linea-search').value = '';
-  sv('linea-cantidad',''); sv('linea-obs',''); sv('linea-material-libre','');
+  sv('linea-pedido-tipo', pedido?.Tipo || 'Material');
+  const titulo = document.querySelector('#modal-nueva-linea .modal-title');
+  if (titulo) titulo.textContent = esServicio ? 'Añadir servicio / equipo' : 'Añadir línea al pedido';
+  document.getElementById('linea-material-section').style.display = esServicio ? 'none' : '';
+  document.getElementById('linea-servicio-section').style.display = esServicio ? '' : 'none';
+  if (esServicio) {
+    sv('linea-servicio-desc', '');
+    const sel = document.getElementById('linea-equipo-id');
+    sel.innerHTML = '<option value="">Sin vincular</option>' +
+      DATA.equipos.map(eq => `<option value="${eq.ID_Activo}">${eq.ID_Activo} — ${[eq.Tipo_Equipo,eq.Marca,eq.Modelo].filter(Boolean).join(' ')}</option>`).join('');
+  } else {
+    setSourceLinea('catalogo');
+    document.getElementById('linea-material-id').value = '';
+    document.getElementById('linea-material-selected').style.display = 'none';
+    document.getElementById('linea-search').value = '';
+    sv('linea-material-libre','');
+  }
+  sv('linea-cantidad', esServicio ? '1' : '');
+  sv('linea-obs','');
   openModal('modal-nueva-linea');
 }
 
@@ -480,17 +509,23 @@ function openModalRecepcionMasiva(pedidoId) {
 
 function openModalRecepcion(lineaId, pedidoId) {
   sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
+  const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const esServicio = pedido?.Tipo === 'Servicio';
+  document.getElementById('rec-label-material').textContent = esServicio ? 'Servicio' : 'Material';
+  document.getElementById('rec-grupo-cantidad-pedida').style.display = esServicio ? 'none' : '';
+  document.getElementById('rec-grupo-cantidad').style.display = esServicio ? 'none' : '';
+  document.getElementById('rec-ya-recibida-group').style.display = 'none';
+  document.getElementById('btn-confirmar-recepcion').textContent = esServicio ? 'Confirmar realizado' : 'Confirmar recepción';
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (l) {
     document.getElementById('rec-material-nombre').textContent = l.Material;
-    document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida;
-    const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
-    const grupoYaRec = document.getElementById('rec-ya-recibida-group');
-    if (yaRec > 0) {
-      document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec;
-      grupoYaRec.style.display = '';
-    } else {
-      grupoYaRec.style.display = 'none';
+    if (!esServicio) {
+      document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida;
+      const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+      if (yaRec > 0) {
+        document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec;
+        document.getElementById('rec-ya-recibida-group').style.display = '';
+      }
     }
   }
   openModal('modal-recepcion-linea');

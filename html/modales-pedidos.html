@@ -77,6 +77,11 @@
       <button class="modal-close" onclick="closeModal('modal-nuevo-pedido')">✕</button>
     </div>
     <div class="modal-body">
+      <input type="hidden" id="ped-tipo" value="Material">
+      <div class="toggle-source" style="margin-bottom:16px">
+        <button id="btn-ped-tipo-material" class="active" onclick="setPedidoTipo('Material')">Material fungible</button>
+        <button id="btn-ped-tipo-servicio" onclick="setPedidoTipo('Servicio')">Servicio / Equipo</button>
+      </div>
       <div class="form-grid" style="gap:14px">
         <div class="form-group">
           <label>Nombre de la lista *</label>
@@ -108,29 +113,49 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="linea-pedido-id">
-      <div class="toggle-source">
-        <button id="btn-lsource-catalogo" class="active" onclick="setSourceLinea('catalogo')">Buscar en catálogo</button>
-        <button id="btn-lsource-libre" onclick="setSourceLinea('libre')">Material libre</button>
-      </div>
-      <div class="form-grid" style="gap:14px">
-        <div class="form-group" id="linea-catalogo-group">
-          <label>Material *</label>
-          <div class="search-material-wrap">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="linea-search" placeholder="Escribe para buscar..." oninput="buscarMaterialLinea(this.value)" autocomplete="off">
-            <div class="autocomplete-list" id="linea-autocomplete"></div>
+      <input type="hidden" id="linea-pedido-tipo">
+      <!-- Sección material fungible -->
+      <div id="linea-material-section">
+        <div class="toggle-source">
+          <button id="btn-lsource-catalogo" class="active" onclick="setSourceLinea('catalogo')">Buscar en catálogo</button>
+          <button id="btn-lsource-libre" onclick="setSourceLinea('libre')">Material libre</button>
+        </div>
+        <div class="form-grid" style="gap:14px">
+          <div class="form-group" id="linea-catalogo-group">
+            <label>Material *</label>
+            <div class="search-material-wrap">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="linea-search" placeholder="Escribe para buscar..." oninput="buscarMaterialLinea(this.value)" autocomplete="off">
+              <div class="autocomplete-list" id="linea-autocomplete"></div>
+            </div>
+            <input type="hidden" id="linea-material-id">
+            <div id="linea-material-selected" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);font-weight:500"></div>
           </div>
-          <input type="hidden" id="linea-material-id">
-          <div id="linea-material-selected" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);font-weight:500"></div>
+          <div class="form-group" id="linea-libre-group" style="display:none">
+            <label>Descripción del material *</label>
+            <input id="linea-material-libre" placeholder="">
+          </div>
+          <div class="form-group" id="linea-libre-unidad-group" style="display:none">
+            <label>Unidad</label>
+            <input id="linea-material-unidades" placeholder="uds, ml, g…">
+          </div>
         </div>
-        <div class="form-group" id="linea-libre-group" style="display:none">
-          <label>Descripción del material *</label>
-          <input id="linea-material-libre" placeholder="">
+      </div>
+      <!-- Sección servicio / equipo -->
+      <div id="linea-servicio-section" style="display:none">
+        <div class="form-grid" style="gap:14px">
+          <div class="form-group">
+            <label>Descripción del servicio / equipo *</label>
+            <input id="linea-servicio-desc" placeholder="Ej: Revisión anual microscopio trinocular, Compra balanza de precisión...">
+          </div>
+          <div class="form-group">
+            <label>Equipo vinculado (opcional)</label>
+            <select id="linea-equipo-id"><option value="">Sin vincular</option></select>
+          </div>
         </div>
-        <div class="form-group" id="linea-libre-unidad-group" style="display:none">
-          <label>Unidad</label>
-          <input id="linea-material-unidades" placeholder="uds, ml, g…">
-        </div>
+      </div>
+      <!-- Campos comunes -->
+      <div class="form-grid" style="gap:14px;margin-top:14px">
         <div class="form-group">
           <label>Cantidad *</label>
           <input id="linea-cantidad" type="number" min="0.01" step="0.01" placeholder="">
@@ -220,10 +245,10 @@
       <input type="hidden" id="rec-pedido-id">
       <div class="form-grid" style="gap:14px">
         <div class="form-group">
-          <label>Material</label>
+          <label id="rec-label-material">Material</label>
           <div id="rec-material-nombre" style="font-weight:500;font-size:13px;padding:8px 0"></div>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="rec-grupo-cantidad-pedida">
           <label>Cantidad pedida</label>
           <div id="rec-cantidad-pedida" style="font-size:13px;color:var(--text-soft);padding:4px 0"></div>
         </div>
@@ -231,7 +256,7 @@
           <label>Ya recibido anteriormente</label>
           <div id="rec-cantidad-ya-recibida" style="font-size:13px;color:var(--text-soft);padding:4px 0"></div>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="rec-grupo-cantidad">
           <label>Cantidad recibida en esta entrega *</label>
           <input id="rec-cantidad" type="number" min="0" step="0.01" placeholder="0">
         </div>
@@ -242,7 +267,7 @@
       </div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-recepcion-linea')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarRecepcionLinea()">Confirmar recepción</button>
+        <button id="btn-confirmar-recepcion" class="btn btn-primary" onclick="guardarRecepcionLinea()">Confirmar recepción</button>
       </div>
     </div>
   </div>
