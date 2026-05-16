@@ -193,7 +193,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   const filterCat = document.getElementById('filter-material-cat');
   if (filterCat) {
     const current = filterCat.value;
-    filterCat.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    filterCat.innerHTML = '<option value="">Todas las categorías</option>' + cats.map(c => `<option value="${c}">${c.split(' — ')[0]}</option>`).join('');
     filterCat.value = current;
   }
 
@@ -220,7 +220,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   const tbody = document.getElementById('tabla-material');
   if (!tbody) return;
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🧴</div><div class="empty-state-title">Sin material registrado</div><div class="empty-state-text">Añade el primer ítem con el botón superior</div></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon">🧴</div><div class="empty-state-title">Sin material registrado</div><div class="empty-state-text">Añade el primer ítem con el botón superior</div></div></td></tr>`;
     return;
   }
 
@@ -250,9 +250,8 @@ function renderFilaMaterial(m) {
     <td>
       ${multiUbi ? `<span class="expand-icon" id="expand-mat-${safeId}">▶</span> ` : ''}${m.Nombre}
     </td>
-    <td><span class="badge badge-gray">${m.Categoria || '—'}</span></td>
+    <td><span class="badge badge-gray">${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</span></td>
     <td>${ubiLabel}</td>
-    <td style="font-size:12px">${m.Unidad || '—'}</td>
     <td>
       <div class="stock-bar-wrap">
         <div class="stock-bar"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
@@ -280,7 +279,7 @@ function renderFilaMaterial(m) {
       const colL  = sLocal === 0 ? 'var(--danger)' : (mnLocal > 0 && sLocal <= mnLocal ? 'var(--warning)' : 'var(--success)');
       return `<tr class="mat-ubic-row" id="mat-ubic-${safeId}-${li}" style="display:none;background:var(--surface2)">
         <td></td>
-        <td colspan="4" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
+        <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
         <td>
           <div class="stock-bar-wrap">
             <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctL}%;background:${colL}"></div></div>
