@@ -442,6 +442,7 @@ function _renderModuloCheckboxesPorCiclo(ciclo) {
 
   if (!ciclo) {
     cont.innerHTML = `<span style="font-size:12px;color:var(--text-muted);font-style:italic">Selecciona primero el ciclo formativo.</span>`;
+    _syncChipsModulos();
     return;
   }
 
