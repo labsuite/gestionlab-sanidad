@@ -280,10 +280,7 @@ function renderFilaMaterial(m) {
       const colL  = sLocal === 0 ? 'var(--danger)' : (mnLocal > 0 && sLocal <= mnLocal ? 'var(--warning)' : 'var(--success)');
       return `<tr class="mat-ubic-row" id="mat-ubic-${safeId}-${li}" style="display:none;background:var(--surface2)">
         <td></td>
-        <td style="padding-left:28px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
-        <td></td>
-        <td></td>
-        <td style="font-size:12px">${m.Unidad || '—'}</td>
+        <td colspan="4" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
         <td>
           <div class="stock-bar-wrap">
             <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctL}%;background:${colL}"></div></div>
