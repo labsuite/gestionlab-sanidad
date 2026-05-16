@@ -54,7 +54,7 @@ function renderUbicaciones() {
         <div>${matCell}</div>
         <div>${u.Activa !== 'FALSE' ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-gray">Inactiva</span>'}</div>
         <div class="row-actions">
-          ${puedeEditar ? `<button class="icon-btn" onclick="mostrarUrlNfc('${u.ID_Ubicacion.replace(/'/g,"\\'")}')" title="URL para etiqueta NFC">🔗</button>` : ''}
+          ${rol === 'Administrador' ? `<button class="icon-btn" onclick="mostrarUrlNfc('${u.ID_Ubicacion.replace(/'/g,"\\'")}')" title="URL para etiqueta NFC">🔗</button>` : ''}
           ${puedeEditar ? `<button class="icon-btn" onclick="editUbicacion(${DATA.ubicaciones.indexOf(u)})">✏️</button>` : ''}
         </div>
       </div>`;
@@ -77,7 +77,7 @@ function renderUbicaciones() {
 
 // ============================================================
 // NFC — Generador de URL para etiquetas
-// Visible solo para Gestor y Administrador (botón 🔗 en cada fila)
+// Visible solo para Administrador (botón 🔗 en cada fila)
 // ============================================================
 function mostrarUrlNfc(ubicacionId) {
   const base = window.location.origin + window.location.pathname;

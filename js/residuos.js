@@ -284,7 +284,7 @@ function _renderContenedoresActivos(lista, canEdit) {
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary" onclick="openModalAdicion(${idx})">+ Añadir residuo</button>
           ${canEdit ? `<button class="btn btn-sm btn-secondary" onclick="cerrarContenedor(${idx})" title="Marcar como lleno y crear uno nuevo">Cerrar</button>` : ''}
-          <button class="btn btn-sm" onclick="mostrarUrlNfcContenedor(${idx})" title="Generar URL / etiqueta NFC">🔗</button>
+          ${getUserRole() === 'Administrador' ? `<button class="btn btn-sm" onclick="mostrarUrlNfcContenedor(${idx})" title="Generar URL / etiqueta NFC">🔗</button>` : ''}
           ${canEdit ? `<button class="btn btn-sm" onclick="openModalContenedor(${idx})">✏️</button>` : ''}
           ${canEdit ? `<button class="btn btn-sm btn-danger" onclick="eliminarContenedor(${idx})">✕</button>` : ''}
         </div>

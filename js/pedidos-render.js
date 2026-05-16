@@ -115,14 +115,83 @@ function renderSolicitudes(filtroEstado = '') {
     ? html
     : `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
   _actualizarBadgeSolicitudes();
+  _notificarCambiosSolicitudes();
 }
 
 function filtrarSolicitudesEstado(val) { renderSolicitudes(val || ''); }
 
+function _nCambiosSolicitudProfesor() {
+  const usuario = currentUser?.email || currentUser?.name || '';
+  if (!usuario) return 0;
+  const guardados = JSON.parse(localStorage.getItem('glab_sol_estados_' + usuario) || 'null');
+  if (!guardados) return 0;
+  const miNombre = currentUser?.name || '';
+  return DATA.solicitudes.filter(s =>
+    s.Solicitante === miNombre &&
+    guardados[s.ID_Solicitud] !== undefined &&
+    guardados[s.ID_Solicitud] !== s.Estado
+  ).length;
+}
+
 function _actualizarBadgeSolicitudes() {
-  const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
   const badge = document.getElementById('badge-solicitudes');
-  if (badge) { badge.textContent = pendientes; badge.style.display = pendientes > 0 ? '' : 'none'; }
+  if (!badge) return;
+  const rol = getUserRole();
+  if (rol === 'Profesor' || rol === 'Alumno') {
+    const n = _nCambiosSolicitudProfesor();
+    badge.textContent = n;
+    badge.style.display = n > 0 ? '' : 'none';
+  } else {
+    const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
+    badge.textContent = pendientes;
+    badge.style.display = pendientes > 0 ? '' : 'none';
+  }
+}
+
+function _notificarCambiosSolicitudes() {
+  const rol = getUserRole();
+  if (rol !== 'Profesor' && rol !== 'Alumno') return;
+  const usuario = currentUser?.email || currentUser?.name || '';
+  if (!usuario) return;
+  const storageKey = 'glab_sol_estados_' + usuario;
+  const guardados = JSON.parse(localStorage.getItem(storageKey) || 'null');
+  const miNombre = currentUser?.name || '';
+  const misSols = DATA.solicitudes.filter(s => s.Solicitante === miNombre);
+  if (!guardados) {
+    const estado = {};
+    misSols.forEach(s => { estado[s.ID_Solicitud] = s.Estado; });
+    localStorage.setItem(storageKey, JSON.stringify(estado));
+    return;
+  }
+  const cambios = misSols.filter(s =>
+    guardados[s.ID_Solicitud] !== undefined && guardados[s.ID_Solicitud] !== s.Estado
+  );
+  const tbody = document.getElementById('tabla-solicitudes');
+  const bannerExistente = document.getElementById('banner-cambios-solicitudes');
+  if (bannerExistente) bannerExistente.remove();
+  if (!cambios.length || !tbody) return;
+  const detalles = cambios.slice(0, 4).map(s =>
+    `<strong>${s.Material}</strong>: ${guardados[s.ID_Solicitud]} → ${s.Estado}`
+  ).join(' · ');
+  const masTexto = cambios.length > 4 ? ` · y ${cambios.length - 4} más` : '';
+  const banner = document.createElement('div');
+  banner.id = 'banner-cambios-solicitudes';
+  banner.style.cssText = 'margin-bottom:12px;padding:12px 16px;background:var(--accent-light,#e8f0fe);border-radius:var(--radius,6px);border-left:3px solid var(--accent,#4f46e5);font-size:13px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap';
+  banner.innerHTML = `<div style="flex:1"><strong style="color:var(--accent,#4f46e5)">${cambios.length} solicitud${cambios.length > 1 ? 'es' : ''} actualizada${cambios.length > 1 ? 's' : ''}:</strong><span style="color:var(--text-soft);margin-left:6px">${detalles}${masTexto}</span></div><button class="btn btn-sm btn-secondary" onclick="_marcarCambiosSolicitudesVisto()">Entendido</button>`;
+  const table = tbody.closest('table');
+  if (table) table.parentElement.insertBefore(banner, table);
+}
+
+function _marcarCambiosSolicitudesVisto() {
+  const usuario = currentUser?.email || currentUser?.name || '';
+  if (!usuario) return;
+  const miNombre = currentUser?.name || '';
+  const estado = {};
+  DATA.solicitudes.filter(s => s.Solicitante === miNombre).forEach(s => { estado[s.ID_Solicitud] = s.Estado; });
+  localStorage.setItem('glab_sol_estados_' + usuario, JSON.stringify(estado));
+  const banner = document.getElementById('banner-cambios-solicitudes');
+  if (banner) banner.remove();
+  _actualizarBadgeSolicitudes();
 }
 // ============================================================
 // PEDIDOS — RENDER
@@ -166,7 +235,7 @@ function renderPedidos(filtroEstado = '') {
   const _card = p => {
     const lineas    = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
     const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
-    const docBadges = [p.Doc_Hoja_Generada==='TRUE'?'📄':'', p.Doc_Hoja_Completada==='TRUE'?'✅':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬':''].filter(Boolean).join(' ');
+    const docBadges = [p.Doc_Hoja_Generada==='TRUE'?'📄':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬':''].filter(Boolean).join(' ');
     return `<div class="pedido-card" onclick="verDetallePedido('${p.ID_Pedido}')">
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
@@ -254,21 +323,20 @@ function verDetallePedido(pedidoId) {
             <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>
           </label>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Generada==='TRUE' ? 'pointer' : 'not-allowed'}">
-            <input type="checkbox" id="chk-hoja-completada" ${p.Doc_Hoja_Completada==='TRUE'?'checked':''} ${p.Doc_Hoja_Generada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Hoja_Completada',this.checked)" style="width:16px;height:16px">
-            <span style="${p.Doc_Hoja_Completada==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">✅ Hoja completada con factura</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Completada==='TRUE' ? 'pointer' : 'not-allowed'}">
-            <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${p.Doc_Hoja_Completada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
-            <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Completada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
+            <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${p.Doc_Hoja_Generada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
+            <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
           </label>
         </div>
-        ${p.Estado==='Recepción completa'&&p.Doc_Hoja_Generada==='TRUE'&&p.Doc_Hoja_Completada==='TRUE'&&p.Doc_Enviada_Jefatura==='TRUE' ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
+        ${p.Estado==='Recepción completa'&&p.Doc_Hoja_Generada==='TRUE'&&p.Doc_Enviada_Jefatura==='TRUE' ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
       </div>` : ''}
     </div>
     <div class="card">
       <div class="card-header">
         <div class="card-title">Líneas del pedido (${lineas.length})</div>
-        <div style="display:flex;gap:8px">${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}</div>
+        <div style="display:flex;gap:8px">
+          ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
+          ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
+        </div>
       </div>
       <div style="padding:12px 16px">
         ${!lineas.length ? `<div class="empty-state" style="padding:24px"><div class="empty-state-icon">📝</div><div class="empty-state-title">Sin líneas todavía</div></div>` :
@@ -368,6 +436,46 @@ function openModalEstadoPedido(pedidoId) {
   const selProv = document.getElementById('estado-proveedor');
   selProv.innerHTML = '<option value="">Sin cambios</option>' + DATA.proveedores.filter(x => x.Activo !== 'FALSE').map(x => `<option value="${x.Nombre_Proveedor}">${x.Nombre_Proveedor}</option>`).join('');
   openModal('modal-estado-pedido');
+}
+
+function openModalRecepcionMasiva(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
+  sv('recmas-pedido-id', pedidoId);
+  const tituloEl = document.querySelector('#modal-recepcion-masiva .modal-title');
+  if (tituloEl) tituloEl.textContent = `Recibir albarán — ${p?.Nombre_Lista || pedidoId}`;
+  const cont = document.getElementById('recmas-tabla-contenedor');
+  if (!lineas.length) {
+    cont.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">No hay líneas pendientes de recepción</div>`;
+    openModal('modal-recepcion-masiva');
+    return;
+  }
+  cont.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border)">
+        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Material</th>
+        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
+        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
+        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">En este albarán *</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Obs.</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${lineas.map(l => {
+        const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+        const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px 6px;font-weight:500">${l.Material}</td>
+          <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${l.Cantidad_Pedida}</td>
+          <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
+          <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
+          <td style="padding:8px 6px"><input type="text" id="recmas-obs-${l.ID_Linea}" placeholder="opcional" style="width:130px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table>
+  <div style="font-size:11px;color:var(--text-muted);margin-top:8px">* Pon 0 si el artículo no viene en este albarán</div>`;
+  openModal('modal-recepcion-masiva');
 }
 
 function openModalRecepcion(lineaId, pedidoId) {

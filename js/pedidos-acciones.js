@@ -259,6 +259,60 @@ async function guardarEstadoPedido() {
   hideLoading();
 }
 
+async function guardarRecepcionMasiva() {
+  const pedidoId = v('recmas-pedido-id');
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
+  const aRecibir = lineas
+    .map(l => ({
+      linea: l,
+      cantRec: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
+      obs: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || ''
+    }))
+    .filter(x => x.cantRec > 0);
+  if (!aRecibir.length) { showToast('Introduce al menos una cantidad', 'error'); return; }
+  closeModal('modal-recepcion-masiva');
+  showLoading('Registrando albarán...');
+  let procesadas = 0, errores = 0;
+  for (const { linea, cantRec, obs } of aRecibir) {
+    const idx = DATA.lineasPedido.indexOf(linea);
+    const cantPed = parseFloat(linea.Cantidad_Pedida) || 0;
+    const cantRecTotal = (parseFloat(linea.Cantidad_Recibida) || 0) + cantRec;
+    const cantRecAntes = linea.Cantidad_Recibida;
+    const estadoAntes  = linea.Estado_Linea;
+    linea.Cantidad_Recibida = String(cantRecTotal);
+    linea.Estado_Linea = cantRecTotal >= cantPed ? 'Recibido' : (cantRecTotal > 0 ? 'Recibido parcialmente' : 'Pendiente');
+    if (obs) linea.Observaciones = obs;
+    try {
+      await _persistirLinea(idx, linea);
+      procesadas++;
+      const mat = DATA.material.find(m => m.Nombre === linea.Material || linea.Material.startsWith(m.Nombre));
+      if (mat && cantRec > 0) {
+        try { await _actualizarStockMaterial(mat, cantRec, pedidoId, null); }
+        catch(e) { console.warn('[albarán] stock no actualizado para', linea.Material, e); }
+      }
+      if (linea.Estado_Linea === 'Recibido') {
+        try { await _actualizarSolicitudOrigen(linea, pedidoId); }
+        catch(e) { console.warn('[albarán] solicitud no actualizada para', linea.ID_Linea, e); }
+      }
+    } catch(e) {
+      linea.Cantidad_Recibida = cantRecAntes;
+      linea.Estado_Linea = estadoAntes;
+      errores++;
+      console.error('[albarán] error persistiendo línea', linea.ID_Linea, e);
+    }
+  }
+  try { await _actualizarEstadoPedidoPostRecepcion(pedidoId); }
+  catch(e) { console.warn('[albarán] estado del pedido no actualizado', e); }
+  hideLoading();
+  if (errores > 0) {
+    showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
+  } else {
+    showToast(`Albarán registrado: ${procesadas} línea(s)`, 'success');
+  }
+  renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+  verDetallePedido(pedidoId);
+}
+
 async function guardarRecepcionLinea() {
   const lineaId = v('rec-linea-id'), pedidoId = v('rec-pedido-id');
   const cantRec = parseFloat(v('rec-cantidad')) || 0;

@@ -272,12 +272,12 @@
         </div>
         <!-- Número de factura -->
         <div class="form-group">
-          <label>Número de factura</label>
+          <label>Número de factura *</label>
           <input id="gen-num-factura" placeholder="Ej: FAC-2024-0312">
         </div>
         <!-- Fecha de factura -->
         <div class="form-group">
-          <label>Fecha de factura</label>
+          <label>Fecha de factura *</label>
           <input id="gen-fecha-factura" type="date">
         </div>
         <div class="form-group full" id="gen-pdf-group" style="display:none">
@@ -357,6 +357,24 @@
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-editar-proveedor')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarProveedorPedido()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Recepción Masiva (albarán) -->
+<div class="modal-overlay" id="modal-recepcion-masiva">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <div class="modal-title">Recibir albarán</div>
+      <button class="modal-close" onclick="closeModal('modal-recepcion-masiva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="recmas-pedido-id">
+      <div id="recmas-tabla-contenedor" style="overflow-x:auto"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-recepcion-masiva')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarRecepcionMasiva()">Confirmar recepción</button>
       </div>
     </div>
   </div>

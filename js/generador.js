@@ -74,6 +74,8 @@ async function generarHojaPedido() {
   const pedidoId = v('gen-pedido-id');
   const ciclo    = v('gen-ciclo');
   if (!ciclo) { showToast('Selecciona el ciclo', 'error'); return; }
+  if (!v('gen-num-factura')) { showToast('El número de factura es obligatorio', 'error'); return; }
+  if (!v('gen-fecha-factura')) { showToast('La fecha de factura es obligatoria', 'error'); return; }
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId); if (!p) return;
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
   const btn = document.getElementById('btn-generar-hoja');
