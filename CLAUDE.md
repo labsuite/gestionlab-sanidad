@@ -191,10 +191,16 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 ### Archivos activos
 - `js/pedidos-render.js` — render de solicitudes y pedidos, `openModalRecepcion`
 - `js/pedidos-acciones.js` — toda la lógica de guardado
-- `js/material.js` — búsquedas de material y autocompletado
+- `js/material.js` — búsquedas de material, autocompletado e inventario de fungibles
 - `js/contabilidad.js` — cálculo de precios históricos
 - `html/modales-pedidos.html` — todos los modales del módulo
+- `html/modales-material.html` — modales de material (incluye `modal-historial-material`)
 - **`js/pedidos.js` ELIMINADO** — era código obsoleto sin cargar, ya no existe
+
+### Inventario de fungibles — historial de movimientos
+- La tabla de inventario ya NO muestra filas expandibles de movimientos inline.
+- Cada fila tiene un botón 🕐 que abre `modal-historial-material` con todos los movimientos del ítem ordenados por fecha desc.
+- `openModalHistorialMaterial(idMaterial)` — función en `material.js`; filtra `DATA.movimientos` por nombre de material.
 
 ### Estados de solicitud (canónicos)
 `Pendiente` → `Añadida a pedido` → `En espera de recepción` → `Recibido` / `Rechazado` / `Cancelado`
