@@ -416,6 +416,12 @@ function _populateModalUsuarioAlumno(modulosStr, ubicStr, cicloPrincipal) {
   document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
 }
 
+function _normCiclo(s) {
+  return (s || '').normalize('NFC').trim().toLowerCase()
+    .replace(/á/g,'a').replace(/é/g,'e').replace(/í/g,'i').replace(/ó/g,'o').replace(/ú/g,'u')
+    .replace(/ñ/g,'n').replace(/\s+/g,' ');
+}
+
 function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal) {
   // Source of truth: plain module names (no ciclo prefix)
   _selectedModulosArray = (preselectedStr || '').split(',')
@@ -430,10 +436,19 @@ function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal) {
     )].sort((a,b) => a.localeCompare(b,'es'));
     const optsHtml = ciclosUnicos.map(c => `<option value="${c}">${c}</option>`).join('');
     cicloSel.innerHTML = `<option value="">— Seleccionar ciclo —</option>${optsHtml}`;
-    if (cicloPrincipal) cicloSel.value = cicloPrincipal;
+    if (cicloPrincipal) {
+      // Exact match first; fall back to accent/case-normalized match
+      const exactMatch = ciclosUnicos.find(c => c === cicloPrincipal);
+      const fuzzyMatch = exactMatch || ciclosUnicos.find(c => _normCiclo(c) === _normCiclo(cicloPrincipal));
+      if (fuzzyMatch) cicloSel.value = fuzzyMatch;
+    }
   }
 
-  _renderModuloCheckboxesPorCiclo(cicloPrincipal || '');
+  // Resolve canonical ciclo name from DATA for the module lookup
+  const cicloCanon = cicloPrincipal
+    ? (DATA.ciclosModulos.find(cm => cm.Ciclo && _normCiclo(cm.Ciclo) === _normCiclo(cicloPrincipal))?.Ciclo || cicloPrincipal)
+    : '';
+  _renderModuloCheckboxesPorCiclo(cicloCanon);
 }
 
 function _renderModuloCheckboxesPorCiclo(ciclo) {

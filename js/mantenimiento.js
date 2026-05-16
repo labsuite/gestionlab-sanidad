@@ -740,6 +740,10 @@ async function exportarModeloCalidad(cursoAcademico) {
 
   const DATA_ROW = 11; // fila 10 = cabecera, 11 = primer dato
 
+  const supervisores = DATA.usuarios
+    .filter(u => (u.Rol === 'Administrador' || u.Rol === 'Gestor') && u.Activo !== 'FALSE')
+    .map(u => u.Nombre).filter(Boolean).join(', ');
+
   for (const [labKey, sheetFile] of Object.entries(SHEET_FILES)) {
     const items = porLab[labKey] || [];
     let xml = await zip.file(sheetFile).async('string');
@@ -754,7 +758,7 @@ async function exportarModeloCalidad(cursoAcademico) {
       xml = fillCell(xml, `F${r}`, operaciones);
       xml = fillCell(xml, `G${r}`, previstas);
       xml = fillCell(xml, `H${r}`, realizadas);
-      // I (Supervisado por): siempre en blanco
+      xml = fillCell(xml, `I${r}`, supervisores);
       // J (Observacións): en blanco — sin registro único de referencia
     });
 
