@@ -1057,7 +1057,7 @@ function buscarEquipoIntervencion(query) {
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(e => {
     const label = [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ');
-    const meta  = e.Ubicacion || '';
+    const meta  = e.Ubicacion ? getNombreUbicacion(e.Ubicacion) : '';
     return `<div class="autocomplete-item" onclick="seleccionarEquipoIntervencion('${e.ID_Activo}','${label.replace(/'/g,"\\'")}')">
       <div>
         <div class="autocomplete-item-name">${e.ID_Activo} – ${label}</div>

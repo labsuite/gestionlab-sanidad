@@ -398,9 +398,11 @@ function buscarEquipoLinea(query) {
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(eq => {
     const desc = [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ');
+    const ubi  = eq.Ubicacion ? getNombreUbicacion(eq.Ubicacion) : '';
+    const meta = [desc, ubi].filter(Boolean).join(' · ');
     const label = (eq.ID_Activo + ' — ' + desc).replace(/'/g,"\\'");
     return `<div class="autocomplete-item" onclick="seleccionarEquipoLinea('${eq.ID_Activo}','${label}')">
-      <div><div class="autocomplete-item-name">${eq.ID_Activo}</div><div class="autocomplete-item-meta">${desc}</div></div>
+      <div><div class="autocomplete-item-name">${eq.ID_Activo}</div><div class="autocomplete-item-meta">${meta}</div></div>
     </div>`;
   }).join('');
   list.classList.add('open');
