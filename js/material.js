@@ -581,11 +581,9 @@ function editMaterial(idx) {
   sv('mat-stock', m.Stock_Actual); sv('mat-minimo', m.Stock_Minimo); sv('mat-optimo', m.Stock_Optimo);
   sv('mat-observaciones', m.Observaciones);
   if (m.Ubicacion) {
-    const ubi = DATA.ubicaciones.find(u => u.ID_Ubicacion === m.Ubicacion);
-    const label = ubi ? m.Ubicacion + ' — ' + (ubi.Laboratorio_Aula || '') + (ubi.Zona ? ' · ' + ubi.Zona : '') : m.Ubicacion;
-    document.getElementById('mat-ubicacion-selected-text').textContent = label;
-    document.getElementById('mat-ubicacion-selected').style.display = 'flex';
-  } else { clearUbicacionMat(); }
+    document.getElementById('mat-ubicacion').value = m.Ubicacion;
+  }
+  clearUbicacionMat();
   sv('mat-ubicacion-search', '');
   const sel = document.getElementById('mat-proveedor');
   if (sel) {

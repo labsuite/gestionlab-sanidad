@@ -38,8 +38,7 @@
         </div>
         <div class="form-group full">
           <label>Ubicaciones y stock por ubicación</label>
-          <div id="mat-lotes-container" style="margin-bottom:8px"></div>
-          <div class="search-material-wrap">
+          <div class="search-material-wrap" style="margin-bottom:8px">
             <span class="search-icon">📍</span>
             <input type="text" id="mat-ubicacion-search" placeholder="Añadir ubicación..." oninput="buscarUbicacionMat(this.value)" autocomplete="off">
             <div class="autocomplete-list" id="mat-ubicacion-autocomplete"></div>
@@ -48,7 +47,7 @@
           <div style="display:none" id="mat-ubicacion-selected">
             <span id="mat-ubicacion-selected-text"></span>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Escribe para buscar y añadir una ubicación. Puedes añadir varias.</div>
+          <div id="mat-lotes-container"></div>
         </div>
         <div class="form-group">
           <label>Proveedor habitual</label>
