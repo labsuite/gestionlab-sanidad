@@ -377,6 +377,50 @@ function verDetallePedido(pedidoId) {
 // ============================================================
 // MODALES PEDIDOS / SOLICITUDES
 // ============================================================
+function setLineaServicioTipo(tipo) {
+  document.getElementById('btn-seq-existente').classList.toggle('active', tipo === 'existente');
+  document.getElementById('btn-seq-nuevo').classList.toggle('active', tipo === 'nuevo');
+  document.getElementById('linea-seq-existente-group').style.display = tipo === 'existente' ? '' : 'none';
+  document.getElementById('linea-seq-nuevo-group').style.display = tipo === 'nuevo' ? '' : 'none';
+}
+
+function buscarEquipoLinea(query) {
+  const list = document.getElementById('linea-equipo-autocomplete');
+  if (!list) return;
+  if (!query || query.length < 1) { list.classList.remove('open'); return; }
+  const q = query.toLowerCase();
+  const resultados = DATA.equipos.filter(eq =>
+    (eq.ID_Activo || '').toLowerCase().includes(q) ||
+    (eq.Tipo_Equipo || '').toLowerCase().includes(q) ||
+    (eq.Marca || '').toLowerCase().includes(q) ||
+    (eq.Modelo || '').toLowerCase().includes(q)
+  ).slice(0, 8);
+  if (!resultados.length) { list.classList.remove('open'); return; }
+  list.innerHTML = resultados.map(eq => {
+    const desc = [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ');
+    const label = (eq.ID_Activo + ' — ' + desc).replace(/'/g,"\\'");
+    return `<div class="autocomplete-item" onclick="seleccionarEquipoLinea('${eq.ID_Activo}','${label}')">
+      <div><div class="autocomplete-item-name">${eq.ID_Activo}</div><div class="autocomplete-item-meta">${desc}</div></div>
+    </div>`;
+  }).join('');
+  list.classList.add('open');
+}
+
+function seleccionarEquipoLinea(id, label) {
+  document.getElementById('linea-equipo-id').value = id;
+  document.getElementById('linea-equipo-search').value = '';
+  document.getElementById('linea-equipo-autocomplete').classList.remove('open');
+  document.getElementById('linea-equipo-selected-text').textContent = label;
+  document.getElementById('linea-equipo-selected').style.display = 'flex';
+}
+
+function clearEquipoLinea() {
+  document.getElementById('linea-equipo-id').value = '';
+  document.getElementById('linea-equipo-search').value = '';
+  document.getElementById('linea-equipo-autocomplete').classList.remove('open');
+  document.getElementById('linea-equipo-selected').style.display = 'none';
+}
+
 function setPedidoTipo(tipo) {
   sv('ped-tipo', tipo);
   document.getElementById('btn-ped-tipo-material').classList.toggle('active', tipo === 'Material');
@@ -433,10 +477,11 @@ function openModalNuevaLinea(pedidoId) {
   document.getElementById('linea-material-section').style.display = esServicio ? 'none' : '';
   document.getElementById('linea-servicio-section').style.display = esServicio ? '' : 'none';
   if (esServicio) {
+    setLineaServicioTipo('existente');
     sv('linea-servicio-desc', '');
-    const sel = document.getElementById('linea-equipo-id');
-    sel.innerHTML = '<option value="">Sin vincular</option>' +
-      DATA.equipos.map(eq => `<option value="${eq.ID_Activo}">${eq.ID_Activo} — ${[eq.Tipo_Equipo,eq.Marca,eq.Modelo].filter(Boolean).join(' ')}</option>`).join('');
+    clearEquipoLinea();
+    sv('linea-nuevo-eq-id', ''); sv('linea-nuevo-eq-tipo', '');
+    sv('linea-nuevo-eq-marca', ''); sv('linea-nuevo-eq-modelo', '');
   } else {
     setSourceLinea('catalogo');
     document.getElementById('linea-material-id').value = '';
@@ -445,6 +490,7 @@ function openModalNuevaLinea(pedidoId) {
     sv('linea-material-libre','');
   }
   sv('linea-cantidad', esServicio ? '1' : '');
+  sv('linea-precio', '');
   sv('linea-obs','');
   openModal('modal-nueva-linea');
 }

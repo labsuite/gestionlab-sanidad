@@ -143,14 +143,51 @@
       </div>
       <!-- Sección servicio / equipo -->
       <div id="linea-servicio-section" style="display:none">
-        <div class="form-grid" style="gap:14px">
-          <div class="form-group">
-            <label>Descripción del servicio / equipo *</label>
-            <input id="linea-servicio-desc" placeholder="Ej: Revisión anual microscopio trinocular, Compra balanza de precisión...">
+        <div class="toggle-source" style="margin-bottom:12px">
+          <button id="btn-seq-existente" class="active" onclick="setLineaServicioTipo('existente')">Servicio / equipo existente</button>
+          <button id="btn-seq-nuevo" onclick="setLineaServicioTipo('nuevo')">Compra equipo nuevo</button>
+        </div>
+        <!-- Servicio sobre equipo existente -->
+        <div id="linea-seq-existente-group">
+          <div class="form-grid" style="gap:14px">
+            <div class="form-group">
+              <label>Descripción del servicio *</label>
+              <input id="linea-servicio-desc" placeholder="Ej: Revisión anual microscopio trinocular...">
+            </div>
+            <div class="form-group">
+              <label>Equipo vinculado (opcional)</label>
+              <div class="search-material-wrap">
+                <span class="search-icon">🔧</span>
+                <input type="text" id="linea-equipo-search" placeholder="Buscar por ID, tipo, marca..." oninput="buscarEquipoLinea(this.value)" autocomplete="off">
+                <div class="autocomplete-list" id="linea-equipo-autocomplete"></div>
+              </div>
+              <input type="hidden" id="linea-equipo-id">
+              <div id="linea-equipo-selected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);align-items:center;justify-content:space-between">
+                <span id="linea-equipo-selected-text"></span>
+                <button type="button" onclick="clearEquipoLinea()" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:0 4px">✕</button>
+              </div>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Equipo vinculado (opcional)</label>
-            <select id="linea-equipo-id"><option value="">Sin vincular</option></select>
+        </div>
+        <!-- Compra equipo nuevo -->
+        <div id="linea-seq-nuevo-group" style="display:none">
+          <div class="form-grid" style="gap:14px;grid-template-columns:1fr 1fr">
+            <div class="form-group">
+              <label>ID del activo *</label>
+              <input id="linea-nuevo-eq-id" placeholder="Ej: MIC-05">
+            </div>
+            <div class="form-group">
+              <label>Tipo de equipo *</label>
+              <input id="linea-nuevo-eq-tipo" placeholder="Ej: Microscopio">
+            </div>
+            <div class="form-group">
+              <label>Marca</label>
+              <input id="linea-nuevo-eq-marca" placeholder="">
+            </div>
+            <div class="form-group">
+              <label>Modelo</label>
+              <input id="linea-nuevo-eq-modelo" placeholder="">
+            </div>
           </div>
         </div>
       </div>
@@ -159,6 +196,10 @@
         <div class="form-group">
           <label>Cantidad *</label>
           <input id="linea-cantidad" type="number" min="0.01" step="0.01" placeholder="">
+        </div>
+        <div class="form-group">
+          <label>Precio unitario (€ con IVA)</label>
+          <input id="linea-precio" type="number" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="form-group">
           <label>Observaciones</label>

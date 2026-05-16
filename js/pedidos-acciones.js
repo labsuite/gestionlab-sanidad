@@ -195,30 +195,63 @@ async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
   const esServicio = pedido?.Tipo === 'Servicio';
-  let materialNombre = '', equipoId = '';
+  let materialNombre = '', equipoId = '', eqRowToCreate = null;
+
   if (esServicio) {
-    materialNombre = v('linea-servicio-desc');
-    if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
-    equipoId = document.getElementById('linea-equipo-id').value;
+    const esNuevo = document.getElementById('btn-seq-nuevo').classList.contains('active');
+    if (esNuevo) {
+      const newEqId   = v('linea-nuevo-eq-id').trim();
+      const newEqTipo = v('linea-nuevo-eq-tipo').trim();
+      const newEqMarca  = v('linea-nuevo-eq-marca').trim();
+      const newEqModelo = v('linea-nuevo-eq-modelo').trim();
+      if (!newEqId || !newEqTipo) { showToast('El ID y el tipo de equipo son obligatorios', 'error'); return; }
+      if (DATA.equipos.find(e => e.ID_Activo === newEqId)) { showToast('Ya existe un equipo con ese ID', 'error'); return; }
+      materialNombre = [newEqTipo, newEqMarca, newEqModelo].filter(Boolean).join(' ');
+      equipoId = newEqId;
+      const eqRow = new Array(23).fill('');
+      eqRow[0] = newEqId;   eqRow[1] = newEqTipo;
+      eqRow[2] = newEqMarca; eqRow[3] = newEqModelo;
+      eqRow[9]  = pedido?.Proveedor || '';
+      eqRow[11] = 'En pedido';
+      eqRow[17] = 'Creado desde pedido ' + pedidoId;
+      eqRow[18] = v('linea-precio') || '';
+      eqRowToCreate = eqRow;
+    } else {
+      materialNombre = v('linea-servicio-desc');
+      if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
+      equipoId = document.getElementById('linea-equipo-id').value;
+    }
   } else {
     const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
     materialNombre = esLibre ? v('linea-material-libre') : (() => { const id = document.getElementById('linea-material-id').value; const mat = DATA.material.find(m => m.ID_Material === id); return mat ? mat.Nombre : ''; })();
     if (!materialNombre) { showToast('Indica el material', 'error'); return; }
   }
+
   const cant = v('linea-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
+  const precio = v('linea-precio') || '';
+
+  if (eqRowToCreate) {
+    showLoading('Creando equipo en inventario...');
+    try {
+      await sheetsAppend('Equipos', eqRowToCreate);
+      DATA.equipos.push(rowToObj(eqRowToCreate, 'equipos'));
+    } catch(e) {
+      hideLoading(); showToast('Error al crear el equipo en el inventario', 'error'); return;
+    }
+    hideLoading();
+  }
+
   const id = genId('LIN-');
   const obs = v('linea-obs');
-  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs, '', equipoId];
+  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs, precio, equipoId];
   const objLocal = rowToObj(row, 'lineasPedido');
-  // Optimista: actualizar UI sin esperar a Sheets
   DATA.lineasPedido.push(objLocal);
   closeModal('modal-nueva-linea');
   verDetallePedido(pedidoId);
-  showToast('Línea añadida', 'success');
+  showToast(eqRowToCreate ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
   try { await sheetsAppend('Lineas_Pedido', row); }
   catch(e) {
-    // Revertir si falla
     const idx = DATA.lineasPedido.indexOf(objLocal);
     if (idx !== -1) DATA.lineasPedido.splice(idx, 1);
     showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
