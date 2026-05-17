@@ -45,6 +45,16 @@ Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de 
 | `siguiente_id(ws, campo_id, prefijo)` | Genera el siguiente ID correlativo |
 | `preview_filas(ws, filas, campos)` | Muestra preview antes de actuar |
 
+### Formatos de ID por hoja
+| Hoja | Formato | Ejemplo |
+|---|---|---|
+| Tipos_Residuo | `R` + 3 dígitos sin guión | `R001`, `R112` |
+| Usuarios | `USR-` + 3 dígitos | `USR-001` |
+| Planes_Mantenimiento | `PM` + 4 dígitos | `PM0046` |
+| Equipos | prefijo tipo + guión + número | `CEN-02`, `PIP-035` |
+
+⚠ Usar `siguiente_id()` de base.py solo si el formato es `PREF-NNN`. Para formatos sin guión (como Tipos_Residuo), calcular el ID manualmente.
+
 ### Formato Excel para importar alumnos
 Cabecera: `Nombre | Apellidos | Email | Ciclo | Modulos | Labs`
 - Ciclo: nombre completo coincidente con Ciclos_Modulos
