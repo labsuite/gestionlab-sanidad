@@ -690,7 +690,7 @@
     .detail-value { font-size: 13px; color: var(--text); }
 
     /* PAGES */
-    .page { display: none; }
+    .page { display: none; min-width: 0; }
     .page.active { display: block; }
 
     /* RESPONSIVE HELPER */
