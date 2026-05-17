@@ -542,6 +542,8 @@ async function guardarConsultaResiduo() {
     await sheetsAppend('Consultas_Residuo', row);
     DATA.consultasResiduo.push(rowToObj(row, 'consultasResiduo'));
     _updateBadgeResiduos();
+    renderPanelConsultasResiduo();
+    renderDashboard();
     showToast('Aviso enviado. La gestora lo revisará pronto.', 'success');
     closeModal('modal-consulta-residuo');
   } catch(e) { showToast('Error al enviar el aviso', 'error'); console.error(e); }
