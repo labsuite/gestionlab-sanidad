@@ -210,8 +210,8 @@ function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
   const opening = !row.classList.contains('open');
+  if (opening) _setExpandWidth(row);   // medir antes de mostrar
   row.classList.toggle('open');
-  if (opening) _setExpandWidth(row);
 }
 function _setExpandWidth(row) {
   const inner = row.querySelector('.equipo-expand-inner');
