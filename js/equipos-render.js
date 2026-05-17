@@ -209,8 +209,18 @@ function renderEquipos(filtro, filtroEstado) {
 function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
+  const opening = !row.classList.contains('open');
+  if (opening) _setExpandWidth(row);
   row.classList.toggle('open');
 }
+function _setExpandWidth(row) {
+  const inner = row.querySelector('.equipo-expand-inner');
+  const table = row.closest('table');
+  if (inner && table) inner.style.width = table.offsetWidth + 'px';
+}
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.equipo-row-expand.open').forEach(row => _setExpandWidth(row));
+}, { passive: true });
 
 function buildIntervencionesEquipo(equipoId) {
   const equipo = DATA.equipos.find(e => e.ID_Activo === equipoId) || {};
