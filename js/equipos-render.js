@@ -2,7 +2,9 @@
 // DASHBOARD
 // ============================================================
 function renderDashboard() {
-  setText('stat-equipos', DATA.equipos.length);
+  const residuosPendientes = (DATA.contenedoresResiduo.filter(c => c.Estado === 'cerrado' || c.Nivel === '75%' || c.Nivel === 'lleno').length)
+    + (DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente').length);
+  setText('stat-residuos-pendientes', residuosPendientes);
 
   const hoy  = new Date();
   const en30 = new Date(); en30.setDate(hoy.getDate() + 30);
