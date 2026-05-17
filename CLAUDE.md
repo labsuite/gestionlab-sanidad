@@ -92,7 +92,7 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
-## Módulo de residuos – COMPLETADO (2026-05-16)
+## Módulo de residuos – COMPLETADO (2026-05-17)
 
 ### Hojas en Sheets
 - **Tipos_Residuo** — columnas A-G: `ID_Residuo, Nombre, Descripcion, Riesgo, Contenedor_Tipo, Lab, Zona`
@@ -127,8 +127,9 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - `_WARNINGS_FORMATO / _getWarningFormato(formato)` — mapa de avisos de seguridad por formato físico; se muestran como banner amarillo en las cards y en el modal de adición (también vía NFC)
 - `_updateBadgeResiduos()` — badge en nav (definida en ui.js)
 - `exportarInformeConsenur()` — botón en pestaña "Pendientes de recogida"; abre nueva pestaña con informe HTML y dispara "Guardar como PDF". Agrupa por lab, incluye categoría/formato/zona/nivel/fecha cierre y lista de tipos de residuo con peligrosidad. Sin datos personales (sin usuario ni fechas individuales).
-- `openModalConsultaResiduo / guardarConsultaResiduo` — flujo para residuos desconocidos: el alumno describe el residuo y dónde lo dejó; se guarda en Consultas_Residuo
+- `openModalConsultaResiduo / guardarConsultaResiduo` — flujo para residuos desconocidos: el alumno describe el residuo y dónde lo dejó; se guarda en Consultas_Residuo. Tras guardar llama a `renderPanelConsultasResiduo()` y `renderDashboard()` para actualizar UI en la misma sesión.
 - `renderPanelConsultasResiduo / resolverConsultaResiduo` — panel visible a Gestor/Admin con las consultas pendientes; botón "Resuelta" marca Estado=Resuelta
+- `abrirModalTipoDesdeConsulta(idxConsulta)` — botón "＋ Añadir a guía" en el panel de consultas; abre modal de nuevo tipo de residuo con la descripción pre-rellenada (editable antes de guardar)
 
 ### Avisos de seguridad por formato (`_WARNINGS_FORMATO`)
 | Formato (matching parcial) | Aviso |
@@ -139,11 +140,13 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 | garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
 
 ### Consultas de residuo desconocido
-- Hoja **Consultas_Residuo** — columnas A-F: `ID_Consulta, Fecha, Usuario, Descripcion, Ubicacion_Dejado, Estado`
+- Hoja **Consultas_Residuo** — columnas A-F: `ID_Consulta, Fecha, Usuario, Descripcion, Ubicacion_Dejado, Estado` ✓ creada
 - Estado: `Pendiente` / `Resuelta`
 - Badge en nav (junto a contenedores) suma consultas pendientes + contenedores al 75%/lleno/cerrado
 - Banner en dashboard para Gestor/Admin cuando hay consultas pendientes
+- Stat card en dashboard: "Residuos por clasificar" (mismo cómputo que el badge)
 - Cuando la búsqueda en la guía no encuentra resultados, aparece mensaje "No lo tires todavía" + botón "Avisar a la gestora"
+- Desde el panel de consultas, botón "＋ Añadir a guía" abre el modal de nuevo tipo de residuo con la descripción pre-rellenada
 
 ### Etiquetas NFC/QR
 La URL codifica **categoría + lab** (no el ID del contenedor), por lo que la etiqueta nunca necesita reprogramarse al cerrar un contenedor. `_checkPendingNfcAction()` en `ui.js` detecta los parámetros tras el login y redirige al modal de adición correcto.
@@ -186,7 +189,7 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ---
 
-## Módulo de pedidos/solicitudes – estado del código (2026-05-16)
+## Módulo de pedidos/solicitudes – estado del código (2026-05-17)
 
 ### Archivos activos
 - `js/pedidos-render.js` — render de solicitudes y pedidos, `openModalRecepcion`
@@ -196,6 +199,15 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 - `html/modales-pedidos.html` — todos los modales del módulo
 - `html/modales-material.html` — modales de material (incluye `modal-historial-material`)
 - **`js/pedidos.js` ELIMINADO** — era código obsoleto sin cargar, ya no existe
+
+### Pedidos de servicio / equipo (SAT, compras de equipo)
+- Los pedidos tienen un campo `Tipo` en col S de la hoja Pedidos (`COLS.pedidos` index 18): `'Material'` (defecto) o `'Servicio'`
+- Las líneas tienen `ID_Equipo` en col I de Lineas_Pedido (`COLS.lineasPedido` index 8)
+- `sheetsGet` carga `Pedidos!A2:S` y `Lineas_Pedido!A2:I` (rangos ampliados en 2026-05-17)
+- Pedido de servicio: sin fase de solicitud, sin actualización de stock en recepción
+- Modal línea servicio: toggle "Servicio/equipo existente" (autocomplete de equipo) vs "Compra equipo nuevo" (mini-form que crea el equipo en inventario antes de crear la línea)
+- `buscarEquipoLinea / seleccionarEquipoLinea / clearEquipoLinea` — autocomplete de equipos en modal de línea de pedido
+- Autocomplete de equipos (tanto en pedidos como en intervenciones) muestra ubicación resuelta vía `getNombreUbicacion`
 
 ### Inventario de fungibles — historial de movimientos
 - La tabla de inventario ya NO muestra filas expandibles de movimientos inline.
