@@ -575,11 +575,22 @@ function renderPanelConsultasResiduo() {
               📍 ${c.Ubicacion_Dejado || '—'} &nbsp;·&nbsp; 👤 ${c.Usuario || '—'} &nbsp;·&nbsp; 📅 ${formatDate(c.Fecha)||c.Fecha||'—'}
             </div>
           </div>
-          <button class="btn btn-secondary" style="font-size:11px;padding:4px 12px;white-space:nowrap"
-            onclick="resolverConsultaResiduo(${idx})">✓ Resuelta</button>
+          <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+            <button class="btn btn-primary" style="font-size:11px;padding:4px 12px;white-space:nowrap"
+              onclick="abrirModalTipoDesdeConsulta(${idx})">＋ Añadir a guía</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 12px;white-space:nowrap"
+              onclick="resolverConsultaResiduo(${idx})">✓ Resuelta</button>
+          </div>
         </div>`;
       }).join('')}
     </div>`;
+}
+
+function abrirModalTipoDesdeConsulta(idxConsulta) {
+  const c = DATA.consultasResiduo[idxConsulta];
+  if (!c) return;
+  openModalTipoResiduo();
+  sv('tr-descripcion', c.Descripcion || '');
 }
 
 async function resolverConsultaResiduo(idx) {
