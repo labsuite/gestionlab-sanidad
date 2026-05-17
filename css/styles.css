@@ -1136,6 +1136,21 @@
   /* Expand td sin padding extra (equipo-expand-inner ya lo gestiona) */
   .card-equipment-table .equipo-row-expand td { padding: 0; }
 
+  /* Tabla fungibles en móvil portrait: columnas reducidas, sin scroll horizontal */
+  #page-material table { display: table; overflow-x: visible; }
+  /* Ocultar: Categoría(3), Mín/Ópt(6), Precio(7) */
+  #page-material thead th:nth-child(3),
+  #page-material thead th:nth-child(6),
+  #page-material thead th:nth-child(7) { display: none; }
+  #page-material .equipo-row td:nth-child(3),
+  #page-material .equipo-row td:nth-child(6),
+  #page-material .equipo-row td:nth-child(7) { display: none; }
+  /* Sub-filas de ubicación: ocultar Mín/Ópt local (4º td) */
+  #page-material .mat-ubic-row td:nth-child(4) { display: none; }
+  /* Compactar celdas visibles */
+  #page-material th, #page-material td { padding: 8px 5px; font-size: 11px; }
+  #page-material td:first-child { font-size: 12px; font-weight: 600; }
+
   /* Modales: sheet desde abajo */
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {
@@ -1272,6 +1287,15 @@
   .card-equipment-table td:nth-child(7) { display: none; }
   .card-equipment-table td,
   .card-equipment-table th { white-space: normal; }
+
+  /* Tabla fungibles en landscape: restaurar columnas ocultas en portrait */
+  #page-material thead th:nth-child(3),
+  #page-material thead th:nth-child(6),
+  #page-material thead th:nth-child(7) { display: table-cell; }
+  #page-material .equipo-row td:nth-child(3),
+  #page-material .equipo-row td:nth-child(6),
+  #page-material .equipo-row td:nth-child(7) { display: table-cell; }
+  #page-material .mat-ubic-row td:nth-child(4) { display: table-cell; }
 
   /* ── Card header: título + controles en fila que rompe si no cabe ── */
   .card-header {
