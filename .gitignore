@@ -1,2 +1,4 @@
 .claude/
 scripts/credentials.json
+scripts/__pycache__/
+*.pyc
