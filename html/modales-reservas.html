@@ -1,0 +1,127 @@
+<!-- ============================================================
+     RESERVAS DE EQUIPOS — modales
+     ============================================================ -->
+
+<!-- NUEVA / EDITAR RESERVA -->
+<div class="modal-overlay" id="modal-nueva-reserva">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-reserva-title">Nueva reserva</div>
+      <button class="modal-close" onclick="closeModal('modal-nueva-reserva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Equipo *</label>
+          <select id="reserva-equipo" onchange="_onCambioEquipoReserva(this.value)" required>
+            <option value="">Seleccionar equipo…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha inicio *</label>
+          <input type="date" id="reserva-fecha" oninput="_onFechaInicioChange()">
+        </div>
+        <div class="form-group">
+          <label>Fecha fin *</label>
+          <input type="date" id="reserva-fecha-fin" oninput="_actualizarVerificacion()">
+        </div>
+        <div class="form-group">
+          <label>Hora inicio *</label>
+          <input type="time" id="reserva-hora-inicio" step="900" oninput="_actualizarVerificacion()">
+        </div>
+        <div class="form-group">
+          <label>Hora fin *</label>
+          <input type="time" id="reserva-hora-fin" step="900" oninput="_actualizarVerificacion()">
+        </div>
+        <div class="form-group full">
+          <label>Propósito / uso previsto *</label>
+          <textarea id="reserva-proposito" rows="2" placeholder="Describe brevemente el uso del equipo…"></textarea>
+        </div>
+      </div>
+      <div id="reserva-params-container"></div>
+      <div id="reserva-disponibilidad-result" style="margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-nueva-reserva')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarReserva()">Solicitar reserva</button>
+    </div>
+  </div>
+</div>
+
+<!-- GESTIÓN DE RESERVA (aprobar / rechazar / conflicto) -->
+<div class="modal-overlay" id="modal-gestion-reserva">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">Gestionar reserva</div>
+      <button class="modal-close" onclick="closeModal('modal-gestion-reserva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="modal-gestion-detalle"></div>
+      <div class="form-group" style="margin-top:16px">
+        <label>Observaciones <span style="font-weight:400;color:var(--text-muted)">(obligatorio al rechazar)</span></label>
+        <textarea id="gestion-obs" rows="3" placeholder="Motivo del rechazo, nota de aprobación, descripción del conflicto…"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="gap:8px">
+      <button class="btn btn-secondary" onclick="closeModal('modal-gestion-reserva')">Cancelar</button>
+      <button class="btn btn-danger" onclick="_accionGestion('rechazar')">✗ Rechazar</button>
+      <button class="btn btn-secondary" onclick="_accionGestion('conflicto')" style="background:#fff7ed;color:#c2410c;border-color:#fed7aa">⚡ Conflicto</button>
+      <button class="btn btn-primary" onclick="_accionGestion('aprobar')">✓ Aprobar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIGURAR EQUIPO RESERVABLE -->
+<div class="modal-overlay" id="modal-config-equipo-reserva">
+  <div class="modal" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Configurar equipo reservable</div>
+      <button class="modal-close" onclick="closeModal('modal-config-equipo-reserva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Equipo</label>
+          <select id="cfg-equipo" onchange="_onCfgEquipoCambio(this.value)">
+            <option value="">Seleccionar equipo…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Política de conflicto</label>
+          <select id="cfg-politica">
+            <option value="BLOCK">BLOCK — Uso exclusivo</option>
+            <option value="COMPATIBLE_CONDITIONS">COMPATIBLE — Condiciones compatibles</option>
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+            <strong>BLOCK:</strong> solo una reserva por tramo.<br>
+            <strong>COMPATIBLE:</strong> varias reservas coexisten si las condiciones son compatibles.
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Duración máxima (horas)</label>
+          <input type="number" id="cfg-max-horas" min="0.5" step="0.5" placeholder="Sin límite">
+        </div>
+        <div class="form-group">
+          <label>Antelación mínima (horas)</label>
+          <input type="number" id="cfg-antelacion" min="0" step="0.5" placeholder="0">
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div>
+            <div style="font-size:13px;font-weight:600">Parámetros de condiciones</div>
+            <div style="font-size:11px;color:var(--text-muted)">Solo para política COMPATIBLE. Define qué condiciones deben coincidir.</div>
+          </div>
+          <button class="btn btn-sm btn-secondary" onclick="_addParamRow()">+ Parámetro</button>
+        </div>
+        <div id="cfg-params-rows" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div id="cfg-params-empty" style="font-size:13px;color:var(--text-muted);display:none">Sin parámetros configurados.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-config-equipo-reserva')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarConfigEquipo()">Guardar configuración</button>
+    </div>
+  </div>
+</div>

@@ -24,7 +24,8 @@ let DATA = {
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
-  revisionesInventario: [], consultasResiduo: []
+  revisionesInventario: [], consultasResiduo: [],
+  configReservas: [], reservas: []
 };
 
 // ============================================================
@@ -52,7 +53,9 @@ const COLS = {
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
   adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],
   revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones'],
-  consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado']
+  consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado'],
+  configReservas:         ['ID_Equipo','Politica','Params_Template','Max_Horas','Antelacion_Min_Horas'],
+  reservas:               ['ID_Reserva','ID_Equipo','Usuario','Fecha_Inicio','Fecha_Fin','Condiciones','Proposito','Estado','Aprobado_Por','Observaciones_Admin','Inicio_Real','Fin_Real']
 };
 
 function rowToObj(row, type) {
