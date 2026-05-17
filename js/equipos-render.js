@@ -206,7 +206,21 @@ function renderEquipos(filtro, filtroEstado) {
   }).join('');
 }
 
-function toggleEquipoExpand(id) { const row = document.getElementById(id); if (row) row.classList.toggle('open'); }
+function toggleEquipoExpand(id) {
+  const row = document.getElementById(id);
+  if (!row) return;
+  const opening = !row.classList.contains('open');
+  row.classList.toggle('open');
+  if (opening) _setExpandWidth(row);
+}
+function _setExpandWidth(row) {
+  const inner = row.querySelector('.equipo-expand-inner');
+  const card = row.closest('.card');
+  if (inner && card) inner.style.width = card.clientWidth + 'px';
+}
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.equipo-row-expand.open').forEach(row => _setExpandWidth(row));
+}, { passive: true });
 
 function buildIntervencionesEquipo(equipoId) {
   const equipo = DATA.equipos.find(e => e.ID_Activo === equipoId) || {};

@@ -898,7 +898,12 @@
     .equipo-expand-inner {
       padding: 12px 20px 16px;
       overflow-wrap: break-word;
-      min-width: 0;
+      position: sticky;
+      left: 0;
+      box-sizing: border-box;
+    }
+    .card-equipment-table {
+      overflow-x: auto;
     }
     .intervenciones-mini-header {
       display: grid;
