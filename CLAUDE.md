@@ -347,7 +347,7 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Pendiente de hacer – CÓDIGO
 
-*(Sin pendientes de código conocidos a 2026-05-18)*
+*(Sin pendientes de código conocidos a 2026-05-18 — sesión tarde)*
 
 ---
 
@@ -412,11 +412,12 @@ Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye eje
 
 ### Tabla de equipos (inventario de activos fijos)
 - En desktop: tabla normal con panel expandible al hacer clic en la fila
-- `toggleEquipoExpand(id)` llama a `_setExpandWidth(row)` **antes** de añadir la clase `open`
-- `_setExpandWidth` mide `table.offsetWidth` (NO `card.clientWidth`) para obtener el ancho exacto de la tabla y asignárselo al panel expandido via `inner.style.width`
-- `.equipo-expand-inner` usa `overflow-x: auto` (no `position: sticky`) para que contenido ancho (p.ej. mini-tabla de intervenciones) sea desplazable dentro del panel sin expandir la tabla exterior
-- El listener de `resize` llama a `_setExpandWidth` en todos los paneles abiertos para recalcular al cambiar tamaño de ventana
-- **NO usar `table-layout: fixed`** en esta tabla — causa que las columnas de acción queden demasiado estrechas
+- `toggleEquipoExpand(id)` simplemente hace toggle de la clase `open` — sin medición de ancho ni JS adicional
+- `.equipo-expand-inner` no tiene ancho explícito ni overflow: el `<td colspan="8">` ocupa el ancho natural de la tabla
+- La sección de intervenciones (`.intervenciones-mini-header` / `.intervencion-mini-row`) usa un grid con columnas de píxeles fijos (~520px mínimo). Sin contención, ese min-content se propaga al `<td>` y la tabla se expande. **Solución**: esa sección va envuelta en `<div style="min-width:0;overflow-x:auto">`, lo que hace que su min-content sea 0 y el contenido ancho quede desplazable dentro del panel sin afectar la tabla exterior
+- **NO usar `table-layout: fixed`** — causa que la columna de acciones quede demasiado estrecha
+- **NO usar `position: sticky`** en `.equipo-expand-inner` — interacciona mal con `overflow: hidden` del card
+- **NO poner `overflow-x: auto` en `.equipo-expand-inner`** — no impide la expansión si el min-content del contenido supera el ancho de la tabla; el scroll debe estar en el wrapper interno de las intervenciones
 
 ### Tabla de fungibles (inventario de material)
 - En desktop: tabla completa con columnas de categoría, mínimo/óptimo y precio visibles
