@@ -888,6 +888,12 @@
     .ubi-row:last-child { border-bottom: none; }
     .ubi-row:hover { background: var(--surface2); }
 
+    /* FUNGIBLES — fila de detalle móvil (siempre oculta en desktop) */
+    .mat-detail-row,
+    .mat-detail-row.open { display: none; }
+    /* Ícono expand: oculto en desktop para ítems de ubicación única */
+    #page-material .equipo-row:not(.expandable) .expand-icon { display: none; }
+
     /* EQUIPOS — fila expandible */
     .equipo-row-expand {
       background: var(--surface2);
@@ -1150,6 +1156,11 @@
   /* Compactar celdas visibles */
   #page-material th, #page-material td { padding: 8px 5px; font-size: 11px; }
   #page-material td:first-child { font-size: 12px; font-weight: 600; }
+  /* Fila de detalle: visible al expandir */
+  .mat-detail-row.open { display: table-row; }
+  /* Ícono y cursor para ítems de ubicación única */
+  #page-material .equipo-row:not(.expandable) .expand-icon { display: inline; }
+  #page-material .equipo-row:not(.expandable) { cursor: pointer; }
 
   /* Modales: sheet desde abajo */
   .modal-overlay { align-items: flex-end; padding: 0; }
@@ -1288,7 +1299,7 @@
   .card-equipment-table td,
   .card-equipment-table th { white-space: normal; }
 
-  /* Tabla fungibles en landscape: restaurar columnas ocultas en portrait */
+  /* Tabla fungibles en landscape: restaurar columnas y estado desktop */
   #page-material thead th:nth-child(3),
   #page-material thead th:nth-child(6),
   #page-material thead th:nth-child(7) { display: table-cell; }
@@ -1296,6 +1307,9 @@
   #page-material .equipo-row td:nth-child(6),
   #page-material .equipo-row td:nth-child(7) { display: table-cell; }
   #page-material .mat-ubic-row td:nth-child(4) { display: table-cell; }
+  .mat-detail-row.open { display: none; }
+  #page-material .equipo-row:not(.expandable) .expand-icon { display: none; }
+  #page-material .equipo-row:not(.expandable) { cursor: default; }
 
   /* ── Card header: título + controles en fila que rompe si no cabe ── */
   .card-header {

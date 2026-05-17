@@ -244,11 +244,11 @@ function renderFilaMaterial(m) {
 
   const rowId = `mat-row-${safeId}`;
 
-  // Fila principal: clic en fila = toggle ubicaciones (solo si multiUbi)
-  let html = `<tr class="equipo-row${multiUbi ? ' expandable' : ''}" id="${rowId}" ${multiUbi ? `style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')"` : ''}>
+  // Fila principal: clic en fila = toggle (ubicaciones si multiUbi, detalle móvil si no)
+  let html = `<tr class="equipo-row${multiUbi ? ' expandable' : ''}" id="${rowId}" style="${multiUbi ? 'cursor:pointer' : ''}" onclick="${multiUbi ? `toggleMatUbics('${m.ID_Material}')` : `toggleMatDetail('${m.ID_Material}')`}">
     <td><strong>${m.ID_Material}</strong></td>
     <td>
-      ${multiUbi ? `<span class="expand-icon" id="expand-mat-${safeId}">▶</span> ` : ''}${m.Nombre}
+      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}
     </td>
     <td><span class="badge badge-gray">${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</span></td>
     <td>${ubiLabel}</td>
@@ -267,6 +267,15 @@ function renderFilaMaterial(m) {
       ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}')" title="Contar stock">🔢</button>` : ''}
       <button class="icon-btn" onclick="openModalHistorialMaterial('${m.ID_Material}')" title="Ver historial">🕐</button>
     </div></td>
+  </tr>
+  <tr class="mat-detail-row" id="mat-detail-${safeId}">
+    <td colspan="8" style="padding:4px 12px 10px;background:var(--surface2)">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Categoría</span><strong>${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</strong></div>
+        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Mín / Óptimo</span><strong>${minTot || '—'} / ${opt || '—'} ${m.Unidad || ''}</strong></div>
+        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Precio medio</span><strong>${_precioMedioLabel(m)}</strong></div>
+      </div>
+    </td>
   </tr>`;
 
   // Sub-filas por ubicación (ocultas inicialmente) — con botón Solicitar
@@ -317,6 +326,18 @@ function toggleMatUbics(idMaterial) {
   const movRow = document.getElementById(`mat-mov-${safeId}`);
   if (movRow && !isOpen === false) movRow.style.display = 'none';
   if (expandIcon) expandIcon.textContent = isOpen ? '▶' : '▼';
+  toggleMatDetail(idMaterial, true); // sincronizar fila de detalle (skipIcon=true)
+}
+
+function toggleMatDetail(idMaterial, skipIcon = false) {
+  const safeId = idMaterial.replace(/[^a-zA-Z0-9]/g, '-');
+  const detail = document.getElementById(`mat-detail-${safeId}`);
+  if (!detail) return;
+  const isOpen = detail.classList.toggle('open');
+  if (!skipIcon) {
+    const icon = document.getElementById(`expand-mat-${safeId}`);
+    if (icon) icon.textContent = isOpen ? '▼' : '▶';
+  }
 }
 
 function openModalHistorialMaterial(idMaterial) {
