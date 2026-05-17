@@ -902,6 +902,7 @@
       left: 0;
       box-sizing: border-box;
     }
+    .detail-mobile-only { display: none; }
     .card-equipment-table {
       overflow-x: auto;
     }
@@ -1112,6 +1113,9 @@
   /* Tablas: scroll horizontal */
   .card > table,
   .card > div > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Campos del panel expandido solo visibles en móvil */
+  .detail-mobile-only { display: block; }
 
   /* Tabla equipos en móvil portrait: columnas reducidas, sin scroll horizontal */
   .card-equipment-table { overflow-x: visible; }
