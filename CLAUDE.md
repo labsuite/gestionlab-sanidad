@@ -5,6 +5,54 @@ Stack: JS vanilla + HTML/CSS, Google Sheets como base de datos vía REST API, Go
 
 ---
 
+## Scripts de mantenimiento de base de datos (carpeta `scripts/`)
+
+Permiten modificar Google Sheets directamente desde Claude Code sin exportar/importar CSV.
+Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de git).
+
+### Estructura
+
+- `base.py` — conexión y funciones comunes (importar desde aquí)
+- `test_conexion.py` — verifica que la conexión funciona
+- `nuevo_residuo.py` — INSERT en Tipos_Residuo
+- `actualizar_planes.py` — UPDATE en Planes_Mantenimiento (operación, periodicidad, tipo...)
+- `actualizar_equipos.py` — UPDATE en Equipos (protocolos, temporadas, ubicaciones...)
+- `limpiar_hoja.py` — DELETE en cualquier hoja con filtro; tiene `DRY_RUN = True` por defecto
+- `importar_alumnos.py` — INSERT masivo en Usuarios desde Excel (inicio de curso)
+
+### Flujo de trabajo
+1. Usuario describe el cambio a Claude
+2. Claude rellena la sección `CONFIGURACIÓN` del script correspondiente
+3. Usuario ejecuta `! python scripts/<nombre>.py`
+4. Los cambios aparecen directamente en Sheets
+
+### Funciones de base.py
+| Función | Uso |
+|---|---|
+| `conectar()` | Devuelve el spreadsheet autenticado |
+| `leer(sh, hoja)` | Devuelve `(ws, headers, datos)` |
+| `buscar(ws, campo, valor)` | Filas con coincidencia exacta |
+| `buscar_multi(ws, {campo: valor})` | Filas que cumplen todos los filtros |
+| `buscar_contiene(ws, campo, texto)` | Búsqueda parcial sin distinción de mayúsculas |
+| `todas_las_filas(ws)` | Índices de todas las filas de datos |
+| `actualizar(ws, filas, campo, valor)` | Actualiza un campo (batch) |
+| `actualizar_varios(ws, filas, {campo: valor})` | Actualiza varios campos (batch) |
+| `actualizar_fila_por_fila(ws, [(fila, {campo: valor})])` | Cambios distintos por equipo |
+| `eliminar(ws, filas)` | Borra filas de abajo arriba |
+| `eliminar_todas(ws)` | Limpieza total manteniendo cabecera |
+| `insertar(ws, dict)` | Añade una fila |
+| `insertar_varios(ws, [dicts])` | Añade múltiples filas (batch) |
+| `siguiente_id(ws, campo_id, prefijo)` | Genera el siguiente ID correlativo |
+| `preview_filas(ws, filas, campos)` | Muestra preview antes de actuar |
+
+### Formato Excel para importar alumnos
+Cabecera: `Nombre | Apellidos | Email | Ciclo | Modulos | Labs`
+- Ciclo: nombre completo coincidente con Ciclos_Modulos
+- Modulos: separados por coma
+- Labs: números de lab separados por coma (ej: `201,203`)
+
+---
+
 ## Arquitectura general
 
 - `index.html` — página principal, carga todos los scripts y modales
@@ -236,7 +284,7 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ### Documentación de pedido — checkboxes en detalle de pedido
 - `Doc_Hoja_Generada` (col N) — hoja de pedido generada
-- ~~`Doc_Hoja_Completada`~~ — **PENDIENTE ELIMINAR**: este checkbox sobra porque la hoja ya se genera con los datos de factura. Ver tarea pendiente abajo.
+- ~~`Doc_Hoja_Completada`~~ — eliminado (sobraba; la hoja ya se genera con los datos de factura)
 - `Doc_Enviada_Jefatura` (col P) — hoja enviada a jefatura
 - `toggleDocPedido(pedidoId, campo, valor)` — actualiza el campo en Sheets col por col
 
@@ -244,19 +292,21 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Pendiente de hacer – CÓDIGO
 
-*(Las tareas A, B y C fueron verificadas como completadas en 2026-05-16)*
+*(Sin pendientes de código conocidos a 2026-05-17)*
 
 ---
 
 ## Pendiente de hacer – DATOS
+
+*(Pendientes que requieren acceso físico al instituto)*
 
 ### 1. Datos – Planes_Mantenimiento ✓
 271 planes importados con Con_Alumnado en formato Sí/No correcto.
 
 ### 2. Datos – Campos nuevos en equipos ✓ parcial
 - `Protocolo_Uso` y `Tipo_Mantenimiento` — importados via CSV auxiliar generado automáticamente (231 equipos)
-- `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — **PENDIENTE** para los 15 equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación)
-- `Ubicacion` — **PENDIENTE**: actualizar al ID correcto de la tabla Ubicaciones para que el modelo de calidad los asigne al lab correcto
+- `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — **PENDIENTE (instituto)** para los 15 equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación)
+- `Ubicacion` — **PENDIENTE (instituto)**: actualizar al ID correcto de la tabla Ubicaciones para que el modelo de calidad los asigne al lab correcto
 
 ### 3. Modelo de calidad – FUNCIONAL ✓
 - Verificado con registros reales; solo pequeños detalles a hablar con jefa
@@ -265,10 +315,10 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ### 4. Datos – Residuos
 - Tipos de residuo: introducidos. Revisar que todos tengan `Contenedor_Tipo` relleno.
-- Contenedores físicos: **PENDIENTE** introducir en Contenedores_Residuo con su nivel inicial.
+- Contenedores físicos: **PENDIENTE (instituto)** introducir en Contenedores_Residuo con su nivel inicial.
 
-### 5. Datos – Usuarios ✓ en curso
-- Alumnos editándose para asignar `Ciclo_Principal` correcto. El código ya tolera discrepancias de acento/caso y las corrige al guardar.
+### 5. Datos – Usuarios ✓
+- Alumnos con `Ciclo_Principal` correcto asignado (completado 2026-05-17).
 
 ---
 
