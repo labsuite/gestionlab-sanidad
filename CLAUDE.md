@@ -72,17 +72,19 @@ Cabecera: `Nombre | Apellidos | Email | Ciclo | Modulos | Labs`
 - `js/ui.js` — navegación, renderAll(), badges, carga de modales
 - `js/mantenimiento.js` — sistema completo de mantenimiento preventivo
 - `js/residuos.js` — módulo de gestión de residuos
+- `js/reservas.js` — módulo de reservas de equipos de laboratorio
 - `js/equipos-render.js` — renderDashboard(), renderEquipos()
 - `js/equipos-acciones.js` — guardarEquipo(), guardarIntervencion(), guardarActuacion()…
 - `js/ubicaciones.js` — proveedores, ubicaciones, usuarios (incluye CRUD y modal de alumnos)
 - `html/modales-equipos.html` — modales de equipo, intervención, actuación
 - `html/modales-mantenimiento.html` — modales de registrar mantenimiento y gestionar plan
 - `html/modales-residuos.html` — modales de residuos (tipo residuo, nivel, contenedor)
+- `html/modales-reservas.html` — modales de reservas (nueva reserva, gestión, configurar equipo)
 - `html/modales-catalogo.html` — modales de proveedor, ubicación, usuario
 - `css/styles.css`
 
 **Orden de carga de scripts en index.html:**
-config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js
+config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js → reservas.js
 
 ---
 
@@ -214,6 +216,49 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 
 ---
 
+## Módulo de reservas de equipos – COMPLETADO (2026-05-17)
+
+### Hojas en Sheets (ya creadas)
+- **Config_Reservas** — columnas A-E: `ID_Equipo, Politica, Params_Template, Max_Horas, Antelacion_Min_Horas`
+  - `Params_Template`: JSON con lista de parámetros de condición, p.ej. `[{"nombre":"Temperatura","unidad":"°C","tolerancia":1}]`
+- **Reservas_Equipos** — columnas A-L: `ID_Reserva, ID_Equipo, Usuario, Fecha_Inicio, Fecha_Fin, Condiciones, Proposito, Estado, Aprobado_Por, Observaciones_Admin, Inicio_Real, Fin_Real`
+  - `Condiciones`: JSON con valores por parámetro, p.ej. `{"Temperatura":"37","CO2":"5"}`
+
+### Equipos reservables pre-configurados (23 equipos)
+- **BLOCK** (uso exclusivo): autoclaves (`AUTC-*`), termocicladores PCR (`PCR-*`), cabina de bioseguridad (`CAB-03`)
+- **COMPATIBLE_CONDITIONS** con parámetro CO2+Temperatura: incubadoras (`INC-*`)
+- **COMPATIBLE_CONDITIONS** con parámetro Temperatura: estufas (`EST-*`), baños termostáticos (`BAT-*`)
+
+### Políticas de conflicto
+- **BLOCK**: solo una reserva activa por tramo horario; cualquier solapamiento = conflicto
+- **COMPATIBLE_CONDITIONS**: varias reservas coexisten si los parámetros numéricos están dentro de la tolerancia y los textuales coinciden exactamente
+
+### Estados de reserva
+`Pendiente` → `Confirmada` / `Rechazada`; `Confirmada` → `Activa` (al inicio real) → `Completada` / `En conflicto`
+
+### Roles
+- Todos los roles (incluido Alumno y Profesor): pueden solicitar reservas y ver disponibilidad
+- Gestor y Administrador: además aprueban/rechazan, marcan conflictos y configuran equipos reservables
+- Badge en nav muestra reservas `Pendiente` (solo visible para Gestor/Admin)
+
+### Código implementado (`js/reservas.js`)
+- `renderReservas()` — 3 tabs: **Disponibilidad** | **Mis reservas** | **Gestión** (Gestor/Admin)
+- `_renderTimeline(idEquipo)` — barra de 14 días (07:00–22:00), bloques de color por estado
+- `_verificarConflicto(idEquipo, inicioStr, finStr, condiciones, excludeId)` — lógica central de solapamiento; para COMPATIBLE_CONDITIONS compara parámetro a parámetro con tolerancia numérica
+- `_actualizarVerificacion()` — verificación en tiempo real al rellenar el modal de nueva reserva; valida también duración máxima y antelación mínima
+- `guardarReserva()` — append a Reservas_Equipos; ID formato `RSV-001`
+- `_cambiarEstadoReserva(idReserva, nuevoEstado, obs, aprobadoPor, inicioReal, finReal)` — actualiza columnas H-L en un solo `sheetsUpdate`
+- `_accionGestion(accion)` — botones aprobar/rechazar/conflicto en modal de gestión
+- `openModalConfigEquipo() / _renderCfgParams() / guardarConfigEquipo()` — builder visual de parámetros; guarda Params_Template como JSON
+- `_addParamRow()` — añade fila de parámetro (nombre, unidad, tolerancia) en el configurador
+- `_updateBadgeReservas()` — badge en nav (definida en `ui.js`)
+- `_solapan(i1,f1,i2,f2)` — `new Date(i1) < new Date(f2) && new Date(f1) > new Date(i2)`
+
+### Navegación
+Ítem "📅 Reservas" en el sidebar, dentro de la sección **Material fungible**, justo bajo "Inventario".
+
+---
+
 ## Módulo de usuarios – COMPLETADO (2026-05-16)
 
 ### Hoja Usuarios – columnas (A–H)
@@ -306,6 +351,8 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ---
 
+---
+
 ## Pendiente de hacer – DATOS
 
 *(Pendientes que requieren acceso físico al instituto)*
@@ -323,11 +370,16 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 - Columna "Supervisado por" se rellena automáticamente con gestores/admins activos
 - Pendiente: actualizar Ubicacion de equipos (ver punto 2)
 
-### 4. Datos – Residuos
+### 4. Datos – Reservas
+- Config_Reservas pre-poblada con 23 equipos (autoclaves, PCR, cabina, incubadoras, estufas, baños)
+- Revisar parámetros de tolerancia de incubadoras (CO2 ±0.5%, temperatura ±0.5°C) y estufas/baños (temperatura ±1°C) con la gestora
+- Añadir más equipos reservables si procede (procesador de tejidos, citómetro…)
+
+### 5. Datos – Residuos
 - Tipos de residuo: introducidos. Revisar que todos tengan `Contenedor_Tipo` relleno.
 - Contenedores físicos: **PENDIENTE (instituto)** introducir en Contenedores_Residuo con su nivel inicial.
 
-### 5. Datos – Usuarios ✓
+### 6. Datos – Usuarios ✓
 - Alumnos con `Ciclo_Principal` correcto asignado (completado 2026-05-17).
 
 ---
@@ -355,6 +407,23 @@ Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye eje
 - EPI y seguridad — guantes, gafas, batas, mascarillas...
 - Equipamiento menor — aparatos pequeños no inventariados como activo fijo
 - Otro
+
+---
+
+## Tablas responsive – patrones implementados
+
+### Tabla de equipos (inventario de activos fijos)
+- En desktop: tabla normal con panel expandible lateral al hacer clic en la fila
+- `toggleEquipoExpand(id)` mide el ancho disponible con `_setExpandWidth(row)` **antes** de añadir la clase `open`; hacerlo después causaba que la card ya se hubiera expandido y la medida fuera incorrecta
+- El panel expandido usa `position: absolute; width: <clientWidth>px` para no desbordarse
+
+### Tabla de fungibles (inventario de material)
+- En desktop: tabla completa con columnas de categoría, mínimo/óptimo y precio visibles
+- En móvil (portrait): se ocultan las columnas 3 (categoría), 6 (mín/opt) y 7 (precio) vía CSS
+- Para ítems con múltiples ubicaciones (`multiUbi`): al expandir filas de ubicación (`toggleMatUbics`) se llama también `toggleMatDetail(id, true)` para mostrar la fila de detalle
+- Para ítems con una sola ubicación: `onclick` llama directamente a `toggleMatDetail`
+- `.mat-detail-row`: siempre en el DOM; en desktop `display: none` siempre; en móvil portrait `display: table-row` cuando tiene clase `open`
+- El icono ▶ de una sola ubicación: oculto en desktop (`#page-material .equipo-row:not(.expandable) .expand-icon { display: none }`), visible en móvil portrait
 
 ---
 
