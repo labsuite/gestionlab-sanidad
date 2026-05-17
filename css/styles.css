@@ -1113,6 +1113,25 @@
   .card > table,
   .card > div > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+  /* Tabla equipos en móvil portrait: columnas reducidas, sin scroll horizontal */
+  .card-equipment-table { overflow-x: visible; }
+  .card-equipment-table table { display: table; overflow-x: visible; }
+  /* Ocultar: Marca/Modelo(3), Ubicación(4), Responsable(5), Mantenimiento(7) */
+  .card-equipment-table th:nth-child(3),
+  .card-equipment-table th:nth-child(4),
+  .card-equipment-table th:nth-child(5),
+  .card-equipment-table th:nth-child(7),
+  .card-equipment-table td:nth-child(3),
+  .card-equipment-table td:nth-child(4),
+  .card-equipment-table td:nth-child(5),
+  .card-equipment-table td:nth-child(7) { display: none; }
+  /* Compactar celdas visibles */
+  .card-equipment-table th,
+  .card-equipment-table td { padding: 8px 5px; font-size: 11px; }
+  .card-equipment-table td:first-child { font-size: 12px; font-weight: 600; }
+  /* Expand td sin padding extra (equipo-expand-inner ya lo gestiona) */
+  .card-equipment-table .equipo-row-expand td { padding: 0; }
+
   /* Modales: sheet desde abajo */
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {
@@ -1237,6 +1256,18 @@
   }
   .card > table td,
   .card > table th { white-space: nowrap; }
+
+  /* Tabla equipos en landscape: mostrar Marca/Modelo, ocultar solo Responsable(5) */
+  .card-equipment-table { overflow-x: visible; }
+  .card-equipment-table table { display: table; overflow-x: visible; }
+  .card-equipment-table th:nth-child(3),
+  .card-equipment-table td:nth-child(3) { display: table-cell; }  /* restaurar Marca/Modelo */
+  .card-equipment-table th:nth-child(5),
+  .card-equipment-table th:nth-child(7),
+  .card-equipment-table td:nth-child(5),
+  .card-equipment-table td:nth-child(7) { display: none; }
+  .card-equipment-table td,
+  .card-equipment-table th { white-space: normal; }
 
   /* ── Card header: título + controles en fila que rompe si no cabe ── */
   .card-header {
