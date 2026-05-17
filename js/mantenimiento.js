@@ -58,6 +58,7 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
     }
     case 'Anual':
     case 'Bianual':
+    case 'Trianual':
     case 'Cada 2 años': {
       const mes = _esMomentoFin(plan) ? mesesBase[mesesBase.length - 1] : mesesBase[0];
       return mesesPasados.some(m => m.str === mes.str) ? [mes.str] : [];
@@ -631,7 +632,7 @@ async function exportarModeloCalidad(cursoAcademico) {
         const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
         return todosMeses.filter((_, i) => idx.includes(i)).map(m => m.str);
       }
-      case 'Anual': case 'Bianual': case 'Cada 2 años': {
+      case 'Anual': case 'Bianual': case 'Trianual': case 'Cada 2 años': {
         const mes = _esMomentoFin(plan) ? todosMeses[todosMeses.length - 1] : todosMeses[0];
         return [mes.str];
       }
