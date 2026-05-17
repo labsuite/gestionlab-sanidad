@@ -904,9 +904,8 @@
     .equipo-expand-inner {
       padding: 12px 20px 16px;
       overflow-wrap: break-word;
-      position: sticky;
-      left: 0;
       box-sizing: border-box;
+      width: 100%;
     }
     .detail-mobile-only { display: none; }
     .card-equipment-table {
