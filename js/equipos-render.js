@@ -237,6 +237,9 @@ function buildIntervencionesEquipo(equipoId) {
 
   const panelDetalles = `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px">
+      ${detalle('Marca / Modelo', [equipo.Marca, equipo.Modelo].filter(Boolean).join(' · '))}
+      ${detalle('Ubicación', equipo.Ubicacion)}
+      ${detalle('Responsable', equipo.Responsable)}
       ${detalle('Nº de serie', equipo.Numero_Serie)}
       ${detalle('Origen financiación', equipo.Origen_Financiacion)}
       ${detalle('Coste', costeStr)}
