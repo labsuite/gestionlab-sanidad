@@ -905,7 +905,6 @@
       padding: 12px 20px 16px;
       overflow-wrap: break-word;
       box-sizing: border-box;
-      overflow-x: auto;
     }
     .detail-mobile-only { display: none; }
     .card-equipment-table {

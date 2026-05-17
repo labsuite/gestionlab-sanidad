@@ -209,18 +209,8 @@ function renderEquipos(filtro, filtroEstado) {
 function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
-  const opening = !row.classList.contains('open');
-  if (opening) _setExpandWidth(row);
   row.classList.toggle('open');
 }
-function _setExpandWidth(row) {
-  const inner = row.querySelector('.equipo-expand-inner');
-  const table = row.closest('table');
-  if (inner && table) inner.style.width = table.offsetWidth + 'px';
-}
-window.addEventListener('resize', () => {
-  document.querySelectorAll('.equipo-row-expand.open').forEach(row => _setExpandWidth(row));
-}, { passive: true });
 
 function buildIntervencionesEquipo(equipoId) {
   const equipo = DATA.equipos.find(e => e.ID_Activo === equipoId) || {};
@@ -262,7 +252,10 @@ function buildIntervencionesEquipo(equipoId) {
   if (!ints.length) return panelDetalles + mantSection + `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
   const tipoBadge    = {'Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Validación':'badge-blue','Limpieza':'badge-gray','Descontaminación':'badge-gray','Sustitución de pieza':'badge-orange','Cambio de consumibles':'badge-orange','Control de temperatura':'badge-blue','Puesta en marcha':'badge-green','Actualización de software':'badge-blue'};
   const estadoBadgeI = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
-  return panelDetalles + mantSection + `<div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
+  // El wrapper con min-width:0 + overflow-x:auto contiene el grid de columnas fijas
+  // para que su min-content sea 0 y no expanda la tabla exterior.
+  return panelDetalles + mantSection + `<div style="min-width:0;overflow-x:auto">
+    <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Últimas intervenciones</div>
     <div class="intervenciones-mini-header"><span>Tipo</span><span>Estado</span><span>Fecha</span><span>Quién</span><span>Descripción</span><span>Resultado</span><span></span></div>
     ${ints.map(({ i, origIdx }) => {
       const intIdx = origIdx;
@@ -285,7 +278,8 @@ function buildIntervencionesEquipo(equipoId) {
           <button class="icon-btn" style="font-size:11px;margin-left:2px" onclick="event.stopPropagation();openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
         </span>
       </div>`;
-    }).join('')}`;
+    }).join('')}
+  </div>`;
 }
 
 function filtrarEquipos(val)       { renderEquipos(val, undefined); }
