@@ -255,7 +255,7 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 - `_solapan(i1,f1,i2,f2)` — `new Date(i1) < new Date(f2) && new Date(f1) > new Date(i2)`
 
 ### Navegación
-Ítem "📅 Reservas" en el sidebar, dentro de la sección **Material fungible**, justo bajo "Inventario".
+Ítem "📅 Reservas" en el sidebar, dentro de la sección **Equipos**, justo debajo de "🛡️ Mantenimiento".
 
 ---
 
@@ -347,9 +347,7 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Pendiente de hacer – CÓDIGO
 
-*(Sin pendientes de código conocidos a 2026-05-17)*
-
----
+*(Sin pendientes de código conocidos a 2026-05-18)*
 
 ---
 
@@ -413,15 +411,20 @@ Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye eje
 ## Tablas responsive – patrones implementados
 
 ### Tabla de equipos (inventario de activos fijos)
-- En desktop: tabla normal con panel expandible lateral al hacer clic en la fila
-- `toggleEquipoExpand(id)` mide el ancho disponible con `_setExpandWidth(row)` **antes** de añadir la clase `open`; hacerlo después causaba que la card ya se hubiera expandido y la medida fuera incorrecta
-- El panel expandido usa `position: absolute; width: <clientWidth>px` para no desbordarse
+- En desktop: tabla normal con panel expandible al hacer clic en la fila
+- `toggleEquipoExpand(id)` llama a `_setExpandWidth(row)` **antes** de añadir la clase `open`
+- `_setExpandWidth` mide `table.offsetWidth` (NO `card.clientWidth`) para obtener el ancho exacto de la tabla y asignárselo al panel expandido via `inner.style.width`
+- `.equipo-expand-inner` usa `overflow-x: auto` (no `position: sticky`) para que contenido ancho (p.ej. mini-tabla de intervenciones) sea desplazable dentro del panel sin expandir la tabla exterior
+- El listener de `resize` llama a `_setExpandWidth` en todos los paneles abiertos para recalcular al cambiar tamaño de ventana
+- **NO usar `table-layout: fixed`** en esta tabla — causa que las columnas de acción queden demasiado estrechas
 
 ### Tabla de fungibles (inventario de material)
 - En desktop: tabla completa con columnas de categoría, mínimo/óptimo y precio visibles
 - En móvil (portrait): se ocultan las columnas 3 (categoría), 6 (mín/opt) y 7 (precio) vía CSS
-- Para ítems con múltiples ubicaciones (`multiUbi`): al expandir filas de ubicación (`toggleMatUbics`) se llama también `toggleMatDetail(id, true)` para mostrar la fila de detalle
+- Para ítems con múltiples ubicaciones (`multiUbi`): al expandir (`toggleMatUbics`) se muestran las `mat-ubic-row` y se llama también `toggleMatDetail(id, true)` para mostrar la fila de detalle
 - Para ítems con una sola ubicación: `onclick` llama directamente a `toggleMatDetail`
+- **Orden en el DOM**: las `mat-ubic-row` se generan **antes** de `mat-detail-row` para que las ubicaciones aparezcan arriba al desplegar en móvil
+- `mat-detail-row` para ítem de una sola ubicación incluye la ubicación en la parte superior del panel (antes de categoría/precio/mín-ópt)
 - `.mat-detail-row`: siempre en el DOM; en desktop `display: none` siempre; en móvil portrait `display: table-row` cuando tiene clase `open`
 - El icono ▶ de una sola ubicación: oculto en desktop (`#page-material .equipo-row:not(.expandable) .expand-icon { display: none }`), visible en móvil portrait
 
