@@ -135,7 +135,7 @@ function buildMantenimientoEquipo(equipoId) {
         <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
           Protocolo de uso
         </div>
-        <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;white-space:pre-line;line-height:1.5">${equipo.Protocolo_Uso}</div>
+        <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;white-space:pre-line;line-height:1.5;overflow-wrap:break-word">${equipo.Protocolo_Uso}</div>
       </div>`);
   }
 

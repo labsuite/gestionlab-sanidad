@@ -897,6 +897,8 @@
     .equipo-row-expand.open { display: table-row; }
     .equipo-expand-inner {
       padding: 12px 20px 16px;
+      overflow-wrap: break-word;
+      min-width: 0;
     }
     .intervenciones-mini-header {
       display: grid;
