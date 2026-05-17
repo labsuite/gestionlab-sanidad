@@ -267,18 +267,9 @@ function renderFilaMaterial(m) {
       ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}')" title="Contar stock">🔢</button>` : ''}
       <button class="icon-btn" onclick="openModalHistorialMaterial('${m.ID_Material}')" title="Ver historial">🕐</button>
     </div></td>
-  </tr>
-  <tr class="mat-detail-row" id="mat-detail-${safeId}">
-    <td colspan="8" style="padding:4px 12px 10px;background:var(--surface2)">
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Categoría</span><strong>${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</strong></div>
-        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Mín / Óptimo</span><strong>${minTot || '—'} / ${opt || '—'} ${m.Unidad || ''}</strong></div>
-        <div style="font-size:11px"><span style="display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">Precio medio</span><strong>${_precioMedioLabel(m)}</strong></div>
-      </div>
-    </td>
   </tr>`;
 
-  // Sub-filas por ubicación (ocultas inicialmente) — con botón Solicitar
+  // Sub-filas por ubicación ANTES del detalle para que aparezcan primero en móvil
   if (multiUbi) {
     html += lotes.map((l, li) => {
       const sLocal  = parseFloat(l.Stock_Local)  || 0;
@@ -304,6 +295,22 @@ function renderFilaMaterial(m) {
       </tr>`;
     }).join('');
   }
+
+  // Fila de detalle (solo visible en móvil): ubicación arriba, luego categoría/precio
+  const labelStyle = 'display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px';
+  const ubiDetalle = !multiUbi
+    ? `<div style="font-size:11px;width:100%"><span style="${labelStyle}">Ubicación</span><strong>📍 ${m.Ubicacion || '—'}</strong></div>`
+    : '';
+  html += `<tr class="mat-detail-row" id="mat-detail-${safeId}">
+    <td colspan="8" style="padding:4px 12px 10px;background:var(--surface2)">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        ${ubiDetalle}
+        <div style="font-size:11px"><span style="${labelStyle}">Categoría</span><strong>${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</strong></div>
+        <div style="font-size:11px"><span style="${labelStyle}">Mín / Óptimo</span><strong>${minTot || '—'} / ${opt || '—'} ${m.Unidad || ''}</strong></div>
+        <div style="font-size:11px"><span style="${labelStyle}">Precio medio</span><strong>${_precioMedioLabel(m)}</strong></div>
+      </div>
+    </td>
+  </tr>`;
 
   return html;
 }
