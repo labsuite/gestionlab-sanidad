@@ -379,12 +379,17 @@ function openModalAdicion(idx) {
   sv('adic-observaciones', '');
   sv('adic-nivel', c.Nivel || 'vacío');
 
-  // Solo mostrar residuos cuyo Contenedor_Tipo coincide con la categoría del contenedor
+  // Buscador: datalist + mapa nombre→ID
   const tiposFiltrados = DATA.tiposResiduo.filter(t => t.Contenedor_Tipo === c.Categoria);
-  const opts = tiposFiltrados.length
-    ? tiposFiltrados.map(t => `<option value="${t.ID_Residuo}">${t.Nombre}</option>`).join('')
-    : DATA.tiposResiduo.map(t => `<option value="${t.ID_Residuo}">${t.Nombre}</option>`).join('');
-  document.getElementById('adic-tipo-residuo').innerHTML = '<option value="">— Selecciona el residuo añadido —</option>' + opts;
+  const tipos = tiposFiltrados.length ? tiposFiltrados : DATA.tiposResiduo;
+  window._adic_tipo_map = {};
+  tipos.forEach(t => { window._adic_tipo_map[t.Nombre] = t.ID_Residuo; });
+  const dl = document.getElementById('adic-tipo-residuo-list');
+  if (dl) dl.innerHTML = tipos.map(t => `<option value="${t.Nombre}">`).join('');
+  const textoEl = document.getElementById('adic-tipo-residuo-texto');
+  const hiddenEl = document.getElementById('adic-tipo-residuo');
+  if (textoEl) { textoEl.value = ''; textoEl.oninput = () => { hiddenEl.value = window._adic_tipo_map[textoEl.value] || ''; }; }
+  if (hiddenEl) hiddenEl.value = '';
 
   // Warning por formato
   const warnEl = document.getElementById('adic-warning-formato');
@@ -491,14 +496,14 @@ function openModalContenedor(idx = null) {
   editingRow = idx;
   const c = idx !== null ? DATA.contenedoresResiduo[idx] : null;
 
-  // Datalist de categorías desde Tipos_Residuo
-  const dl = document.getElementById('cont-datalist-cat');
-  if (dl) {
+  // Select cerrado de categorías desde Tipos_Residuo
+  const catSel = document.getElementById('cont-categoria');
+  if (catSel) {
     const cats = [...new Set(DATA.tiposResiduo.map(t => t.Contenedor_Tipo).filter(Boolean))].sort();
-    dl.innerHTML = cats.map(c => `<option value="${c}">`).join('');
+    catSel.innerHTML = '<option value="">— Seleccionar categoría —</option>' +
+      cats.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+    catSel.value = c?.Categoria || '';
   }
-
-  sv('cont-categoria', c?.Categoria || '');
   sv('cont-lab',       c?.Lab       || '');
   sv('cont-zona',      c?.Zona      || '');
   sv('cont-formato',   c?.Formato   || '');

@@ -81,9 +81,10 @@
       <div id="adic-warning-formato" style="display:none;padding:8px 12px;background:#fef9c3;border:1px solid #fde047;border-radius:6px;font-size:12px;color:#713f12;line-height:1.5;margin-bottom:14px"></div>
       <div class="form-group">
         <label class="form-label">Tipo de residuo añadido *</label>
-        <select id="adic-tipo-residuo" class="form-input">
-          <option value="">— Selecciona —</option>
-        </select>
+        <input type="hidden" id="adic-tipo-residuo">
+        <input id="adic-tipo-residuo-texto" class="form-input" list="adic-tipo-residuo-list"
+          placeholder="Buscar tipo de residuo…" autocomplete="off">
+        <datalist id="adic-tipo-residuo-list"></datalist>
       </div>
       <div class="form-group">
         <label class="form-label">Nivel del contenedor tras la adición *</label>
@@ -117,10 +118,9 @@
     <div class="modal-body">
       <div class="form-group">
         <label class="form-label">Categoría de contenedor *</label>
-        <input id="cont-categoria" class="form-input" list="cont-datalist-cat"
-          placeholder="Ej: Bidón 30L solventes, Garrafa 5L…">
-        <datalist id="cont-datalist-cat"></datalist>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Selecciona una existente o escribe una nueva.</div>
+        <select id="cont-categoria" class="form-input">
+          <option value="">— Seleccionar categoría —</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Laboratorio *</label>
@@ -135,16 +135,15 @@
       </div>
       <div class="form-group">
         <label class="form-label">Formato físico</label>
-        <input id="cont-formato" class="form-input" list="cont-datalist-formato"
-          placeholder="Ej: Garrafa 5L, Bidón azul 30L…">
-        <datalist id="cont-datalist-formato">
-          <option value="Bidón azul 30L (sólidos)">
-          <option value="Garrafa 20L">
-          <option value="Garrafa 5L">
-          <option value="Bolsa plástica">
-          <option value="Cubo con tapa">
-          <option value="Contenedor rígido">
-        </datalist>
+        <select id="cont-formato" class="form-input">
+          <option value="">— Sin especificar —</option>
+          <option>Bidón azul 30L (sólidos)</option>
+          <option>Garrafa 20L</option>
+          <option>Garrafa 5L</option>
+          <option>Bolsa plástica</option>
+          <option>Cubo con tapa</option>
+          <option>Contenedor rígido</option>
+        </select>
       </div>
       <div class="form-group">
         <label class="form-label">Nivel inicial</label>
