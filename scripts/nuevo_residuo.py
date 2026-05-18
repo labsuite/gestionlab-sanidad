@@ -1,52 +1,66 @@
 """
-nuevo_residuo.py — Añadir nuevos tipos de residuo a Tipos_Residuo.
-Uso: ! python scripts/nuevo_residuo.py
+nuevo_residuo.py – gestión de Tipos_Residuo
+Acciones configuradas:
+  1. Actualizar descripción de R072 (aclarar que solo cubre reactivos líquidos, no tarjetas)
+  2. Insertar R113 – Calibradores de pHmetro (tampones de calibración usados)
+
+Nota: el ID se calcula manualmente (formato R + 3 dígitos sin guión).
+No usar siguiente_id() — ese helper genera formato PREF-NNN.
 """
 import sys
-sys.path.insert(0, 'scripts')
-from base import conectar, leer, siguiente_id, insertar_varios
+sys.path.insert(0, '.')
+from scripts.base import conectar, leer, buscar, actualizar_varios, insertar
 
-# ===========================================================================
-# CONFIGURACIÓN — Claude rellena esta sección cada vez
-# ===========================================================================
+# ── CONFIGURACIÓN ────────────────────────────────────────────────
 
-NUEVOS_RESIDUOS = [
-    {
-        # Nombre corto que aparece en la guía
-        'Nombre': 'Ejemplo: Ácido clorhídrico concentrado',
-        # Descripción para que el alumno lo reconozca
-        'Descripcion': 'Ejemplo: Líquido corrosivo incoloro con olor fuerte y sofocante.',
-        # Alto / Medio / Bajo
-        'Riesgo': 'Alto',
-        # Nombre del tipo de contenedor (debe coincidir con uno existente o crear uno nuevo)
-        'Contenedor_Tipo': 'Ejemplo: Bidón azul',
-    },
-    # Añadir más bloques si se insertan varios a la vez
-]
+ACTUALIZAR_R072 = True
+INSERTAR_R113   = True
 
-# ===========================================================================
-# EJECUCIÓN — no tocar
-# ===========================================================================
+R072_NUEVO = {
+    'Nombre': 'Antisueros y reactivos líquidos del sistema Ortho (inmunohematología)',
+    'Descripcion': (
+        'Antisueros (anti-A, anti-B, anti-D y otros) y solución LISS del sistema '
+        'Ortho TM Workstation, utilizados en tipaje ABO/Rh y escrutinio de anticuerpos. '
+        'Contienen anticuerpos monoclonales murinos o policlonales humanos. '
+        'Pueden contener azida sódica como conservante (ver R074 — NUNCA al desagüe). '
+        'Las tarjetas BioVue usadas se gestionan por separado en bolsa de autoclave (ver R112).'
+    ),
+}
+
+R113 = {
+    'ID_Residuo':     'R113',
+    'Nombre':         'Calibradores de pHmetro (tampones de calibración usados)',
+    'Descripcion':    (
+        'Soluciones tampón de calibración del pHmetro usadas: pH 4,0 (ftalato ácido de potasio '
+        '0,05 M), pH 7,0 (mezcla de fosfatos) y pH 10,0 (carbonatos o boratos). '
+        'No son residuos peligrosos a las concentraciones y volúmenes de calibración habituales. '
+        'Recoger en el contenedor de aguas de laboratorio; si el pH de la mezcla está entre '
+        '5,5 y 9,5 pueden verterse al desagüe con abundante agua. '
+        'No mezclar con disolventes orgánicos ni ácidos concentrados.'
+    ),
+    'Riesgo':         'Bajo',
+    'Contenedor_Tipo': 'Aguas Laboratorio',
+    'Lab':            '',
+    'Zona':           '',
+}
+
+# ── EJECUCIÓN ────────────────────────────────────────────────────
 
 sh = conectar()
-ws, headers, _ = leer(sh, 'Tipos_Residuo')
+ws, headers, datos = leer(sh, 'Tipos_Residuo')
 
-filas_nuevas = []
-for r in NUEVOS_RESIDUOS:
-    nuevo_id = siguiente_id(ws, 'ID_Residuo', 'RES')
-    fila = {
-        'ID_Residuo':     nuevo_id,
-        'Nombre':         r['Nombre'],
-        'Descripcion':    r['Descripcion'],
-        'Riesgo':         r['Riesgo'],
-        'Contenedor_Tipo': r['Contenedor_Tipo'],
-        'Lab':            '',
-        'Zona':           '',
-    }
-    filas_nuevas.append(fila)
-    # Reservar el ID para el siguiente del lote
-    ws.append_row([nuevo_id] + [''] * (len(headers) - 1), value_input_option='USER_ENTERED')
-    print(f"  ✓ {nuevo_id} — {r['Nombre']}")
+if ACTUALIZAR_R072:
+    filas_r072 = buscar(ws, 'ID_Residuo', 'R072')
+    if not filas_r072:
+        print('⚠️  R072 no encontrado')
+    else:
+        actualizar_varios(ws, filas_r072, R072_NUEVO)
+        print(f'✓ R072 actualizado (filas: {filas_r072})')
 
-print(f"\n✅ {len(filas_nuevas)} tipo(s) de residuo añadido(s).")
-print("Recuerda verificar en Sheets que el Contenedor_Tipo coincide con los existentes.")
+if INSERTAR_R113:
+    ya_existe = buscar(ws, 'ID_Residuo', 'R113')
+    if ya_existe:
+        print('⚠️  R113 ya existe — no se inserta de nuevo')
+    else:
+        insertar(ws, R113)
+        print(f'✓ R113 insertado: {R113["Nombre"]}')

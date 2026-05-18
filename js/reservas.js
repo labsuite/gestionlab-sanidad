@@ -126,17 +126,85 @@ function _renderTabDisponibilidad() {
 
 function _onDispEquipoCambio(idEquipo) {
   _reservaEquipoDisp = idEquipo;
+  const sel = document.getElementById('disp-equipo-sel');
+  if (sel) sel.value = idEquipo;
   const el = document.getElementById('disp-timeline-container');
   if (el) el.innerHTML = _renderTimeline(idEquipo);
 }
 
-function _renderTimeline(idEquipo) {
-  if (!idEquipo) return `
+function _renderVisionGeneral() {
+  const ahora  = new Date();
+  const hoy    = new Date(ahora); hoy.setHours(0,0,0,0);
+  const hoyFin = new Date(hoy);   hoyFin.setHours(23,59,59,999);
+  const limite = new Date(hoy);   limite.setDate(hoy.getDate() + 14);
+
+  const estadosActivos = ['Confirmada','Activa','Pendiente','En conflicto'];
+  const proximas = DATA.reservas
+    .filter(r => estadosActivos.includes(r.Estado) && new Date(r.Fecha_Fin) >= ahora && new Date(r.Fecha_Inicio) <= limite)
+    .sort((a,b) => new Date(a.Fecha_Inicio) - new Date(b.Fecha_Inicio));
+
+  if (!proximas.length) return `
     <div class="empty-state">
       <div class="empty-state-icon">📅</div>
-      <div class="empty-state-title">Selecciona un equipo</div>
-      <div class="empty-state-text">Elige un equipo del desplegable para ver su disponibilidad los próximos 14 días</div>
+      <div class="empty-state-title">Sin reservas próximas</div>
+      <div class="empty-state-text">No hay reservas en los próximos 14 días · Selecciona un equipo para ver su disponibilidad</div>
     </div>`;
+
+  // Stats
+  const enUso      = proximas.filter(r => r.Estado === 'Activa').length;
+  const hoyCount   = proximas.filter(r => _solapan(r.Fecha_Inicio, r.Fecha_Fin, hoy.toISOString(), hoyFin.toISOString())).length;
+  const futCount   = proximas.filter(r => new Date(r.Fecha_Inicio) > hoyFin).length;
+
+  let html = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">`;
+  if (enUso) html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--accent)">${enUso}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">En uso ahora</div></div>`;
+  html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--primary)">${hoyCount}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Reservas hoy</div></div>`;
+  html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700">${futCount}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Próximas (14 días)</div></div>`;
+  html += `</div>`;
+
+  // Agrupar por día (si empezó antes de hoy, aparece bajo "Hoy")
+  const grupos = new Map();
+  proximas.forEach(r => {
+    const ini     = new Date(r.Fecha_Inicio);
+    const dayDate = ini < hoy ? hoy : new Date(ini.getFullYear(), ini.getMonth(), ini.getDate());
+    const key     = dayDate.getTime();
+    if (!grupos.has(key)) grupos.set(key, { date: dayDate, reservas: [] });
+    grupos.get(key).reservas.push(r);
+  });
+
+  let primerGrupo = true;
+  for (const [, { date, reservas }] of [...grupos].sort((a,b) => a[0]-b[0])) {
+    const esHoy    = date.getTime() === hoy.getTime();
+    const labelDia = (esHoy ? 'Hoy · ' : '') +
+      date.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
+
+    html += `<div style="font-size:12px;font-weight:600;color:${esHoy?'var(--primary)':'var(--text-muted)'};text-transform:uppercase;letter-spacing:.5px;margin:${primerGrupo?'0':'20px'} 0 8px">${labelDia}</div>`;
+    primerGrupo = false;
+
+    reservas.forEach(r => {
+      const eq       = DATA.equipos.find(e => e.ID_Activo === r.ID_Equipo);
+      const conds    = _condLabel(r.Condiciones);
+      const multiDia = new Date(r.Fecha_Inicio).toDateString() !== new Date(r.Fecha_Fin).toDateString();
+      const rango    = multiDia
+        ? `${_fmtReservaTs(r.Fecha_Inicio)} → ${_fmtReservaTs(r.Fecha_Fin)}`
+        : `${_fmtHoraR(r.Fecha_Inicio)} – ${_fmtHoraR(r.Fecha_Fin)}`;
+      const detalle  = [r.Usuario ? r.Usuario.split('@')[0] : '', r.Proposito, conds].filter(Boolean).join(' · ');
+
+      html += `<div class="card" style="padding:11px 16px;margin-bottom:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;cursor:pointer" onclick="_onDispEquipoCambio('${r.ID_Equipo}')" title="Ver disponibilidad de ${r.ID_Equipo}">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600">${eq?.Tipo_Equipo||r.ID_Equipo} <span style="font-size:11px;font-weight:400;color:var(--text-muted)">${r.ID_Equipo}</span></div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${rango}${detalle?' · '+detalle:''}</div>
+        </div>
+        ${_estadoBadgeR(r.Estado)}
+      </div>`;
+    });
+  }
+
+  html += `<div style="font-size:11px;color:var(--text-muted);margin-top:16px;text-align:center">Haz clic en una reserva para ver la disponibilidad completa del equipo</div>`;
+  return html;
+}
+
+function _renderTimeline(idEquipo) {
+  if (!idEquipo) return _renderVisionGeneral();
 
   const config = DATA.configReservas.find(c => c.ID_Equipo === idEquipo);
   const eq = DATA.equipos.find(e => e.ID_Activo === idEquipo);
