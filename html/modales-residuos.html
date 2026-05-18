@@ -36,9 +36,20 @@
           <label class="form-label">Descripción</label>
           <textarea id="tr-descripcion" class="form-input" placeholder="Tipo de residuo, procedencia habitual…" rows="2"></textarea>
         </div>
-        <div class="form-group">
-          <label class="form-label">Peligrosidad / Clasificación</label>
-          <input id="tr-riesgo" class="form-input" placeholder="Ej: Inflamable, Corrosivo, Citotóxico…">
+        <div class="form-group full">
+          <label class="form-label">Peligrosidad (pictogramas GHS)</label>
+          <div id="tr-riesgo-checks" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0">
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Tóxico"> ☠️ Tóxico</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Nocivo / Irritante"> ⚠️ Nocivo / Irritante</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Inflamable"> 🔥 Inflamable</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Comburente"> 🟠 Comburente</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Corrosivo"> ⚗️ Corrosivo</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Cancerígeno / CMR"> 🫁 Cancerígeno / CMR</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Peligroso para el medio ambiente"> 🌿 Peligroso para el medio ambiente</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Explosivo"> 💥 Explosivo</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Gas comprimido"> 💨 Gas comprimido</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface2)"><input type="checkbox" value="Citotóxico"> 💊 Citotóxico</label>
+          </div>
         </div>
         <div class="form-group">
           <label class="form-label">Tipo de contenedor *</label>

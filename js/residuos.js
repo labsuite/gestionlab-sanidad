@@ -47,11 +47,36 @@ function _nivelBadge(nivel) {
 }
 
 
+// ── Peligrosidad GHS ─────────────────────────────────────────
+const _GHS = {
+  'Tóxico':                           { icon:'☠️', bg:'#fee2e2', color:'#991b1b' },
+  'Nocivo / Irritante':               { icon:'⚠️', bg:'#fff7ed', color:'#c2410c' },
+  'Inflamable':                       { icon:'🔥', bg:'#fff7ed', color:'#c2410c' },
+  'Comburente':                       { icon:'🟠', bg:'#fff7ed', color:'#ea580c' },
+  'Corrosivo':                        { icon:'⚗️', bg:'#f5f3ff', color:'#6d28d9' },
+  'Cancerígeno / CMR':                { icon:'🫁', bg:'#fdf2f8', color:'#9d174d' },
+  'Peligroso para el medio ambiente': { icon:'🌿', bg:'#f0fdf4', color:'#15803d' },
+  'Explosivo':                        { icon:'💥', bg:'#fee2e2', color:'#991b1b' },
+  'Gas comprimido':                   { icon:'💨', bg:'#eff6ff', color:'#1d4ed8' },
+  'Citotóxico':                       { icon:'💊', bg:'#faf5ff', color:'#7e22ce' },
+};
+
+function _riesgoBadges(riesgo) {
+  if (!riesgo) return '—';
+  return riesgo.split(/,\s*/).map(r => {
+    const h = _GHS[r.trim()];
+    const icon  = h ? h.icon  : '⚠️';
+    const bg    = h ? h.bg    : '#fee2e2';
+    const color = h ? h.color : '#dc2626';
+    return `<span style="display:inline-flex;align-items:center;gap:3px;background:${bg};color:${color};border:1px solid ${color}33;padding:2px 8px;border-radius:10px;font-size:12px;white-space:nowrap">${icon} ${r.trim()}</span>`;
+  }).join(' ');
+}
+
 // ── Página: Guía de residuos ─────────────────────────────────
 function renderResiduosGuia() {
   const el = document.getElementById('page-residuos-guia');
   if (!el) return;
-  const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
+  const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
   el.innerHTML = `
     <div id="panel-consultas-residuo"></div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
@@ -87,7 +112,7 @@ function _renderGuia(tipos, filtro) {
     </div>`;
   }
 
-  const canEdit = ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole());
+  const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
 
   // Agrupar por Contenedor_Tipo
   const grupos = {};
@@ -109,7 +134,7 @@ function _renderGuia(tipos, filtro) {
         return `<tr>
           <td><strong>${t.Nombre}</strong></td>
           <td style="font-size:13px;color:var(--text-soft)">${t.Descripcion || '—'}</td>
-          <td style="white-space:nowrap">${t.Riesgo ? `<span style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:2px 8px;border-radius:10px;font-size:12px">⚠️ ${t.Riesgo}</span>` : '—'}</td>
+          <td style="white-space:nowrap">${_riesgoBadges(t.Riesgo)}</td>
           ${canEdit ? `<td><div class="row-actions">
             <button class="icon-btn" onclick="openModalTipoResiduo(${idx})">✏️</button>
             <button class="icon-btn" onclick="eliminarTipoResiduo(${idx})">🗑️</button>
@@ -142,8 +167,11 @@ function openModalTipoResiduo(idx = null) {
   const t = idx !== null ? DATA.tiposResiduo[idx] : null;
   sv('tr-nombre',      t?.Nombre         || '');
   sv('tr-descripcion', t?.Descripcion    || '');
-  sv('tr-riesgo',      t?.Riesgo         || '');
   sv('tr-contenedor',  t?.Contenedor_Tipo || '');
+  const riesgoActual = (t?.Riesgo || '').split(/,\s*/).map(s => s.trim()).filter(Boolean);
+  document.querySelectorAll('#tr-riesgo-checks input[type=checkbox]').forEach(cb => {
+    cb.checked = riesgoActual.includes(cb.value);
+  });
 
   // Poblar datalist con tipos de contenedor ya existentes
   const dl = document.getElementById('datalist-contenedor-tipos');
@@ -162,9 +190,11 @@ async function guardarTipoResiduo() {
   const nombre = v('tr-nombre');
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
   const existing = editingRow ? DATA.tiposResiduo[editingRow.rowIndex] : null;
+  const riesgo = [...document.querySelectorAll('#tr-riesgo-checks input[type=checkbox]:checked')]
+    .map(cb => cb.value).join(', ');
   const row = [
     existing?.ID_Residuo || genId('RES'),
-    nombre, v('tr-descripcion'), v('tr-riesgo'), v('tr-contenedor'),
+    nombre, v('tr-descripcion'), riesgo, v('tr-contenedor'),
     existing?.Lab || '', existing?.Zona || ''
   ];
   showLoading('Guardando...');
@@ -669,7 +699,7 @@ function exportarInformeConsenur() {
     const filas = porLab[lab].map(c => {
       const tipos = tiposDeContenedor(c);
       const tiposHtml = tipos.length
-        ? tipos.map(t => `<li>${t.nombre}${t.riesgo ? ` <span class="riesgo">${t.riesgo}</span>` : ''}</li>`).join('')
+        ? tipos.map(t => `<li>${t.nombre}${t.riesgo ? ` ${_riesgoBadges(t.riesgo)}` : ''}</li>`).join('')
         : '<li style="color:#999;font-style:italic">Sin adiciones registradas</li>';
       return `<tr>
         <td><strong>${c.Categoria || '—'}</strong>${c.Formato ? `<br><span class="sub">${c.Formato}</span>` : ''}</td>
