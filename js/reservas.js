@@ -219,8 +219,8 @@ function _renderTabMisReservas() {
   if (!reservas.length) return `<div class="empty-state"><div class="empty-state-icon">📅</div><div class="empty-state-title">Sin reservas</div><div class="empty-state-text">Usa la pestaña Disponibilidad para reservar un equipo</div></div>`;
 
   const activas  = reservas.filter(r => r.Estado === 'Activa');
-  const proximas = reservas.filter(r => ['Pendiente','Confirmada','En conflicto'].includes(r.Estado) && new Date(r.Fecha_Inicio) >= ahora);
-  const pasadas  = reservas.filter(r => ['Completada','Rechazada','Cancelada'].includes(r.Estado) || (['Pendiente','Confirmada'].includes(r.Estado) && new Date(r.Fecha_Fin) < ahora));
+  const proximas = reservas.filter(r => ['Pendiente','Confirmada','En conflicto'].includes(r.Estado) && new Date(r.Fecha_Fin) >= ahora);
+  const pasadas  = reservas.filter(r => ['Completada','Rechazada','Cancelada'].includes(r.Estado) || (['Pendiente','Confirmada','En conflicto'].includes(r.Estado) && new Date(r.Fecha_Fin) < ahora));
 
   const renderCard = r => {
     const esPropia = (r.Usuario||'').toLowerCase().trim() === email;
@@ -503,13 +503,11 @@ async function guardarReserva() {
 
   const condiciones = _leerCondicionesModal();
   const conflicto = _verificarConflicto(idEquipo, inicio, fin, condiciones, _reservaEditandoId);
-  if (!conflicto.ok) {
-    showToast(`No se puede reservar: ${conflicto.mensaje}`, 'error'); return;
-  }
+  const estado = conflicto.ok ? 'Confirmada' : 'Pendiente';
 
   const email = (currentUser?.email||'').toLowerCase().trim();
   const id    = _nextIdReserva();
-  const fila  = [id, idEquipo, email, inicio, fin, JSON.stringify(condiciones), proposito, 'Pendiente', '', '', '', ''];
+  const fila  = [id, idEquipo, email, inicio, fin, JSON.stringify(condiciones), proposito, estado, '', '', '', ''];
 
   showLoading('Guardando reserva…');
   try {
@@ -518,7 +516,11 @@ async function guardarReserva() {
     closeModal('modal-nueva-reserva');
     renderReservas();
     _updateBadgeReservas();
-    showToast('Reserva solicitada — pendiente de confirmación', 'success');
+    if (conflicto.ok) {
+      showToast('Reserva confirmada', 'success');
+    } else {
+      showToast(`Reserva registrada — pendiente de revisión por conflicto: ${conflicto.mensaje}`, 'warning');
+    }
   } catch(e) {
     showToast('Error al guardar la reserva', 'error'); console.error(e);
   } finally { hideLoading(); }

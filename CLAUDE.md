@@ -216,7 +216,7 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 
 ---
 
-## Módulo de reservas de equipos – COMPLETADO (2026-05-17)
+## Módulo de reservas de equipos – COMPLETADO (2026-05-18)
 
 ### Hojas en Sheets (ya creadas)
 - **Config_Reservas** — columnas A-E: `ID_Equipo, Politica, Params_Template, Max_Horas, Antelacion_Min_Horas`
@@ -234,19 +234,23 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 - **COMPATIBLE_CONDITIONS**: varias reservas coexisten si los parámetros numéricos están dentro de la tolerancia y los textuales coinciden exactamente
 
 ### Estados de reserva
-`Pendiente` → `Confirmada` / `Rechazada`; `Confirmada` → `Activa` (al inicio real) → `Completada` / `En conflicto`
+- Sin conflicto → se guarda directamente como `Confirmada` (auto-aprobada)
+- Con conflicto → se guarda como `Pendiente` + toast warning, queda en la cola de gestión
+- `Confirmada` → `Activa` (al inicio real con `iniciarUso()`) → `Completada`
+- `Pendiente` → `Confirmada` / `Rechazada` / `En conflicto` (por Gestor)
 
 ### Roles
 - Todos los roles (incluido Alumno y Profesor): pueden solicitar reservas y ver disponibilidad
 - Gestor y Administrador: además aprueban/rechazan, marcan conflictos y configuran equipos reservables
-- Badge en nav muestra reservas `Pendiente` (solo visible para Gestor/Admin)
+- Badge en nav muestra reservas `Pendiente` (solo visible para Gestor/Admin); solo aparecen cuando hay conflicto real
 
 ### Código implementado (`js/reservas.js`)
 - `renderReservas()` — 3 tabs: **Disponibilidad** | **Mis reservas** | **Gestión** (Gestor/Admin)
 - `_renderTimeline(idEquipo)` — barra de 14 días (07:00–22:00), bloques de color por estado
 - `_verificarConflicto(idEquipo, inicioStr, finStr, condiciones, excludeId)` — lógica central de solapamiento; para COMPATIBLE_CONDITIONS compara parámetro a parámetro con tolerancia numérica
 - `_actualizarVerificacion()` — verificación en tiempo real al rellenar el modal de nueva reserva; valida también duración máxima y antelación mínima
-- `guardarReserva()` — append a Reservas_Equipos; ID formato `RSV-001`
+- `guardarReserva()` — auto-aprueba si sin conflicto (`Confirmada`); guarda como `Pendiente` si hay conflicto; ID formato `RSV-001`
+- `_renderTabMisReservas()` — "Próximas" muestra reservas cuya `Fecha_Fin >= ahora` (captura también las en curso); "Historial" en `<details>` colapsado para las ya terminadas
 - `_cambiarEstadoReserva(idReserva, nuevoEstado, obs, aprobadoPor, inicioReal, finReal)` — actualiza columnas H-L en un solo `sheetsUpdate`
 - `_accionGestion(accion)` — botones aprobar/rechazar/conflicto en modal de gestión
 - `openModalConfigEquipo() / _renderCfgParams() / guardarConfigEquipo()` — builder visual de parámetros; guarda Params_Template como JSON
