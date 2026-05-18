@@ -15,9 +15,11 @@ Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de 
 - `base.py` — conexión y funciones comunes (importar desde aquí)
 - `test_conexion.py` — verifica que la conexión funciona
 - `nuevo_residuo.py` — INSERT en Tipos_Residuo
+- `actualizar_riesgos_ghs.py` — UPDATE masivo del campo Riesgo en Tipos_Residuo con pictogramas GHS; usa matching por nombre + OVERRIDES por ID; tiene `DRY_RUN = True` por defecto
 - `actualizar_planes.py` — UPDATE en Planes_Mantenimiento (operación, periodicidad, tipo...)
 - `actualizar_equipos.py` — UPDATE en Equipos (protocolos, temporadas, ubicaciones...)
 - `limpiar_hoja.py` — DELETE en cualquier hoja con filtro; tiene `DRY_RUN = True` por defecto
+- `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 hojas del módulo de fungibles (útil para reset de datos de prueba)
 - `importar_alumnos.py` — INSERT masivo en Usuarios desde Excel (inicio de curso)
 
 ### Flujo de trabajo
@@ -152,7 +154,7 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
-## Módulo de residuos – COMPLETADO (2026-05-17)
+## Módulo de residuos – COMPLETADO (2026-05-18)
 
 ### Hojas en Sheets
 - **Tipos_Residuo** — columnas A-G: `ID_Residuo, Nombre, Descripcion, Riesgo, Contenedor_Tipo, Lab, Zona`
@@ -172,16 +174,25 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ### Roles
 - Todos los roles (incluido Alumno): pueden ver la Guía y registrar adiciones en contenedores
-- Admin / Gestor / **Profesor**: pueden crear, editar, cerrar y eliminar tipos de residuo y contenedores
+- Admin / Gestor / **Profesor**: pueden crear, editar, cerrar y eliminar **contenedores**
+- Admin / Gestor (solo): pueden crear, editar y eliminar **tipos de residuo** (Profesor no tiene este permiso)
+
+### Peligrosidad GHS
+- El campo `Riesgo` almacena los pictogramas GHS como string con comas: `"Tóxico, Inflamable"` (vacío = sin peligrosidad especial)
+- Valores canónicos: `Tóxico` / `Nocivo / Irritante` / `Inflamable` / `Comburente` / `Corrosivo` / `Cancerígeno / CMR` / `Peligroso para el medio ambiente` / `Explosivo` / `Gas comprimido` / `Citotóxico`
+- En la UI, el modal de tipo de residuo muestra checkboxes con cada categoría GHS
+- `_GHS` — constante con mapa `{nombre: {icon, bg, color}}` para los 10 pictogramas
+- `_riesgoBadges(riesgo)` — renderiza cada valor GHS como chip de color; los valores no reconocidos (datos legacy) muestran chip genérico ⚠️ naranja
+- Los 113 tipos de residuo R001–R113 tienen Riesgo actualizado con GHS mediante `scripts/actualizar_riesgos_ghs.py`
 
 ### Código implementado (`js/residuos.js`)
 - `renderResiduosGuia()` — página con buscador y tabla agrupada por **Contenedor_Tipo** (categorías dinámicas)
-- `openModalTipoResiduo / guardarTipoResiduo / eliminarTipoResiduo` — CRUD de tipos de residuo (Admin/Gestor/Profesor). El campo Contenedor_Tipo usa `<datalist>` — crear un nombre nuevo crea una nueva categoría automáticamente. No se puede eliminar un tipo si tiene contenedores asociados.
+- `openModalTipoResiduo / guardarTipoResiduo / eliminarTipoResiduo` — CRUD de tipos de residuo (Admin/Gestor). El campo Contenedor_Tipo usa `<datalist>` — crear un nombre nuevo crea una nueva categoría automáticamente. No se puede eliminar un tipo si tiene contenedores asociados.
 - `renderResiduosContenedores()` — dos tabs: **Activos** (cards con historial expandible) y **Pendientes de recogida** (tabla)
-- `openModalAdicion / guardarAdicion` — registrar adición a un contenedor (filtra tipos de residuo por Categoria del contenedor)
+- `openModalAdicion / guardarAdicion` — registrar adición; el selector de tipo de residuo es un **buscador con sugerencias** (`<input>` + `<datalist>`), con campo oculto `adic-tipo-residuo` que guarda el ID; `window._adic_tipo_map` mapea Nombre→ID_Residuo; filtra por Categoria del contenedor si hay coincidencias
 - `cerrarContenedor` — marca Estado=cerrado y crea contenedor nuevo vacío automáticamente
 - `registrarRecogida` — marca Estado=recogido y elimina la fila del sheet
-- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores (incluye campo Formato)
+- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores; **categoría es `<select>` cerrado** poblado dinámicamente desde valores únicos de `Contenedor_Tipo` en Tipos_Residuo; **formato es `<select>` cerrado** con 6 opciones fijas
 - `mostrarUrlNfcContenedor(idx)` — genera URL con `?cont-cat=X&cont-lab=Y&action=adicion` para etiqueta NFC/QR
 - `_abrirAdicionPorNfc(categoria, lab)` — localiza el contenedor activo por categoría+lab y abre el modal de adición
 - `_WARNINGS_FORMATO / _getWarningFormato(formato)` — mapa de avisos de seguridad por formato físico; se muestran como banner amarillo en las cards y en el modal de adición (también vía NFC)
