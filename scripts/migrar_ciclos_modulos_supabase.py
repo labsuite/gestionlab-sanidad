@@ -40,9 +40,10 @@ _, _, filas = leer(sh, 'Ciclos_Modulos')
 pares = []
 ultimo_ciclo = ''
 for fila in filas:
-    ciclo  = fila[0].strip() if fila and fila[0].strip() else ultimo_ciclo
-    modulo = fila[1].strip() if len(fila) > 1 else ''
+    ciclo  = str(fila.get('Ciclos',  fila.get('Ciclo',  '')) or '').strip()
+    modulo = str(fila.get('Modulos', fila.get('Modulo', '')) or '').strip()
     if ciclo: ultimo_ciclo = ciclo
+    else: ciclo = ultimo_ciclo
     if ciclo and modulo:
         pares.append((ciclo, modulo))
 
