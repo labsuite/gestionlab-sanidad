@@ -362,7 +362,80 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Pendiente de hacer – CÓDIGO
 
-*(Sin pendientes de código conocidos a 2026-05-18 — sesión tarde)*
+### Asistente de IA guiado (Gemini Flash)
+
+Añadir un asistente de IA contextual accesible desde cualquier página de la app. El asistente conoce los datos reales de la app (equipos, residuos, planes…) y responde preguntas sobre temas científicos y de gestión del laboratorio.
+
+#### Requisito previo (usuario)
+Antes de implementar, la usuaria debe:
+1. Ir a [Google AI Studio](https://aistudio.google.com/) → iniciar sesión con su cuenta Google → "Get API key" → "Create API key" → copiar la clave (formato `AIza…`).
+2. Ir a [Google Cloud Console](https://console.cloud.google.com/) → el mismo proyecto → "APIs y servicios" → "Credenciales" → hacer clic en la clave creada → en "Restricciones de aplicación" elegir "Referentes HTTP" → añadir `https://palomafedez.github.io/*` → guardar. Esto impide que nadie use la clave desde otro dominio.
+3. En la misma consola, ir a "Cuotas" del servicio "Generative Language API" y poner un límite diario razonable (p.ej. 500 peticiones/día).
+4. Proporcionar la clave a Claude para incluirla en `js/config.js` como constante `GEMINI_API_KEY`.
+
+#### Archivos a crear/modificar
+- **`js/asistente.js`** — lógica completa del asistente (nuevo archivo)
+- **`html/modal-asistente.html`** — HTML del modal (nuevo archivo)
+- **`css/styles.css`** — estilos del botón flotante y el modal
+- **`index.html`** — cargar `asistente.js` al final del orden de scripts; cargar `modal-asistente.html` junto al resto de modales; añadir el botón flotante `<button id="btn-asistente">` justo antes de `</body>`
+- **`js/config.js`** — añadir constante `GEMINI_API_KEY` con la clave proporcionada por la usuaria
+
+#### Interfaz de usuario
+- **Botón flotante** en esquina inferior derecha, siempre visible tras login: icono 🤖, circular, color `var(--primary)`. Solo se muestra si el usuario está autenticado (`currentUser` existe).
+- Al hacer clic: abre modal centrado, tamaño medio (~560px ancho).
+- El modal tiene **dos pantallas**:
+  1. **Selección de tema** — grid de tarjetas con los 6 temas disponibles.
+  2. **Chat** — área de mensajes + campo de texto + botón Enviar. Botón "← Volver" para cambiar de tema.
+- El historial de chat se borra al cambiar de tema o al cerrar el modal.
+
+#### Temas y contexto inyectado en el prompt de sistema
+
+Cada tema construye un prompt de sistema distinto antes de enviar la pregunta a Gemini. El prompt de sistema se envía solo una vez por conversación (primer mensaje); las respuestas siguientes continúan en el mismo `contents[]` array.
+
+| Tema | Icono | Contexto inyectado al prompt de sistema |
+|---|---|---|
+| Residuos | 🧪 | Lista completa de `DATA.tiposResiduo` (ID, nombre, descripción, Riesgo GHS, contenedor_tipo) + contenedores activos de `DATA.contenedores` (categoría, lab, nivel) |
+| Uso de equipos | ⚙️ | Ficha del equipo seleccionado: tipo, marca, modelo, ubicación, protocolo de uso (`Protocolo_Uso`), estado operativo |
+| Mantenimiento | 🔧 | Planes de mantenimiento del equipo (`DATA.planesMantenimiento` filtrado por ID_Equipo), tipos de intervención canónicos del CLAUDE.md, historial de los últimos 10 registros (`DATA.registros`) |
+| Resultados analíticos | 📊 | Solo prompt genérico: "Eres un asistente experto en técnicas de laboratorio clínico y anatomía patológica. Ayuda al personal del laboratorio a interpretar resultados, identificar posibles errores de técnica y sugerir controles de calidad." Sin datos de la app. |
+| Gestión de incidencias | 🚨 | Lista de tipos de intervención canónicos + estados de equipos en `DATA.equipos` (solo ID, tipo, estado operativo, ubicación) |
+| Búsqueda de SAT | 📋 | Marca y modelo del equipo seleccionado inyectados en el prompt. Gemini debe sugerir cómo localizar el SAT oficial (web del fabricante, distribuidores habituales en España para equipamiento de laboratorio clínico). Aclarar siempre que el resultado es orientativo y que hay que verificar con el fabricante. |
+
+Para los temas que requieren un equipo concreto ("Uso de equipos", "Mantenimiento", "Búsqueda de SAT"), mostrar primero un `<select>` con los equipos de `DATA.equipos` (formato: "AUTC-01 — Autoclave Raypa") antes de activar el chat.
+
+#### Llamada a la API de Gemini
+
+```js
+// Endpoint (no cambiar el modelo sin probar primero — gemini-1.5-flash es el del tier gratuito)
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+// Estructura de la petición
+const body = {
+  contents: _chatHistory, // array de {role:'user'|'model', parts:[{text:'...'}]}
+  generationConfig: { maxOutputTokens: 1024, temperature: 0.3 }
+};
+
+// _chatHistory[0] es siempre el mensaje de sistema inyectado como role:'user'
+// seguido de una respuesta ficticia role:'model' con "Entendido." para establecer contexto
+// Los mensajes reales del usuario se añaden como role:'user' a continuación
+```
+
+Usar `fetch` estándar, `method: 'POST'`, `Content-Type: application/json`. La respuesta llega en `response.candidates[0].content.parts[0].text`.
+
+Mostrar spinner mientras se espera respuesta. Si la API devuelve error, mostrar mensaje claro: "Error al conectar con el asistente. Inténtalo de nuevo."
+
+#### Seguridad
+- El botón flotante y el modal solo se renderizan si `currentUser` existe (tras login OAuth). No añadir ninguna lógica de autenticación adicional; la app ya gestiona esto.
+- La clave API se almacena en `js/config.js` como constante en texto plano — aceptable para este caso de uso (app interna, login requerido, restricción de dominio en Google Cloud).
+- No enviar a Gemini datos personales de usuarios (emails, nombres). Si el contexto incluye usuarios, omitir o anonimizar.
+
+#### Orden de carga en index.html
+`asistente.js` se carga después de `reservas.js` (al final de todo), ya que usa `DATA` que debe estar cargado.
+
+#### Lo que NO hacer
+- No crear un sistema de historial persistente entre sesiones (sin localStorage, sin Sheets).
+- No enviar el contenido completo de todas las hojas de Sheets — solo los campos relevantes listados arriba para mantener los tokens bajos.
+- No usar el modelo `gemini-1.5-pro` ni `gemini-2.0` en el tier gratuito — solo `gemini-1.5-flash`.
 
 ---
 
