@@ -125,7 +125,8 @@ async function loadAllData() {
            planesMantenimiento, registroMantenimientos,
            tiposResiduo, contenedoresResiduo, adicionesResiduo,
            revisionesInventario, consultasResiduo,
-           configReservas, reservas] = await Promise.all([
+           configReservas, reservas,
+           sbCiclosRes, sbModulosRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:I'),
@@ -149,7 +150,12 @@ async function loadAllData() {
       sheetsGet('Revisiones_Inventario!A2:I').catch(() => []),
       sheetsGet('Consultas_Residuo!A2:F').catch(() => []),
       sheetsGet('Config_Reservas!A2:E').catch(() => []),
-      sheetsGet('Reservas_Equipos!A2:L').catch(() => [])
+      sheetsGet('Reservas_Equipos!A2:L').catch(() => []),
+      // Supabase — en paralelo con Sheets
+      _sb.from('ciclos').select('id,nombre').catch(() => ({ data: [] })),
+      _sb.from('modulos').select('id,nombre,ciclo_id,lab_teoria,lab_practicas').catch(() => ({ data: [] })),
+      _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').catch(() => ({ data: [] })),
+      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').catch(() => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -185,6 +191,42 @@ async function loadAllData() {
     DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
     DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
     DATA.reservas               = toObj(reservas               || [], 'reservas');
+
+    // Supabase: ciclos, módulos y asignaciones usuario→módulo
+    const sbCiclos      = sbCiclosRes?.data      || [];
+    const sbModulos     = sbModulosRes?.data     || [];
+    const sbUserModulos = sbUserModulosRes?.data || [];
+    const sbUsuarios    = sbUsuariosRes?.data    || [];
+
+    DATA.sbUsuarios = sbUsuarios;
+
+    if (sbModulos.length) {
+      // Sustituir ciclosModulos por datos enriquecidos de Supabase (incluye labs)
+      DATA.ciclosModulos = sbModulos.map(m => {
+        const ciclo = sbCiclos.find(c => c.id === m.ciclo_id);
+        return {
+          Ciclo: ciclo?.nombre || '',
+          Modulo: m.nombre,
+          _sbId: m.id,
+          lab_teoria: m.lab_teoria || '',
+          lab_practicas: m.lab_practicas || ''
+        };
+      });
+    }
+
+    DATA.userModulos = sbUserModulos.map(um => {
+      const mod   = sbModulos.find(m => m.id === um.modulo_id);
+      const ciclo = mod ? sbCiclos.find(c => c.id === mod.ciclo_id) : null;
+      return {
+        user_id:        um.user_id,
+        modulo_id:      um.modulo_id,
+        curso_academico: um.curso_academico,
+        nombre_modulo:  mod?.nombre      || '',
+        nombre_ciclo:   ciclo?.nombre    || '',
+        lab_teoria:     mod?.lab_teoria  || '',
+        lab_practicas:  mod?.lab_practicas || ''
+      };
+    });
 
     renderAll();
   } catch(e) {

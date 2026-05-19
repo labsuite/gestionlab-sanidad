@@ -5,6 +5,10 @@ const CLIENT_ID = '617390713769-milqb8jfdk9l6bd63bh52bbronivablb.apps.googleuser
 const SHEET_ID  = '1YeoIPn3UqvcljptbgJIX-1CdrDLwIiT_3vcOy8k2Acg';
 const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file profile email';
 
+const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
+const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
 // ============================================================
 // ESTADO GLOBAL
 // ============================================================
@@ -25,7 +29,10 @@ let DATA = {
   planesMantenimiento: [], registroMantenimientos: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
   revisionesInventario: [], consultasResiduo: [],
-  configReservas: [], reservas: []
+  configReservas: [], reservas: [],
+  // Supabase
+  sbUsuarios: [],   // usuarios de Supabase (id uuid, email, role, ciclo_principal…)
+  userModulos: []   // asignaciones usuario→módulo enriquecidas con labs
 };
 
 // ============================================================
@@ -139,12 +146,32 @@ function esResponsableDeEquipo(equipo) {
 
 /**
  * Devuelve los ID_Ubicacion accesibles para el Alumno actual.
- * Ubicaciones_Asignadas puede contener números de lab ("201","203") o IDs de zona.
- * Los números de lab se expanden a todos los IDs de zona de ese lab.
+ * Primero intenta derivar los labs desde los módulos asignados en Supabase (user_modulos).
+ * Si no hay datos en Supabase (migración pendiente), usa el campo Ubicaciones_Asignadas de Sheets.
  * La zona común se incluye siempre automáticamente.
  */
 function getUbicacionesAlumno() {
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const zonasComun = DATA.ubicaciones
+    .filter(ub => (ub.Laboratorio_Aula || '').trim() === '205 - Zona común')
+    .map(ub => ub.ID_Ubicacion);
+
+  // Fuente primaria: módulos asignados en Supabase
+  const sbUser = DATA.sbUsuarios.find(u => (u.email || '').toLowerCase() === emailNorm);
+  if (sbUser && DATA.userModulos.length) {
+    const misModulos = DATA.userModulos.filter(um => um.user_id === sbUser.id);
+    const labNums = [...new Set(misModulos.flatMap(um =>
+      [um.lab_teoria, um.lab_practicas].filter(Boolean)
+    ))];
+    if (labNums.length) {
+      const asignadas = labNums.flatMap(lab =>
+        DATA.ubicaciones.filter(ub => (ub.Laboratorio_Aula || '').includes(lab)).map(ub => ub.ID_Ubicacion)
+      );
+      return [...new Set([...asignadas, ...zonasComun])];
+    }
+  }
+
+  // Fallback: Ubicaciones_Asignadas de Sheets
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   const raw = (u?.Ubicaciones_Asignadas || '').split(',').map(s => s.trim()).filter(Boolean);
   const asignadas = raw.flatMap(val => {
@@ -153,9 +180,6 @@ function getUbicacionesAlumno() {
     }
     return [val];
   });
-  const zonasComun = DATA.ubicaciones
-    .filter(ub => (ub.Laboratorio_Aula || '').trim() === '205 - Zona común')
-    .map(ub => ub.ID_Ubicacion);
   return [...new Set([...asignadas, ...zonasComun])];
 }
 
