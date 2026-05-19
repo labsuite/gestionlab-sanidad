@@ -1122,24 +1122,6 @@
   /* Campos del panel expandido solo visibles en móvil */
   .detail-mobile-only { display: block; }
 
-  /* Tabla equipos en móvil portrait: columnas reducidas, sin scroll horizontal */
-  .card-equipment-table { overflow-x: visible; }
-  .card-equipment-table table { display: table; overflow-x: visible; }
-  /* Ocultar: Marca/Modelo(3), Ubicación(4), Responsable(5), Mantenimiento(7) */
-  .card-equipment-table th:nth-child(3),
-  .card-equipment-table th:nth-child(4),
-  .card-equipment-table th:nth-child(5),
-  .card-equipment-table th:nth-child(7),
-  .card-equipment-table td:nth-child(3),
-  .card-equipment-table td:nth-child(4),
-  .card-equipment-table td:nth-child(5),
-  .card-equipment-table td:nth-child(7) { display: none; }
-  /* Compactar celdas visibles */
-  .card-equipment-table th,
-  .card-equipment-table td { padding: 8px 5px; font-size: 11px; }
-  .card-equipment-table td:first-child { font-size: 12px; font-weight: 600; }
-  /* Expand td sin padding extra (equipo-expand-inner ya lo gestiona) */
-  .card-equipment-table .equipo-row-expand td { padding: 0; }
 
   /* Fila de detalle: visible al expandir (tablet portrait usa layout tabla) */
   .mat-detail-row.open { display: table-row; }
@@ -1177,9 +1159,6 @@
   .ubi-table-header,
   .ubi-row { min-width: 560px; }
 
-  /* Intervenciones mini en equipo: apiladas */
-  .intervenciones-mini-header { display: none; }
-  .intervencion-mini-row { grid-template-columns: 1fr 1fr !important; gap: 4px; }
 
   /* Row actions: siempre visibles */
   .row-actions { opacity: 1 !important; }
@@ -1269,13 +1248,17 @@
   .card > table td,
   .card > table th { white-space: nowrap; }
 
-  /* Tabla equipos en landscape: mostrar Marca/Modelo, ocultar solo Responsable(5) */
+  /* Tabla equipos en landscape: ID, Equipo, Marca/Modelo, Estado, Acciones */
   .card-equipment-table { overflow-x: visible; }
   .card-equipment-table table { display: table; overflow-x: visible; }
-  .card-equipment-table th:nth-child(3),
-  .card-equipment-table td:nth-child(3) { display: table-cell; }  /* restaurar Marca/Modelo */
+  .card-equipment-table tbody tr:not(.equipo-row-expand) { display: table-row; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td { display: table-cell; padding: 8px 5px; border: revert; background: revert; font-size: 11px; }
+  .card-equipment-table .equipo-row-expand.open { display: table-row; }
+  .card-equipment-table .equipo-row-expand td { display: table-cell; padding: 0; border: none; }
+  .card-equipment-table th:nth-child(4),
   .card-equipment-table th:nth-child(5),
   .card-equipment-table th:nth-child(7),
+  .card-equipment-table td:nth-child(4),
   .card-equipment-table td:nth-child(5),
   .card-equipment-table td:nth-child(7) { display: none; }
   .card-equipment-table td,
@@ -1402,5 +1385,60 @@
   #page-material .mat-ubic-row td:nth-child(5) { display: block; grid-area: acc;   align-self: center; }
   #page-material .mat-ubic-row .stock-bar { min-width: 25px; }
   #page-material .mat-ubic-row .stock-val { min-width: 40px; font-size: 10px; }
+  .row-actions { opacity: 1 !important; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   EQUIPOS: card layout en móvil portrait
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 768px) and (orientation: portrait) {
+  .card-equipment-table { overflow-x: visible; }
+  .card-equipment-table table { display: block; }
+  .card-equipment-table thead { display: none; }
+  .card-equipment-table tbody { display: block; }
+
+  /* ── Fila principal: card ── */
+  .card-equipment-table tbody tr:not(.equipo-row-expand) {
+    display: grid;
+    grid-template-areas:
+      "id estado"
+      "equipo equipo"
+      "marcamod marcamod"
+      "ubi mant"
+      "actions actions";
+    grid-template-columns: 1fr auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    gap: 2px 8px;
+    cursor: pointer;
+  }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td { display: block; padding: 0; border: none; background: transparent; font-size: 12px; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(1) { grid-area: id;       font-size: 10px; font-weight: 700; color: var(--text-muted); align-self: center; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(2) { grid-area: equipo;   font-size: 13px; font-weight: 600; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(3) { grid-area: marcamod; font-size: 11px; color: var(--text-soft); }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(4) { grid-area: ubi;      font-size: 11px; color: var(--text-soft); }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(5) { display: none; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(6) { grid-area: estado;   align-self: center; text-align: right; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(7) { grid-area: mant;     font-size: 11px; text-align: right; align-self: center; }
+  .card-equipment-table tbody tr:not(.equipo-row-expand) td:nth-child(8) { grid-area: actions;  padding-top: 6px; border-top: 1px solid var(--border); margin-top: 2px; }
+
+  /* ── Panel expandido: conectado a la card ── */
+  .card-equipment-table .equipo-row-expand { display: none; }
+  .card-equipment-table .equipo-row-expand.open {
+    display: block;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    margin: -8px 0 8px;
+  }
+  .card-equipment-table .equipo-row-expand td { display: block; padding: 0; border: none; }
+
+  /* Intervenciones: apiladas en card */
+  .intervenciones-mini-header { display: none; }
+  .intervencion-mini-row { grid-template-columns: 1fr 1fr !important; gap: 4px; }
   .row-actions { opacity: 1 !important; }
 }
