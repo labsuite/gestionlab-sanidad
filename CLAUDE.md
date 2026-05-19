@@ -360,6 +360,93 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ---
 
+## Integración con Supabase (app de gestión del departamento)
+
+La usuaria tiene una segunda app (Vercel + Supabase) para gestión integral del departamento. GestionLab comparte con ella dos ámbitos: **usuarios** y **reservas de autoclaves**.
+
+### Credenciales de Supabase
+
+- **Project URL (API):** `https://clxcjsvkmaydpxvtqesv.supabase.co`
+- **Anon key (pública, segura en cliente):** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA`
+- **Dashboard:** `https://supabase.com/dashboard/project/clxcjsvkmaydpxvtqesv`
+
+La anon key es la clave pública diseñada para uso en cliente. NO es la service key (que nunca debe ir en el cliente ni en git).
+
+### Tabla `users` en Supabase — estructura conocida
+
+La query devolvió columnas duplicadas (`id`, `role`, `created_at`, `updated_at`), lo que indica que hay una **vista o join** entre `auth.users` (tabla interna de Supabase) y una tabla personalizada `public.users`. Los campos útiles para GestionLab son:
+
+| Campo Supabase | Tipo | Equivalente en GestionLab (Sheets) | Notas |
+|---|---|---|---|
+| `email` | varchar | `Email` (col C) | Identificador común entre ambas apps |
+| `full_name` | text | `Nombre` (col B) | En Sheets son nombre+apellidos separados; en Supabase es un solo campo |
+| `role` | USER-DEFINED (enum) | `Rol` (col D) | Ver valores del enum más abajo |
+| `ciclo_principal` | text | `Ciclo_Principal` (col H) | Coincidencia exacta de nombre |
+| `is_active` | boolean | `Activo` (col E) | En Sheets es texto "TRUE"/"FALSE"; en Supabase es boolean real |
+| `xade_id` | text | *(no existe)* | ID en el sistema XADE (gestión académica de la Xunta). Útil para importar alumnos |
+| `department_id` | uuid | *(no existe)* | Departamento al que pertenece el usuario |
+| `id` | uuid | `ID_Usuario` (col A, formato USR-001) | En Supabase es UUID; en Sheets es string correlativo |
+
+**Campos de GestionLab que NO están en Supabase** (pendiente de resolver):
+- `Ubicaciones_Asignadas` (col F) — labs asignados al alumno, p.ej. `"201,203"`
+- `Modulo` (col G) — módulos en los que está matriculado
+
+**Pendiente antes de implementar:** preguntar a la usuaria si se pueden añadir columnas `ubicaciones_asignadas` y `modulo` a la tabla `public.users` de Supabase, o si es preferible una tabla auxiliar `gestionlab_user_data` en Supabase con esos campos referenciando `users.id`. La decisión afecta a las otras apps que usen la misma tabla.
+
+**Valores del enum `role`:** no confirmados aún. Los de GestionLab son `Admin`, `Gestor`, `Profesor`, `Alumno`. Verificar que coinciden con los valores del enum en Supabase antes de implementar. Si no coinciden, habrá que mapearlos.
+
+### Plan de integración — Usuarios
+
+**Objetivo:** alta de usuario en Supabase = aparece automáticamente en GestionLab y en las otras apps. Sin doble introducción de datos.
+
+**Cambios en GestionLab:**
+1. Añadir `@supabase/supabase-js` vía CDN en `index.html`:
+   ```html
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+   ```
+2. Añadir en `js/config.js`:
+   ```js
+   const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
+   const SUPABASE_ANON = '...anon key...';
+   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+   ```
+3. En `js/sheets.js`, dentro de `loadAllData()`, reemplazar `sheetsGet('Usuarios!A2:H')` por una query a Supabase:
+   ```js
+   const { data: sbUsers } = await supabaseClient.from('users').select('id,email,full_name,role,ciclo_principal,is_active,ubicaciones_asignadas,modulo');
+   DATA.usuarios = sbUsers.map(u => ({
+     ID_Usuario : u.id,                          // UUID en lugar de USR-001
+     Nombre     : u.full_name,
+     Email      : u.email,
+     Rol        : u.role,                        // mapear enum si los valores difieren
+     Activo     : u.is_active ? 'TRUE' : 'FALSE',
+     Ubicaciones_Asignadas: u.ubicaciones_asignadas || '',
+     Modulo     : u.modulo || '',
+     Ciclo_Principal: u.ciclo_principal || ''
+   }));
+   ```
+4. Las funciones de creación/edición de usuarios en `js/ubicaciones.js` dejarán de usar `sheetsAppend`/`sheetsUpdate` sobre `Usuarios` y pasarán a usar `supabaseClient.from('users').insert()` / `.update()`.
+5. La hoja `Usuarios` de Sheets queda obsoleta y se puede eliminar (o mantener en solo lectura como backup temporal durante la transición).
+
+**Nota sobre `ID_Usuario`:** GestionLab usa el formato `USR-001` en varios sitios (pedidos, reservas, registros de mantenimiento). Al migrar a UUID de Supabase, hay que actualizar las referencias en esas hojas de Sheets, o mantener el campo `xade_id` / un campo `gestionlab_id` en Supabase que guarde el `USR-001` legado.
+
+### Plan de integración — Reservas de autoclaves
+
+**Objetivo:** una reserva de autoclave creada en cualquiera de las dos apps es visible y gestionable desde ambas.
+
+**Cambios:**
+1. Crear tabla `reservas_autoclave` en Supabase con las columnas de `Reservas_Equipos` de Sheets (solo para autoclaves `AUTC-*`):
+   `id_reserva, id_equipo, usuario_email, fecha_inicio, fecha_fin, condiciones, proposito, estado, aprobado_por, observaciones_admin, inicio_real, fin_real`
+2. En GestionLab, `loadAllData()` carga las reservas de autoclaves desde Supabase en lugar de Sheets. Las de otros equipos (incubadoras, estufas, baños, PCR…) siguen leyendo de `Reservas_Equipos` en Sheets.
+3. `guardarReserva()`, `_cambiarEstadoReserva()` y `_actualizarVerificacion()` detectan si `idEquipo` empieza por `AUTC-` y usan Supabase en lugar de Sheets.
+4. Supabase tiene **Realtime** — se puede suscribir a cambios en la tabla para actualizar el timeline sin recargar.
+
+### Lo que NO hacer
+- No usar la **service key** de Supabase en el cliente ni en git. Solo la anon key.
+- No migrar todas las hojas de Sheets a Supabase de golpe — hacerlo tabla a tabla, empezando por `users`.
+- No eliminar la hoja `Usuarios` de Sheets hasta que la migración esté verificada en producción.
+
+---
+
 ## Pendiente de hacer – CÓDIGO
 
 ### Asistente de IA guiado (Gemini Flash)
