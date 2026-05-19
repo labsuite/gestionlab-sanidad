@@ -362,7 +362,7 @@ Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laborato
 
 ## Integración con Supabase (app de gestión del departamento)
 
-La usuaria tiene una segunda app (Vercel + Supabase) para gestión integral del departamento. GestionLab comparte con ella dos ámbitos: **usuarios** y **reservas de autoclaves**.
+La usuaria tiene una segunda app (Vercel + Supabase) para gestión integral del departamento. GestionLab comparte con ella ciclos/módulos, usuarios y (en el futuro) reservas de autoclaves.
 
 ### Credenciales de Supabase
 
@@ -370,80 +370,77 @@ La usuaria tiene una segunda app (Vercel + Supabase) para gestión integral del 
 - **Anon key (pública, segura en cliente):** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA`
 - **Dashboard:** `https://supabase.com/dashboard/project/clxcjsvkmaydpxvtqesv`
 
-La anon key es la clave pública diseñada para uso en cliente. NO es la service key (que nunca debe ir en el cliente ni en git).
+La anon key es la clave pública diseñada para uso en cliente. NO usar la service key en el cliente ni en git.
 
-### Tabla `users` en Supabase — estructura conocida
+### Estado actual de la integración (2026-05-19) ✓ PARCIALMENTE COMPLETADO
 
-La query devolvió columnas duplicadas (`id`, `role`, `created_at`, `updated_at`), lo que indica que hay una **vista o join** entre `auth.users` (tabla interna de Supabase) y una tabla personalizada `public.users`. Los campos útiles para GestionLab son:
+| Ámbito | Estado | Fuente activa |
+|---|---|---|
+| Cliente Supabase (`_sb`) | ✓ integrado | `js/config.js` + CDN en `index.html` |
+| `ciclos` | ✓ migrado + datos cargados | Supabase |
+| `modulos` | ✓ migrado + datos cargados | Supabase |
+| `modulo_ciclo` | ✓ migrado + datos cargados | Supabase |
+| `user_modulos` | ✓ tabla creada, vacía | Supabase (se puebla desde la otra app al asignar módulos a usuarios) |
+| `puede_revisar_inventario` | ✓ columna añadida a `public.users` | Supabase |
+| `DATA.sbUsuarios` | ✓ cargado en paralelo | Supabase (solo para lookup de UUID) |
+| `DATA.usuarios` | ✗ pendiente | **Sheets** (sin cambios — alta/edición siguen en Sheets) |
+| Reservas autoclaves | ✗ pendiente | **Sheets** |
 
-| Campo Supabase | Tipo | Equivalente en GestionLab (Sheets) | Notas |
-|---|---|---|---|
-| `email` | varchar | `Email` (col C) | Identificador común entre ambas apps |
-| `full_name` | text | `Nombre` (col B) | En Sheets son nombre+apellidos separados; en Supabase es un solo campo |
-| `role` | USER-DEFINED (enum) | `Rol` (col D) | Ver valores del enum más abajo |
-| `ciclo_principal` | text | `Ciclo_Principal` (col H) | Coincidencia exacta de nombre |
-| `is_active` | boolean | `Activo` (col E) | En Sheets es texto "TRUE"/"FALSE"; en Supabase es boolean real |
-| `xade_id` | text | *(no existe)* | ID en el sistema XADE (gestión académica de la Xunta). Útil para importar alumnos |
-| `department_id` | uuid | *(no existe)* | Departamento al que pertenece el usuario |
-| `id` | uuid | `ID_Usuario` (col A, formato USR-001) | En Supabase es UUID; en Sheets es string correlativo |
+### Cómo funciona actualmente en GestionLab
 
-**Campos de GestionLab que NO están en Supabase** (pendiente de resolver):
-- `Ubicaciones_Asignadas` (col F) — labs asignados al alumno, p.ej. `"201,203"`
-- `Modulo` (col G) — módulos en los que está matriculado
+`loadAllData()` lanza en paralelo todas las lecturas de Sheets **y** cuatro queries a Supabase: `ciclos`, `modulos`, `modulo_ciclo` y `users`. Si Supabase falla, la app cae al fallback de Sheets sin romperse.
 
-**Pendiente antes de implementar:** preguntar a la usuaria si se pueden añadir columnas `ubicaciones_asignadas` y `modulo` a la tabla `public.users` de Supabase, o si es preferible una tabla auxiliar `gestionlab_user_data` en Supabase con esos campos referenciando `users.id`. La decisión afecta a las otras apps que usen la misma tabla.
+- `DATA.ciclosModulos` se construye desde Supabase (`modulo_ciclo` + `modulos` + `ciclos`), con `lab_teoria` y `lab_practicas` por módulo. Si Supabase devuelve vacío, se usa el de Sheets.
+- `DATA.userModulos` se construye desde `user_modulos` de Supabase enriquecido con nombre de módulo y labs. Empieza vacío.
+- `DATA.sbUsuarios` carga `id, email, full_name, role, ciclo_principal, is_active, puede_revisar_inventario` desde Supabase. Solo se usa para obtener el UUID del usuario actual.
+- `getUbicacionesAlumno()` primero busca el UUID del usuario en `DATA.sbUsuarios`, luego sus módulos en `DATA.userModulos`, y deriva los labs de `lab_teoria`/`lab_practicas`. Si `user_modulos` está vacío, usa `Ubicaciones_Asignadas` de Sheets como fallback.
 
-**Valores del enum `role`:** no confirmados aún. Los de GestionLab son `Admin`, `Gestor`, `Profesor`, `Alumno`. Verificar que coinciden con los valores del enum en Supabase antes de implementar. Si no coinciden, habrá que mapearlos.
+### Estructura de tablas en Supabase relevante para GestionLab
 
-### Plan de integración — Usuarios
+**`public.ciclos`**: `id (uuid), nombre (text), created_at, department_id (uuid, nullable)`
+**`public.modulos`**: `id (uuid), nombre (text), created_at, lab_teoria (text), lab_practicas (text), horas_semanales (integer)`
+**`public.modulo_ciclo`**: `ciclo_id (uuid), modulo_id (uuid)` — tabla pivot pura (muchos-a-muchos)
+**`public.user_modulos`**: `id (uuid), user_id (uuid→users), modulo_id (uuid→modulos), curso_academico (text), created_at` — RLS: anon SELECT, authenticated ALL
+**`public.users`**: vista/join de `auth.users` + tabla personalizada. Campos útiles: `id, email, full_name, role (enum), ciclo_principal, is_active, xade_id, department_id, puede_revisar_inventario`
 
-**Objetivo:** alta de usuario en Supabase = aparece automáticamente en GestionLab y en las otras apps. Sin doble introducción de datos.
+**RLS en tablas compartidas:** `ciclos`, `modulos` y `modulo_ciclo` tienen `SELECT TO authenticated`. Se añadió `SELECT TO anon` para GestionLab (que usa anon key con Google OAuth propio, no Supabase Auth).
 
-**Cambios en GestionLab:**
-1. Añadir `@supabase/supabase-js` vía CDN en `index.html`:
-   ```html
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-   ```
-2. Añadir en `js/config.js`:
-   ```js
-   const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
-   const SUPABASE_ANON = '...anon key...';
-   const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-   ```
-3. En `js/sheets.js`, dentro de `loadAllData()`, reemplazar `sheetsGet('Usuarios!A2:H')` por una query a Supabase:
-   ```js
-   const { data: sbUsers } = await supabaseClient.from('users').select('id,email,full_name,role,ciclo_principal,is_active,ubicaciones_asignadas,modulo');
-   DATA.usuarios = sbUsers.map(u => ({
-     ID_Usuario : u.id,                          // UUID en lugar de USR-001
-     Nombre     : u.full_name,
-     Email      : u.email,
-     Rol        : u.role,                        // mapear enum si los valores difieren
-     Activo     : u.is_active ? 'TRUE' : 'FALSE',
-     Ubicaciones_Asignadas: u.ubicaciones_asignadas || '',
-     Modulo     : u.modulo || '',
-     Ciclo_Principal: u.ciclo_principal || ''
-   }));
-   ```
-4. Las funciones de creación/edición de usuarios en `js/ubicaciones.js` dejarán de usar `sheetsAppend`/`sheetsUpdate` sobre `Usuarios` y pasarán a usar `supabaseClient.from('users').insert()` / `.update()`.
-5. La hoja `Usuarios` de Sheets queda obsoleta y se puede eliminar (o mantener en solo lectura como backup temporal durante la transición).
+### Flujo objetivo una vez completada la integración
 
-**Nota sobre `ID_Usuario`:** GestionLab usa el formato `USR-001` en varios sitios (pedidos, reservas, registros de mantenimiento). Al migrar a UUID de Supabase, hay que actualizar las referencias en esas hojas de Sheets, o mantener el campo `xade_id` / un campo `gestionlab_id` en Supabase que guarde el `USR-001` legado.
+Alta de usuario en Supabase (desde cualquier app) → asignar módulos en `user_modulos` → GestionLab deriva automáticamente los labs de `lab_teoria`/`lab_practicas` del módulo. Sin introducción manual de datos en múltiples apps.
 
-### Plan de integración — Reservas de autoclaves
+### Pendiente — Fase 2: migración de usuarios a Supabase
 
-**Objetivo:** una reserva de autoclave creada en cualquiera de las dos apps es visible y gestionable desde ambas.
+**Objetivo:** `DATA.usuarios` lea de Supabase en lugar de Sheets. Alta de usuario = solo en Supabase.
+
+**Bloqueante:** el enum `role` de Supabase tiene valores no confirmados. Los de GestionLab son `Admin`, `Gestor`, `Profesor`, `Alumno`. Verificar que coinciden antes de implementar; si no, mapearlos.
+
+**Nota sobre `ID_Usuario`:** GestionLab usa formato `USR-001`. Al migrar a UUID de Supabase, las referencias en Sheets (pedidos, reservas, registros) quedan obsoletas. Opción: añadir campo `gestionlab_id text` en `public.users` que conserve el `USR-001` legado.
+
+**Cambios en GestionLab cuando se implemente:**
+1. En `loadAllData()`: reemplazar `sheetsGet('Usuarios!A2:I')` por query a `_sb.from('users').select(...)` y mapear a la estructura de `DATA.usuarios`.
+2. En `js/ubicaciones.js`: reemplazar `sheetsAppend`/`sheetsUpdate` sobre `Usuarios` por `_sb.from('users').insert()` / `.update()`.
+3. Mantener hoja `Usuarios` de Sheets en solo lectura como backup durante la transición; eliminar solo cuando esté verificado en producción.
+
+### Pendiente — Fase 3: migración a Supabase Auth
+
+**Objetivo:** GestionLab usa Supabase Auth con proveedor Google en lugar de Google GIS directo. Los usuarios pasan a ser `authenticated` en Supabase → acceden a tablas compartidas sin necesidad de políticas `anon`.
+
+**Alcance:** solo `js/auth.js` (~30-40 líneas). El resto de la app no cambia. El token de Google para Sheets API se obtiene de `session.provider_token`.
+
+**Requisito previo:** añadir `https://clxcjsvkmaydpxvtqesv.supabase.co/auth/v1/callback` como URL de redirección autorizada en Google Cloud Console. El flujo cambia de popup/token a redirección; la renovación silenciosa actual se sustituye por `_sb.auth.getSession()`.
+
+**Hacer en sesión dedicada** — no mezclar con otras tareas; si falla, el login deja de funcionar.
+
+### Pendiente — Fase 4: reservas de autoclaves compartidas
+
+**Objetivo:** reserva de autoclave visible y gestionable desde GestionLab y la app de Vercel.
 
 **Cambios:**
-1. Crear tabla `reservas_autoclave` en Supabase con las columnas de `Reservas_Equipos` de Sheets (solo para autoclaves `AUTC-*`):
-   `id_reserva, id_equipo, usuario_email, fecha_inicio, fecha_fin, condiciones, proposito, estado, aprobado_por, observaciones_admin, inicio_real, fin_real`
-2. En GestionLab, `loadAllData()` carga las reservas de autoclaves desde Supabase en lugar de Sheets. Las de otros equipos (incubadoras, estufas, baños, PCR…) siguen leyendo de `Reservas_Equipos` en Sheets.
-3. `guardarReserva()`, `_cambiarEstadoReserva()` y `_actualizarVerificacion()` detectan si `idEquipo` empieza por `AUTC-` y usan Supabase en lugar de Sheets.
-4. Supabase tiene **Realtime** — se puede suscribir a cambios en la tabla para actualizar el timeline sin recargar.
-
-### Lo que NO hacer
-- No usar la **service key** de Supabase en el cliente ni en git. Solo la anon key.
-- No migrar todas las hojas de Sheets a Supabase de golpe — hacerlo tabla a tabla, empezando por `users`.
-- No eliminar la hoja `Usuarios` de Sheets hasta que la migración esté verificada en producción.
+1. Crear tabla `reservas_autoclave` en Supabase (misma estructura que `Reservas_Equipos`, solo `AUTC-*`).
+2. En `loadAllData()`: cargar reservas de autoclaves desde Supabase; el resto (`INC-*`, `EST-*`, etc.) sigue en Sheets.
+3. En `guardarReserva()`, `_cambiarEstadoReserva()`, `_actualizarVerificacion()`: detectar `idEquipo.startsWith('AUTC-')` y usar Supabase.
+4. Opcional: suscribirse a Supabase Realtime para actualizar el timeline sin recargar.
 
 ---
 
