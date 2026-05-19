@@ -1150,14 +1150,8 @@
   #page-material .equipo-row td:nth-child(3),
   #page-material .equipo-row td:nth-child(6),
   #page-material .equipo-row td:nth-child(7) { display: none; }
-  /* Sub-filas de ubicación: flex para evitar desbordamiento horizontal en móvil */
-  #page-material .mat-ubic-row { display: flex; align-items: center; gap: 4px; }
-  #page-material .mat-ubic-row td { display: none; }
-  #page-material .mat-ubic-row td:nth-child(2) { display: block; flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #page-material .mat-ubic-row td:nth-child(3) { display: block; flex: 0 0 85px; }
-  #page-material .mat-ubic-row td:nth-child(5) { display: block; flex: 0 0 auto; }
-  #page-material .mat-ubic-row .stock-bar { min-width: 25px; }
-  #page-material .mat-ubic-row .stock-val { min-width: 35px; font-size: 10px; }
+  /* Sub-filas de ubicación: ocultar Mín/Ópt local (4º td) */
+  #page-material .mat-ubic-row td:nth-child(4) { display: none; }
   /* Compactar celdas visibles */
   #page-material th, #page-material td { padding: 8px 5px; font-size: 11px; }
   #page-material td:first-child { font-size: 12px; font-weight: 600; }
@@ -1311,10 +1305,7 @@
   #page-material .equipo-row td:nth-child(3),
   #page-material .equipo-row td:nth-child(6),
   #page-material .equipo-row td:nth-child(7) { display: table-cell; }
-  #page-material .mat-ubic-row { display: table-row; }
-  #page-material .mat-ubic-row td { display: table-cell; }
-  #page-material .mat-ubic-row .stock-bar { min-width: 60px; }
-  #page-material .mat-ubic-row .stock-val { min-width: 60px; font-size: 12px; }
+  #page-material .mat-ubic-row td:nth-child(4) { display: table-cell; }
   .mat-detail-row.open { display: none; }
   #page-material .equipo-row:not(.expandable) .expand-icon { display: none; }
   #page-material .equipo-row:not(.expandable) { cursor: default; }
