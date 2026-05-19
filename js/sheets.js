@@ -126,7 +126,7 @@ async function loadAllData() {
            tiposResiduo, contenedoresResiduo, adicionesResiduo,
            revisionesInventario, consultasResiduo,
            configReservas, reservas,
-           sbCiclosRes, sbModulosRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
+           sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:I'),
@@ -153,7 +153,8 @@ async function loadAllData() {
       sheetsGet('Reservas_Equipos!A2:L').catch(() => []),
       // Supabase — en paralelo con Sheets
       _sb.from('ciclos').select('id,nombre').catch(() => ({ data: [] })),
-      _sb.from('modulos').select('id,nombre,ciclo_id,lab_teoria,lab_practicas').catch(() => ({ data: [] })),
+      _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').catch(() => ({ data: [] })),
+      _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').catch(() => ({ data: [] })),
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').catch(() => ({ data: [] })),
       _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').catch(() => ({ data: [] }))
     ]);
@@ -195,36 +196,41 @@ async function loadAllData() {
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];
     const sbModulos     = sbModulosRes?.data     || [];
+    const sbModuloCiclo = sbModuloCicloRes?.data || [];
     const sbUserModulos = sbUserModulosRes?.data || [];
     const sbUsuarios    = sbUsuariosRes?.data    || [];
 
     DATA.sbUsuarios = sbUsuarios;
 
-    if (sbModulos.length) {
-      // Sustituir ciclosModulos por datos enriquecidos de Supabase (incluye labs)
-      DATA.ciclosModulos = sbModulos.map(m => {
-        const ciclo = sbCiclos.find(c => c.id === m.ciclo_id);
+    if (sbModuloCiclo.length && sbModulos.length) {
+      // Construir ciclosModulos desde la tabla pivot modulo_ciclo (muchos-a-muchos)
+      DATA.ciclosModulos = sbModuloCiclo.map(mc => {
+        const mod   = sbModulos.find(m => m.id === mc.modulo_id);
+        const ciclo = sbCiclos.find(c => c.id === mc.ciclo_id);
         return {
-          Ciclo: ciclo?.nombre || '',
-          Modulo: m.nombre,
-          _sbId: m.id,
-          lab_teoria: m.lab_teoria || '',
-          lab_practicas: m.lab_practicas || ''
+          Ciclo:        ciclo?.nombre         || '',
+          Modulo:       mod?.nombre           || '',
+          _sbModuloId:  mc.modulo_id,
+          lab_teoria:   mod?.lab_teoria       || '',
+          lab_practicas: mod?.lab_practicas   || ''
         };
-      });
+      }).filter(cm => cm.Ciclo && cm.Modulo);
     }
 
     DATA.userModulos = sbUserModulos.map(um => {
-      const mod   = sbModulos.find(m => m.id === um.modulo_id);
-      const ciclo = mod ? sbCiclos.find(c => c.id === mod.ciclo_id) : null;
+      const mod = sbModulos.find(m => m.id === um.modulo_id);
+      const ciclosDelMod = sbModuloCiclo
+        .filter(mc => mc.modulo_id === um.modulo_id)
+        .map(mc => sbCiclos.find(c => c.id === mc.ciclo_id)?.nombre || '')
+        .filter(Boolean);
       return {
-        user_id:        um.user_id,
-        modulo_id:      um.modulo_id,
+        user_id:         um.user_id,
+        modulo_id:       um.modulo_id,
         curso_academico: um.curso_academico,
-        nombre_modulo:  mod?.nombre      || '',
-        nombre_ciclo:   ciclo?.nombre    || '',
-        lab_teoria:     mod?.lab_teoria  || '',
-        lab_practicas:  mod?.lab_practicas || ''
+        nombre_modulo:   mod?.nombre          || '',
+        nombre_ciclos:   ciclosDelMod,
+        lab_teoria:      mod?.lab_teoria      || '',
+        lab_practicas:   mod?.lab_practicas   || ''
       };
     });
 

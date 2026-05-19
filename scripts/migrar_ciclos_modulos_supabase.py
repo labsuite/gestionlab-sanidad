@@ -1,7 +1,7 @@
 """
 Migra Ciclos_Modulos de Google Sheets a Supabase.
-Crea los ciclos y módulos en las tablas correspondientes.
-Los campos lab_teoria y lab_practicas se dejan vacíos — rellenar desde la nueva app.
+Usa la tabla pivot modulo_ciclo (muchos-a-muchos), que ya existe en Supabase.
+Los campos lab_teoria y lab_practicas quedan vacíos — rellenar desde la nueva app.
 
 Uso: python scripts/migrar_ciclos_modulos_supabase.py
 """
@@ -18,7 +18,7 @@ HEADERS = {
 }
 
 def sb_get(tabla, select='*'):
-    r = requests.get(f'{SUPABASE_URL}/rest/v1/{tabla}?select={select}', headers=HEADERS)
+    r = requests.get(f'{SUPABASE_URL}/rest/v1/{tabla}?select={select}&limit=1000', headers=HEADERS)
     r.raise_for_status()
     return r.json()
 
@@ -37,48 +37,57 @@ sh = conectar()
 _, _, filas = leer(sh, 'Ciclos_Modulos')
 
 # Propagar ciclo hacia abajo (celdas vacías heredan el anterior)
-datos = []
+pares = []
 ultimo_ciclo = ''
 for fila in filas:
     ciclo  = fila[0].strip() if fila and fila[0].strip() else ultimo_ciclo
     modulo = fila[1].strip() if len(fila) > 1 else ''
     if ciclo: ultimo_ciclo = ciclo
     if ciclo and modulo:
-        datos.append((ciclo, modulo))
+        pares.append((ciclo, modulo))
 
-ciclos_unicos = sorted(set(c for c, _ in datos))
-print(f'{len(datos)} pares ciclo-módulo, {len(ciclos_unicos)} ciclos únicos.')
+ciclos_unicos  = sorted(set(c for c, _ in pares))
+modulos_unicos = sorted(set(m for _, m in pares))
+print(f'{len(pares)} pares ciclo-módulo | {len(ciclos_unicos)} ciclos | {len(modulos_unicos)} módulos únicos')
 
-# ── Insertar ciclos ────────────────────────────────────────────
+# ── Leer estado actual de Supabase ─────────────────────────────
+existentes_ciclos  = {c['nombre']: c['id'] for c in sb_get('ciclos',  'id,nombre')}
+existentes_modulos = {m['nombre']: m['id'] for m in sb_get('modulos', 'id,nombre')}
+existentes_pivot   = {(r['ciclo_id'], r['modulo_id']) for r in sb_get('modulo_ciclo', 'ciclo_id,modulo_id')}
+
+# ── Insertar ciclos nuevos ─────────────────────────────────────
 print('\nInsertando ciclos...')
-existentes = {c['nombre']: c['id'] for c in sb_get('ciclos', 'id,nombre')}
-
 for nombre in ciclos_unicos:
-    if nombre in existentes:
-        print(f'  [ya existe] {nombre}')
+    if nombre in existentes_ciclos:
+        print(f'  [existe] {nombre}')
         continue
     result = sb_insert('ciclos', {'nombre': nombre})
-    existentes[nombre] = result[0]['id']
+    existentes_ciclos[nombre] = result[0]['id']
     print(f'  ✓ {nombre}')
 
-# ── Insertar módulos ───────────────────────────────────────────
+# ── Insertar módulos nuevos ────────────────────────────────────
 print('\nInsertando módulos...')
-existentes_mod = {
-    (m['nombre'], m['ciclo_id'])
-    for m in sb_get('modulos', 'nombre,ciclo_id')
-}
+for nombre in modulos_unicos:
+    if nombre in existentes_modulos:
+        continue
+    result = sb_insert('modulos', {'nombre': nombre})
+    existentes_modulos[nombre] = result[0]['id']
+    print(f'  ✓ {nombre}')
 
+# ── Insertar relaciones en modulo_ciclo ───────────────────────
+print('\nInsertando relaciones ciclo-módulo...')
 insertados = 0
-for ciclo, modulo in datos:
-    ciclo_id = existentes.get(ciclo)
-    if not ciclo_id:
-        print(f'  [sin ciclo_id] {ciclo}')
+for ciclo, modulo in pares:
+    ciclo_id  = existentes_ciclos.get(ciclo)
+    modulo_id = existentes_modulos.get(modulo)
+    if not ciclo_id or not modulo_id:
+        print(f'  [sin ID] {ciclo} / {modulo}')
         continue
-    if (modulo, ciclo_id) in existentes_mod:
+    if (ciclo_id, modulo_id) in existentes_pivot:
         continue
-    sb_insert('modulos', {'nombre': modulo, 'ciclo_id': ciclo_id})
-    existentes_mod.add((modulo, ciclo_id))
+    sb_insert('modulo_ciclo', {'ciclo_id': ciclo_id, 'modulo_id': modulo_id})
+    existentes_pivot.add((ciclo_id, modulo_id))
     insertados += 1
 
-print(f'\n✓ Migración completada: {insertados} módulos insertados.')
+print(f'\n✓ Migración completada: {insertados} relaciones insertadas.')
 print('Recuerda rellenar lab_teoria y lab_practicas para cada módulo desde la app de gestión.')
