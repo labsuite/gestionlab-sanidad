@@ -1141,25 +1141,8 @@
   /* Expand td sin padding extra (equipo-expand-inner ya lo gestiona) */
   .card-equipment-table .equipo-row-expand td { padding: 0; }
 
-  /* Tabla fungibles en móvil portrait: columnas reducidas, sin scroll horizontal */
-  #page-material table { display: table; overflow-x: visible; }
-  /* Ocultar: Categoría(3), Mín/Ópt(6), Precio(7) */
-  #page-material thead th:nth-child(3),
-  #page-material thead th:nth-child(6),
-  #page-material thead th:nth-child(7) { display: none; }
-  #page-material .equipo-row td:nth-child(3),
-  #page-material .equipo-row td:nth-child(6),
-  #page-material .equipo-row td:nth-child(7) { display: none; }
-  /* Sub-filas de ubicación: ocultar Mín/Ópt local (4º td) */
-  #page-material .mat-ubic-row td:nth-child(4) { display: none; }
-  /* Compactar celdas visibles */
-  #page-material th, #page-material td { padding: 8px 5px; font-size: 11px; }
-  #page-material td:first-child { font-size: 12px; font-weight: 600; }
-  /* Fila de detalle: visible al expandir */
+  /* Fila de detalle: visible al expandir (tablet portrait usa layout tabla) */
   .mat-detail-row.open { display: table-row; }
-  /* Ícono y cursor para ítems de ubicación única */
-  #page-material .equipo-row:not(.expandable) .expand-icon { display: inline; }
-  #page-material .equipo-row:not(.expandable) { cursor: pointer; }
 
   /* Modales: sheet desde abajo */
   .modal-overlay { align-items: flex-end; padding: 0; }
@@ -1356,4 +1339,68 @@
 
   /* ── iOS: evitar zoom al enfocar inputs ── */
   input, select, textarea { font-size: 16px !important; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   FUNGIBLES: card layout exclusivo en móvil portrait
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* Convertir tabla en lista de cards */
+  #page-material table { display: block; }
+  #page-material thead { display: none; }
+  #page-material tbody { display: block; }
+  #page-material .mat-detail-row,
+  #page-material .mat-detail-row.open { display: none; }
+
+  /* ── equipo-row: card con grid ── */
+  #page-material .equipo-row {
+    display: grid;
+    grid-template-areas:
+      "id   cat"
+      "nombre nombre"
+      "ubi  ubi"
+      "stock minopt"
+      "actions actions";
+    grid-template-columns: 1fr auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    gap: 2px 8px;
+    cursor: default !important;
+  }
+  #page-material .equipo-row.expandable { cursor: pointer !important; }
+  #page-material .equipo-row td { display: block; padding: 0; border: none; background: transparent; font-size: 12px; }
+  #page-material .equipo-row td:nth-child(1) { grid-area: id;      font-size: 10px; color: var(--text-muted); font-weight: 700; align-self: center; }
+  #page-material .equipo-row td:nth-child(2) { grid-area: nombre;  font-size: 13px; font-weight: 600; }
+  #page-material .equipo-row td:nth-child(3) { grid-area: cat;     text-align: right; align-self: center; }
+  #page-material .equipo-row td:nth-child(4) { grid-area: ubi;     font-size: 11px; color: var(--text-soft); }
+  #page-material .equipo-row td:nth-child(5) { grid-area: stock;   align-self: center; }
+  #page-material .equipo-row td:nth-child(6) { grid-area: minopt;  text-align: right; font-size: 11px; color: var(--text-muted); align-self: center; white-space: nowrap; }
+  #page-material .equipo-row td:nth-child(7) { display: none; }
+  #page-material .equipo-row td:nth-child(8) { grid-area: actions; padding-top: 6px; border-top: 1px solid var(--border); margin-top: 2px; }
+  #page-material .equipo-row:not(.expandable) .expand-icon { display: none; }
+
+  /* ── mat-ubic-row: sub-card indentada ── */
+  #page-material .mat-ubic-row {
+    display: grid;
+    grid-template-areas:
+      "loc loc"
+      "stock acc";
+    grid-template-columns: 1fr auto;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    margin: -4px 0 4px 16px;
+    gap: 4px 8px;
+  }
+  #page-material .mat-ubic-row td { display: none; padding: 0; border: none; background: transparent; }
+  #page-material .mat-ubic-row td:nth-child(2) { display: block; grid-area: loc;   font-size: 11px; color: var(--text-soft); }
+  #page-material .mat-ubic-row td:nth-child(3) { display: block; grid-area: stock; align-self: center; }
+  #page-material .mat-ubic-row td:nth-child(5) { display: block; grid-area: acc;   align-self: center; }
+  #page-material .mat-ubic-row .stock-bar { min-width: 25px; }
+  #page-material .mat-ubic-row .stock-val { min-width: 40px; font-size: 10px; }
+  .row-actions { opacity: 1 !important; }
 }
