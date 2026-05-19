@@ -245,8 +245,12 @@ function _renderTimeline(idEquipo) {
       .map(r => {
         const ini = new Date(r.Fecha_Inicio);
         const fin = new Date(r.Fecha_Fin);
-        const sH = Math.max(RANGE_START, ini.getHours() + ini.getMinutes()/60);
-        const eH = Math.min(RANGE_START + RANGE_HOURS, fin.getHours() + fin.getMinutes()/60);
+        const iniDay = new Date(ini); iniDay.setHours(0,0,0,0);
+        const finDay = new Date(fin); finDay.setHours(0,0,0,0);
+        const startsToday = iniDay.getTime() === day.getTime();
+        const endsToday   = finDay.getTime() === day.getTime();
+        const sH = startsToday ? Math.max(RANGE_START, ini.getHours() + ini.getMinutes()/60) : RANGE_START;
+        const eH = endsToday   ? Math.min(RANGE_START + RANGE_HOURS, fin.getHours() + fin.getMinutes()/60) : RANGE_START + RANGE_HOURS;
         if (eH <= sH) return '';
         const left  = (sH - RANGE_START) / RANGE_HOURS * 100;
         const width = (eH - sH) / RANGE_HOURS * 100;
