@@ -176,7 +176,9 @@ function getUserRole() {
   if (!currentUser?.email) return 'Alumno';
   const emailNorm = currentUser.email.toLowerCase().trim();
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
-  return u?.Rol || 'Alumno';
+  if (u) return u?.Rol || 'Alumno';
+  const sbU = DATA.sbUsuarios?.find(u => (u.email || '').toLowerCase().trim() === emailNorm);
+  return sbU?.role || 'Alumno';
 }
 
 function showPage(page) {
@@ -201,7 +203,8 @@ function showPage(page) {
 function showApp() {
   // ── Bloqueo estricto: email no registrado → pantalla no autorizado ──────
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
-  const userInDb  = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const userInDb  = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm)
+    || DATA.sbUsuarios?.find(u => (u.email || '').toLowerCase().trim() === emailNorm && u.is_active !== false);
   if (!userInDb) {
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app').style.display = 'none';
