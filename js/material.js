@@ -461,7 +461,8 @@ function buscarUbicacionMat(query) {
     (u.ID_Ubicacion.toLowerCase().includes(q) ||
      (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
      (u.Zona || '').toLowerCase().includes(q))
-  ).slice(0, 8);
+  ).sort((a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }))
+   .slice(0, 15);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => `<div class="autocomplete-item" onclick="seleccionarUbicacionMatLote('${u.ID_Ubicacion}','${(u.Laboratorio_Aula + (u.Zona ? ' · ' + u.Zona : '')).replace(/'/g,"\\'")}')">
     <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${u.Laboratorio_Aula || ''}${u.Zona ? ' · ' + u.Zona : ''}</div></div>
