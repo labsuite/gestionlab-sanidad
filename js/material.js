@@ -602,6 +602,17 @@ function editMaterial(idx) {
     _nuevo: false,
     _loteIdx: DATA.materialUbicaciones.indexOf(l)
   }));
+  // Si no tiene lotes pero sí Ubicacion legacy, pre-poblar para no perderla al añadir una segunda
+  if (_lotesTemp.length === 0 && m.Ubicacion) {
+    _lotesTemp.push({
+      ID_Ubicacion: m.Ubicacion,
+      Stock_Local: m.Stock_Actual || '0',
+      Stock_Minimo_Local: m.Stock_Minimo || '0',
+      Stock_Optimo_Local: m.Stock_Optimo || '0',
+      Gestion_Auto: m.Gestion_Automatica !== 'FALSE',
+      _nuevo: true
+    });
+  }
   document.getElementById('modal-material-title').textContent = 'Editar material';
   sv('mat-id', m.ID_Material); sv('mat-nombre', m.Nombre); sv('mat-categoria', m.Categoria);
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = true;
