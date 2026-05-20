@@ -151,12 +151,12 @@ async function loadAllData() {
       sheetsGet('Consultas_Residuo!A2:F').catch(() => []),
       sheetsGet('Config_Reservas!A2:E').catch(() => []),
       sheetsGet('Reservas_Equipos!A2:L').catch(() => []),
-      // Supabase — en paralelo con Sheets
-      _sb.from('ciclos').select('id,nombre').catch(() => ({ data: [] })),
-      _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').catch(() => ({ data: [] })),
-      _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').catch(() => ({ data: [] })),
-      _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').catch(() => ({ data: [] })),
-      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').catch(() => ({ data: [] }))
+      // Supabase — en paralelo con Sheets (usar .then(r=>r, fallback) porque el builder no tiene .catch())
+      _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
+      _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
+      _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
+      _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
+      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
