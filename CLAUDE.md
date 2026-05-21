@@ -562,6 +562,13 @@ Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye eje
 - **NO usar `position: sticky`** en `.equipo-expand-inner` — interacciona mal con `overflow: hidden` del card
 - **NO poner `overflow-x: auto` en `.equipo-expand-inner`** — no impide la expansión si el min-content del contenido supera el ancho de la tabla; el scroll debe estar en el wrapper interno de las intervenciones
 
+### Vista de incidencias (card layout)
+- Usa `<div id="lista-incidencias" class="inc-lista">` en lugar de `<table>` — el problema nunca se trunca
+- `renderIncidencias()` genera `.inc-card` por elemento; las urgentes añaden clase `.inc-urgente` (borde izquierdo rojo)
+- Estructura de cada card: cabecera (ID + equipo + badges estado/urgencia + fecha) → bloque problema (`var(--surface2)`) → pie (badge impacto + reportado por + botón acción)
+- El botón de acción es contextual: "Responder" si Abierta, "Ver / Actuar" o "📎 Adjuntar factura" si En gestión según estado de la intervención enlazada
+- **NO volver a tabla** — el campo `Descripcion_Problema` puede ser largo; la tabla truncaba con `text-overflow:ellipsis`
+
 ### Tabla de fungibles (inventario de material)
 - En desktop: tabla completa con columnas de categoría, mínimo/óptimo y precio visibles
 - En móvil (portrait): se ocultan las columnas 3 (categoría), 6 (mín/opt) y 7 (precio) vía CSS
