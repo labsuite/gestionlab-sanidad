@@ -282,7 +282,7 @@ function _renderTablaUsuarios(lista, rolActual) {
             <td>${u.Email||'—'}</td>
             <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
             <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-            <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+            <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -346,7 +346,7 @@ function _renderSeccionAlumnos(lista, rolActual) {
         <td>${modBadges}</td>
         <td>${labBadges}</td>
         <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-        <td><div class="row-actions">${puedeEditar ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+        <td><div class="row-actions">${puedeEditar && !u._sbOnly ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
       </tr>`;
     }).join('');
     return `<div class="card" style="margin-bottom:16px">
@@ -586,7 +586,8 @@ function editUsuario(idx) {
     showToast('Solo puedes modificar usuarios con rol Alumno', 'error');
     return;
   }
-  editingRow = { sheet: 'Usuarios', rowIndex: idx };
+  // _sbOnly: usuario de Supabase sin fila en Sheets → insertar nuevo al guardar
+  editingRow = u._sbOnly ? null : { sheet: 'Usuarios', rowIndex: idx };
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
   const grp = document.getElementById('usr-alumno-fields');
   if (grp) grp.style.display = u.Rol === 'Alumno' ? '' : 'none';

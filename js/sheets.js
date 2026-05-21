@@ -234,6 +234,33 @@ async function loadAllData() {
       };
     });
 
+    // Complementar DATA.usuarios con profesores/alumnos de Supabase que tengan módulos con lab asignado
+    const _roleMap    = { TEACHER: 'Profesor', STUDENT: 'Alumno' };
+    const _emailsSheets = new Set(DATA.usuarios.map(u => (u.Email || '').toLowerCase().trim()));
+    sbUsuarios
+      .filter(su =>
+        (su.role === 'TEACHER' || su.role === 'STUDENT') &&
+        DATA.userModulos.some(um => um.user_id === su.id && (um.lab_teoria || um.lab_practicas))
+      )
+      .forEach(su => {
+        if (_emailsSheets.has((su.email || '').toLowerCase().trim())) return;
+        const misModulos = DATA.userModulos.filter(um => um.user_id === su.id);
+        const labs   = [...new Set(misModulos.flatMap(um => [um.lab_teoria, um.lab_practicas].filter(Boolean)))];
+        const modulos = [...new Set(misModulos.map(um => um.nombre_modulo).filter(Boolean))];
+        DATA.usuarios.push({
+          ID_Usuario:               su.id,
+          Nombre:                   su.full_name             || '',
+          Email:                    su.email                 || '',
+          Rol:                      _roleMap[su.role]        || '',
+          Activo:                   su.is_active ? 'TRUE' : 'FALSE',
+          Ubicaciones_Asignadas:    labs.join(','),
+          Modulo:                   modulos.join(','),
+          Ciclo_Principal:          su.ciclo_principal       || '',
+          Puede_Revisar_Inventario: su.puede_revisar_inventario ? 'TRUE' : 'FALSE',
+          _sbOnly: true
+        });
+      });
+
     renderAll();
   } catch(e) {
     showToast('Error cargando datos. Comprueba los permisos del Sheet.', 'error');

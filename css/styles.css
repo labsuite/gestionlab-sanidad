@@ -615,6 +615,59 @@
     .empty-state-title { font-size: 15px; font-weight: 500; color: var(--text-soft); margin-bottom: 6px; }
     .empty-state-text { font-size: 13px; }
 
+    /* BTN-SM */
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+    /* INCIDENCIAS — card layout */
+    .inc-lista { display: flex; flex-direction: column; gap: 10px; padding: 0 0 8px; }
+
+    .inc-card {
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: box-shadow 0.15s;
+    }
+    .inc-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .inc-card.inc-urgente { border-left-color: var(--danger); }
+
+    .inc-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .inc-card-ident { display: flex; flex-direction: column; gap: 3px; }
+    .inc-id { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.03em; }
+    .inc-equipo { font-size: 14px; font-weight: 600; color: var(--accent); }
+
+    .inc-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .inc-fecha { font-size: 12px; color: var(--text-soft); white-space: nowrap; }
+
+    .inc-problema {
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text);
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+
+    .inc-card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .inc-footer-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .inc-reporter { font-size: 12px; color: var(--text-soft); }
+
     /* TOAST */
     .toast-container {
       position: fixed;

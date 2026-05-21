@@ -137,21 +137,6 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - Pretemporada: "pretemporada-YYYY-YYYY" (si hoy ≥ Mes_Inicio_Temporada)
 - Posttemporada: "posttemporada-YYYY-YYYY" (si hoy ≥ Mes_Fin_Temporada)
 
-### Código implementado
-- `buildMantenimientoEquipo(equipoId)` — sección en card de equipo: protocolo de uso + filas de plan con botón Registrar
-- `openModalRegistrarMant / guardarRegistroMant` — modal y guardado de registro
-- `openModalPlan / guardarPlan / eliminarPlan` — CRUD de planes
-- `renderMantenimiento()` — página completa con tabs: Pendientes (filtros lab+período) y Planes configurados
-- `exportarModeloCalidad(cursoAcademico)` — genera xlsx usando JSZip sobre la plantilla `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`, preservando 100% del formato original. Una fila por equipo × tipo (Interno/Externo), todas las fechas previstas separadas por comas. Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5. Columna I (Supervisado por) se rellena automáticamente con los gestores y admins activos de DATA.usuarios.
-- `_detectarLabEquipo(eq)` — devuelve el lab de un equipo buscando en tabla Ubicaciones o inferiendo del campo Ubicacion (busca "201"/"203"/"205"/"207" con includes)
-- `_labAHoja(labAula)` — mapea el lab detectado al nombre del sheet Excel
-
-### Limpieza del sistema legado (COMPLETADO)
-- Eliminadas funciones: `calcProximoPreventivo`, `togglePeriodicidadCustom`
-- Eliminados campos del modal de equipos: eq-periodicidad, eq-periodicidad-custom, eq-ultimo-preventivo
-- Eliminado campo "¿Actualizar próximo preventivo?" del modal de intervenciones
-- Dashboard y tabla de equipos actualizados para usar el nuevo sistema
-
 ---
 
 ## Módulo de residuos – COMPLETADO (2026-05-18)
@@ -184,23 +169,6 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 - `_GHS` — constante con mapa `{nombre: {icon, bg, color}}` para los 10 pictogramas
 - `_riesgoBadges(riesgo)` — renderiza cada valor GHS como chip de color; los valores no reconocidos (datos legacy) muestran chip genérico ⚠️ naranja
 - Los 113 tipos de residuo R001–R113 tienen Riesgo actualizado con GHS mediante `scripts/actualizar_riesgos_ghs.py`
-
-### Código implementado (`js/residuos.js`)
-- `renderResiduosGuia()` — página con buscador y tabla agrupada por **Contenedor_Tipo** (categorías dinámicas)
-- `openModalTipoResiduo / guardarTipoResiduo / eliminarTipoResiduo` — CRUD de tipos de residuo (Admin/Gestor). El campo Contenedor_Tipo usa `<datalist>` — crear un nombre nuevo crea una nueva categoría automáticamente. No se puede eliminar un tipo si tiene contenedores asociados.
-- `renderResiduosContenedores()` — dos tabs: **Activos** (cards con historial expandible) y **Pendientes de recogida** (tabla)
-- `openModalAdicion / guardarAdicion` — registrar adición; el selector de tipo de residuo es un **buscador con sugerencias** (`<input>` + `<datalist>`), con campo oculto `adic-tipo-residuo` que guarda el ID; `window._adic_tipo_map` mapea Nombre→ID_Residuo; filtra por Categoria del contenedor si hay coincidencias
-- `cerrarContenedor` — marca Estado=cerrado y crea contenedor nuevo vacío automáticamente
-- `registrarRecogida` — marca Estado=recogido y elimina la fila del sheet
-- `openModalContenedor / guardarContenedor / eliminarContenedor` — CRUD de contenedores; **categoría es `<select>` cerrado** poblado dinámicamente desde valores únicos de `Contenedor_Tipo` en Tipos_Residuo; **formato es `<select>` cerrado** con 6 opciones fijas
-- `mostrarUrlNfcContenedor(idx)` — genera URL con `?cont-cat=X&cont-lab=Y&action=adicion` para etiqueta NFC/QR
-- `_abrirAdicionPorNfc(categoria, lab)` — localiza el contenedor activo por categoría+lab y abre el modal de adición
-- `_WARNINGS_FORMATO / _getWarningFormato(formato)` — mapa de avisos de seguridad por formato físico; se muestran como banner amarillo en las cards y en el modal de adición (también vía NFC)
-- `_updateBadgeResiduos()` — badge en nav (definida en ui.js)
-- `exportarInformeConsenur()` — botón en pestaña "Pendientes de recogida"; abre nueva pestaña con informe HTML y dispara "Guardar como PDF". Agrupa por lab, incluye categoría/formato/zona/nivel/fecha cierre y lista de tipos de residuo con peligrosidad. Sin datos personales (sin usuario ni fechas individuales).
-- `openModalConsultaResiduo / guardarConsultaResiduo` — flujo para residuos desconocidos: el alumno describe el residuo y dónde lo dejó; se guarda en Consultas_Residuo. Tras guardar llama a `renderPanelConsultasResiduo()` y `renderDashboard()` para actualizar UI en la misma sesión.
-- `renderPanelConsultasResiduo / resolverConsultaResiduo` — panel visible a Gestor/Admin con las consultas pendientes; botón "Resuelta" marca Estado=Resuelta
-- `abrirModalTipoDesdeConsulta(idxConsulta)` — botón "＋ Añadir a guía" en el panel de consultas; abre modal de nuevo tipo de residuo con la descripción pre-rellenada (editable antes de guardar)
 
 ### Avisos de seguridad por formato (`_WARNINGS_FORMATO`)
 | Formato (matching parcial) | Aviso |
@@ -254,20 +222,6 @@ Sección "Residuos" independiente en el sidebar, con dos items: "Guía de residu
 - Todos los roles (incluido Alumno y Profesor): pueden solicitar reservas y ver disponibilidad
 - Gestor y Administrador: además aprueban/rechazan, marcan conflictos y configuran equipos reservables
 - Badge en nav muestra reservas `Pendiente` (solo visible para Gestor/Admin); solo aparecen cuando hay conflicto real
-
-### Código implementado (`js/reservas.js`)
-- `renderReservas()` — 3 tabs: **Disponibilidad** | **Mis reservas** | **Gestión** (Gestor/Admin)
-- `_renderTimeline(idEquipo)` — barra de 14 días (07:00–22:00), bloques de color por estado
-- `_verificarConflicto(idEquipo, inicioStr, finStr, condiciones, excludeId)` — lógica central de solapamiento; para COMPATIBLE_CONDITIONS compara parámetro a parámetro con tolerancia numérica
-- `_actualizarVerificacion()` — verificación en tiempo real al rellenar el modal de nueva reserva; valida también duración máxima y antelación mínima
-- `guardarReserva()` — auto-aprueba si sin conflicto (`Confirmada`); guarda como `Pendiente` si hay conflicto; ID formato `RSV-001`
-- `_renderTabMisReservas()` — "Próximas" muestra reservas cuya `Fecha_Fin >= ahora` (captura también las en curso); "Historial" en `<details>` colapsado para las ya terminadas
-- `_cambiarEstadoReserva(idReserva, nuevoEstado, obs, aprobadoPor, inicioReal, finReal)` — actualiza columnas H-L en un solo `sheetsUpdate`
-- `_accionGestion(accion)` — botones aprobar/rechazar/conflicto en modal de gestión
-- `openModalConfigEquipo() / _renderCfgParams() / guardarConfigEquipo()` — builder visual de parámetros; guarda Params_Template como JSON
-- `_addParamRow()` — añade fila de parámetro (nombre, unidad, tolerancia) en el configurador
-- `_updateBadgeReservas()` — badge en nav (definida en `ui.js`)
-- `_solapan(i1,f1,i2,f2)` — `new Date(i1) < new Date(f2) && new Date(f1) > new Date(i2)`
 
 ### Navegación
 Ítem "📅 Reservas" en el sidebar, dentro de la sección **Equipos**, justo debajo de "🛡️ Mantenimiento".
@@ -383,7 +337,7 @@ La anon key es la clave pública diseñada para uso en cliente. NO usar la servi
 | `user_modulos` | ✓ tabla creada, vacía | Supabase (se puebla desde la otra app al asignar módulos a usuarios) |
 | `puede_revisar_inventario` | ✓ columna añadida a `public.users` | Supabase |
 | `DATA.sbUsuarios` | ✓ cargado en paralelo | Supabase (solo para lookup de UUID) |
-| `DATA.usuarios` | ✗ pendiente | **Sheets** (sin cambios — alta/edición siguen en Sheets) |
+| `DATA.usuarios` | ✓ parcial | **Sheets** + complementado con Supabase (ver abajo) |
 | Reservas autoclaves | ✗ pendiente | **Sheets** |
 
 ### Cómo funciona actualmente en GestionLab
@@ -404,6 +358,23 @@ La anon key es la clave pública diseñada para uso en cliente. NO usar la servi
 **`public.users`**: vista/join de `auth.users` + tabla personalizada. Campos útiles: `id, email, full_name, role (enum), ciclo_principal, is_active, xade_id, department_id, puede_revisar_inventario`
 
 **RLS en tablas compartidas:** `ciclos`, `modulos` y `modulo_ciclo` tienen `SELECT TO authenticated`. Se añadió `SELECT TO anon` para GestionLab (que usa anon key con Google OAuth propio, no Supabase Auth).
+
+### Complementación de DATA.usuarios desde Supabase (2026-05-20) ✓ IMPLEMENTADO
+
+Al final de `loadAllData()`, después de construir `DATA.userModulos`, se añaden a `DATA.usuarios` los usuarios de Supabase que cumplan:
+1. Rol `TEACHER` o `STUDENT` (no `ADMIN` — los admins/gestores se gestionan en Sheets)
+2. Tienen al menos un módulo en `user_modulos` con `lab_teoria` o `lab_practicas` asignado
+3. No están ya en Sheets (deduplicación por email)
+
+Estos usuarios se marcan con `_sbOnly: true` y sus campos `Ubicaciones_Asignadas` y `Modulo` se derivan automáticamente de `DATA.userModulos`.
+
+**Mapeo de roles:** `TEACHER → Profesor`, `STUDENT → Alumno`
+
+**Edición de usuarios `_sbOnly`:**
+- Alumnos (`_sbOnly`): sin botón ✏️ — se gestionan desde la otra app
+- Profesores (`_sbOnly`): botón ✏️ visible para Admin/Gestor — permite promoverlos a `Gestor`. Al guardar, `editingRow = null` → `sheetsAppend` crea fila nueva en Sheets con ID `USR-XXX`. En la siguiente carga el usuario se encuentra en Sheets y deja de ser `_sbOnly`.
+
+**Nota:** mientras `user_modulos` esté vacía, ningún usuario de Supabase aparecerá (el filtro por lab no pasa). Empezarán a aparecer cuando la otra app asigne módulos.
 
 ### Flujo objetivo una vez completada la integración
 

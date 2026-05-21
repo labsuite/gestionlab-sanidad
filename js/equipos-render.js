@@ -342,7 +342,7 @@ function filtrarIntervencionesTipo(val) { renderIntervenciones(val); }
 // INCIDENCIAS — RENDER
 // ============================================================
 function renderIncidencias(filtroEstado = '') {
-  const tbody = document.getElementById('tabla-incidencias');
+  const container = document.getElementById('lista-incidencias');
   const rol = getUserRole();
   let items = DATA.incidencias;
   if (rol === 'Profesor') {
@@ -354,45 +354,57 @@ function renderIncidencias(filtroEstado = '') {
     });
   }
   if (filtroEstado) items = items.filter(i => i.Estado === filtroEstado);
-  // Ocultar incidencias archivadas a menos que se filtre explícitamente
   if (filtroEstado !== 'Archivada') items = items.filter(i => i.Estado !== 'Archivada');
   items = [...items].sort((a,b) => new Date(b.Fecha_Hora) - new Date(a.Fecha_Hora));
-  if (!items.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin incidencias pendientes</div></div></td></tr>`; return; }
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin incidencias pendientes</div></div>`;
+    return;
+  }
   const estadoBadge  = {'Abierta':'badge-red','En gestión':'badge-orange','Resuelta':'badge-green','Cerrada':'badge-gray'};
   const impactoBadge = {'Equipo fuera de servicio':'badge-red','Uso limitado':'badge-orange','No bloquea':'badge-gray'};
-  tbody.innerHTML = items.map(i => {
-    const incIdx = DATA.incidencias.indexOf(i);
-    // Botón contextual según estado e intervención enlazada
+  const esProfesor = getUserRole() === 'Profesor';
+  container.innerHTML = items.map(i => {
     let btnAccion = '';
-    const esProfesor = getUserRole() === 'Profesor';
     if (puedeHacer('crearIntervenciones') && !esProfesor) {
       if (i.Estado === 'Abierta') {
-        btnAccion = `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="abrirPlanificacion('${i.ID_Incidencia}','${i.Equipo}')">Responder</button>`;
+        btnAccion = `<button class="btn btn-secondary btn-sm" onclick="abrirPlanificacion('${i.ID_Incidencia}','${i.Equipo}')">Responder</button>`;
       } else if (i.Estado === 'En gestión' && i.Intervencion_Generada) {
         const intEnl = DATA.intervenciones.find(x => x.ID_Intervencion === i.Intervencion_Generada);
         const intIdx = intEnl ? DATA.intervenciones.indexOf(intEnl) : -1;
         if (intEnl && intEnl.Estado === 'Pendiente factura') {
           btnAccion = intIdx >= 0
-            ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura</button>`
+            ? `<button class="btn btn-secondary btn-sm" onclick="openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         } else {
           btnAccion = intIdx >= 0
-            ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">Ver / Actuar</button>`
+            ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">Ver / Actuar</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         }
       }
     }
-    return `<tr>
-      <td><strong>${i.ID_Incidencia}</strong></td>
-      <td>${i.Equipo||'—'}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.Descripcion_Problema||'—'}</td>
-      <td><span class="badge ${impactoBadge[i.Impacto]||'badge-gray'}">${i.Impacto||'—'}</span></td>
-      <td>${i.Urgencia==='Urgente'?'<span class="badge badge-red">Urgente</span>':'<span class="badge badge-gray">Normal</span>'}</td>
-      <td>${i.Reportado_Por||'—'}</td>
-      <td>${formatDate(i.Fecha_Hora)||'—'}</td>
-      <td><span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado||'—'}</span></td>
-      <td><div class="row-actions">${btnAccion}</div></td>
-    </tr>`;
+    const urgenteCls = i.Urgencia === 'Urgente' ? ' inc-urgente' : '';
+    return `
+<div class="inc-card${urgenteCls}">
+  <div class="inc-card-top">
+    <div class="inc-card-ident">
+      <span class="inc-id">${i.ID_Incidencia}</span>
+      <span class="inc-equipo">${i.Equipo || '—'}</span>
+    </div>
+    <div class="inc-card-meta">
+      ${i.Urgencia === 'Urgente' ? '<span class="badge badge-red">Urgente</span>' : ''}
+      <span class="badge ${estadoBadge[i.Estado] || 'badge-gray'}">${i.Estado || '—'}</span>
+      <span class="inc-fecha">${formatDate(i.Fecha_Hora) || '—'}</span>
+    </div>
+  </div>
+  <div class="inc-problema">${i.Descripcion_Problema || '—'}</div>
+  <div class="inc-card-footer">
+    <div class="inc-footer-meta">
+      <span class="badge ${impactoBadge[i.Impacto] || 'badge-gray'}">${i.Impacto || '—'}</span>
+      <span class="inc-reporter">👤 ${i.Reportado_Por || '—'}</span>
+    </div>
+    <div>${btnAccion}</div>
+  </div>
+</div>`;
   }).join('');
 }
 function filtrarIncidenciasEstado(val) { renderIncidencias(val); }
