@@ -238,14 +238,16 @@ function renderFilaMaterial(m) {
   const safeId = m.ID_Material.replace(/[^a-zA-Z0-9]/g, '-');
 
   const multiUbi = lotes.length > 0;
-  const ubiLabel = multiUbi
-    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${lotes.length} ubicación${lotes.length > 1 ? 'es' : ''}</span>`
-    : `<span style="font-size:12px;color:var(--text-muted)">${m.Ubicacion || '—'}</span>`;
+  const ubiLabel = lotes.length > 1
+    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${lotes.length} ubicaciones</span>`
+    : lotes.length === 1
+      ? `<span style="font-size:12px;color:var(--text-muted)">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</span>`
+      : `<span style="font-size:12px;color:var(--text-muted)">${m.Ubicacion ? getNombreUbicacion(m.Ubicacion) : '—'}</span>`;
 
   const rowId = `mat-row-${safeId}`;
 
-  // Fila principal: clic en fila = toggle (ubicaciones si multiUbi, detalle móvil si no)
-  let html = `<tr class="equipo-row${multiUbi ? ' expandable' : ''}" id="${rowId}" style="${multiUbi ? 'cursor:pointer' : ''}" onclick="${multiUbi ? `toggleMatUbics('${m.ID_Material}')` : `toggleMatDetail('${m.ID_Material}')`}">
+  // Fila principal: siempre expandable con el mismo estilo
+  let html = `<tr class="equipo-row expandable" id="${rowId}" style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')">
     <td><strong>${m.ID_Material}</strong></td>
     <td>
       <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}
@@ -261,7 +263,6 @@ function renderFilaMaterial(m) {
     <td style="font-size:12px;color:var(--text-muted)">${minTot || '—'} / ${opt || '—'}</td>
     <td style="font-size:12px;color:var(--text-soft);text-align:right;padding-right:4px">${_precioMedioLabel(m)}</td>
     <td onclick="event.stopPropagation()"><div class="row-actions">
-      ${!multiUbi ? `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>` : ''}
       ${puedeHacer('crearSolicitudes') ? `<button class="icon-btn" onclick="openModalSolicitudMaterial('${m.ID_Material}')" title="Solicitar">📋</button>` : ''}
       ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="editMaterial(${idx})" title="Editar">✏️</button>` : ''}
       ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}')" title="Contar stock">🔢</button>` : ''}
@@ -269,7 +270,7 @@ function renderFilaMaterial(m) {
     </div></td>
   </tr>`;
 
-  // Sub-filas por ubicación ANTES del detalle para que aparezcan primero en móvil
+  // Sub-filas por ubicación — siempre se generan (al menos una), ANTES del detalle
   if (multiUbi) {
     html += lotes.map((l, li) => {
       const sLocal  = parseFloat(l.Stock_Local)  || 0;
@@ -294,17 +295,34 @@ function renderFilaMaterial(m) {
         </div></td>
       </tr>`;
     }).join('');
+  } else {
+    // Ítem legacy (sin lotes en Material_Ubicaciones): sub-fila sintética
+    const sLeg  = parseFloat(m.Stock_Actual) || 0;
+    const mnLeg = parseFloat(m.Stock_Minimo) || 0;
+    const opLeg = parseFloat(m.Stock_Optimo) || 0;
+    const pctLeg = opLeg > 0 ? Math.min(100, Math.round(sLeg / opLeg * 100)) : (mnLeg > 0 ? Math.min(100, Math.round(sLeg / mnLeg * 100)) : 100);
+    const colLeg = sLeg === 0 ? 'var(--danger)' : (mnLeg > 0 && sLeg <= mnLeg ? 'var(--warning)' : 'var(--success)');
+    html += `<tr class="mat-ubic-row" id="mat-ubic-${safeId}-0" style="display:none;background:var(--surface2)">
+      <td></td>
+      <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">📍 ${m.Ubicacion ? getNombreUbicacion(m.Ubicacion) : '—'}</td>
+      <td>
+        <div class="stock-bar-wrap">
+          <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctLeg}%;background:${colLeg}"></div></div>
+          <span class="stock-val" style="color:${colLeg}">${sLeg} ${m.Unidad || ''}</span>
+        </div>
+      </td>
+      <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLeg || '—'} / ${opLeg || '—'}</td>
+      <td onclick="event.stopPropagation()"><div class="row-actions">
+        <button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>
+      </div></td>
+    </tr>`;
   }
 
-  // Fila de detalle (solo visible en móvil): ubicación arriba, luego categoría/precio
+  // Fila de detalle (solo visible en móvil): categoría/precio — la ubicación ya está en la sub-fila
   const labelStyle = 'display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px';
-  const ubiDetalle = !multiUbi
-    ? `<div style="font-size:11px;width:100%"><span style="${labelStyle}">Ubicación</span><strong>📍 ${m.Ubicacion || '—'}</strong></div>`
-    : '';
   html += `<tr class="mat-detail-row" id="mat-detail-${safeId}">
     <td colspan="8" style="padding:4px 12px 10px;background:var(--surface2)">
       <div style="display:flex;gap:16px;flex-wrap:wrap">
-        ${ubiDetalle}
         <div style="font-size:11px"><span style="${labelStyle}">Categoría</span><strong>${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</strong></div>
         <div style="font-size:11px"><span style="${labelStyle}">Mín / Óptimo</span><strong>${minTot || '—'} / ${opt || '—'} ${m.Unidad || ''}</strong></div>
         <div style="font-size:11px"><span style="${labelStyle}">Precio medio</span><strong>${_precioMedioLabel(m)}</strong></div>
@@ -325,10 +343,11 @@ function toggleMatUbics(idMaterial) {
   const firstRow  = document.getElementById(`mat-ubic-${safeId}-0`);
   if (!firstRow) return;
   const isOpen = firstRow.style.display !== 'none';
-  lotes.forEach((_, i) => {
+  const numRows = Math.max(lotes.length, 1); // legacy items have 1 synthetic row
+  for (let i = 0; i < numRows; i++) {
     const row = document.getElementById(`mat-ubic-${safeId}-${i}`);
     if (row) row.style.display = isOpen ? 'none' : '';
-  });
+  }
   // Cerrar movimientos si estaban abiertos
   const movRow = document.getElementById(`mat-mov-${safeId}`);
   if (movRow && !isOpen === false) movRow.style.display = 'none';
