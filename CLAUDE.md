@@ -572,12 +572,33 @@ Select `mat-categoria` en `html/modales-material.html`. Cada opción incluye eje
 ### Tabla de fungibles (inventario de material)
 - En desktop: tabla completa con columnas de categoría, mínimo/óptimo y precio visibles
 - En móvil (portrait): se ocultan las columnas 3 (categoría), 6 (mín/opt) y 7 (precio) vía CSS
-- Para ítems con múltiples ubicaciones (`multiUbi`): al expandir (`toggleMatUbics`) se muestran las `mat-ubic-row` y se llama también `toggleMatDetail(id, true)` para mostrar la fila de detalle
-- Para ítems con una sola ubicación: `onclick` llama directamente a `toggleMatDetail`
+- **Todos los ítems son expandibles** con el mismo patrón: clase `expandable`, cursor pointer, `▶` siempre visible, `onclick` llama siempre a `toggleMatUbics`
+- **`mat-ubic-row`**: siempre se genera al menos una. Ítems con lotes en `Material_Ubicaciones` → una sub-fila por lote. Ítems legacy (0 lotes) → sub-fila sintética con datos de `m.Ubicacion` + `m.Stock_Actual`/`m.Stock_Minimo`/`m.Stock_Optimo`
+- `toggleMatUbics` usa `Math.max(lotes.length, 1)` para toggler también la sub-fila sintética de ítems legacy
+- El 📦 (consumo) está **siempre en la sub-fila**, nunca en el main row. Ítems con lotes: `openModalConsumoLote`; ítems legacy: `openModalConsumoMaterial`
 - **Orden en el DOM**: las `mat-ubic-row` se generan **antes** de `mat-detail-row` para que las ubicaciones aparezcan arriba al desplegar en móvil
-- `mat-detail-row` para ítem de una sola ubicación incluye la ubicación en la parte superior del panel (antes de categoría/precio/mín-ópt)
-- `.mat-detail-row`: siempre en el DOM; en desktop `display: none` siempre; en móvil portrait `display: table-row` cuando tiene clase `open`
-- El icono ▶ de una sola ubicación: oculto en desktop (`#page-material .equipo-row:not(.expandable) .expand-icon { display: none }`), visible en móvil portrait
+- `mat-detail-row` muestra categoría/precio/mín-ópt (ya NO incluye ubicación, que está en la sub-fila)
+- `.mat-detail-row`: siempre en el DOM; en desktop `display: none` siempre; en móvil portrait `display: table-row` cuando tiene clase `open` (solo en el media query de teléfono portrait, NO en tablet)
+
+#### Data model: por qué la hoja Material solo muestra 1 ubicación
+La hoja `Material` (col G: `Ubicacion`) es un campo legacy que almacena solo la ubicación primaria. Las ubicaciones adicionales se guardan en la hoja `Material_Ubicaciones` (cols A-F: `ID, ID_Material, ID_Ubicacion, Stock_Local, Stock_Minimo_Local, Stock_Optimo_Local`). Si un ítem tiene filas en `Material_Ubicaciones`, la app usa esas (modo lote) e ignora la col G. Si no tiene ninguna, usa col G (modo legacy).
+
+#### Flag `_esPrepoblado` en `_lotesTemp`
+Al editar un ítem legacy (0 lotes), `editMaterial()` pre-rellena `_lotesTemp` con la ubicación de `m.Ubicacion` marcada `_esPrepoblado: true`. `guardarMaterial()` omite crear el lote si es `_esPrepoblado` y no hay ningún otro lote nuevo real (`_nuevo: true && !_esPrepoblado`). Así se evita convertir ítems legacy a modo lote involuntariamente al solo editar nombre/categoría.
+
+---
+
+## Eliminar ítems del inventario (2026-05-22)
+
+- Permiso `eliminarItems: true` en el rol **Administrador** únicamente (Gestor no lo tiene)
+- Botón "Eliminar" en el footer izquierdo (`margin-right:auto`) de los modales `modal-material` y `modal-equipo`
+- Solo visible cuando se está **editando** un ítem existente; oculto al crear uno nuevo
+- Confirmación con `confirm()` nativo antes de actuar
+- `eliminarMaterial()` en `js/material.js`:
+  1. Vacía todos los lotes en `Material_Ubicaciones` (de mayor a menor índice con `eliminarLote`) para evitar desplazamiento de índices
+  2. Elimina la fila física de `Material` con `sheetsDeleteRow`
+  3. Actualiza `DATA.material` y re-renderiza
+- `eliminarEquipo()` en `js/equipos-acciones.js`: elimina la fila física de `Equipos` con `sheetsDeleteRow` y actualiza `DATA.equipos`
 
 ---
 
