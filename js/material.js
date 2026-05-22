@@ -238,11 +238,10 @@ function renderFilaMaterial(m) {
   const safeId = m.ID_Material.replace(/[^a-zA-Z0-9]/g, '-');
 
   const multiUbi = lotes.length > 0;
-  const ubiLabel = lotes.length > 1
-    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${lotes.length} ubicaciones</span>`
-    : lotes.length === 1
-      ? `<span style="font-size:12px;color:var(--text-muted)">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</span>`
-      : `<span style="font-size:12px;color:var(--text-muted)">${m.Ubicacion ? getNombreUbicacion(m.Ubicacion) : '—'}</span>`;
+  const ubiCount = lotes.length > 0 ? lotes.length : (m.Ubicacion ? 1 : 0);
+  const ubiLabel = ubiCount > 0
+    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${ubiCount} ubicación${ubiCount > 1 ? 'es' : ''}</span>`
+    : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
 
   const rowId = `mat-row-${safeId}`;
 
