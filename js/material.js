@@ -602,7 +602,8 @@ function editMaterial(idx) {
     _nuevo: false,
     _loteIdx: DATA.materialUbicaciones.indexOf(l)
   }));
-  // Si no tiene lotes pero sí Ubicacion legacy, pre-poblar para no perderla al añadir una segunda
+  // Si no tiene lotes pero sí Ubicacion legacy, pre-poblar para no perderla al añadir una segunda.
+  // Se marca _esPrepoblado para NO crear el lote si el usuario no añade una segunda ubicación.
   if (_lotesTemp.length === 0 && m.Ubicacion) {
     _lotesTemp.push({
       ID_Ubicacion: m.Ubicacion,
@@ -610,7 +611,8 @@ function editMaterial(idx) {
       Stock_Minimo_Local: m.Stock_Minimo || '0',
       Stock_Optimo_Local: m.Stock_Optimo || '0',
       Gestion_Auto: m.Gestion_Automatica !== 'FALSE',
-      _nuevo: true
+      _nuevo: true,
+      _esPrepoblado: true
     });
   }
   document.getElementById('modal-material-title').textContent = 'Editar material';
@@ -857,6 +859,8 @@ async function guardarMaterial() {
 
     for (const lote of _lotesTemp) {
       if (lote._nuevo) {
+        // No convertir ubicación legacy a lote si no se añadió una segunda ubicación real
+        if (lote._esPrepoblado && !_lotesTemp.some(l => l._nuevo && !l._esPrepoblado)) continue;
         await añadirLote(id, lote.ID_Ubicacion, lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local);
       } else if (lote._loteIdx !== undefined) {
         const l = DATA.materialUbicaciones[lote._loteIdx];

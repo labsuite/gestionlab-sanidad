@@ -1176,9 +1176,6 @@
   .detail-mobile-only { display: block; }
 
 
-  /* Fila de detalle: visible al expandir (tablet portrait usa layout tabla) */
-  .mat-detail-row.open { display: table-row; }
-
   /* Modales: sheet desde abajo */
   .modal-overlay { align-items: flex-end; padding: 0; }
   .modal {
