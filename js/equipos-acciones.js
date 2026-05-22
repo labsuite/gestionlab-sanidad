@@ -115,6 +115,8 @@ function openModalEquipo() {
   if (document.getElementById('eq-pdf-input')) document.getElementById('eq-pdf-input').value = '';
   // Limpiar autocomplete ubicación
   clearUbicacionEquipo();
+  const btnElimEq = document.getElementById('btn-eliminar-equipo');
+  if (btnElimEq) btnElimEq.style.display = 'none';
   poblarSelects(); openModal('modal-equipo');
 }
 
@@ -154,9 +156,28 @@ function editEquipo(idx) {
   }
   if (e.Manual_Ficha_Tecnica) { document.getElementById('eq-pdf-preview').style.display = 'flex'; document.getElementById('eq-pdf-name').textContent = 'Manual adjunto (ver 📄)'; }
   else document.getElementById('eq-pdf-preview').style.display = 'none';
+  const btnElimEqEdit = document.getElementById('btn-eliminar-equipo');
+  if (btnElimEqEdit) btnElimEqEdit.style.display = puedeHacer('eliminarItems') ? '' : 'none';
   openModal('modal-equipo');
 }
 
+async function eliminarEquipo() {
+  const e = DATA.equipos[editingRow.rowIndex];
+  if (!confirm(`¿Eliminar "${e.ID_Activo} — ${e.Marca} ${e.Modelo}" del inventario? Esta acción no se puede deshacer.`)) return;
+  showLoading('Eliminando...');
+  try {
+    await sheetsDeleteRow('Equipos', editingRow.rowIndex);
+    DATA.equipos.splice(editingRow.rowIndex, 1);
+    closeModal('modal-equipo');
+    editingRow = null;
+    renderEquipos(); renderDashboard(); updateBadges();
+    showToast(`Equipo eliminado del inventario`, 'success');
+  } catch(err) {
+    showToast('Error al eliminar. Comprueba la consola.', 'error');
+    console.error(err);
+  }
+  hideLoading();
+}
 
 // ============================================================
 // MODAL INTERVENCIÓN (modo manual / edición directa)

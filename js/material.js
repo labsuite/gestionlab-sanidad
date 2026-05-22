@@ -596,6 +596,8 @@ function openModalMaterial() {
   const sel = document.getElementById('mat-proveedor');
   if (sel) sel.innerHTML = '<option value="">Seleccionar...</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
   renderLotesModal();
+  const btnElimMat = document.getElementById('btn-eliminar-material');
+  if (btnElimMat) btnElimMat.style.display = 'none';
   openModal('modal-material');
 }
 
@@ -658,7 +660,34 @@ function editMaterial(idx) {
     toggleGestionAutoStock(esAuto);
   }
   renderLotesModal();
+  const btnElimEdit = document.getElementById('btn-eliminar-material');
+  if (btnElimEdit) btnElimEdit.style.display = puedeHacer('eliminarItems') ? '' : 'none';
   openModal('modal-material');
+}
+
+async function eliminarMaterial() {
+  const m = DATA.material[editingRow.rowIndex];
+  if (!confirm(`¿Eliminar "${m.Nombre}" del inventario? Esta acción no se puede deshacer.`)) return;
+  showLoading('Eliminando...');
+  try {
+    // Vaciar lotes de Material_Ubicaciones de mayor a menor índice (splice no desplaza los anteriores)
+    const loteIndices = getMatUbics(m.ID_Material)
+      .map(l => DATA.materialUbicaciones.indexOf(l))
+      .filter(i => i !== -1)
+      .sort((a, b) => b - a);
+    for (const idx of loteIndices) await eliminarLote(idx);
+    // Eliminar fila física de Material
+    await sheetsDeleteRow('Material', editingRow.rowIndex);
+    DATA.material.splice(editingRow.rowIndex, 1);
+    closeModal('modal-material');
+    editingRow = null;
+    renderMaterial(); renderDashboard(); updateBadges();
+    showToast(`"${m.Nombre}" eliminado del inventario`, 'success');
+  } catch(e) {
+    showToast('Error al eliminar. Comprueba la consola.', 'error');
+    console.error(e);
+  }
+  hideLoading();
 }
 
 // ============================================================

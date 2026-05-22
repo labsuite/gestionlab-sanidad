@@ -166,6 +166,7 @@ const PERMISOS = {
     verPedidos: true, gestionarPedidos: true, crearSolicitudes: true, verTareas: true,
     usuarios: true, crearUsuarios: true,
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
+    eliminarItems: true,
   }
 };
 
