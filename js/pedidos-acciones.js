@@ -544,15 +544,47 @@ async function eliminarLineaPedido(lineaId, pedidoId) {
   if (!confirm('¿Eliminar esta línea del pedido?')) return;
   const idx = DATA.lineasPedido.findIndex(l => l.ID_Linea === lineaId);
   if (idx === -1) return;
+  const l = DATA.lineasPedido[idx];
   showLoading('Eliminando...');
   try {
-    // Vaciamos la fila en Sheets y la eliminamos del array local
-    await sheetsClear(`Lineas_Pedido!A${idx+2}:G${idx+2}`);
+    await sheetsClear(`Lineas_Pedido!A${idx+2}:I${idx+2}`);
     DATA.lineasPedido.splice(idx, 1);
-    // Filtrar posibles entradas vacías que puedan quedar en el array
-    DATA.lineasPedido = DATA.lineasPedido.filter(l => l.ID_Linea);
-    showToast('Línea eliminada', 'success');
+    DATA.lineasPedido = DATA.lineasPedido.filter(x => x.ID_Linea);
+
+    // Revertir solicitud vinculada si procede
+    const normNombre = n => (n || '').normalize('NFC').replace(/\s*\[.*?\]/g, '').trim().toLowerCase();
+    const estadosRevertibles = ['Añadida a pedido', 'En espera de recepción'];
+    const solIdMatch = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
+    let solOrigen = solIdMatch
+      ? DATA.solicitudes.find(s => s.ID_Solicitud === solIdMatch[1] && estadosRevertibles.includes(s.Estado))
+      : null;
+    if (!solOrigen) {
+      solOrigen = DATA.solicitudes.find(s =>
+        s.Lista_Pedido === pedidoId &&
+        normNombre(s.Material) === normNombre(l.Material) &&
+        estadosRevertibles.includes(s.Estado)
+      );
+    }
+
+    if (solOrigen) {
+      const solIdx = DATA.solicitudes.indexOf(solOrigen);
+      const idSol = solOrigen.ID_Solicitud;
+      solOrigen.Estado = 'Pendiente';
+      solOrigen.Lista_Pedido = '';
+      const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Pendiente', '', solOrigen.Observaciones];
+      try {
+        await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
+        showToast(`Línea eliminada. La solicitud ${idSol} volvió a Pendiente.`, 'success');
+      } catch(e) {
+        console.error('[pedidos] No se pudo revertir solicitud', solOrigen.ID_Solicitud, e);
+        showToast('Línea eliminada, pero no se pudo revertir la solicitud. Cámbiala manualmente.', 'error');
+      }
+    } else {
+      showToast('Línea eliminada', 'success');
+    }
+
     verDetallePedido(pedidoId);
+    renderSolicitudes();
   }
   catch(e) { showToast('Error eliminando', 'error'); console.error(e); }
   hideLoading();

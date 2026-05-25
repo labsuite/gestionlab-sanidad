@@ -864,6 +864,24 @@ async function guardarIncidencia() {
   hideLoading();
 }
 
+async function eliminarIncidencia(incId) {
+  const idx = DATA.incidencias.findIndex(i => i.ID_Incidencia === incId);
+  if (idx === -1) return;
+  const inc = DATA.incidencias[idx];
+  const msg = inc.Intervencion_Generada
+    ? `¿Eliminar la incidencia "${incId}"?\n\nAtención: tiene la intervención ${inc.Intervencion_Generada} vinculada, que NO se eliminará.`
+    : `¿Eliminar la incidencia "${incId}"? Esta acción no se puede deshacer.`;
+  if (!confirm(msg)) return;
+  showLoading('Eliminando...');
+  try {
+    await sheetsDeleteRow('Incidencias', idx);
+    DATA.incidencias.splice(idx, 1);
+    showToast('Incidencia eliminada', 'success');
+    renderIncidencias();
+  } catch(e) { showToast('Error eliminando', 'error'); console.error(e); }
+  hideLoading();
+}
+
 async function cambiarEstadoIncidencia(idx) {
   const i = DATA.incidencias[idx];
   const estados = ['Abierta','En gestión','Resuelta','Cerrada'];

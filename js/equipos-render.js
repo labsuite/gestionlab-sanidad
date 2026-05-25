@@ -383,6 +383,9 @@ function renderIncidencias(filtroEstado = '') {
       }
     }
     const urgenteCls = i.Urgencia === 'Urgente' ? ' inc-urgente' : '';
+    const btnEliminar = puedeHacer('eliminarItems') && i.Estado !== 'Archivada'
+      ? `<button class="btn btn-danger btn-sm" onclick="eliminarIncidencia('${i.ID_Incidencia}')">Eliminar</button>`
+      : '';
     return `
 <div class="inc-card${urgenteCls}">
   <div class="inc-card-top">
@@ -402,7 +405,7 @@ function renderIncidencias(filtroEstado = '') {
       <span class="badge ${impactoBadge[i.Impacto] || 'badge-gray'}">${i.Impacto || '—'}</span>
       <span class="inc-reporter">👤 ${i.Reportado_Por || '—'}</span>
     </div>
-    <div>${btnAccion}</div>
+    <div style="display:flex;gap:8px;align-items:center">${btnAccion}${btnEliminar}</div>
   </div>
 </div>`;
   }).join('');
