@@ -588,7 +588,7 @@ Al editar un ítem legacy (0 lotes), `editMaterial()` pre-rellena `_lotesTemp` c
 
 ---
 
-## Eliminar ítems del inventario (2026-05-22)
+## Eliminar ítems del inventario (2026-05-22) y otras eliminaciones (2026-05-25)
 
 - Permiso `eliminarItems: true` en el rol **Administrador** únicamente (Gestor no lo tiene)
 - Botón "Eliminar" en el footer izquierdo (`margin-right:auto`) de los modales `modal-material` y `modal-equipo`
@@ -599,6 +599,27 @@ Al editar un ítem legacy (0 lotes), `editMaterial()` pre-rellena `_lotesTemp` c
   2. Elimina la fila física de `Material` con `sheetsDeleteRow`
   3. Actualiza `DATA.material` y re-renderiza
 - `eliminarEquipo()` en `js/equipos-acciones.js`: elimina la fila física de `Equipos` con `sheetsDeleteRow` y actualiza `DATA.equipos`
+- `eliminarIncidencia(incId)` en `js/equipos-acciones.js`: botón "Eliminar" visible en cada `.inc-card` para Administrador (estados no archivados). Si tiene `Intervencion_Generada`, el `confirm()` lo advierte explícitamente. Usa `sheetsDeleteRow('Incidencias', idx)`.
+- `eliminarLineaPedido(lineaId, pedidoId)` en `js/pedidos-acciones.js`: al eliminar una línea en estado `Pendiente`, busca la solicitud vinculada (2 intentos: ID en Observaciones → pedidoId+nombre normalizado) y la revierte a `Pendiente` limpiando `Lista_Pedido`, si estaba en `Añadida a pedido` o `En espera de recepción`. Toast diferenciado según si se revirtió o no.
+
+---
+
+## Visibilidad de notificaciones en el dashboard (2026-05-25)
+
+`renderDashboard()` en `js/equipos-render.js` calcula `esGestorAdmin = !esProfesor && !esAlumno` para controlar qué alertas se muestran a cada rol.
+
+| Notificación | Alumno | Profesor | Gestor / Admin |
+|---|---|---|---|
+| Equipos averiados / fuera de servicio | ✗ | ✗ | ✓ |
+| Mantenimientos preventivos pendientes | ✗ | ✓ (solo sus equipos) | ✓ (todos) |
+| Incidencias abiertas | ✗ | ✓ (solo sus equipos) | ✓ (todas) |
+| Solicitudes de material pendientes | ✗ | ✗ | ✓ |
+| Consultas de residuos pendientes | ✗ | ✗ | ✓ |
+| Stock crítico / bajo mínimo / zona común | ✗ | ✗ | ✓ |
+| Tabla de preventivos pendientes | ✗ | ✓ (solo sus equipos) | ✓ (todos) |
+
+- El Profesor ve las incidencias de sus equipos usando la misma lógica que `renderIncidencias()`: `DATA.equipos.find(e => i.Equipo.startsWith(e.ID_Activo))` + `esResponsableDeEquipo()`.
+- Los pendientes de mantenimiento del Profesor ya estaban filtrados por `misEquipos` (equipos donde es responsable según col G de Equipos).
 
 ---
 
