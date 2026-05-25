@@ -9,8 +9,9 @@ function renderDashboard() {
   const hoy  = new Date();
   const en30 = new Date(); en30.setDate(hoy.getDate() + 30);
   const miNombre = currentUser?.name || '';
-  const esProfesor = getUserRole() === 'Profesor';
-  const esAlumno   = getUserRole() === 'Alumno';
+  const esProfesor    = getUserRole() === 'Profesor';
+  const esAlumno      = getUserRole() === 'Alumno';
+  const esGestorAdmin = !esProfesor && !esAlumno;
   // Profesor: solo sus equipos (por responsabilidad). Alumno: equipos de sus ubicaciones asignadas + zona común.
   const misEquipos = esProfesor
     ? DATA.equipos.filter(e => esResponsableDeEquipo(e))
@@ -35,9 +36,9 @@ function renderDashboard() {
 
   const averiados = DATA.equipos.filter(e => e.Estado_Operativo === 'Averiado' || e.Estado_Operativo === 'Fuera de servicio');
 
-  if (averiados.length) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
-  if (pendientesMant > 0) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
-  if (incAbiertas.length) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incAbiertas.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incAbiertas.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
+  if (averiados.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
+  if (pendientesMant > 0 && (esGestorAdmin || esProfesor)) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
+  if (incAbiertas.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incAbiertas.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incAbiertas.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
 
   const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
   if (solPendientes.length && puedeHacer('gestionarPedidos')) {
@@ -56,7 +57,7 @@ function renderDashboard() {
   const alertasStock = document.getElementById('alertas-stock-container');
   if (!alertasStock) return;
   alertasStock.innerHTML = '';
-  if (bajominimo.length) {
+  if (bajominimo.length && esGestorAdmin) {
     const criticos = bajominimo.filter(m => getStockTotal(m) === 0);
     const bajos    = bajominimo.filter(m => getStockTotal(m) > 0);
     const puedeGestionar = puedeHacer('gestionarPedidos');
@@ -80,7 +81,7 @@ function renderDashboard() {
   const alertasZC = DATA.material
     .map(m => ({ m, lotes: getLotesZonaComunBajoMinimo(m) }))
     .filter(({ lotes }) => lotes.length > 0);
-  if (alertasZC.length) {
+  if (alertasZC.length && esGestorAdmin) {
     const puedeGestionar = puedeHacer('gestionarPedidos');
     const itemsZC = alertasZC.slice(0, 6).map(({ m, lotes }) => {
       const stock = lotes.reduce((s, l) => s + (parseFloat(l.Stock_Local) || 0), 0);
@@ -99,6 +100,7 @@ function renderDashboard() {
   }
 
   const tbody = document.getElementById('tabla-proximos');
+  if (esAlumno) { tbody.innerHTML = ''; return; }
   const pendientesList = [];
   misEquipos.forEach(eq => {
     DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
