@@ -38,7 +38,12 @@ function renderDashboard() {
 
   if (averiados.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
   if (pendientesMant > 0 && (esGestorAdmin || esProfesor)) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
-  if (incAbiertas.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incAbiertas.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incAbiertas.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
+  const incVisibles = esGestorAdmin
+    ? incAbiertas
+    : esProfesor
+      ? incAbiertas.filter(i => { const eq = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)); return eq ? esResponsableDeEquipo(eq) : false; })
+      : [];
+  if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
 
   const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
   if (solPendientes.length && puedeHacer('gestionarPedidos')) {
