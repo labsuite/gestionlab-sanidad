@@ -63,10 +63,14 @@ function renderDashboard() {
   if (!alertasStock) return;
   alertasStock.innerHTML = '';
   if (bajominimo.length && esGestorAdmin) {
-    const yaEnPedido = m => DATA.solicitudes.some(s =>
-      s.Material === m.Nombre &&
-      (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')
-    );
+    const yaEnPedido = m => {
+      if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
+      return DATA.lineasPedido.some(l => {
+        if (l.Material !== m.Nombre || l.Estado_Linea === 'Recibido') return false;
+        const ped = DATA.pedidos.find(p => p.ID_Pedido === l.Pedido);
+        return ped && ped.Estado !== 'Archivado';
+      });
+    };
     const criticos = bajominimo.filter(m => getStockTotal(m) === 0 && !yaEnPedido(m));
     const bajos    = bajominimo.filter(m => getStockTotal(m) > 0  && !yaEnPedido(m));
     const puedeGestionar = puedeHacer('gestionarPedidos');
@@ -84,10 +88,14 @@ function renderDashboard() {
   }
 
   // Alertas específicas de zona común (almacén central)
-  const yaEnPedidoZC = m => DATA.solicitudes.some(s =>
-    s.Material === m.Nombre &&
-    (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')
-  );
+  const yaEnPedidoZC = m => {
+    if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
+    return DATA.lineasPedido.some(l => {
+      if (l.Material !== m.Nombre || l.Estado_Linea === 'Recibido') return false;
+      const ped = DATA.pedidos.find(p => p.ID_Pedido === l.Pedido);
+      return ped && ped.Estado !== 'Archivado';
+    });
+  };
   const alertasZC = DATA.material
     .map(m => ({ m, lotes: getLotesZonaComunBajoMinimo(m) }))
     .filter(({ m, lotes }) => lotes.length > 0 && !yaEnPedidoZC(m));

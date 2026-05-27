@@ -882,8 +882,12 @@
     .pedido-stat strong { color: var(--text); }
 
     /* LÍNEAS */
-    .linea-row { display: grid; grid-template-columns: 1fr 70px 70px 110px 28px; gap: 8px; align-items: center; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 6px; font-size: 13px; background: var(--surface); }
+    .linea-row { display: flex; align-items: center; gap: 8px 16px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 6px; background: var(--surface); }
     .linea-row:hover { background: var(--surface2); }
+    .linea-nombre { flex: 1; font-weight: 500; font-size: 13px; min-width: 0; }
+    .linea-meta { display: flex; gap: 10px; align-items: center; flex-shrink: 0; font-size: 12px; color: var(--text-soft); }
+    .linea-meta .badge { flex-shrink: 0; }
+    .linea-actions { display: flex; gap: 4px; flex-shrink: 0; }
 
     /* SOLICITUDES */
     .badge-solicitud-nueva { background: #f3e8fd; color: #7a2d93; }
@@ -1491,4 +1495,9 @@
   .intervenciones-mini-header { display: none; }
   .intervencion-mini-row { grid-template-columns: 1fr 1fr !important; gap: 4px; }
   .row-actions { opacity: 1 !important; }
+
+  /* Líneas de pedido: card apilado */
+  .linea-row { flex-wrap: wrap; }
+  .linea-nombre { flex: 0 0 100%; margin-bottom: 2px; }
+  .linea-meta { flex: 1; }
 }
