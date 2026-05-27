@@ -8,6 +8,17 @@
 - **NO usar `position: sticky`** en `.equipo-expand-inner` — interacciona mal con `overflow: hidden` del card
 - **NO poner `overflow-x: auto` en `.equipo-expand-inner`** — el scroll debe estar en el wrapper interno de las intervenciones
 
+## Modal incidencias — autocomplete de equipo
+El campo "Equipo afectado" usa el patrón `search-material-wrap` (mismo que intervenciones y pedidos):
+- `<div class="search-material-wrap">` con icono 🔍 e `input#inc-equipo-search`
+- `<div class="autocomplete-list" id="inc-equipo-autocomplete">`
+- `<input type="hidden" id="inc-equipo">` — valor real que usa `guardarIncidencia()`
+- Chip de seleccionado: `#inc-equipo-selected` con botón ✕ → `limpiarEquipoIncidencia()`
+- Funciones en `js/equipos-acciones.js`: `buscarEquipoIncidencia`, `seleccionarEquipoIncidencia`, `limpiarEquipoIncidencia`
+- `openModalIncidencia()` limpia el autocomplete (ya NO llama a `poblarSelects()`)
+- `openModalIncidenciaEquipo(equipoId)` usa `seleccionarEquipoIncidencia` en lugar del `<select>`
+- **`inc-equipo` ya NO está en `poblarSelects()`** de `ui.js`
+
 ## Vista de incidencias (card layout)
 - `<div id="lista-incidencias" class="inc-lista">` en lugar de `<table>` — el problema nunca se trunca
 - `renderIncidencias()` genera `.inc-card`; las urgentes añaden `.inc-urgente` (borde izquierdo rojo)
@@ -25,7 +36,18 @@
 - **Orden en el DOM**: `mat-ubic-row` se generan **antes** de `mat-detail-row`
 - `.mat-detail-row`: siempre en el DOM; en desktop `display: none`; en móvil portrait `display: table-row` cuando tiene clase `open` (solo en media query portrait, NO en tablet)
 
-## Visibilidad de notificaciones en el dashboard (2026-05-25)
+## Líneas de pedido — layout responsive
+`.linea-row` usa flex con tres clases hijas:
+- `.linea-nombre` — `flex:1`, nombre del material (+ equipo vinculado si lo hay)
+- `.linea-meta` — `flex-shrink:0`, contiene "Ped: X", "Rec: Y" y el badge de estado
+- `.linea-actions` — botones 📥 y 🗑️
+
+En portrait móvil (`@media (max-width:768px) and (orientation:portrait)`):
+- `.linea-row` → `flex-wrap:wrap`
+- `.linea-nombre` → `flex: 0 0 100%` (ocupa fila completa arriba)
+- `.linea-meta` → `flex:1` (comparte fila con `.linea-actions`)
+
+## Visibilidad de notificaciones en el dashboard (2026-05-27)
 `renderDashboard()` en `js/equipos-render.js` calcula `esGestorAdmin = !esProfesor && !esAlumno`.
 
 | Notificación | Alumno | Profesor | Gestor / Admin |
@@ -35,8 +57,11 @@
 | Incidencias abiertas | ✗ | ✓ (solo sus equipos) | ✓ (todas) |
 | Solicitudes de material pendientes | ✗ | ✗ | ✓ |
 | Consultas de residuos pendientes | ✗ | ✗ | ✓ |
-| Stock crítico / bajo mínimo / zona común | ✗ | ✗ | ✓ |
+| Stock = 0 (sin stock) / zona común sin stock | ✗ | ✗ | ✓ |
 | Tabla de preventivos pendientes | ✗ | ✓ (solo sus equipos) | ✓ (todos) |
 
+- Alerta de stock **solo cuando `getStockTotal(m) === 0`** (barra roja). Bajo mínimo (barra amarilla) no genera alerta en el dashboard.
+- Un material **no aparece en la alerta si ya tiene línea activa en un pedido**: `DATA.lineasPedido` con `Estado_Linea !== 'Recibido'` y pedido no archivado, O solicitud con estado `'Añadida a pedido'` / `'En espera de recepción'`.
+- Zona común: solo alerta si algún lote de zona común tiene `Stock_Local === 0`.
 - Profesor ve incidencias de sus equipos: `DATA.equipos.find(e => i.Equipo.startsWith(e.ID_Activo))` + `esResponsableDeEquipo()`
 - Preventivos del Profesor filtrados por `misEquipos` (col G de Equipos)

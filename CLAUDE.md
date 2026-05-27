@@ -14,7 +14,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-usuarios.md` — columnas Usuarios, lógica alumnos, ciclos/módulos, usuarios _sbOnly
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
-- `docs/patrones-ui.md` — tablas responsive, vista de incidencias, visibilidad dashboard por rol
+- `docs/patrones-ui.md` — autocomplete incidencias, tablas/líneas responsive, alertas stock dashboard
 
 ---
 
