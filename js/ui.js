@@ -327,7 +327,7 @@ function poblarSelects() {
   // eq-ubicacion y eq-responsable son autocompletes, no selects estáticos
   ['eq-proveedor-compra', 'eq-proveedor-sat', 'int-proveedor'].forEach(id => setOptions(id, proveedoresNames));
   ['int-realizado-por'].forEach(id => setOptions(id, usuariosNames));
-  ['int-equipo-dummy', 'inc-equipo'].forEach(id => setOptions(id, equiposIds));
+  ['int-equipo-dummy'].forEach(id => setOptions(id, equiposIds));
 }
 
 // ============================================================

@@ -491,7 +491,17 @@
       <div class="form-grid form-grid-2">
         <div class="form-group full" id="inc-equipo-group">
           <label>Equipo afectado *</label>
-          <select id="inc-equipo"><option value="">Seleccionar...</option></select>
+          <div class="search-material-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="inc-equipo-search" placeholder="Escribe para buscar..."
+              oninput="buscarEquipoIncidencia(this.value)" autocomplete="off">
+            <div class="autocomplete-list" id="inc-equipo-autocomplete"></div>
+          </div>
+          <input type="hidden" id="inc-equipo">
+          <div id="inc-equipo-selected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);align-items:center;justify-content:space-between">
+            <span id="inc-equipo-selected-text"></span>
+            <button type="button" onclick="limpiarEquipoIncidencia()" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0 2px">✕</button>
+          </div>
         </div>
         <div class="form-group">
           <label>Impacto operativo</label>

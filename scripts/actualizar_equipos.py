@@ -14,7 +14,7 @@ from base import conectar, leer, buscar, buscar_multi, buscar_contiene, actualiz
 
 # MODO A: mismo cambio para varios equipos que comparten un filtro
 # -------------------------------------------------------------------
-MODO = 'A'   # Cambiar a 'B' para cambios distintos por equipo
+MODO = 'B'   # Cambiar a 'B' para cambios distintos por equipo
 
 # Filtro para MODO A (qué equipos modificar)
 FILTRO_A = {'Tipo_Equipo': 'Micropipeta'}   # Ejemplo
@@ -27,13 +27,25 @@ CAMBIOS_A = {
     # 'Mes_Fin_Temporada': '6',
 }
 
+_PROTOCOLO_COAG = (
+    'Encender y esperar temperatura estable 37°C. '
+    'Verificar reactivos: lote, caducidad y nivel suficiente. '
+    'CONTROL DE CALIDAD (obligatorio antes de procesar muestras): '
+    'determinar TP y APTT en plasma control de nivel normal y comprobar '
+    'que los valores están dentro del rango del kit; si no pasan, no procesar '
+    'hasta identificar y resolver el problema. '
+    'Usar plasma pobre en plaquetas (PPP) obtenido por centrifugación 15 min a 1500 g. '
+    'Pipetear muestra y reactivos según protocolo del kit en uso. '
+    'Al finalizar: limpiar zona de trabajo, tapar y refrigerar reactivos abiertos (4°C), '
+    'desechar cubetas en contenedor de biorriesgo.'
+)
+
 # MODO B: cambios distintos para cada equipo (lista explícita)
 # -------------------------------------------------------------------
-# MODO = 'B'
 CAMBIOS_B = [
-    # (ID_Activo, {campo: valor})
-    ('EQU-001', {'Mes_Inicio_Temporada': '9', 'Mes_Fin_Temporada': '6'}),
-    ('EQU-002', {'Mes_Inicio_Temporada': '10', 'Mes_Fin_Temporada': '5'}),
+    ('COAG-01', {'Protocolo_Uso': _PROTOCOLO_COAG}),
+    ('COAG-02', {'Protocolo_Uso': _PROTOCOLO_COAG}),
+    ('COAG-03', {'Protocolo_Uso': _PROTOCOLO_COAG}),
 ]
 
 # ===========================================================================

@@ -246,19 +246,24 @@ function editIntervencion(idx) {
 // ============================================================
 function openModalIncidencia() {
   editingRow = null;
-  ['inc-equipo','inc-descripcion'].forEach(id => sv(id,''));
+  sv('inc-equipo',''); sv('inc-descripcion','');
   sv('inc-impacto','No bloquea'); sv('inc-urgencia','Normal');
-  const grp = document.getElementById('inc-equipo-group');
+  const srch = document.getElementById('inc-equipo-search'); if (srch) srch.value = '';
+  const sel  = document.getElementById('inc-equipo-selected'); if (sel) sel.style.display = 'none';
+  const ac   = document.getElementById('inc-equipo-autocomplete'); if (ac) ac.classList.remove('open');
+  const grp  = document.getElementById('inc-equipo-group');
   if (grp) grp.style.display = '';
-  poblarSelects(); openModal('modal-incidencia');
+  openModal('modal-incidencia');
+  setTimeout(() => document.getElementById('inc-equipo-search')?.focus(), 100);
 }
 
 function openModalIncidenciaEquipo(equipoId) {
   openModalIncidencia();
   setTimeout(() => {
-    const sel = document.getElementById('inc-equipo');
-    const opt = Array.from(sel.options).find(o => o.value.startsWith(equipoId));
-    if (opt) sel.value = opt.value;
+    const eq = DATA.equipos.find(e => e.ID_Activo === equipoId);
+    if (!eq) return;
+    const label = [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ');
+    seleccionarEquipoIncidencia(equipoId, label);
     const grp = document.getElementById('inc-equipo-group');
     if (grp) grp.style.display = 'none';
   }, 50);
@@ -1072,6 +1077,54 @@ function clearUbicacionEquipo() {
   document.getElementById('eq-ubicacion-search').value = '';
   const sel = document.getElementById('eq-ubicacion-selected');
   if (sel) sel.style.display = 'none';
+}
+
+// ============================================================
+// AUTOCOMPLETE EQUIPO EN INCIDENCIA
+// ============================================================
+function buscarEquipoIncidencia(query) {
+  const list = document.getElementById('inc-equipo-autocomplete');
+  if (!list) return;
+  if (!query || query.length < 1) { list.classList.remove('open'); return; }
+  const q = query.toLowerCase();
+  const resultados = DATA.equipos.filter(e =>
+    e.ID_Activo.toLowerCase().includes(q) ||
+    (e.Tipo_Equipo || '').toLowerCase().includes(q) ||
+    (e.Marca || '').toLowerCase().includes(q) ||
+    (e.Modelo || '').toLowerCase().includes(q) ||
+    (e.Ubicacion || '').toLowerCase().includes(q)
+  ).slice(0, 8);
+  if (!resultados.length) { list.classList.remove('open'); return; }
+  list.innerHTML = resultados.map(e => {
+    const label = [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ');
+    const meta  = e.Ubicacion ? getNombreUbicacion(e.Ubicacion) : '';
+    return `<div class="autocomplete-item" onclick="seleccionarEquipoIncidencia('${e.ID_Activo}','${label.replace(/'/g,"\\'")}')">
+      <div>
+        <div class="autocomplete-item-name">${e.ID_Activo} – ${label}</div>
+        ${meta ? `<div class="autocomplete-item-meta">${meta}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  list.classList.add('open');
+}
+
+function seleccionarEquipoIncidencia(id, label) {
+  document.getElementById('inc-equipo').value = id + (label ? ' – ' + label : '');
+  const srch = document.getElementById('inc-equipo-search'); if (srch) srch.value = '';
+  const sel  = document.getElementById('inc-equipo-selected');
+  const txt  = document.getElementById('inc-equipo-selected-text');
+  if (sel) sel.style.display = 'flex';
+  if (txt) txt.textContent = id + (label ? ' – ' + label : '');
+  const list = document.getElementById('inc-equipo-autocomplete');
+  if (list) list.classList.remove('open');
+}
+
+function limpiarEquipoIncidencia() {
+  sv('inc-equipo', '');
+  const srch = document.getElementById('inc-equipo-search'); if (srch) srch.value = '';
+  const sel  = document.getElementById('inc-equipo-selected'); if (sel) sel.style.display = 'none';
+  const list = document.getElementById('inc-equipo-autocomplete'); if (list) list.classList.remove('open');
+  document.getElementById('inc-equipo-search')?.focus();
 }
 
 // ============================================================
