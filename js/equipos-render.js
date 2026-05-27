@@ -72,7 +72,6 @@ function renderDashboard() {
       });
     };
     const criticos = bajominimo.filter(m => getStockTotal(m) === 0 && !yaEnPedido(m));
-    const bajos    = bajominimo.filter(m => getStockTotal(m) > 0  && !yaEnPedido(m));
     const puedeGestionar = puedeHacer('gestionarPedidos');
     const renderItemsStock = items => items.slice(0,5).map(m => {
       const stock = getStockTotal(m);
@@ -84,7 +83,6 @@ function renderDashboard() {
       return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:8px">${m.Nombre} (${stock} ${m.Unidad||''}) ${btnPedido}</span>`;
     }).join('');
     if (criticos.length) alertasStock.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${criticos.length} material(es) sin stock</div><div class="alert-text" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px">${renderItemsStock(criticos)}${criticos.length > 5 ? ' y ' + (criticos.length-5) + ' más...' : ''}</div></div></div>`;
-    if (bajos.length)    alertasStock.innerHTML += `<div class="alert-banner"><div class="alert-icon">🟡</div><div class="alert-content"><div class="alert-title">${bajos.length} material(es) por debajo del mínimo</div><div class="alert-text" style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin-top:4px">${renderItemsStock(bajos)}${bajos.length > 5 ? ' y ' + (bajos.length-5) + ' más...' : ''}</div></div></div>`;
   }
 
   // Alertas específicas de zona común (almacén central)
@@ -98,7 +96,7 @@ function renderDashboard() {
   };
   const alertasZC = DATA.material
     .map(m => ({ m, lotes: getLotesZonaComunBajoMinimo(m) }))
-    .filter(({ m, lotes }) => lotes.length > 0 && !yaEnPedidoZC(m));
+    .filter(({ m, lotes }) => lotes.some(l => parseFloat(l.Stock_Local) === 0) && !yaEnPedidoZC(m));
   if (alertasZC.length && esGestorAdmin) {
     const puedeGestionar = puedeHacer('gestionarPedidos');
     const itemsZC = alertasZC.slice(0, 6).map(({ m, lotes }) => {
