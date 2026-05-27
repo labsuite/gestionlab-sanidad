@@ -63,18 +63,19 @@ function renderDashboard() {
   if (!alertasStock) return;
   alertasStock.innerHTML = '';
   if (bajominimo.length && esGestorAdmin) {
-    const criticos = bajominimo.filter(m => getStockTotal(m) === 0);
-    const bajos    = bajominimo.filter(m => getStockTotal(m) > 0);
+    const yaEnPedido = m => DATA.solicitudes.some(s =>
+      s.Material === m.Nombre &&
+      (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')
+    );
+    const criticos = bajominimo.filter(m => getStockTotal(m) === 0 && !yaEnPedido(m));
+    const bajos    = bajominimo.filter(m => getStockTotal(m) > 0  && !yaEnPedido(m));
     const puedeGestionar = puedeHacer('gestionarPedidos');
     const renderItemsStock = items => items.slice(0,5).map(m => {
       const stock = getStockTotal(m);
       const opt   = parseFloat(m.Stock_Optimo) || 0;
       const falta = opt > 0 ? Math.max(0, opt - stock) : 0;
-      const solPedido = DATA.solicitudes.find(s => s.Material === m.Nombre && (s.Estado === 'En pedido' || s.Estado === 'En camino'));
       const btnPedido = puedeGestionar
-        ? (solPedido && solPedido.Lista_Pedido
-            ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();verDetallePedido('${solPedido.Lista_Pedido}')">Ver pedido</button>`
-            : `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();solicitudStockAPedido('${m.ID_Material}',${falta||''})">+ Pedido${falta ? ' (' + falta + ')' : ''}</button>`)
+        ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();solicitudStockAPedido('${m.ID_Material}',${falta||''})">+ Pedido${falta ? ' (' + falta + ')' : ''}</button>`
         : '';
       return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:8px">${m.Nombre} (${stock} ${m.Unidad||''}) ${btnPedido}</span>`;
     }).join('');
@@ -83,21 +84,22 @@ function renderDashboard() {
   }
 
   // Alertas específicas de zona común (almacén central)
+  const yaEnPedidoZC = m => DATA.solicitudes.some(s =>
+    s.Material === m.Nombre &&
+    (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción')
+  );
   const alertasZC = DATA.material
     .map(m => ({ m, lotes: getLotesZonaComunBajoMinimo(m) }))
-    .filter(({ lotes }) => lotes.length > 0);
+    .filter(({ m, lotes }) => lotes.length > 0 && !yaEnPedidoZC(m));
   if (alertasZC.length && esGestorAdmin) {
     const puedeGestionar = puedeHacer('gestionarPedidos');
     const itemsZC = alertasZC.slice(0, 6).map(({ m, lotes }) => {
       const stock = lotes.reduce((s, l) => s + (parseFloat(l.Stock_Local) || 0), 0);
-      const solPedido = DATA.solicitudes.find(s => s.Material === m.Nombre && (s.Estado === 'En pedido' || s.Estado === 'En camino'));
       const opt   = parseFloat(m.Stock_Optimo) || 0;
       const total = getStockTotal(m);
       const falta = opt > 0 ? Math.max(0, opt - total) : 0;
       const btnPedido = puedeGestionar
-        ? (solPedido && solPedido.Lista_Pedido
-            ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();verDetallePedido('${solPedido.Lista_Pedido}')">Ver pedido</button>`
-            : `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();solicitudStockAPedido('${m.ID_Material}',${falta||''})">+ Pedido${falta ? ' (' + falta + ')' : ''}</button>`)
+        ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();solicitudStockAPedido('${m.ID_Material}',${falta||''})">+ Pedido${falta ? ' (' + falta + ')' : ''}</button>`
         : '';
       return `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:8px">${m.Nombre} (zona común: ${stock} ${m.Unidad||''}) ${btnPedido}</span>`;
     }).join('');
