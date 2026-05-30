@@ -473,6 +473,66 @@
     .icon-btn:hover { background: var(--surface2); color: var(--text); }
     .icon-btn.danger:hover { background: var(--danger-light); color: var(--danger); border-color: #f0c8c8; }
 
+    /* SOLICITUDES — CARDS */
+    .sol-sec-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 16px;
+      background: var(--surface2);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+    }
+    .sol-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sol-card:last-child { border-bottom: none; }
+    .sol-card-left { flex: 1; min-width: 0; }
+    .sol-card-material {
+      font-weight: 600;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .sol-card-qty {
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--text-soft);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+    }
+    .sol-card-meta {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0 4px;
+    }
+    .sol-card-necesario { color: var(--accent2); font-weight: 500; }
+    .sol-card-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    .sol-card-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
     /* MODAL */
     .modal-overlay {
       display: none;

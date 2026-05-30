@@ -14,35 +14,54 @@ const _estadoBadge = {
 };
 const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
 
-// trExtra: atributos extra para el tag <tr> (data-sec, style, etc.)
-function _renderFilaSolicitud(s, rol, trExtra) {
+// extraAttrs: atributos extra para el tag <div> (data-sec, style, etc.)
+function _renderFilaSolicitud(s, rol, extraAttrs) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
   const esProfesor = rol === 'Profesor' || rol === 'Alumno';
   const urgencia = s.Urgencia || ((s.Observaciones||'').includes('⚠️ URGENTE') ? 'Urgente' : 'Normal');
   const mejorProv = typeof getMejorProveedorPrecio === 'function' ? getMejorProveedorPrecio(s.Material) : null;
   const hintProv = mejorProv && puedeGestionar
-    ? `<div style="font-size:10px;color:var(--text-muted);margin-top:2px">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
+    ? `<div class="sol-card-hint">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
     : '';
   const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado'].includes(s.Estado);
   const puedeEditar = esProfesor && s.Estado === 'Pendiente';
-  const trOpen = trExtra ? ` ${trExtra}` : '';
-  return `<tr${trOpen}>
-    <td><strong>${s.ID_Solicitud}</strong></td>
-    <td><div>${s.Material}</div>${hintProv}</td>
-    <td>${s.Cantidad_Solicitada}</td>
-    <td style="font-size:12px">${s.Solicitante}</td>
-    <td style="font-size:12px">${formatDate(s.Fecha)}</td>
-    <td><span class="badge ${_urgenciaBadge[urgencia] || 'badge-gray'}">${urgencia}</span></td>
-    <td style="font-size:12px">${s.Proveedor_Requerido || '—'}</td>
-    <td><span class="badge ${_estadoBadge[s.Estado] || 'badge-gray'}">${s.Estado || 'Pendiente'}</span></td>
-    <td><div class="row-actions">
-      ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Añadir a pedido" onclick="solicitudAPedido('${s.ID_Solicitud}')">🛒</button>` : ''}
-      ${mostrarVerPedido ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
-      ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
-      ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
-      ${puedeEditar ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
-    </div></td>
-  </tr>`;
+
+  const fechaNecesariaRaw = (s.Motivo || '').match(/Necesario:\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+  const fechaNecesaria = fechaNecesariaRaw
+    ? `<span class="sol-card-necesario"> · 📅 ${formatDate(fechaNecesariaRaw)}</span>`
+    : '';
+  const prov = s.Proveedor_Requerido ? ` · ${s.Proveedor_Requerido}` : '';
+
+  const open = extraAttrs ? ` ${extraAttrs}` : '';
+  return `<div class="sol-card"${open}>
+    <div class="sol-card-left">
+      <div class="sol-card-material">
+        ${s.Material}
+        <span class="sol-card-qty">${s.Cantidad_Solicitada}</span>
+        ${urgencia === 'Urgente' ? `<span class="badge badge-red" style="font-size:10px">⚠️ Urgente</span>` : ''}
+      </div>
+      <div class="sol-card-meta">
+        <span style="color:var(--text-muted);font-size:10px">${s.ID_Solicitud}</span>
+        <span>·</span>
+        <span>${s.Solicitante}</span>
+        <span>·</span>
+        <span>${formatDate(s.Fecha)}</span>
+        ${prov ? `<span>${prov}</span>` : ''}
+        ${fechaNecesaria}
+      </div>
+      ${hintProv}
+    </div>
+    <div class="sol-card-right">
+      <span class="badge ${_estadoBadge[s.Estado] || 'badge-gray'}">${s.Estado || 'Pendiente'}</span>
+      <div class="row-actions">
+        ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Añadir a pedido" onclick="solicitudAPedido('${s.ID_Solicitud}')">🛒</button>` : ''}
+        ${mostrarVerPedido ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
+        ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
+        ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
+        ${puedeEditar ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
+      </div>
+    </div>
+  </div>`;
 }
 
 const _seccionesColapsadas = new Set(['recibido', 'rechazado', 'cancelado']);
@@ -97,14 +116,10 @@ function renderSolicitudes(filtroEstado = '') {
     hayAlgo = true;
     const key = toKey(estado);
     const collapsed = _seccionesColapsadas.has(key);
-    html += `<tr class="sol-sec-header" onclick="toggleSeccionSolicitud('${key}')" style="cursor:pointer;user-select:none">
-      <td colspan="9" style="background:var(--bg-soft,#f5f5f3);padding:7px 16px;font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid var(--border)">
-        <span style="display:flex;align-items:center;justify-content:space-between">
-          <span>${ICONOS[estado] || '📋'} ${estado} · ${grupo.length}</span>
-          <span id="sol-arrow-${key}" style="font-size:13px">${collapsed ? '▸' : '▾'}</span>
-        </span>
-      </td>
-    </tr>`;
+    html += `<div class="sol-sec-header" onclick="toggleSeccionSolicitud('${key}')">
+      <span>${ICONOS[estado] || '📋'} ${estado} · ${grupo.length}</span>
+      <span id="sol-arrow-${key}">${collapsed ? '▸' : '▾'}</span>
+    </div>`;
     html += grupo.map(s => {
       const attrs = `data-sec="${key}"${collapsed ? ' style="display:none"' : ''}`;
       return _renderFilaSolicitud(s, rol, attrs);
@@ -113,7 +128,7 @@ function renderSolicitudes(filtroEstado = '') {
 
   tbody.innerHTML = hayAlgo
     ? html
-    : `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></td></tr>`;
+    : `<div style="padding:32px 16px"><div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin solicitudes</div></div></div>`;
   _actualizarBadgeSolicitudes();
   _notificarCambiosSolicitudes();
 }
@@ -178,8 +193,7 @@ function _notificarCambiosSolicitudes() {
   banner.id = 'banner-cambios-solicitudes';
   banner.style.cssText = 'margin-bottom:12px;padding:12px 16px;background:var(--accent-light,#e8f0fe);border-radius:var(--radius,6px);border-left:3px solid var(--accent,#4f46e5);font-size:13px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap';
   banner.innerHTML = `<div style="flex:1"><strong style="color:var(--accent,#4f46e5)">${cambios.length} solicitud${cambios.length > 1 ? 'es' : ''} actualizada${cambios.length > 1 ? 's' : ''}:</strong><span style="color:var(--text-soft);margin-left:6px">${detalles}${masTexto}</span></div><button class="btn btn-sm btn-secondary" onclick="_marcarCambiosSolicitudesVisto()">Entendido</button>`;
-  const table = tbody.closest('table');
-  if (table) table.parentElement.insertBefore(banner, table);
+  if (tbody) tbody.parentElement.insertBefore(banner, tbody);
 }
 
 function _marcarCambiosSolicitudesVisto() {

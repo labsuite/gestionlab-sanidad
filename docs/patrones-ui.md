@@ -26,6 +26,13 @@ El campo "Equipo afectado" usa el patrón `search-material-wrap` (mismo que inte
 - Botón contextual: "Responder" si Abierta, "Ver / Actuar" o "📎 Adjuntar factura" si En gestión
 - **NO volver a tabla** — `Descripcion_Problema` puede ser largo
 
+## Vista de solicitudes de material (card layout)
+- `<div id="tabla-solicitudes">` en lugar de `<table>` — permite mostrar más info sin columnas estrechas
+- `_renderFilaSolicitud()` genera `.sol-card`; grupos colapsables por estado con `.sol-sec-header` (div)
+- Estructura card: izquierda (`sol-card-left`) → nombre + cantidad chip + badge urgente si aplica → meta (ID · solicitante · fecha · proveedor · 📅 fecha necesaria) → hint precio. Derecha (`sol-card-right`) → badge estado + botones acción
+- **Fecha necesaria** se extrae de `s.Motivo` con regex `/Necesario:\s*(\d{4}-\d{2}-\d{2})/` — no hay columna separada en Sheets, se concatena al motivo al guardar
+- **NO volver a tabla** — la meta row necesita espacio flexible y la fecha necesaria no cabe como columna adicional
+
 ## Tabla de fungibles (inventario de material)
 - En desktop: tabla completa con todas las columnas
 - En móvil portrait: se ocultan columnas 3 (categoría), 6 (mín/opt) y 7 (precio) vía CSS
@@ -61,7 +68,7 @@ En portrait móvil (`@media (max-width:768px) and (orientation:portrait)`):
 | Tabla de preventivos pendientes | ✗ | ✓ (solo sus equipos) | ✓ (todos) |
 
 - Alerta de stock **solo cuando `getStockTotal(m) === 0`** (barra roja). Bajo mínimo (barra amarilla) no genera alerta en el dashboard.
-- Un material **no aparece en la alerta si ya tiene línea activa en un pedido**: `DATA.lineasPedido` con `Estado_Linea !== 'Recibido'` y pedido no archivado, O solicitud con estado `'Añadida a pedido'` / `'En espera de recepción'`.
+- Un material **no aparece en la alerta si ya tiene gestión activa**: línea en `DATA.lineasPedido` con `Estado_Linea !== 'Recibido'` y pedido no archivado, O solicitud con estado `'Pendiente'`, `'Añadida a pedido'` o `'En espera de recepción'`. Incluir `'Pendiente'` evita que la alerta persista tras crear una solicitud antes de formalizarla en pedido.
 - Zona común: solo alerta si algún lote de zona común tiene `Stock_Local === 0`.
 - Profesor ve incidencias de sus equipos: `DATA.equipos.find(e => i.Equipo.startsWith(e.ID_Activo))` + `esResponsableDeEquipo()`
 - Preventivos del Profesor filtrados por `misEquipos` (col G de Equipos)

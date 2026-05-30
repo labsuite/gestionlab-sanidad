@@ -64,7 +64,7 @@ function renderDashboard() {
   alertasStock.innerHTML = '';
   if (bajominimo.length && esGestorAdmin) {
     const yaEnPedido = m => {
-      if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
+      if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Pendiente' || s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
       return DATA.lineasPedido.some(l => {
         if (l.Material !== m.Nombre || l.Estado_Linea === 'Recibido') return false;
         const ped = DATA.pedidos.find(p => p.ID_Pedido === l.Pedido);
@@ -87,7 +87,7 @@ function renderDashboard() {
 
   // Alertas específicas de zona común (almacén central)
   const yaEnPedidoZC = m => {
-    if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
+    if (DATA.solicitudes.some(s => s.Material === m.Nombre && (s.Estado === 'Pendiente' || s.Estado === 'Añadida a pedido' || s.Estado === 'En espera de recepción'))) return true;
     return DATA.lineasPedido.some(l => {
       if (l.Material !== m.Nombre || l.Estado_Linea === 'Recibido') return false;
       const ped = DATA.pedidos.find(p => p.ID_Pedido === l.Pedido);
