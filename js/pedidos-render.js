@@ -2,6 +2,32 @@
 // SOLICITUDES — RENDER Y LÓGICA
 // ============================================================
 let _mostrarSolicitudesArchivadas = false;
+let _mostrarSnoozed = false;
+
+// Snooze de solicitudes (localStorage)
+const _SNOOZE_KEY = 'glab_sol_snooze';
+function _getSnoozes() { return JSON.parse(localStorage.getItem(_SNOOZE_KEY) || '{}'); }
+function aplicarSnooze(solId) {
+  const input = document.getElementById('snooze-date-' + solId);
+  const fecha = input?.value;
+  if (!fecha) { showToast('Indica una fecha', 'error'); return; }
+  const s = _getSnoozes(); s[solId] = fecha;
+  localStorage.setItem(_SNOOZE_KEY, JSON.stringify(s));
+  renderSolicitudes();
+}
+function cancelarSnooze(solId) {
+  const s = _getSnoozes(); delete s[solId];
+  localStorage.setItem(_SNOOZE_KEY, JSON.stringify(s));
+  renderSolicitudes();
+}
+function toggleSnoozeInput(solId) {
+  const el = document.getElementById('snooze-panel-' + solId);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+function toggleMostrarSnoozed() {
+  _mostrarSnoozed = !_mostrarSnoozed;
+  renderSolicitudes();
+}
 
 // Badge de estados
 const _estadoBadge = {
@@ -15,7 +41,8 @@ const _estadoBadge = {
 const _urgenciaBadge = { 'Urgente': 'badge-red', 'Normal': 'badge-gray' };
 
 // extraAttrs: atributos extra para el tag <div> (data-sec, style, etc.)
-function _renderFilaSolicitud(s, rol, extraAttrs) {
+// snoozeHasta: ISO date string si está en snooze activo, null si no
+function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
   const puedeGestionar = rol === 'Administrador' || rol === 'Gestor';
   const esProfesor = rol === 'Profesor' || rol === 'Alumno';
   const urgencia = s.Urgencia || ((s.Observaciones||'').includes('⚠️ URGENTE') ? 'Urgente' : 'Normal');
@@ -32,8 +59,36 @@ function _renderFilaSolicitud(s, rol, extraAttrs) {
     : '';
   const prov = s.Proveedor_Requerido ? ` · ${s.Proveedor_Requerido}` : '';
 
+  const estadosActivos = ['Pendiente', 'Añadida a pedido', 'En espera de recepción'];
+  const puedeSnooze = estadosActivos.includes(s.Estado);
+  const hoy = new Date().toISOString().split('T')[0];
+
+  const btnSnooze = puedeSnooze
+    ? `<button class="icon-btn" style="${snoozeHasta ? 'color:var(--accent2)' : ''}" title="${snoozeHasta ? 'Oculta hasta ' + formatDate(snoozeHasta) : 'Ocultar hasta una fecha'}" onclick="toggleSnoozeInput('${s.ID_Solicitud}')">🕐</button>`
+    : '';
+
+  let snoozePanel = '';
+  if (puedeSnooze) {
+    if (snoozeHasta) {
+      snoozePanel = `<div class="sol-card-snooze" id="snooze-panel-${s.ID_Solicitud}" style="display:flex">
+        <span>😴 Oculta hasta ${formatDate(snoozeHasta)}</span>
+        <input type="date" id="snooze-date-${s.ID_Solicitud}" min="${hoy}" value="${snoozeHasta}">
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="aplicarSnooze('${s.ID_Solicitud}')">Cambiar</button>
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="cancelarSnooze('${s.ID_Solicitud}')">Mostrar ya</button>
+      </div>`;
+    } else {
+      snoozePanel = `<div class="sol-card-snooze" id="snooze-panel-${s.ID_Solicitud}" style="display:none">
+        <span style="white-space:nowrap">Ocultar hasta:</span>
+        <input type="date" id="snooze-date-${s.ID_Solicitud}" min="${hoy}" value="${fechaNecesariaRaw || ''}">
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="aplicarSnooze('${s.ID_Solicitud}')">Confirmar</button>
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="toggleSnoozeInput('${s.ID_Solicitud}')">Cancelar</button>
+      </div>`;
+    }
+  }
+
+  const cardClass = `sol-card${snoozeHasta ? ' sol-card-snoozed' : ''}`;
   const open = extraAttrs ? ` ${extraAttrs}` : '';
-  return `<div class="sol-card"${open}>
+  return `<div class="${cardClass}"${open}>
     <div class="sol-card-left">
       <div class="sol-card-material">
         ${s.Material}
@@ -59,8 +114,10 @@ function _renderFilaSolicitud(s, rol, extraAttrs) {
         ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
         ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
         ${puedeEditar ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
+        ${btnSnooze}
       </div>
     </div>
+    ${snoozePanel}
   </div>`;
 }
 
@@ -99,8 +156,22 @@ function renderSolicitudes(filtroEstado = '') {
 
   if (filtroEstado) items = items.filter(s => s.Estado === filtroEstado);
 
+  const snoozes = _getSnoozes();
+  const hoy = new Date().toISOString().split('T')[0];
+  const snoozedItems = items.filter(s => snoozes[s.ID_Solicitud] && snoozes[s.ID_Solicitud] > hoy);
+  if (!_mostrarSnoozed) items = items.filter(s => !snoozes[s.ID_Solicitud] || snoozes[s.ID_Solicitud] <= hoy);
+
   const toggleContainer = document.getElementById('solicitudes-toggle-container');
-  if (toggleContainer) toggleContainer.innerHTML = '';
+  if (toggleContainer) {
+    toggleContainer.innerHTML = '';
+    if (snoozedItems.length) {
+      const earliest = snoozedItems.map(s => snoozes[s.ID_Solicitud]).sort()[0];
+      toggleContainer.innerHTML = `<div style="padding:4px 0 8px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px">
+        😴 ${snoozedItems.length} solicitud${snoozedItems.length > 1 ? 'es' : ''} oculta${snoozedItems.length > 1 ? 's' : ''} · próxima: ${formatDate(earliest)}
+        <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px" onclick="toggleMostrarSnoozed()">${_mostrarSnoozed ? 'Ocultar' : 'Ver'}</button>
+      </div>`;
+    }
+  }
 
   const ORDEN  = ['Pendiente', 'Añadida a pedido', 'En espera de recepción', 'Recibido', 'Rechazado', 'Cancelado'];
   const ICONOS = { 'Pendiente': '⏳', 'Añadida a pedido': '🛒', 'En espera de recepción': '🔄', 'Recibido': '✅', 'Rechazado': '❌', 'Cancelado': '🚫' };
@@ -122,7 +193,8 @@ function renderSolicitudes(filtroEstado = '') {
     </div>`;
     html += grupo.map(s => {
       const attrs = `data-sec="${key}"${collapsed ? ' style="display:none"' : ''}`;
-      return _renderFilaSolicitud(s, rol, attrs);
+      const snoozeHasta = snoozes[s.ID_Solicitud] && snoozes[s.ID_Solicitud] > hoy ? snoozes[s.ID_Solicitud] : null;
+      return _renderFilaSolicitud(s, rol, attrs, snoozeHasta);
     }).join('');
   }
 
