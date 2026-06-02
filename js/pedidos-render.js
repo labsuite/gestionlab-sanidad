@@ -327,7 +327,7 @@ function renderPedidos(filtroEstado = '') {
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
         <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
-          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
+          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
           ${docBadges ? `<span style="font-size:14px" title="Documentación">${docBadges}</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${!['Archivado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Cambiar estado" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄</button>` : ''}
@@ -384,7 +384,7 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div><div class="card-title">${p.Nombre_Lista}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${p.ID_Pedido}</div></div>
         <div style="display:flex;gap:8px;align-items:center">
-          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
+          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${puedeEditar && !['Recepción parcial','Recepción completa','Archivado'].includes(p.Estado) ? `<button class="btn btn-secondary" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄 Estado</button>` : ''}
 
