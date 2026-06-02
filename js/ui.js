@@ -69,7 +69,9 @@ function updateBadges() {
   const badgeInc = document.getElementById('badge-incidencias');
   if (badgeInc) { badgeInc.textContent = abiertas; badgeInc.style.display = abiertas > 0 ? '' : 'none'; }
 
-  const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
+  const _hoy = new Date().toISOString().split('T')[0];
+  const _snoozes = JSON.parse(localStorage.getItem('glab_sol_snooze') || '{}');
+  const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(_snoozes[s.ID_Solicitud] && _snoozes[s.ID_Solicitud] > _hoy)).length;
   const badgeSol = document.getElementById('badge-solicitudes');
   if (badgeSol) { badgeSol.textContent = pendientes; badgeSol.style.display = pendientes > 0 ? '' : 'none'; }
 }

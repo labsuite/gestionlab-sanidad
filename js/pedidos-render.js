@@ -166,9 +166,8 @@ function renderSolicitudes(filtroEstado = '') {
     toggleContainer.innerHTML = '';
     if (snoozedItems.length) {
       const earliest = snoozedItems.map(s => snoozes[s.ID_Solicitud]).sort()[0];
-      toggleContainer.innerHTML = `<div style="padding:4px 0 8px;font-size:12px;color:var(--text-muted);display:flex;align-items:center;gap:8px">
-        😴 ${snoozedItems.length} solicitud${snoozedItems.length > 1 ? 'es' : ''} oculta${snoozedItems.length > 1 ? 's' : ''} · próxima: ${formatDate(earliest)}
-        <button class="btn btn-secondary" style="padding:2px 10px;font-size:11px" onclick="toggleMostrarSnoozed()">${_mostrarSnoozed ? 'Ocultar' : 'Ver'}</button>
+      toggleContainer.innerHTML = `<div style="display:flex;justify-content:flex-end;padding-bottom:4px">
+        <button class="btn btn-secondary" style="padding:1px 8px;font-size:11px;opacity:0.55;border-color:var(--border)" onclick="toggleMostrarSnoozed()" title="${snoozedItems.length} solicitud${snoozedItems.length > 1 ? 'es' : ''} pospuesta${snoozedItems.length > 1 ? 's' : ''} · próxima: ${formatDate(earliest)}">💤 ${snoozedItems.length}${_mostrarSnoozed ? ' · ocultar' : ''}</button>
       </div>`;
     }
   }
@@ -229,7 +228,9 @@ function _actualizarBadgeSolicitudes() {
     badge.textContent = n;
     badge.style.display = n > 0 ? '' : 'none';
   } else {
-    const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente').length;
+    const _hoy = new Date().toISOString().split('T')[0];
+    const _snz = _getSnoozes();
+    const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(_snz[s.ID_Solicitud] && _snz[s.ID_Solicitud] > _hoy)).length;
     badge.textContent = pendientes;
     badge.style.display = pendientes > 0 ? '' : 'none';
   }
@@ -395,7 +396,7 @@ function verDetallePedido(pedidoId) {
         <div class="detail-item"><div class="detail-label">Presupuesto</div><div class="detail-value">${formatDate(p.Fecha_Presupuesto)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Aprobado</div><div class="detail-value">${formatDate(p.Fecha_Aprobacion)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Nº Factura</div><div class="detail-value">${p.Numero_Factura||'—'}</div></div>
-        <div class="detail-item"><div class="detail-label">Coste total</div><div class="detail-value">${(() => { const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0); return coste > 0 ? coste.toFixed(2) + ' €' : '—'; })()}</div></div>
+        <div class="detail-item"><div class="detail-label">Coste total (IVA 21%)</div><div class="detail-value">${(() => { const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0); return coste > 0 ? (coste * 1.21).toFixed(2) + ' €' : '—'; })()}</div></div>
       </div>
       ${puedeEditar ? `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px">

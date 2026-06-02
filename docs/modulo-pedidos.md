@@ -58,6 +58,15 @@ La hoja `Material` (col G: `Ubicacion`) es un campo legacy que almacena solo la 
 ### Flag `_esPrepoblado` en `_lotesTemp`
 Al editar un ítem legacy, `editMaterial()` pre-rellena `_lotesTemp` con `_esPrepoblado: true`. `guardarMaterial()` omite crear el lote si es `_esPrepoblado` y no hay ningún otro lote nuevo real. Evita convertir ítems legacy a modo lote involuntariamente.
 
+## Snooze de solicitudes
+- Almacenado en `localStorage` bajo la clave `glab_sol_snooze` (`{ID_Solicitud: 'YYYY-MM-DD'}`).
+- Solo aplicable a estados activos: `Pendiente`, `Añadida a pedido`, `En espera de recepción`.
+- Las solicitudes con snooze activo **no cuentan** en el badge del sidebar (ni en `updateBadges` de `ui.js` ni en `_actualizarBadgeSolicitudes` de `pedidos-render.js`).
+- El indicador de pospuestas es un pequeño botón `💤 N` alineado a la derecha, con opacidad reducida; el tooltip muestra la fecha más próxima. El toggle `_mostrarSnoozed` muestra/oculta las cards pospuestas en la lista.
+
+## Coste total en detalle de pedido
+Campo "Coste total (IVA 21%)" en `verDetallePedido`: suma `Precio_Unitario × Cantidad_Pedida` de todas las líneas y multiplica por 1.21.
+
 ## Eliminar ítems del inventario (2026-05-22)
 - Permiso `eliminarItems: true` en **Administrador** únicamente (Gestor no lo tiene)
 - Botón "Eliminar" en footer izquierdo de los modales `modal-material` y `modal-equipo`, solo al editar
