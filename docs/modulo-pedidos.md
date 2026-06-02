@@ -58,6 +58,11 @@ La hoja `Material` (col G: `Ubicacion`) es un campo legacy que almacena solo la 
 ### Flag `_esPrepoblado` en `_lotesTemp`
 Al editar un ítem legacy, `editMaterial()` pre-rellena `_lotesTemp` con `_esPrepoblado: true`. `guardarMaterial()` omite crear el lote si es `_esPrepoblado` y no hay ningún otro lote nuevo real. Evita convertir ítems legacy a modo lote involuntariamente.
 
+## Eliminar pedido
+- Botón 🗑️ en el header del detalle, visible solo para **Administrador** (`puedeHacer('eliminarItems')`).
+- `eliminarPedido(pedidoId)` en `js/pedidos-acciones.js`: elimina las líneas de mayor a menor índice (para no desplazar filas) y luego el pedido; actualiza `DATA.lineasPedido` y `DATA.pedidos`; vuelve a la lista con `showPage('pedidos')`.
+- Si hay líneas ya recibidas, el `confirm()` lo advierte (no revierte stock).
+
 ## Snooze de solicitudes
 - Almacenado en `localStorage` bajo la clave `glab_sol_snooze` (`{ID_Solicitud: 'YYYY-MM-DD'}`).
 - Solo aplicable a estados activos: `Pendiente`, `Añadida a pedido`, `En espera de recepción`.
