@@ -387,7 +387,7 @@ function verDetallePedido(pedidoId) {
           ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${puedeEditar && !['Recepción parcial','Recepción completa','Archivado'].includes(p.Estado) ? `<button class="btn btn-secondary" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄 Estado</button>` : ''}
-
+          ${puedeHacer('eliminarItems') ? `<button class="icon-btn" title="Eliminar pedido" onclick="eliminarPedido('${p.ID_Pedido}')" style="color:var(--danger,#dc2626)">🗑️</button>` : ''}
         </div>
       </div>
       <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(3,1fr);gap:16px">

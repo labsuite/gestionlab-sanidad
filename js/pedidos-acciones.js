@@ -618,6 +618,34 @@ async function avanceEstadoPedido(pedidoId) {
   hideLoading();
 }
 
+async function eliminarPedido(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  const hayRecibidas = lineas.some(l => l.Estado_Linea === 'Recibido' || l.Estado_Linea === 'Recibido parcialmente');
+  const aviso = hayRecibidas ? '\n⚠️ Hay líneas ya recibidas. Esta acción no revertirá el stock.' : (lineas.length ? `\nSe eliminarán también sus ${lineas.length} línea(s).` : '');
+  if (!confirm(`¿Eliminar el pedido "${p.Nombre_Lista}" (${p.ID_Pedido})?${aviso}\n\nEsta acción no se puede deshacer.`)) return;
+  showLoading('Eliminando...');
+  try {
+    // Eliminar líneas de mayor a menor índice para no desplazar filas
+    const indicesLineas = lineas
+      .map(l => DATA.lineasPedido.indexOf(l))
+      .filter(i => i !== -1)
+      .sort((a, b) => b - a);
+    for (const idx of indicesLineas) {
+      await sheetsDeleteRow('Lineas_Pedido', idx);
+      DATA.lineasPedido.splice(idx, 1);
+    }
+    const pedIdx = DATA.pedidos.indexOf(p);
+    await sheetsDeleteRow('Pedidos', pedIdx);
+    DATA.pedidos.splice(pedIdx, 1);
+    showToast('Pedido eliminado', 'success');
+    showPage('pedidos');
+    renderPedidos();
+  } catch(e) { showToast('Error al eliminar', 'error'); console.error(e); }
+  hideLoading();
+}
+
 // ============================================================
 // DOCUMENTACIÓN Y ARCHIVO DE PEDIDOS
 // ============================================================
