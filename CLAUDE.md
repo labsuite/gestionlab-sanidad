@@ -33,6 +33,8 @@ Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de 
 - `limpiar_hoja.py` — DELETE en cualquier hoja con filtro; `DRY_RUN = True` por defecto
 - `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 hojas del módulo de fungibles
 - `importar_alumnos.py` — INSERT masivo en Usuarios desde Excel (inicio de curso)
+- `rellenar_mantenimientos.py` — INSERT en Registro_Mantenimientos de todos los periodos de un curso como realizados; `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
+- `generar_modelo_calidad.py` — genera los dos Excel del modelo de calidad (inventario + plan de mantenimiento) desde Python; alternativa al botón de la app cuando se necesita uso puntual offline.
 
 ### Flujo de trabajo
 1. Usuario describe el cambio a Claude
@@ -74,6 +76,46 @@ Cabecera: `Nombre | Apellidos | Email | Ciclo | Modulos | Labs`
 - Ciclo: nombre completo coincidente con Ciclos_Modulos
 - Modulos: separados por coma
 - Labs: números de lab separados por coma (ej: `201,203`)
+
+---
+
+## Exportación de documentos de calidad
+
+Dos botones en el módulo de mantenimiento (`js/mantenimiento.js`) generan los Excel del modelo de calidad usando JSZip sobre las plantillas de `assets/templates/`. No requieren servidor; se ejecutan en el navegador.
+
+### 📄 Exportar plan de mantenimiento (`exportarModeloCalidad`)
+Plantilla: `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`
+Salida: `MD84MAN01_Plan_mantemento_YYYY-YYYY.xlsx`
+Una fila por equipo × tipo (Interno/Externo). Columnas:
+
+| Col | Contenido |
+|-----|-----------|
+| A | Denominación (Tipo_Equipo Marca Modelo ID) |
+| B | Nº de laboratorio extraído de Ubicacion (ej. `205`) |
+| C | Responsable del equipo; si vacío → Gestores y Admins activos |
+| D | Interno / Externo |
+| E | Periodicidad normalizada al dropdown del template (Pre/Posttemporada → `Anual`) |
+| F | Operaciones del plan |
+| G | Fechas previstas (`01/MM/YYYY` de cada periodo del curso completo) |
+| H | Fechas de realización registradas en Registro_Mantenimientos |
+| I | Gestores y Admins activos (supervisores) |
+| J | Si hay incidencia abierta: `Descripcion_Problema (ID_Incidencia)` |
+
+### 📋 Exportar inventario (`exportarInventario`)
+Plantilla: `assets/templates/CIFP Manuel Antonio_Inventarios_Curso 2025-26.xlsx` (hoja `Sanidade`)
+Salida: `Inventario_Sanidade_YYYY-YYYY.xlsx`
+Una fila por equipo, ordenados por ubicación y tipo. Columnas:
+
+| Col | Contenido |
+|-----|-----------|
+| A | Tipo_Equipo (ID_Activo) |
+| B | Nº de laboratorio extraído de Ubicacion |
+| C | Marca Modelo |
+| D | Numero_Serie |
+| E | 1 (unidades) |
+| F | Si incidencia abierta: `Incidencia abierta. Impacto (ID_Incidencia)`; si no: Estado_Operativo |
+
+**Extracción de nº de lab:** regex `\b(\d{3})\b` sobre el campo Ubicacion — funciona tanto con `Lab 205` como con `205-ZC-2.1`.
 
 ---
 
@@ -225,7 +267,7 @@ Respuesta en `response.candidates[0].content.parts[0].text`. Mostrar spinner mie
 
 ### Campos en equipos – pendiente
 - `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — **PENDIENTE (instituto)** para los 15 equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación)
-- `Ubicacion` — **PENDIENTE (instituto)**: actualizar al ID correcto de la tabla Ubicaciones para que el modelo de calidad los asigne al lab correcto
+- `Ubicacion` — **PENDIENTE (instituto)**: actualizar al ID correcto de la tabla Ubicaciones para coherencia interna. Los exports de calidad ya extraen el nº de lab por regex y funcionan con ambos formatos (`Lab 205` y `205-ZC-2.1`).
 
 ### Residuos
 - Revisar que todos los tipos tengan `Contenedor_Tipo` relleno.
