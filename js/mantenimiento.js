@@ -849,7 +849,14 @@ async function exportarInventario(cursoAcademico) {
       inc.Equipo && (inc.Equipo === eq.ID_Activo || inc.Equipo.startsWith(eq.ID_Activo + ' '))
     );
     let desc = eq.Estado_Operativo || '';
-    if (incAbierta) desc += (desc ? ' / ' : '') + incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')';
+    if (incAbierta) {
+      desc += (desc ? ' / ' : '') + incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')';
+    } else if (eq.Estado_Operativo === 'Revisión planificada') {
+      const intPlan = DATA.intervenciones
+        .filter(i => i.Equipo && i.Equipo.startsWith(eq.ID_Activo) && i.Estado === 'Planificada' && i.Fecha_Planificada)
+        .sort((a, b) => new Date(a.Fecha_Planificada) - new Date(b.Fecha_Planificada))[0];
+      if (intPlan) desc += ' (' + formatDate(intPlan.Fecha_Planificada) + ')';
+    }
     const denom = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
     return makeRow(9 + i, denom, labDesdeUbicacion(eq.Ubicacion), marcaModelo, serie, desc);
   }).join('');
