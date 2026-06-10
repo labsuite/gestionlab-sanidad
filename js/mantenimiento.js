@@ -623,18 +623,20 @@ async function exportarModeloCalidad(cursoAcademico) {
   function getPeriodosCursoCompleto(plan, equipo) {
     const [añoInicio, añoFin] = curso.split('-').map(Number);
     const todosMeses = getMesesCurso(curso);
+    // Planes con alumnado no se programan en septiembre: mismo criterio que el script Python
+    const meses = _esConAlumnado(plan) ? todosMeses.filter(m => m.mes !== 9) : todosMeses;
     switch (plan.Periodicidad) {
-      case 'Mensual':    return todosMeses.map(m => m.str);
+      case 'Mensual':    return meses.map(m => m.str);
       case 'Trimestral': {
         const idx = _esMomentoFin(plan) ? [3, 6, 9] : [0, 4, 7];
-        return todosMeses.filter((_, i) => idx.includes(i)).map(m => m.str);
+        return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
       }
       case 'Semestral': {
         const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
-        return todosMeses.filter((_, i) => idx.includes(i)).map(m => m.str);
+        return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
       }
       case 'Anual': case 'Bianual': case 'Trianual': case 'Cada 2 años': {
-        const mes = _esMomentoFin(plan) ? todosMeses[todosMeses.length - 1] : todosMeses[0];
+        const mes = _esMomentoFin(plan) ? meses[meses.length - 1] : meses[0];
         return [mes.str];
       }
       case 'Pretemporada':  return [`pretemporada-${curso}`];
