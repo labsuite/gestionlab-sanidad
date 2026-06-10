@@ -653,6 +653,25 @@ async function exportarModeloCalidad(cursoAcademico) {
     return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(', ');
   }
 
+  const VALID_PERIODICIDADES = new Set(['Diaria','Semanal','Quincenal','Mensual','Bimensual','Trimestral','Semestral','Anual','Bianual','Trianual','Quinquenal','Decenal']);
+  function normalizePeriodicidad(p) {
+    return VALID_PERIODICIDADES.has(p) ? p : 'Anual';
+  }
+
+  function periodoAFecha(periodo, equipo) {
+    const [añoInicio, añoFin] = curso.split('-').map(Number);
+    if (periodo.startsWith('pretemporada')) {
+      const m = parseInt(equipo.Mes_Inicio_Temporada) || 9;
+      return `01/${String(m).padStart(2,'0')}/${m >= 9 ? añoInicio : añoFin}`;
+    }
+    if (periodo.startsWith('posttemporada')) {
+      const m = parseInt(equipo.Mes_Fin_Temporada) || 5;
+      return `01/${String(m).padStart(2,'0')}/${m >= 9 ? añoInicio : añoFin}`;
+    }
+    const [y, m] = periodo.split('-');
+    return `01/${m}/${y}`;
+  }
+
   // Una fila por equipo × tipo (Interno/Externo), con todas las fechas en la misma celda
   const porLab = { 'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [] };
 
@@ -667,13 +686,13 @@ async function exportarModeloCalidad(cursoAcademico) {
       if (!planesDelTipo.length) return;
 
       const operaciones    = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
-      const periodicidades = [...new Set(planesDelTipo.map(p => p.Periodicidad).filter(Boolean))].join(', ');
+      const periodicidades = [...new Set(planesDelTipo.map(p => normalizePeriodicidad(p.Periodicidad)).filter(Boolean))].join(', ');
 
       // Todos los periodos esperados del curso completo (incluidos futuros)
       const todosPeriodos = planesDelTipo.flatMap(p => getPeriodosCursoCompleto(p, eq));
       const periodosUnicos = [...new Set(todosPeriodos)].sort();
 
-      const previstas  = `${periodosUnicos.length} mantenimiento${periodosUnicos.length !== 1 ? 's' : ''}`;
+      const previstas  = periodosUnicos.map(p => periodoAFecha(p, eq)).join(', ');
       const realizadas = periodosUnicos
         .map(p => {
           const regs = planesDelTipo
@@ -684,7 +703,15 @@ async function exportarModeloCalidad(cursoAcademico) {
         .filter(Boolean)
         .join(', ');
 
-      porLab[hoja].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas });
+      const incAbierta = DATA.incidencias.find(inc =>
+        (inc.Estado === 'Abierta' || inc.Estado === 'En gestión') &&
+        inc.Equipo && (inc.Equipo === eq.ID_Activo || inc.Equipo.startsWith(eq.ID_Activo + ' '))
+      );
+      const observaciones = incAbierta
+        ? (incAbierta.Descripcion_Problema || '') + ' (' + incAbierta.ID_Incidencia + ')'
+        : '';
+
+      porLab[hoja].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas, observaciones });
     });
   });
 
@@ -750,7 +777,7 @@ async function exportarModeloCalidad(cursoAcademico) {
     const items = porLab[labKey] || [];
     let xml = await zip.file(sheetFile).async('string');
 
-    items.forEach(({ eq, tipo, operaciones, periodicidades, previstas, realizadas }, i) => {
+    items.forEach(({ eq, tipo, operaciones, periodicidades, previstas, realizadas, observaciones }, i) => {
       const r = DATA_ROW + i;
       xml = fillCell(xml, `A${r}`, denominacion(eq));
       xml = fillCell(xml, `B${r}`, ubicacionTexto(eq.Ubicacion));
@@ -761,7 +788,7 @@ async function exportarModeloCalidad(cursoAcademico) {
       xml = fillCell(xml, `G${r}`, previstas);
       xml = fillCell(xml, `H${r}`, realizadas);
       xml = fillCell(xml, `I${r}`, supervisores);
-      // J (Observacións): en blanco — sin registro único de referencia
+      xml = fillCell(xml, `J${r}`, observaciones);
     });
 
     zip.file(sheetFile, xml);
