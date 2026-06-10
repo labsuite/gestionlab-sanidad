@@ -672,7 +672,7 @@ async function exportarModeloCalidad(cursoAcademico) {
     return `01/${m}/${y}`;
   }
 
-  // Una fila por equipo × tipo (Interno/Externo), con todas las fechas en la misma celda
+  // Una fila por plan (cada plan tiene su propia fila con su ID_Plan en la denominación)
   const porLab = { 'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [] };
 
   DATA.equipos.forEach(eq => {
@@ -681,24 +681,18 @@ async function exportarModeloCalidad(cursoAcademico) {
     const planesEq = planesActivos.filter(p => p.ID_Equipo === eq.ID_Activo);
     if (!planesEq.length) return;
 
-    ['Interno', 'Externo'].forEach(tipo => {
-      const planesDelTipo = planesEq.filter(p => p.Tipo_Intervencion === tipo);
-      if (!planesDelTipo.length) return;
+    planesEq.forEach(plan => {
+      const tipo = plan.Tipo_Intervencion;
+      if (!tipo) return;
 
-      const operaciones    = [...new Set(planesDelTipo.map(p => p.Operacion).filter(Boolean))].join(' / ');
-      const periodicidades = [...new Set(planesDelTipo.map(p => normalizePeriodicidad(p.Periodicidad)).filter(Boolean))].join(', ');
-
-      // Todos los periodos esperados del curso completo (incluidos futuros)
-      const todosPeriodos = planesDelTipo.flatMap(p => getPeriodosCursoCompleto(p, eq));
-      const periodosUnicos = [...new Set(todosPeriodos)].sort();
+      const periodosUnicos = [...new Set(getPeriodosCursoCompleto(plan, eq))].sort();
+      if (!periodosUnicos.length) return;
 
       const previstas  = periodosUnicos.map(p => periodoAFecha(p, eq)).join(', ');
       const realizadas = periodosUnicos
         .map(p => {
-          const regs = planesDelTipo
-            .map(pl => getRegistroMant(pl.ID_Plan, curso, p))
-            .filter(Boolean);
-          return regs.length ? formatDate(regs[0].Fecha_Realizacion) : '';
+          const reg = getRegistroMant(plan.ID_Plan, curso, p);
+          return reg ? formatDate(reg.Fecha_Realizacion) : '';
         })
         .filter(Boolean)
         .join(', ');
@@ -711,7 +705,12 @@ async function exportarModeloCalidad(cursoAcademico) {
         ? (incAbierta.Descripcion_Problema || '') + ' (' + incAbierta.ID_Incidencia + ')'
         : '';
 
-      porLab[hoja].push({ eq, tipo, operaciones, periodicidades, previstas, realizadas, observaciones });
+      porLab[hoja].push({
+        eq, plan, tipo,
+        operacion:    plan.Operacion || '',
+        periodicidad: normalizePeriodicidad(plan.Periodicidad),
+        previstas, realizadas, observaciones,
+      });
     });
   });
 
@@ -773,20 +772,43 @@ async function exportarModeloCalidad(cursoAcademico) {
     .filter(u => (u.Rol === 'Administrador' || u.Rol === 'Gestor') && u.Activo !== 'FALSE')
     .map(u => u.Nombre).filter(Boolean).join(', ');
 
+  // ── Correcciones de fuente en styles.xml ──────────────────────────────
+  // El template tiene 3 zonas: ~filas 11-32 (color correcto), ~33-65 (theme="1"=negro),
+  // ~66+ (Arial 8pt negro). Normalizamos todas las fuentes de una vez.
+  let stylesXml = await zip.file('xl/styles.xml').async('string');
+
+  // 1. Arial (cualquier variante) → Xunta Sans
+  stylesXml = stylesXml.replace(/<name val="Arial[^"]*"\/>/g, '<name val="Xunta Sans"/>');
+
+  // 2. color theme="1" = dk1 = #000000 en este tema → azul corporativo
+  stylesXml = stylesXml.replace(/<color theme="1"\/>/g, '<color rgb="FF002B4A"/>');
+
+  // 3. Fuentes sin <color> explícito → añadir azul corporativo
+  stylesXml = stylesXml.replace(/<font>([\s\S]*?)<\/font>/g, (m, inner) =>
+    inner.includes('<color') ? m : m.replace('</font>', '<color rgb="FF002B4A"/></font>')
+  );
+
+  // 4. Tamaño 8pt → 10pt (encabezados y filas de zonas tardías del template)
+  stylesXml = stylesXml.replace(/<sz val="8"\/>/g, '<sz val="10"/>');
+
+  zip.file('xl/styles.xml', stylesXml);
+  // ──────────────────────────────────────────────────────────────────────
+
   for (const [labKey, sheetFile] of Object.entries(SHEET_FILES)) {
     const items = porLab[labKey] || [];
     let xml = await zip.file(sheetFile).async('string');
 
-    items.forEach(({ eq, tipo, operaciones, periodicidades, previstas, realizadas, observaciones }, i) => {
+    items.forEach(({ eq, plan, tipo, operacion, periodicidad, previstas, realizadas, observaciones }, i) => {
       const r = DATA_ROW + i;
       const labNum = ((eq.Ubicacion || '').match(/\b(\d{3})\b/) || [])[1] || eq.Ubicacion || '';
       const responsable = (eq.Responsable || '').trim() || supervisores;
-      xml = fillCell(xml, `A${r}`, denominacion(eq));
+      const denom = plan.ID_Plan ? `${denominacion(eq)} · ${plan.ID_Plan}` : denominacion(eq);
+      xml = fillCell(xml, `A${r}`, denom);
       xml = fillCell(xml, `B${r}`, labNum);
       xml = fillCell(xml, `C${r}`, responsable);
       xml = fillCell(xml, `D${r}`, tipo);
-      xml = fillCell(xml, `E${r}`, periodicidades);
-      xml = fillCell(xml, `F${r}`, operaciones);
+      xml = fillCell(xml, `E${r}`, periodicidad);
+      xml = fillCell(xml, `F${r}`, operacion);
       xml = fillCell(xml, `G${r}`, previstas);
       xml = fillCell(xml, `H${r}`, realizadas);
       xml = fillCell(xml, `I${r}`, supervisores);

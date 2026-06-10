@@ -21,7 +21,7 @@ from base import conectar, leer, insertar_varios
 # ─────────────── CONFIGURACIÓN ───────────────
 CURSO          = '2025-2026'
 REALIZADO_POR  = 'Paloma'    # Nombre que aparece en "Realizado_Por"
-DRY_RUN        = False       # Cambiar a False para escribir en Sheets
+DRY_RUN        = True        # Cambiar a False para escribir en Sheets
 # ──────────────────────────────────────────────
 
 # Los 10 meses del curso (Sep–Jun) como tuplas (año, mes)
@@ -124,6 +124,8 @@ def main():
     for plan in planes_list:
         activo = str(plan.get('Activo', '')).strip().upper()
         if activo not in ('TRUE', 'SÍ', 'SI'):
+            continue
+        if plan.get('Tipo_Intervencion', '').strip() == 'Externo':
             continue
         equipo = equipos.get(plan.get('ID_Equipo', ''))
         if not equipo:
