@@ -451,7 +451,8 @@ function renderMantenimiento() {
 
     <!-- Acciones -->
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">
-      <button class="btn btn-secondary" onclick="exportarModeloCalidad('${curso}')">📄 Exportar modelo de calidad ${curso}</button>
+      <button class="btn btn-secondary" onclick="exportarModeloCalidad('${curso}')">📄 Exportar plan de mantenimiento</button>
+      <button class="btn btn-secondary" onclick="exportarInventario('${curso}')">📋 Exportar inventario</button>
     </div>
 
     <!-- Pestañas -->
@@ -672,7 +673,7 @@ async function exportarModeloCalidad(cursoAcademico) {
       const todosPeriodos = planesDelTipo.flatMap(p => getPeriodosCursoCompleto(p, eq));
       const periodosUnicos = [...new Set(todosPeriodos)].sort();
 
-      const previstas  = periodosUnicos.map(p => labelPeriodo(p)).join(', ');
+      const previstas  = `${periodosUnicos.length} mantenimiento${periodosUnicos.length !== 1 ? 's' : ''}`;
       const realizadas = periodosUnicos
         .map(p => {
           const regs = planesDelTipo
@@ -781,4 +782,84 @@ async function exportarModeloCalidad(cursoAcademico) {
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 5000);
   showToast('Documento generado correctamente', 'success');
+}
+
+async function exportarInventario(cursoAcademico) {
+  const curso = cursoAcademico || getCursoAcademico();
+
+  const equipos = [...DATA.equipos].sort((a, b) => {
+    const ua = a.Ubicacion || '', ub = b.Ubicacion || '';
+    if (ua !== ub) return ua.localeCompare(ub, 'es');
+    return (a.Tipo_Equipo || '').localeCompare(b.Tipo_Equipo || '', 'es');
+  });
+
+  if (!equipos.length) {
+    showToast('No hay equipos cargados.', 'error');
+    return;
+  }
+
+  showToast('Generando inventario…', 'info');
+
+  let zip;
+  try {
+    const resp = await fetch('./assets/templates/CIFP Manuel Antonio_Inventarios_Curso 2025-26.xlsx');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    zip = await JSZip.loadAsync(await resp.arrayBuffer());
+  } catch (e) {
+    showToast('No se pudo cargar la plantilla: ' + e.message, 'error');
+    return;
+  }
+
+  const SHEET = 'xl/worksheets/sheet2.xml';
+  let xml = await zip.file(SHEET).async('string');
+
+  function xmlEsc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function makeRow(r, denom, ubicacion, marcaModelo, serie, desc) {
+    const cel = (ref, s, val) => val
+      ? `<c r="${ref}" s="${s}" t="inlineStr"><is><t>${xmlEsc(val)}</t></is></c>`
+      : `<c r="${ref}" s="${s}"/>`;
+    return `<row r="${r}" spans="1:6">` +
+      cel(`A${r}`, '14', denom) +
+      cel(`B${r}`, '15', ubicacion) +
+      cel(`C${r}`, '15', marcaModelo) +
+      cel(`D${r}`, '15', serie) +
+      `<c r="E${r}" s="15"><v>1</v></c>` +
+      cel(`F${r}`, '14', desc) +
+      `</row>`;
+  }
+
+  // Eliminar filas vacías del template (9-21) y añadir todas las reales
+  for (let r = 9; r <= 21; r++) {
+    xml = xml.replace(new RegExp(`<row r="${r}"[^>]*>[\\s\\S]*?<\\/row>`), '');
+  }
+
+  const rows = equipos.map((eq, i) => {
+    const marcaModelo = [eq.Marca, eq.Modelo].filter(Boolean).join(' ');
+    const serie       = eq.Numero_Serie ? String(eq.Numero_Serie).replace(/\.0+$/, '') : '';
+    const desc        = (eq.Observaciones || '').trim() || (eq.Estado_Operativo || '').trim();
+    const denom       = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
+    return makeRow(9 + i, denom, eq.Ubicacion || '', marcaModelo, serie, desc);
+  }).join('');
+
+  xml = xml.replace('</sheetData>', rows + '</sheetData>');
+  zip.file(SHEET, xml);
+
+  const blob = await zip.generateAsync({
+    type: 'blob',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    compression: 'DEFLATE',
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href     = url;
+  a.download = `Inventario_Sanidade_${curso}.xlsx`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  showToast('Inventario generado correctamente', 'success');
 }
