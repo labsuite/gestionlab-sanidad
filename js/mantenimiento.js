@@ -836,12 +836,22 @@ async function exportarInventario(cursoAcademico) {
     xml = xml.replace(new RegExp(`<row r="${r}"[^>]*>[\\s\\S]*?<\\/row>`), '');
   }
 
+  function labDesdeUbicacion(ubicacion) {
+    const m = (ubicacion || '').match(/\b(\d{3})\b/);
+    return m ? m[1] : (ubicacion || '');
+  }
+
   const rows = equipos.map((eq, i) => {
     const marcaModelo = [eq.Marca, eq.Modelo].filter(Boolean).join(' ');
     const serie       = eq.Numero_Serie ? String(eq.Numero_Serie).replace(/\.0+$/, '') : '';
-    const desc        = (eq.Observaciones || '').trim() || (eq.Estado_Operativo || '').trim();
-    const denom       = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
-    return makeRow(9 + i, denom, eq.Ubicacion || '', marcaModelo, serie, desc);
+    const incAbierta  = DATA.incidencias.find(inc =>
+      (inc.Estado === 'Abierta' || inc.Estado === 'En gestión') &&
+      inc.Equipo && (inc.Equipo === eq.ID_Activo || inc.Equipo.startsWith(eq.ID_Activo + ' '))
+    );
+    let desc = eq.Estado_Operativo || '';
+    if (incAbierta) desc += (desc ? ' / ' : '') + incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')';
+    const denom = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
+    return makeRow(9 + i, denom, labDesdeUbicacion(eq.Ubicacion), marcaModelo, serie, desc);
   }).join('');
 
   xml = xml.replace('</sheetData>', rows + '</sheetData>');
