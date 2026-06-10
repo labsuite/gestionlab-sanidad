@@ -33,7 +33,8 @@ Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de 
 - `limpiar_hoja.py` — DELETE en cualquier hoja con filtro; `DRY_RUN = True` por defecto
 - `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 hojas del módulo de fungibles
 - `importar_alumnos.py` — INSERT masivo en Usuarios desde Excel (inicio de curso)
-- `rellenar_mantenimientos.py` — INSERT en Registro_Mantenimientos de todos los periodos de un curso como realizados; `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
+- `rellenar_mantenimientos.py` — INSERT en Registro_Mantenimientos de todos los periodos de un curso como realizados (solo Internos); `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
+- `quitar_externos_excel.py` — elimina filas de Tipo_Intervencion=Externo de un XLSX ya exportado; busca automáticamente el más reciente en Descargas o acepta ruta como argumento. Genera `*_sin_externos.xlsx` sin tocar el original.
 - `generar_modelo_calidad.py` — genera los dos Excel del modelo de calidad (inventario + plan de mantenimiento) desde Python; alternativa al botón de la app cuando se necesita uso puntual offline.
 
 ### Flujo de trabajo
@@ -86,20 +87,25 @@ Dos botones en el módulo de mantenimiento (`js/mantenimiento.js`) generan los E
 ### 📄 Exportar plan de mantenimiento (`exportarModeloCalidad`)
 Plantilla: `assets/templates/MD84MAN01_Plan_mantemento_Sanidade.xlsx`
 Salida: `MD84MAN01_Plan_mantemento_YYYY-YYYY.xlsx`
-Una fila por equipo × tipo (Interno/Externo). Columnas:
+**Una fila por plan** (no por equipo × tipo). Columnas:
 
 | Col | Contenido |
 |-----|-----------|
-| A | Denominación (Tipo_Equipo Marca Modelo ID) |
+| A | Denominación `Tipo_Equipo Marca Modelo (ID_Activo) · ID_Plan` |
 | B | Nº de laboratorio extraído de Ubicacion (ej. `205`) |
 | C | Responsable del equipo; si vacío → Gestores y Admins activos |
 | D | Interno / Externo |
-| E | Periodicidad normalizada al dropdown del template (Pre/Posttemporada → `Anual`) |
-| F | Operaciones del plan |
+| E | Periodicidad del plan (normalizada; Pre/Posttemporada → `Anual`) |
+| F | Operación del plan |
 | G | Fechas previstas (`01/MM/YYYY` de cada periodo del curso completo) |
 | H | Fechas de realización registradas en Registro_Mantenimientos |
 | I | Gestores y Admins activos (supervisores) |
 | J | Si hay incidencia abierta: `Descripcion_Problema (ID_Incidencia)` |
+
+**Notas de implementación:**
+- Los periodos se calculan con `getPeriodosCursoCompleto` (incluye futuros, aplica filtro `Con_Alumnado` igual que el script Python).
+- Al generar el XLSX se normalizan todas las fuentes del `xl/styles.xml`: Arial→Xunta Sans, `color theme="1"` (negro)→`#002B4A`, fuentes sin color→`#002B4A`, 8pt→10pt. El template tiene zonas de estilos que degeneran a negro a partir de la fila ~33-66 según hoja.
+- Para eliminar los Externos del documento ya generado: usar `scripts/quitar_externos_excel.py`.
 
 ### 📋 Exportar inventario (`exportarInventario`)
 Plantilla: `assets/templates/CIFP Manuel Antonio_Inventarios_Curso 2025-26.xlsx` (hoja `Sanidade`)
@@ -116,6 +122,19 @@ Una fila por equipo, ordenados por ubicación y tipo. Columnas:
 | F | Si incidencia abierta: `Incidencia abierta. Impacto (ID_Incidencia)`; si no: Estado_Operativo |
 
 **Extracción de nº de lab:** regex `\b(\d{3})\b` sobre el campo Ubicacion — funciona tanto con `Lab 205` como con `205-ZC-2.1`.
+
+---
+
+## Rangos de carga en sheets.js
+
+⚠ Al añadir una columna nueva a una hoja de Sheets, **actualizar el rango** en `loadAllData()` (`js/sheets.js`) y las columnas en `COLS` (`js/config.js`). Si no, el campo llega siempre `undefined` en el navegador.
+
+Rangos actuales relevantes:
+| Hoja | Rango | Última col |
+|------|-------|-----------|
+| Planes_Mantenimiento | `A2:H` | H = Con_Alumnado |
+| Registro_Mantenimientos | `A2:I` | I = Observaciones |
+| Equipos | `A2:W` | W = Mes_Fin_Temporada |
 
 ---
 
