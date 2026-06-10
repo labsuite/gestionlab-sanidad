@@ -779,9 +779,11 @@ async function exportarModeloCalidad(cursoAcademico) {
 
     items.forEach(({ eq, tipo, operaciones, periodicidades, previstas, realizadas, observaciones }, i) => {
       const r = DATA_ROW + i;
+      const labNum = ((eq.Ubicacion || '').match(/\b(\d{3})\b/) || [])[1] || eq.Ubicacion || '';
+      const responsable = (eq.Responsable || '').trim() || supervisores;
       xml = fillCell(xml, `A${r}`, denominacion(eq));
-      xml = fillCell(xml, `B${r}`, ubicacionTexto(eq.Ubicacion));
-      xml = fillCell(xml, `C${r}`, eq.Responsable || '');
+      xml = fillCell(xml, `B${r}`, labNum);
+      xml = fillCell(xml, `C${r}`, responsable);
       xml = fillCell(xml, `D${r}`, tipo);
       xml = fillCell(xml, `E${r}`, periodicidades);
       xml = fillCell(xml, `F${r}`, operaciones);
