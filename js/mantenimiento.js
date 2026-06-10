@@ -849,7 +849,7 @@ async function exportarInventario(cursoAcademico) {
       inc.Equipo && (inc.Equipo === eq.ID_Activo || inc.Equipo.startsWith(eq.ID_Activo + ' '))
     );
     const desc = incAbierta
-      ? incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')'
+      ? 'Incidencia abierta. ' + incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')'
       : (eq.Estado_Operativo || '');
     const denom = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
     return makeRow(9 + i, denom, labDesdeUbicacion(eq.Ubicacion), marcaModelo, serie, desc);
