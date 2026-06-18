@@ -20,6 +20,7 @@ function renderProveedores() {
       <td><div class="row-actions" onclick="event.stopPropagation()">
         ${nPedidos > 0 ? `<span class="badge badge-blue" style="margin-right:4px" title="${nPedidos} pedido(s)">${nPedidos} 🛒</span>` : ''}
         ${puedeEditar ? `<button class="icon-btn" onclick="editProveedor(${DATA.proveedores.indexOf(p)})">✏️</button>` : ''}
+        ${puedeEditar && nPedidos === 0 ? `<button class="icon-btn" title="Eliminar proveedor" onclick="borrarProveedor(${DATA.proveedores.indexOf(p)})">🗑️</button>` : ''}
       </div></td>
     </tr>`;
   }).join('');
@@ -182,6 +183,7 @@ function renderDetalleProveedor(p) {
           ${p.Email_Contacto ? `<a href="mailto:${p.Email_Contacto}" class="btn btn-secondary" style="text-decoration:none">✉️ Email</a>` : ''}
           ${p.Web ? `<a href="${p.Web}" target="_blank" rel="noopener" class="btn btn-secondary" style="text-decoration:none">🌐 Web</a>` : ''}
           ${(getUserRole()==='Administrador'||getUserRole()==='Gestor') ? `<button class="btn btn-secondary" onclick="editProveedor(${DATA.proveedores.indexOf(p)})">✏️ Editar proveedor</button>` : ''}
+          ${(getUserRole()==='Administrador'||getUserRole()==='Gestor') && !pedidosProv.length ? `<button class="btn btn-danger" onclick="borrarProveedor(${DATA.proveedores.indexOf(p)})">🗑️ Eliminar proveedor</button>` : ''}
         </div>
       </div>
       <div style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px">
@@ -638,6 +640,22 @@ async function guardarProveedor() {
     closeModal('modal-proveedor'); renderAll();
   } catch(e) { showToast('Error guardando', 'error'); }
   hideLoading(); editingRow = null;
+}
+
+async function borrarProveedor(idx) {
+  const p = DATA.proveedores[idx];
+  const nPedidos = DATA.pedidos.filter(x => x.Proveedor === p.Nombre_Proveedor).length;
+  if (nPedidos > 0) { showToast('No se puede eliminar: tiene pedidos asociados', 'error'); return; }
+  if (!confirm(`¿Eliminar el proveedor "${p.Nombre_Proveedor}"? Esta acción no se puede deshacer.`)) return;
+  showLoading('Eliminando...');
+  try {
+    await sheetsDeleteRow('Proveedores', idx);
+    DATA.proveedores.splice(idx, 1);
+    showToast('Proveedor eliminado', 'success');
+    if (document.getElementById('proveedor-detalle')?.style.display !== 'none') showPage('proveedores');
+    renderAll();
+  } catch(e) { showToast('Error eliminando', 'error'); console.error(e); }
+  hideLoading();
 }
 
 async function guardarUbicacion() {
