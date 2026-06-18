@@ -428,6 +428,38 @@
   </div>
 </div>
 
+<!-- Modal Reasignar Ciclo/Módulo (desde Contabilidad) -->
+<div class="modal-overlay" id="modal-reasignar-ciclo">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Reasignar ciclo y módulo</div>
+      <button class="modal-close" onclick="closeModal('modal-reasignar-ciclo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="reas-pedido-id">
+      <div id="reas-pedido-nombre" style="font-size:13px;color:var(--text-soft);margin-bottom:16px;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm)"></div>
+      <div class="form-grid form-grid-2" style="gap:14px">
+        <div class="form-group">
+          <label>Ciclo *</label>
+          <select id="reas-ciclo" onchange="actualizarModulosReasignar()">
+            <option value="">Seleccionar...</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Módulo</label>
+          <select id="reas-modulo">
+            <option value="">— (dejar vacío si es para varios) —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-reasignar-ciclo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarReasignacion()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Recepción Masiva (albarán) -->
 <div class="modal-overlay" id="modal-recepcion-masiva">
   <div class="modal" style="max-width:700px">

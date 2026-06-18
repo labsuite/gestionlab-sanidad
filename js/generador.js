@@ -19,8 +19,8 @@ function abrirGeneradorHoja(pedidoId) {
 
   // Pre-rellenar ciclo/módulo y datos de factura si ya están guardados
   if (p) {
-    if (p.Ciclo)          { selCiclo.value = p.Ciclo; actualizarModulos(); }
-    if (p.Modulo)           setTimeout(() => sv('gen-modulo', p.Modulo), 50);
+    if (p.Ciclo)          { selCiclo.value = (p.Ciclo||'').normalize('NFC').trim(); actualizarModulos(); }
+    if (p.Modulo)           setTimeout(() => sv('gen-modulo', (p.Modulo||'').normalize('NFC').trim()), 50);
     if (p.Numero_Factura)   sv('gen-num-factura', p.Numero_Factura);
     if (p.Fecha_Factura)    sv('gen-fecha-factura', p.Fecha_Factura);
   }

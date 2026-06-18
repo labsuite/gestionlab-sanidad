@@ -263,10 +263,15 @@ function _renderContabilidadConAnio(anio) {
           <td style="padding:8px 4px">
             <div>${mod}</div>
             <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">
-              ${d.pedidos.map(p => `<button onclick="verDetallePedido('${p.id}')"
-                style="font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--accent);
-                       background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap"
-                title="${p.nombre}">📋 ${p.id}</button>`).join('')}
+              ${d.pedidos.map(p => `
+                <button onclick="verDetallePedido('${p.id}')"
+                  style="font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--accent);
+                         background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap"
+                  title="${p.nombre}">📋 ${p.id}</button>
+                <button onclick="abrirReasignacion('${p.id}')"
+                  style="font-size:11px;padding:2px 5px;border-radius:20px;border:1px solid var(--border);
+                         background:transparent;color:var(--text-muted);cursor:pointer"
+                  title="Reasignar ciclo/módulo">🔀</button>`).join('')}
             </div>
           </td>
           <td style="text-align:right;padding:8px 4px;color:var(--text-soft)">${fmt(d.subtotal)}</td>
@@ -281,4 +286,54 @@ function _renderContabilidadConAnio(anio) {
   }
 
   cont.innerHTML = html;
+}
+
+// ============================================================
+// REASIGNACIÓN DE CICLO/MÓDULO DESDE CONTABILIDAD
+// ============================================================
+
+function abrirReasignacion(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  sv('reas-pedido-id', pedidoId);
+  document.getElementById('reas-pedido-nombre').textContent = p.Nombre_Lista + '  ·  ' + pedidoId;
+
+  const selCiclo = document.getElementById('reas-ciclo');
+  const ciclos = [...new Set(DATA.ciclosModulos.map(cm => (cm.Ciclo||'').normalize('NFC').trim()).filter(Boolean))].sort();
+  selCiclo.innerHTML = '<option value="">Seleccionar...</option>' +
+    ciclos.map(c => `<option value="${c}">${c}</option>`).join('') +
+    '<option value="Laboratorios">Laboratorios</option>';
+  selCiclo.value = (p.Ciclo||'').normalize('NFC').trim();
+
+  actualizarModulosReasignar();
+  setTimeout(() => { sv('reas-modulo', (p.Modulo||'').normalize('NFC').trim()); }, 50);
+  openModal('modal-reasignar-ciclo');
+}
+
+function actualizarModulosReasignar() {
+  const ciclo = v('reas-ciclo');
+  const sel = document.getElementById('reas-modulo');
+  const norm = s => (s||'').normalize('NFC').trim();
+  const modulos = DATA.ciclosModulos.filter(cm => norm(cm.Ciclo) === norm(ciclo)).map(cm => cm.Modulo).filter(Boolean);
+  sel.innerHTML = '<option value="">— (dejar vacío si es para varios) —</option>' +
+    modulos.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+async function guardarReasignacion() {
+  const pedidoId = v('reas-pedido-id');
+  const ciclo = v('reas-ciclo');
+  const modulo = v('reas-modulo');
+  if (!ciclo) { showToast('Selecciona un ciclo', 'error'); return; }
+  const pedIdx = DATA.pedidos.findIndex(x => x.ID_Pedido === pedidoId);
+  if (pedIdx === -1) return;
+  showLoading('Guardando...');
+  try {
+    await sheetsUpdate(`Pedidos!Q${pedIdx+2}:R${pedIdx+2}`, [ciclo, modulo]);
+    DATA.pedidos[pedIdx].Ciclo = ciclo;
+    DATA.pedidos[pedIdx].Modulo = modulo;
+    showToast('Reasignado correctamente', 'success');
+    closeModal('modal-reasignar-ciclo');
+    renderContabilidad();
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
 }
