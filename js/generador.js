@@ -14,7 +14,7 @@ function abrirGeneradorHoja(pedidoId) {
   const selCiclo = document.getElementById('gen-ciclo');
   const ciclos = [...new Set(DATA.ciclosModulos.map(cm => (cm.Ciclo||'').normalize('NFC').trim()).filter(Boolean))].sort();
   DATA.ciclosModulos.forEach(cm => { cm.Ciclo = (cm.Ciclo||'').normalize('NFC').trim(); cm.Modulo = (cm.Modulo||'').normalize('NFC').trim(); });
-  selCiclo.innerHTML = '<option value="">Seleccionar...</option>' + ciclos.map(c => `<option value="${c}">${c}</option>`).join('');
+  selCiclo.innerHTML = '<option value="">Seleccionar...</option>' + ciclos.map(c => `<option value="${c}">${c}</option>`).join('') + '<option value="Laboratorios">Laboratorios</option>';
   selCiclo.value = '';
 
   // Pre-rellenar ciclo/módulo y datos de factura si ya están guardados
