@@ -223,6 +223,23 @@ Select `mat-categoria` en `html/modales-material.html`:
 
 ## Pendiente de hacer – CÓDIGO
 
+### Árbol de decisión en Guía de residuos
+
+**Pendiente:** esperando esquema definitivo de Consenur para estructurar el árbol.
+
+Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
+
+1. **Árbol de decisión** (vista por defecto) — estructura JS estática con nodos de pregunta y nodos hoja. Cada nodo hoja referencia un `Contenedor_Tipo` y opcionalmente IDs de `Tipos_Residuo`. Solo visible con login.
+2. **Lista filtrada** (activada al escribir en el buscador) — el comportamiento actual de `_renderGuia()` agrupado por contenedor.
+
+**Interactividad del árbol:**
+- Clic en un **contenedor** (nodo hoja) → muestra los contenedores activos de ese tipo en `DATA.contenedoresResiduo` + botón "Añadir residuo aquí" que pre-selecciona el contenedor en el modal de adición (`openModalAdicion`).
+- Clic en una **categoría de residuo** en el árbol → despliega inline los `tiposResiduo` de `DATA.tiposResiduo` que corresponden a esa rama.
+
+**Archivos a modificar:** `js/residuos.js` (funciones `renderResiduosGuia`, `_renderGuia`, `filtrarGuia`). El árbol se define como objeto JS estático en el mismo archivo o en un bloque separado al inicio.
+
+---
+
 ### Asistente de IA guiado (Gemini Flash)
 
 Añadir un asistente de IA contextual accesible desde cualquier página de la app.
