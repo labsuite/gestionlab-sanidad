@@ -283,6 +283,36 @@
   </div>
 </div>
 
+<!-- Modal Subdividir lote en botes de uso -->
+<div class="modal-overlay" id="modal-subdividir-lote">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">✂️ Subdividir en botes de uso</div>
+      <button class="modal-close" onclick="closeModal('modal-subdividir-lote')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="subdiv-mat-id">
+      <input type="hidden" id="subdiv-origen-ubicacion">
+      <input type="hidden" id="subdiv-lote-origen-id">
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px">
+        <strong id="subdiv-mat-nombre"></strong>
+        <div style="color:var(--text-muted);font-size:12px;margin-top:4px">
+          Bote madre: <strong id="subdiv-origen-label"></strong> · Stock disponible: <strong id="subdiv-stock-origen"></strong>
+        </div>
+      </div>
+      <div id="subdiv-filas"></div>
+      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="_subdivAddFila()">+ Añadir destino</button>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:10px">
+        Cada bote de uso queda anidado bajo el bote madre (se ve con 🫙/↳🧪 en el listado). No crea un ítem de inventario nuevo ni afecta a lo que se puede pedir al proveedor.
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-subdividir-lote')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarSubdivision()">✂️ Subdividir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Contar Stock (alumnos con permiso de revisión de inventario) -->
 <div class="modal-overlay" id="modal-contar-stock">
   <div class="modal" style="max-width:440px">

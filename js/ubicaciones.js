@@ -146,7 +146,7 @@ function renderDetalleProveedor(p) {
   const totalGastado = pedidosProv.reduce((sum, ped) => {
     return sum + DATA.lineasPedido
       .filter(l => l.Pedido === ped.ID_Pedido)
-      .reduce((s,l) => s + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0);
+      .reduce((s,l) => s + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), parseFloat(ped.Gasto_Extra_Importe) || 0);
   }, 0);
 
   const pedidosHTML = !pedidosProv.length
@@ -154,7 +154,7 @@ function renderDetalleProveedor(p) {
     : pedidosProv.map(ped => {
         const lineas    = DATA.lineasPedido.filter(l => l.Pedido === ped.ID_Pedido);
         const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
-        const coste     = lineas.reduce((s,l) => s + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0);
+        const coste     = lineas.reduce((s,l) => s + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), parseFloat(ped.Gasto_Extra_Importe) || 0);
         return `<div class="pedido-card" onclick="verDetallePedido('${ped.ID_Pedido}')">
           <div class="pedido-card-header">
             <div>

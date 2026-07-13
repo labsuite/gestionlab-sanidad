@@ -337,7 +337,7 @@ function renderPedidos(filtroEstado = '') {
         <div class="pedido-stat"><strong>${lineas.length}</strong> líneas</div>
         <div class="pedido-stat"><strong>${recibidas}</strong> recibidas</div>
         ${p.Numero_Factura ? `<div class="pedido-stat">Factura <strong>${p.Numero_Factura}</strong></div>` : ''}
-        ${(() => { const coste = lineas.reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0); return coste > 0 ? `<div class="pedido-stat">Total <strong>${coste.toFixed(2)} €</strong></div>` : ''; })()}
+        ${(() => { const coste = lineas.reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), parseFloat(p.Gasto_Extra_Importe)||0); return coste > 0 ? `<div class="pedido-stat">Total <strong>${coste.toFixed(2)} €</strong></div>` : ''; })()}
       </div>
     </div>`;
   };
@@ -377,7 +377,7 @@ function verDetallePedido(pedidoId) {
   if (!p) return;
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
   const puedeEditar  = getUserRole() === 'Administrador' || getUserRole() === 'Gestor';
-  const puedeAddLinea = p.Estado === 'Abierto' && puedeEditar;
+  const puedeAddLinea = ['Abierto','Presupuesto solicitado'].includes(p.Estado) && puedeEditar;
   const cont = document.getElementById('pedido-detalle-contenido');
   cont.innerHTML = `
     <div class="card" style="margin-bottom:16px">
@@ -396,7 +396,8 @@ function verDetallePedido(pedidoId) {
         <div class="detail-item"><div class="detail-label">Presupuesto</div><div class="detail-value">${formatDate(p.Fecha_Presupuesto)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Aprobado</div><div class="detail-value">${formatDate(p.Fecha_Aprobacion)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Nº Factura</div><div class="detail-value">${p.Numero_Factura||'—'}</div></div>
-        <div class="detail-item"><div class="detail-label">Coste total (IVA 21%)</div><div class="detail-value">${(() => { const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), 0); return coste > 0 ? (coste * 1.21).toFixed(2) + ' €' : '—'; })()}</div></div>
+        <div class="detail-item"><div class="detail-label">Coste total (IVA 21%)</div><div class="detail-value">${(() => { const gastoExtra = parseFloat(p.Gasto_Extra_Importe)||0; const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), gastoExtra); return coste > 0 ? (coste * 1.21).toFixed(2) + ' €' : '—'; })()}</div></div>
+        <div class="detail-item"><div class="detail-label">Gasto extra</div><div class="detail-value" style="display:flex;align-items:center;gap:8px">${parseFloat(p.Gasto_Extra_Importe)>0 ? `${p.Gasto_Extra_Concepto||'Gasto extra'} · ${parseFloat(p.Gasto_Extra_Importe).toFixed(2)} €` : '—'}${puedeEditar ? `<button class="icon-btn" title="Añadir/editar gasto extra" onclick="openModalGastoExtra('${p.ID_Pedido}')" style="font-size:12px;padding:2px 6px">✏️</button>` : ''}</div></div>
       </div>
       ${puedeEditar ? `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px">

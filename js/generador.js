@@ -144,8 +144,19 @@ async function generarHojaPedido() {
       };
     });
 
+    // ── Gasto extra (transporte, tasas...) — se añade como línea más, entra en la base del IVA ──
+    const gastoExtraImporte = parseFloat(p.Gasto_Extra_Importe) || 0;
+    if (gastoExtraImporte > 0) {
+      lineasConPrecios.push({
+        concepto: p.Gasto_Extra_Concepto || 'Gasto extra',
+        cantidad: '',
+        precio:   '',
+        total:    gastoExtraImporte.toFixed(2) + ' €'
+      });
+    }
+
     // ── Calcular subtotal, IVA y total ──
-    const subtotal    = lineas.reduce((sum, l) => sum + (parseFloat(l.Precio_Unitario)||0) * (parseFloat(l.Cantidad_Pedida)||0), 0);
+    const subtotal    = lineas.reduce((sum, l) => sum + (parseFloat(l.Precio_Unitario)||0) * (parseFloat(l.Cantidad_Pedida)||0), gastoExtraImporte);
     const ivaAmount   = subtotal * 0.21;
     const totalConIva = subtotal + ivaAmount;
     const hayPrecios  = subtotal > 0;

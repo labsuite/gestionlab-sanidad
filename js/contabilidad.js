@@ -3,6 +3,7 @@
 // ============================================================
 
 let _preciosPedidoId  = null;
+let _preciosGastoExtra = 0;
 let _anioContabilidad = new Date().getFullYear();
 
 function abrirModalPrecios(pedidoId) {
@@ -10,6 +11,15 @@ function abrirModalPrecios(pedidoId) {
   const p      = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
   if (!p || !lineas.length) return;
+  _preciosGastoExtra = parseFloat(p.Gasto_Extra_Importe) || 0;
+  const gastoExtraLine = document.getElementById('precios-gasto-extra-line');
+  if (gastoExtraLine) {
+    gastoExtraLine.style.display = _preciosGastoExtra > 0 ? 'flex' : 'none';
+    if (_preciosGastoExtra > 0) {
+      document.getElementById('precios-gasto-extra-concepto').textContent = p.Gasto_Extra_Concepto || 'Gasto extra';
+      document.getElementById('precios-gasto-extra-importe').textContent = _preciosGastoExtra.toFixed(2) + ' €';
+    }
+  }
 
   document.getElementById('modal-precios-titulo').textContent = p.Nombre_Lista;
 
@@ -47,7 +57,7 @@ function abrirModalPrecios(pedidoId) {
 
 function calcTotalesPrecios(inputEl, idx) {
   const inputs = document.querySelectorAll('.precio-input');
-  let subtotal = 0;
+  let subtotal = _preciosGastoExtra;
   inputs.forEach((inp, i) => {
     const precio = parseFloat(inp.value) || 0;
     const cant   = parseFloat(inp.dataset.cant) || 0;
@@ -190,7 +200,8 @@ function _renderContabilidadConAnio(anio) {
     if (!resumen[ciclo][modulo]) resumen[ciclo][modulo] = { subtotal: 0, pedidos: [] };
     const lineasP  = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
     const subtotal = lineasP.reduce((sum, l) =>
-      sum + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
+      sum + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0),
+      parseFloat(p.Gasto_Extra_Importe) || 0);
     resumen[ciclo][modulo].subtotal += subtotal;
     resumen[ciclo][modulo].pedidos.push({ id: p.ID_Pedido, nombre: p.Nombre_Lista, subtotal });
   }

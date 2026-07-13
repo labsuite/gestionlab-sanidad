@@ -277,9 +277,14 @@ function renderFilaMaterial(m) {
       const opLocal = parseFloat(l.Stock_Optimo_Local) || 0;
       const pctL  = opLocal > 0 ? Math.min(100, Math.round(sLocal / opLocal * 100)) : (mnLocal > 0 ? Math.min(100, Math.round(sLocal / mnLocal * 100)) : 100);
       const colL  = sLocal === 0 ? 'var(--danger)' : (mnLocal > 0 && sLocal <= mnLocal ? 'var(--warning)' : 'var(--success)');
+      const esMadre = lotes.some(o => o.ID_Lote_Padre === l.ID);
+      const lotePadre = l.ID_Lote_Padre ? lotes.find(o => o.ID === l.ID_Lote_Padre) : null;
+      const etiquetaLinaje = lotePadre
+        ? `<span title="Subdividido de: ${getNombreUbicacion(lotePadre.ID_Ubicacion)}" style="margin-right:4px">↳🧪</span>`
+        : (esMadre ? `<span title="Bote madre — tiene subdivisiones" style="margin-right:4px">🫙</span>` : '');
       return `<tr class="mat-ubic-row" id="mat-ubic-${safeId}-${li}" style="display:none;background:var(--surface2)">
         <td></td>
-        <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
+        <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">${etiquetaLinaje}📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
         <td>
           <div class="stock-bar-wrap">
             <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctL}%;background:${colL}"></div></div>
@@ -290,6 +295,7 @@ function renderFilaMaterial(m) {
         <td onclick="event.stopPropagation()"><div class="row-actions">
           <button class="icon-btn" onclick="openModalConsumoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Consumo en esta ubicación">📦</button>
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Entrada en esta ubicación">📥</button>` : ''}
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Subdividir en botes de uso">✂️</button>` : ''}
           <button class="icon-btn" onclick="openModalTrasladoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Trasladar a otra ubicación">🔀</button>
         </div></td>
       </tr>`;
@@ -1180,11 +1186,13 @@ function openModalTrasladoLote(matId, idUbicacionOrigen) {
   const stockOrigen = DATA.materialUbicaciones.find(l => l.ID_Material === matId && l.ID_Ubicacion === idUbicacionOrigen);
   document.getElementById('traslado-stock-origen').textContent =
     (parseFloat(stockOrigen?.Stock_Local) || 0) + ' ' + (mat.Unidad || '');
-  // Poblar destinos (todas las ubicaciones donde ya existe el material, excepto la origen)
-  const destinos = DATA.materialUbicaciones.filter(l => l.ID_Material === matId && l.ID_Ubicacion !== idUbicacionOrigen);
+  // Poblar destinos: cualquier ubicación activa (si no tiene lote aún, se crea al trasladar)
   const selDest = document.getElementById('traslado-destino');
   selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
-    destinos.map(l => `<option value="${l.ID_Ubicacion}">${getNombreUbicacion(l.ID_Ubicacion)}</option>`).join('');
+    DATA.ubicaciones
+      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idUbicacionOrigen)
+      .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
+      .join('');
   document.getElementById('traslado-origen-label').textContent = getNombreUbicacion(idUbicacionOrigen);
   openModal('modal-traslado');
 }
@@ -1199,15 +1207,19 @@ async function guardarTraslado() {
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
   const loteOrigenIdx  = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idOrigen);
-  const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idDestino);
-  if (loteOrigenIdx === -1 || loteDestinoIdx === -1) { showToast('Error: ubicación no encontrada', 'error'); return; }
+  if (loteOrigenIdx === -1) { showToast('Error: ubicación de origen no encontrada', 'error'); return; }
   const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
   if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${mat.Unidad})`, 'error'); return; }
   showLoading('Trasladando...');
   try {
     await actualizarStockLocal(loteOrigenIdx, stockOrigen - cant);
-    const stockDestino = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
-    await actualizarStockLocal(loteDestinoIdx, stockDestino + cant);
+    const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idDestino);
+    if (loteDestinoIdx === -1) {
+      await añadirLote(matId, idDestino, cant, 0, 0);
+    } else {
+      const stockDestino = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
+      await actualizarStockLocal(loteDestinoIdx, stockDestino + cant);
+    }
     // Registrar movimiento de traslado
     const fecha = new Date().toISOString().split('T')[0];
     const movRow = [genId('MOV-'), mat.Nombre, 'Traslado',cant, currentUser?.name||'Usuario', fecha,
@@ -1219,6 +1231,82 @@ async function guardarTraslado() {
     renderDashboard();
     updateBadges();
   } catch(e) { showToast('Error en el traslado', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
+// SUBDIVIDIR LOTE — bote madre repartido en botes de uso
+// ============================================================
+let _subdivTemp = [];
+
+function openModalSubdividirLote(matId, idUbicacionOrigen) {
+  const mat = DATA.material.find(m => m.ID_Material === matId);
+  const loteOrigen = DATA.materialUbicaciones.find(l => l.ID_Material === matId && l.ID_Ubicacion === idUbicacionOrigen);
+  if (!mat || !loteOrigen) return;
+  sv('subdiv-mat-id', matId);
+  sv('subdiv-origen-ubicacion', idUbicacionOrigen);
+  sv('subdiv-lote-origen-id', loteOrigen.ID);
+  document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
+  document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(idUbicacionOrigen);
+  document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (mat.Unidad || '');
+  _subdivTemp = [{ idUbicacion: '', cantidad: '' }];
+  renderSubdivModal();
+  openModal('modal-subdividir-lote');
+}
+
+function renderSubdivModal() {
+  const idOrigen = v('subdiv-origen-ubicacion');
+  const destinos = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
+  const cont = document.getElementById('subdiv-filas');
+  cont.innerHTML = _subdivTemp.map((f, i) => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <select style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)" onchange="_subdivTemp[${i}].idUbicacion=this.value">
+        <option value="">Seleccionar destino...</option>
+        ${destinos.map(u => `<option value="${u.ID_Ubicacion}" ${f.idUbicacion === u.ID_Ubicacion ? 'selected' : ''}>${getNombreUbicacion(u.ID_Ubicacion)}</option>`).join('')}
+      </select>
+      <input type="number" min="0" step="0.01" placeholder="Cantidad" value="${f.cantidad}"
+        style="width:100px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
+        oninput="_subdivTemp[${i}].cantidad=this.value">
+      <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar">🗑️</button>
+    </div>`).join('');
+}
+
+function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '' }); renderSubdivModal(); }
+
+async function guardarSubdivision() {
+  const matId = v('subdiv-mat-id');
+  const idOrigen = v('subdiv-origen-ubicacion');
+  const loteOrigenId = v('subdiv-lote-origen-id');
+  const mat = DATA.material.find(m => m.ID_Material === matId);
+  const loteOrigenIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idOrigen);
+  if (!mat || loteOrigenIdx === -1) return;
+  const filas = _subdivTemp.filter(f => f.idUbicacion && parseFloat(f.cantidad) > 0);
+  if (!filas.length) { showToast('Añade al menos un destino con cantidad', 'error'); return; }
+  const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
+  const totalRepartido = filas.reduce((s, f) => s + (parseFloat(f.cantidad) || 0), 0);
+  if (totalRepartido > stockOrigen) { showToast(`Stock insuficiente en el bote madre (${stockOrigen} ${mat.Unidad || ''})`, 'error'); return; }
+  showLoading('Subdividiendo...');
+  try {
+    await actualizarStockLocal(loteOrigenIdx, stockOrigen - totalRepartido);
+    const fecha = new Date().toISOString().split('T')[0];
+    for (const f of filas) {
+      const cant = parseFloat(f.cantidad) || 0;
+      const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === f.idUbicacion);
+      if (loteDestinoIdx === -1) {
+        await añadirLote(matId, f.idUbicacion, cant, 0, 0, loteOrigenId);
+      } else {
+        const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
+        await actualizarStockLocal(loteDestinoIdx, stockDest + cant);
+      }
+      const movRow = [genId('MOV-'), mat.Nombre, 'Subdivisión', cant, currentUser?.name || 'Usuario', fecha,
+        `Subdividido de: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(f.idUbicacion)}`, ''];
+      await sheetsAppend('Movimientos', movRow);
+      DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
+    }
+    showToast(`Repartido en ${filas.length} ubicación${filas.length > 1 ? 'es' : ''}`, 'success');
+    closeModal('modal-subdividir-lote');
+    renderMaterial(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error al subdividir', 'error'); console.error(e); }
   hideLoading();
 }
 

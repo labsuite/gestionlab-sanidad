@@ -714,6 +714,35 @@ async function guardarProveedorPedido() {
 }
 
 // ============================================================
+// GASTO EXTRA DEL PEDIDO (transporte, tasas...)
+// ============================================================
+function openModalGastoExtra(pedidoId) {
+  sv('gasto-extra-pedido-id', pedidoId);
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  sv('gasto-extra-concepto', p?.Gasto_Extra_Concepto || '');
+  sv('gasto-extra-importe', p?.Gasto_Extra_Importe || '');
+  openModal('modal-gasto-extra');
+}
+
+async function guardarGastoExtraPedido() {
+  const pedidoId = v('gasto-extra-pedido-id');
+  const idx = DATA.pedidos.findIndex(x => x.ID_Pedido === pedidoId);
+  if (idx === -1) return;
+  const importe = parseFloat(v('gasto-extra-importe')) || 0;
+  const concepto = importe > 0 ? (v('gasto-extra-concepto').trim() || 'Gasto extra') : '';
+  showLoading('Guardando...');
+  try {
+    await sheetsUpdate(`Pedidos!T${idx + 2}:U${idx + 2}`, [concepto, importe > 0 ? importe : '']);
+    DATA.pedidos[idx].Gasto_Extra_Concepto = concepto;
+    DATA.pedidos[idx].Gasto_Extra_Importe = importe > 0 ? String(importe) : '';
+    showToast('Gasto extra actualizado', 'success');
+    closeModal('modal-gasto-extra');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
 // EDITAR SOLICITUD (solo Profesor, solo en estado Pendiente)
 // ============================================================
 function openModalEditarSolicitud(solId) {

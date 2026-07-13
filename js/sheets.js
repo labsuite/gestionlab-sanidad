@@ -93,9 +93,9 @@ async function actualizarStockLocal(loteIndex, nuevoStock) {
  * Añade un nuevo lote a Material_Ubicaciones y lo registra en DATA.
  * Devuelve el objeto lote creado.
  */
-async function añadirLote(idMaterial, idUbicacion, stockLocal, stockMin, stockOpt) {
+async function añadirLote(idMaterial, idUbicacion, stockLocal, stockMin, stockOpt, idLotePadre = '') {
   const id = genId('LU');
-  const row = [id, idMaterial, idUbicacion, String(stockLocal), String(stockMin || 0), String(stockOpt || 0)];
+  const row = [id, idMaterial, idUbicacion, String(stockLocal), String(stockMin || 0), String(stockOpt || 0), idLotePadre || ''];
   await sheetsAppend('Material_Ubicaciones', row);
   const lote = rowToObj(row, 'materialUbicaciones');
   DATA.materialUbicaciones.push(lote);
@@ -136,10 +136,10 @@ async function loadAllData() {
       sheetsGet('Material!A2:L'),
       sheetsGet('Movimientos!A2:H'),
       sheetsGet('Solicitudes!A2:J'),
-      sheetsGet('Pedidos!A2:S'),
+      sheetsGet('Pedidos!A2:U'),
       sheetsGet('Lineas_Pedido!A2:I'),
       sheetsGet('Ciclos_Modulos!A2:B'),
-      sheetsGet('Material_Ubicaciones!A2:F'),
+      sheetsGet('Material_Ubicaciones!A2:G'),
       sheetsGet('Historico_Precios!A2:F').catch(() => []),
       sheetsGet('Tareas_Usuario!A2:F').catch(() => []),
       sheetsGet('Planes_Mantenimiento!A2:H').catch(e => { console.warn('Planes_Mantenimiento no cargó:', e); return []; }),

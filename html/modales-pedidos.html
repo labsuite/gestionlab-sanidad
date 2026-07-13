@@ -198,7 +198,7 @@
           <input id="linea-cantidad" type="number" min="0.01" step="0.01" placeholder="">
         </div>
         <div class="form-group">
-          <label>Precio unitario (€ con IVA)</label>
+          <label>Precio unitario (€ sin IVA)</label>
           <input id="linea-precio" type="number" min="0" step="0.01" placeholder="0.00">
         </div>
         <div class="form-group">
@@ -391,6 +391,10 @@
       </div>
       <!-- Resumen total con IVA -->
       <div style="margin-top:16px;border-top:2px solid var(--border);padding-top:14px">
+        <div id="precios-gasto-extra-line" style="display:none;justify-content:space-between;align-items:center;max-width:300px;margin-left:auto;font-size:12px;color:var(--text-muted);margin-bottom:4px">
+          <span id="precios-gasto-extra-concepto"></span>
+          <span id="precios-gasto-extra-importe"></span>
+        </div>
         <div style="display:flex;justify-content:space-between;align-items:center;max-width:300px;margin-left:auto">
           <span style="font-weight:600;font-size:14px">Total con IVA (21%)</span>
           <strong style="color:var(--accent);font-size:16px" id="precios-total">0,00 €</strong>
@@ -423,6 +427,34 @@
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-editar-proveedor')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarProveedorPedido()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Gasto Extra del Pedido -->
+<div class="modal-overlay" id="modal-gasto-extra">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Gasto extra (transporte, tasas...)</div>
+      <button class="modal-close" onclick="closeModal('modal-gasto-extra')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="gasto-extra-pedido-id">
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>Concepto</label>
+          <input id="gasto-extra-concepto" placeholder="Ej: Transporte con hielo">
+        </div>
+        <div class="form-group">
+          <label>Importe (€ sin IVA)</label>
+          <input id="gasto-extra-importe" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Se suma a la base del pedido (con IVA 21% incluido) y aparece como línea extra en la hoja de pedido. Deja el importe a 0 para quitarlo.</div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-gasto-extra')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarGastoExtraPedido()">Guardar</button>
       </div>
     </div>
   </div>

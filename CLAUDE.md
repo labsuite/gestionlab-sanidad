@@ -2,6 +2,7 @@
 
 App web de gestión de laboratorio para el CIFP Manuel Antonio (Vigo).
 Stack: JS vanilla + HTML/CSS, Google Sheets como base de datos vía REST API, Google OAuth client-side.
+URL de la app: `https://palomafedez.github.io/gestionlab-sanidad/`
 
 ---
 
@@ -135,6 +136,8 @@ Rangos actuales relevantes:
 | Planes_Mantenimiento | `A2:H` | H = Con_Alumnado |
 | Registro_Mantenimientos | `A2:I` | I = Observaciones |
 | Equipos | `A2:W` | W = Mes_Fin_Temporada |
+| Pedidos | `A2:U` | U = Gasto_Extra_Importe |
+| Material_Ubicaciones | `A2:G` | G = ID_Lote_Padre |
 
 ---
 

@@ -31,6 +31,7 @@
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
 - "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales
 - Archivado: solo posible cuando Estado=Recepción completa Y los tres checks de documentación están marcados
+- "+ Añadir línea" (`puedeAddLinea` en `pedidos-render.js`): permitido en `Abierto` y `Presupuesto solicitado` — en la práctica se pueden seguir añadiendo artículos mientras se espera el presupuesto. A partir de `Presupuesto aprobado` el pedido se considera cerrado en firme.
 
 ## Recepción de líneas — lógica clave
 `_completarRecepcionLinea(idx, l, cantRec, ...)` dividido en 4 subfunciones:
@@ -70,7 +71,26 @@ Al editar un ítem legacy, `editMaterial()` pre-rellena `_lotesTemp` con `_esPre
 - El indicador de pospuestas es un pequeño botón `💤 N` alineado a la derecha, con opacidad reducida; el tooltip muestra la fecha más próxima. El toggle `_mostrarSnoozed` muestra/oculta las cards pospuestas en la lista.
 
 ## Coste total en detalle de pedido
-Campo "Coste total (IVA 21%)" en `verDetallePedido`: suma `Precio_Unitario × Cantidad_Pedida` de todas las líneas y multiplica por 1.21.
+Campo "Coste total (IVA 21%)" en `verDetallePedido`: suma `Precio_Unitario × Cantidad_Pedida` de todas las líneas + `Gasto_Extra_Importe`, y multiplica por 1.21.
+
+## Gasto extra del pedido (2026-07-13)
+- Cols `T` (`Gasto_Extra_Concepto`) y `U` (`Gasto_Extra_Importe`) en `Pedidos` — para tasas puntuales (transporte con hielo, impuestos raros...) que **no** deben generar una línea de pedido normal (eso obligaría a "recibirla" y crearía un ítem falso en el inventario).
+- Un solo gasto por pedido (no hace falta hoja aparte para algo tan infrecuente); si hay varios conceptos, se combinan en un único texto+importe.
+- `openModalGastoExtra` / `guardarGastoExtraPedido` en `js/pedidos-acciones.js`; botón ✏️ junto a "Gasto extra" en `verDetallePedido`.
+- Entra en la **base del IVA** en los tres sitios donde se calcula un total: "Coste total" del detalle, `modal-precios` (`js/contabilidad.js`), resumen de contabilidad por ciclo/módulo, y la hoja Word generada (`generarHojaPedido`, como fila extra tras las líneas de material, antes de la fila de IVA).
+- No toca `Lineas_Pedido` ni el flujo de recepción/stock.
+
+## Traslado de stock a otra ubicación (2026-07-13)
+`openModalTrasladoLote` / `guardarTraslado` en `js/material.js`: el destino ahora puede ser **cualquier ubicación activa**, no solo una donde ya exista un lote del material. Si el lote destino no existe, se crea con `añadirLote`. Este botón (🔀) es para mover stock ya existente entre ubicaciones (p.ej. "ir a buscar algo al almacén") — **no** es el flujo de subdivisión (ver siguiente sección).
+
+## Subdividir lote — botes madre/hija (2026-07-13)
+Caso: se compra un envase "madre" (p.ej. un bote de tinción o DPX) y se reparte en varios botes de uso más pequeños hacia distintas ubicaciones, en cantidades no necesariamente iguales. Solo se puede *pedir* la madre (el proveedor no vende "un falcon de DPX"), así que los botes de uso nunca deben ser un ítem de `Material` nuevo — son lotes de `Material_Ubicaciones` del mismo material, enlazados a su origen.
+- Col `G` nueva en `Material_Ubicaciones`: `ID_Lote_Padre` — vacío en un lote normal/madre; contiene el `ID` (col A, `LU-xxx`) del lote de origen en un lote "hija".
+- `añadirLote(idMaterial, idUbicacion, stockLocal, stockMin, stockOpt, idLotePadre)` en `js/sheets.js` — el 6º parámetro es opcional y por defecto `''` (compatible con todas las llamadas existentes).
+- Botón ✂️ "Subdividir en botes de uso" en cada fila de lote (`js/material.js`, junto a 🔀): abre `modal-subdividir-lote`, con filas repetibles de destino+cantidad para repartir en varias ubicaciones a la vez (p.ej. 3 a un lab, 2 a otro, 4 a otro, en una sola pantalla). Resta el total del lote origen; crea un lote nuevo por destino (con `ID_Lote_Padre` = lote origen) o suma a uno ya existente.
+- `openModalSubdividirLote` / `guardarSubdivision` en `js/material.js`. Registra un movimiento tipo `'Subdivisión'` por cada destino.
+- En el listado de lotes se ve de un vistazo quién es madre y quién es hija: 🫙 en la fila que tiene subdivisiones, ↳🧪 en cada lote hijo (con tooltip indicando de dónde viene).
+- La recepción de pedidos sigue sin tocarse: se recibe lo que dice el albarán (la madre) tal cual; subdividir es una acción posterior e independiente, disponible en cualquier momento.
 
 ## Eliminar ítems del inventario (2026-05-22)
 - Permiso `eliminarItems: true` en **Administrador** únicamente (Gestor no lo tiene)
