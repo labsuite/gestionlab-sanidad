@@ -6,6 +6,12 @@ URL de la app: `https://palomafedez.github.io/gestionlab-sanidad/`
 
 ---
 
+## Commit y push tras cada cambio de código
+
+La app se sirve directamente desde `main` en GitHub Pages — sin commit y push, la usuaria **no puede ver ni probar** el cambio en la app real. Por tanto: siempre que se termine un cambio de código (JS/HTML/CSS) y esté verificada la sintaxis, hacer `git add` + `git commit` + `git push` sin esperar a que lo pida explícitamente cada vez. Si hay cambios de sesiones anteriores no relacionados mezclados en el working tree, separarlos en su propio commit en vez de mezclarlos.
+
+---
+
 ## Documentación de módulos
 
 Ver `docs/` para detalles de módulos completados y patrones de implementación:

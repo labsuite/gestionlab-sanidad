@@ -532,14 +532,24 @@ function renderLotesModal() {
     const gestionOn = l.Gestion_Auto !== false && l.Gestion_Auto !== 'false';
     const checkId   = `lote-auto-${i}`;
     const camposId  = `lote-campos-${i}`;
+    // Linaje madre/hija: se calcula dentro de los propios lotes que se están editando
+    const esMadre   = l._loteId && _lotesTemp.some(o => o.ID_Lote_Padre === l._loteId);
+    const lotePadre = l.ID_Lote_Padre ? _lotesTemp.find(o => o._loteId === l.ID_Lote_Padre) : null;
+    const etiqueta  = lotePadre
+      ? `<span title="Subdividido de: ${getNombreUbicacion(lotePadre.ID_Ubicacion)}" style="margin-right:4px">↳🧪</span>`
+      : (esMadre ? `<span title="Bote madre — tiene subdivisiones" style="margin-right:4px">🫙</span>` : '');
     return `<div class="lote-row" style="background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
       <!-- Cabecera del lote -->
       <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap">
-        <span style="flex:1;font-size:13px;font-weight:500;min-width:120px">📍 ${nombre}</span>
+        <span style="flex:1;font-size:13px;font-weight:500;min-width:120px">${etiqueta}📍 ${nombre}</span>
         <label style="font-size:12px;color:var(--text-muted)">Stock actual</label>
         <input type="number" min="0" value="${l.Stock_Local||0}" style="width:70px"
           onchange="_lotesTemp[${i}].Stock_Local=this.value"
           oninput="_lotesTemp[${i}].Stock_Local=this.value">
+        <label style="font-size:12px;color:var(--text-muted)">Unidad</label>
+        <input type="text" placeholder="(la del material)" value="${l.Unidad_Lote||''}" style="width:110px"
+          onchange="_lotesTemp[${i}].Unidad_Lote=this.value"
+          oninput="_lotesTemp[${i}].Unidad_Lote=this.value">
         <!-- Checkbox gestión automática -->
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;margin-left:8px;white-space:nowrap">
           <input type="checkbox" id="${checkId}" ${gestionOn ? 'checked' : ''}
@@ -628,6 +638,9 @@ function editMaterial(idx) {
     Stock_Local: l.Stock_Local,
     Stock_Minimo_Local: l.Stock_Minimo_Local,
     Stock_Optimo_Local: l.Stock_Optimo_Local,
+    Unidad_Lote: l.Unidad_Lote || '',
+    ID_Lote_Padre: l.ID_Lote_Padre || '',
+    _loteId: l.ID,
     Gestion_Auto: (parseFloat(l.Stock_Minimo_Local) > 0 || parseFloat(l.Stock_Optimo_Local) > 0),
     _nuevo: false,
     _loteIdx: DATA.materialUbicaciones.indexOf(l)
@@ -945,15 +958,18 @@ async function guardarMaterial() {
       if (lote._nuevo) {
         // No convertir ubicación legacy a lote si no se añadió una segunda ubicación real
         if (lote._esPrepoblado && !_lotesTemp.some(l => l._nuevo && !l._esPrepoblado)) continue;
-        await añadirLote(id, lote.ID_Ubicacion, lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local);
+        await añadirLote(id, lote.ID_Ubicacion, lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local, '', (lote.Unidad_Lote || '').trim());
       } else if (lote._loteIdx !== undefined) {
         const l = DATA.materialUbicaciones[lote._loteIdx];
-        if (l && (l.Stock_Local !== lote.Stock_Local || l.Stock_Minimo_Local !== lote.Stock_Minimo_Local || l.Stock_Optimo_Local !== lote.Stock_Optimo_Local)) {
+        const unidadLoteNueva = (lote.Unidad_Lote || '').trim();
+        if (l && (l.Stock_Local !== lote.Stock_Local || l.Stock_Minimo_Local !== lote.Stock_Minimo_Local || l.Stock_Optimo_Local !== lote.Stock_Optimo_Local || (l.Unidad_Lote || '') !== unidadLoteNueva)) {
           const fila = lote._loteIdx + 2;
-          await sheetsUpdate(`Material_Ubicaciones!D${fila}:F${fila}`, [lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local]);
+          // D:F son Stock_Local/Mín/Óptimo; G es ID_Lote_Padre (se reescribe tal cual, no es editable aquí); H es Unidad_Lote
+          await sheetsUpdate(`Material_Ubicaciones!D${fila}:H${fila}`, [lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local, l.ID_Lote_Padre || '', unidadLoteNueva]);
           DATA.materialUbicaciones[lote._loteIdx].Stock_Local         = lote.Stock_Local;
           DATA.materialUbicaciones[lote._loteIdx].Stock_Minimo_Local  = lote.Stock_Minimo_Local;
           DATA.materialUbicaciones[lote._loteIdx].Stock_Optimo_Local  = lote.Stock_Optimo_Local;
+          DATA.materialUbicaciones[lote._loteIdx].Unidad_Lote         = unidadLoteNueva;
         }
       }
     }
@@ -1223,14 +1239,34 @@ function openModalTrasladoLote(loteId) {
   document.getElementById('traslado-mat-nombre').textContent = mat.Nombre;
   document.getElementById('traslado-stock-origen').textContent =
     (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
-  // Poblar destinos: cualquier ubicación activa (si no tiene lote aún, se crea al trasladar)
-  const selDest = document.getElementById('traslado-destino');
-  selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
-    DATA.ubicaciones
-      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== loteOrigen.ID_Ubicacion)
-      .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
-      .join('');
   document.getElementById('traslado-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
+
+  const selDest  = document.getElementById('traslado-destino');
+  const destGrp  = document.getElementById('traslado-destino-group');
+  const fijoGrp  = document.getElementById('traslado-destino-fijo-group');
+  const fijoLbl  = document.getElementById('traslado-destino-fijo-label');
+  const madre    = loteOrigen.ID_Lote_Padre ? DATA.materialUbicaciones.find(l => l.ID === loteOrigen.ID_Lote_Padre) : null;
+
+  if (madre) {
+    // Bote hija: el destino siempre es el bote madre — se apunta por su ID
+    // (no por ubicación: si hija y madre viven en el mismo sitio, buscar por
+    // ubicación sería ambiguo entre las dos).
+    sv('traslado-destino-lote-id', madre.ID);
+    selDest.innerHTML = `<option value="${madre.ID_Ubicacion}" selected>${getNombreUbicacion(madre.ID_Ubicacion)}</option>`;
+    fijoLbl.textContent = getNombreUbicacion(madre.ID_Ubicacion);
+    if (destGrp) destGrp.style.display = 'none';
+    if (fijoGrp) fijoGrp.style.display = '';
+  } else {
+    // Bote madre o ítem sin subdividir: destino libre, como hasta ahora
+    sv('traslado-destino-lote-id', '');
+    selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
+      DATA.ubicaciones
+        .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== loteOrigen.ID_Ubicacion)
+        .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
+        .join('');
+    if (destGrp) destGrp.style.display = '';
+    if (fijoGrp) fijoGrp.style.display = 'none';
+  }
   openModal('modal-traslado');
 }
 
@@ -1252,7 +1288,12 @@ async function guardarTraslado() {
   showLoading('Trasladando...');
   try {
     await actualizarStockLocal(loteOrigenIdx, stockOrigen - cant);
-    const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idDestino);
+    // Si el destino es un bote concreto (vuelta a la madre), se apunta por ID — sin ambigüedad
+    // aunque comparta ubicación con el origen. Si no, se busca/crea por ubicación como antes.
+    const destinoLoteId = v('traslado-destino-lote-id');
+    const loteDestinoIdx = destinoLoteId
+      ? DATA.materialUbicaciones.findIndex(l => l.ID === destinoLoteId)
+      : DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idDestino);
     if (loteDestinoIdx === -1) {
       await añadirLote(matId, idDestino, cant, 0, 0);
     } else {

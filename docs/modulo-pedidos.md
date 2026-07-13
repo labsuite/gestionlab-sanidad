@@ -113,6 +113,16 @@ Caso real: alícuotas guardadas junto al bote madre (mismo estante/armario), no 
 - **Limitación que queda pendiente:** `guardarTraslado` sigue resolviendo el destino por `(matId, ubicación)` — si esa ubicación ya tiene 2+ lotes, coge el primero que encuentra. No es el caso de uso que motivó este cambio (trasladar es para mover a un sitio distinto, no para juntar en el mismo), pero si aparece, habría que aplicarle el mismo tratamiento de "siempre crear nuevo" o pedir explícitamente a qué lote sumar.
 - La UI de "editar material" (`_lotesTemp`, `seleccionarUbicacionMatLote`) **todavía bloquea** añadir dos ubicaciones iguales a mano (`js/material.js:582`) — ese camino no se tocó; solo Subdividir permite el caso de misma ubicación por ahora.
 
+### Trasladar hijas siempre a su madre (2026-07-13)
+Regla de negocio: 🔀 Trasladar sobre un bote **hija** (tiene `ID_Lote_Padre`) ya no deja elegir destino — siempre va a la ubicación de su bote madre, apuntando directo al `ID` del lote madre (no a su ubicación, para no ambigüedad si hija y madre comparten sitio). Sobre el bote **madre** o un ítem sin subdividir, el destino sigue siendo libre como antes. Ver `openModalTrasladoLote`/`guardarTraslado` en `js/material.js` — nuevo hidden `traslado-destino-lote-id`.
+
+### Editar lote desde "editar material": linaje y unidad (2026-07-13)
+El modal de editar material (`renderLotesModal`, `_lotesTemp`) no mostraba si un lote era madre/hija ni dejaba tocar `Unidad_Lote` una vez creado (solo se podía fijar al subdividir). Ahora:
+- `editMaterial()` copia `ID` (como `_loteId`), `ID_Lote_Padre` y `Unidad_Lote` de cada lote a `_lotesTemp`.
+- `renderLotesModal()` muestra el mismo badge 🫙/↳🧪 que la tabla principal, calculado entre los propios `_lotesTemp` (no hace falta ir a `DATA.materialUbicaciones`).
+- Cada fila tiene un campo "Unidad" editable; vacío = usa la del material, como siempre.
+- `guardarMaterial()` persiste el cambio de unidad en la col `H` de `Material_Ubicaciones`, reescribiendo `D:H` (incluye `ID_Lote_Padre` en `G`, que se reenvía tal cual para no perderlo — no es editable desde esta pantalla).
+
 ### Destino con autocomplete (2026-07-13)
 El `<select>` de destino en el modal de subdividir (poco usable con muchas ubicaciones) se sustituyó por el mismo patrón `search-material-wrap` / `autocomplete-list` que ya usan incidencias y equipos (`docs/patrones-ui.md`). Adaptado a filas repetibles: `buscarDestinoSubdiv(i, query)` / `seleccionarDestinoSubdiv(i, id)` / `limpiarDestinoSubdiv(i)` en `js/material.js`, con ids únicos por fila (`subdiv-destino-autocomplete-${i}`). Al seleccionar, se re-renderiza todo el modal (`renderSubdivModal()`), lo cual es seguro porque cada input ya escribe su valor en `_subdivTemp[i]` en el propio `oninput`.
 - Botón 🗑️ "Eliminar este bote" en cada fila de lote (`eliminarLoteDirecto` en `js/material.js`): antes solo se podía "quitar" un lote desde el modal de editar material, pero ese flujo no lo persistía en Sheets (solo lo hacía desaparecer del formulario hasta el siguiente recargo). Ahora hay un borrado real vía `eliminarLote()`, con aviso si el bote tiene stock o si es un bote madre con hijas (las hijas no se borran, solo pierden la referencia).

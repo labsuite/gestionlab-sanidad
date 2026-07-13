@@ -259,6 +259,7 @@
     <div class="modal-body">
       <input type="hidden" id="traslado-mat-id">
       <input type="hidden" id="traslado-origen">
+      <input type="hidden" id="traslado-destino-lote-id">
       <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px;font-size:13px">
         <strong id="traslado-mat-nombre"></strong>
         <div style="color:var(--text-muted);font-size:12px;margin-top:4px">
@@ -266,9 +267,16 @@
         </div>
       </div>
       <div class="form-grid" style="gap:14px">
-        <div class="form-group">
+        <div class="form-group" id="traslado-destino-group">
           <label>Destino *</label>
           <select id="traslado-destino"><option value="">Seleccionar destino...</option></select>
+        </div>
+        <div class="form-group" id="traslado-destino-fijo-group" style="display:none">
+          <label>Destino</label>
+          <div style="padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent)">
+            📍 <strong id="traslado-destino-fijo-label"></strong>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:400">Este bote es una subdivisión — siempre vuelve a la ubicación de su bote madre.</div>
+          </div>
         </div>
         <div class="form-group">
           <label>Cantidad a trasladar *</label>
