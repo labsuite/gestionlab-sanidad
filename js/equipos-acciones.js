@@ -856,7 +856,10 @@ async function guardarIncidencia() {
   const equipo = v('inc-equipo'); const desc = v('inc-descripcion');
   if (!equipo || !desc) { showToast('Equipo y descripción son obligatorios', 'error'); return; }
   const id  = genId('INC-');
-  const row = [id, equipo, currentUser?.name || 'Usuario', new Date().toISOString().replace('T',' ').slice(0,16), desc, v('inc-impacto'), v('inc-urgencia'), 'Abierta', ''];
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const usuarioApp = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const reportadoPor = usuarioApp?.Nombre || currentUser?.name || 'Usuario';
+  const row = [id, equipo, reportadoPor, new Date().toISOString().replace('T',' ').slice(0,16), desc, v('inc-impacto'), v('inc-urgencia'), 'Abierta', ''];
   showLoading('Guardando...');
   try {
     await sheetsAppend('Incidencias', row);
