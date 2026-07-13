@@ -1256,19 +1256,22 @@ function openModalSubdividirLote(matId, idUbicacionOrigen) {
 }
 
 function renderSubdivModal() {
-  const idOrigen = v('subdiv-origen-ubicacion');
-  const destinos = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
   const cont = document.getElementById('subdiv-filas');
   cont.innerHTML = _subdivTemp.map((f, i) => `
     <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-        <select style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)" onchange="_subdivTemp[${i}].idUbicacion=this.value">
-          <option value="">Seleccionar destino...</option>
-          ${destinos.map(u => `<option value="${u.ID_Ubicacion}" ${f.idUbicacion === u.ID_Ubicacion ? 'selected' : ''}>${getNombreUbicacion(u.ID_Ubicacion)}</option>`).join('')}
-        </select>
-        <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar">🗑️</button>
+      <div style="margin-bottom:8px">
+        ${f.idUbicacion ? `
+          <div style="padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);display:flex;align-items:center;justify-content:space-between">
+            <span>📍 ${getNombreUbicacion(f.idUbicacion)}</span>
+            <span style="cursor:pointer;color:var(--text-muted)" onclick="limpiarDestinoSubdiv(${i})">✕</span>
+          </div>` : `
+          <div class="search-material-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" placeholder="Buscar ubicación..." autocomplete="off" oninput="buscarDestinoSubdiv(${i}, this.value)">
+            <div class="autocomplete-list" id="subdiv-destino-autocomplete-${i}"></div>
+          </div>`}
       </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input type="number" min="0" step="0.01" placeholder="Cantidad" value="${f.cantidad}"
           style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
           oninput="_subdivTemp[${i}].cantidad=this.value">
@@ -1281,8 +1284,44 @@ function renderSubdivModal() {
         <input type="number" min="0" step="0.01" placeholder="Óptimo" value="${f.stockOpt}"
           style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
           oninput="_subdivTemp[${i}].stockOpt=this.value">
+        <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar destino" style="margin-left:auto">🗑️</button>
       </div>
     </div>`).join('');
+}
+
+function buscarDestinoSubdiv(i, query) {
+  const list = document.getElementById('subdiv-destino-autocomplete-' + i);
+  if (!list) return;
+  if (!query || query.length < 1) { list.classList.remove('open'); return; }
+  const idOrigen = v('subdiv-origen-ubicacion');
+  const q = query.toLowerCase();
+  const resultados = DATA.ubicaciones.filter(u =>
+    u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen &&
+    (u.ID_Ubicacion.toLowerCase().includes(q) ||
+     (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
+     (u.Zona || '').toLowerCase().includes(q) ||
+     (u.Subzona || '').toLowerCase().includes(q))
+  ).slice(0, 8);
+  if (!resultados.length) { list.classList.remove('open'); return; }
+  list.innerHTML = resultados.map(u => {
+    const label = [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ');
+    return `<div class="autocomplete-item" onclick="seleccionarDestinoSubdiv(${i},'${u.ID_Ubicacion}')">
+      <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${label}</div></div>
+    </div>`;
+  }).join('');
+  list.classList.add('open');
+}
+
+function seleccionarDestinoSubdiv(i, id) {
+  if (!_subdivTemp[i]) return;
+  _subdivTemp[i].idUbicacion = id;
+  renderSubdivModal();
+}
+
+function limpiarDestinoSubdiv(i) {
+  if (!_subdivTemp[i]) return;
+  _subdivTemp[i].idUbicacion = '';
+  renderSubdivModal();
 }
 
 function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }); renderSubdivModal(); }
