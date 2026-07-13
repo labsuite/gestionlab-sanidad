@@ -256,7 +256,7 @@ function renderFilaMaterial(m) {
     <td>
       <div class="stock-bar-wrap">
         <div class="stock-bar"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-        <span class="stock-val" style="color:${color}">${stock} ${m.Unidad || ''}</span>
+        <span class="stock-val" style="color:${color}">${getStockLabel(m)}</span>
       </div>
     </td>
     <td style="font-size:12px;color:var(--text-muted)">${minTot || '—'} / ${opt || '—'}</td>
@@ -293,11 +293,11 @@ function renderFilaMaterial(m) {
         </td>
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
-          <button class="icon-btn" onclick="openModalConsumoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Consumo en esta ubicación">📦</button>
-          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Entrada en esta ubicación">📥</button>` : ''}
-          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Subdividir en botes de uso">✂️</button>` : ''}
-          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="eliminarLoteDirecto('${m.ID_Material}','${l.ID_Ubicacion}')" title="Eliminar este bote">🗑️</button>` : ''}
-          <button class="icon-btn" onclick="openModalTrasladoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Trasladar a otra ubicación">🔀</button>
+          <button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Consumo en esta ubicación">📦</button>
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir en botes de uso">✂️</button>` : ''}
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="eliminarLoteDirecto('${l.ID}')" title="Eliminar este bote">🗑️</button>` : ''}
+          <button class="icon-btn" onclick="openModalTrasladoLote('${l.ID}')" title="Trasladar a otra ubicación">🔀</button>
         </div></td>
       </tr>`;
     }).join('');
@@ -743,8 +743,8 @@ function openModalConsumo() {
   sv('consumo-cantidad', ''); sv('consumo-motivo', ''); sv('consumo-obs', '');
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
-  // Limpiar ubicación fija (puede venir de openModalConsumoLote anterior)
-  const fixedInput = document.getElementById('consumo-ubicacion-fixed');
+  // Limpiar bote fijo (puede venir de openModalConsumoLote anterior)
+  const fixedInput = document.getElementById('consumo-lote-fixed');
   if (fixedInput) fixedInput.value = '';
   openModal('modal-consumo');
 }
@@ -763,19 +763,21 @@ function openModalConsumoMaterial(matId) {
   _mostrarSelectorUbicConsumo(matId);
 }
 
-function openModalConsumoLote(matId, idUbicacion) {
-  openModalConsumoMaterial(matId);
-  // Guardar la ubicación fija en un input hidden dedicado
-  // (más robusto que confiar en el value de un select oculto)
-  let fixedInput = document.getElementById('consumo-ubicacion-fixed');
+function openModalConsumoLote(loteId) {
+  const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
+  if (!lote) return;
+  openModalConsumoMaterial(lote.ID_Material);
+  // Guardar el LOTE fijo en un input hidden dedicado (no la ubicación: puede
+  // haber más de un bote en la misma ubicación, p.ej. madre + alícuotas)
+  let fixedInput = document.getElementById('consumo-lote-fixed');
   if (!fixedInput) {
     fixedInput = document.createElement('input');
     fixedInput.type = 'hidden';
-    fixedInput.id = 'consumo-ubicacion-fixed';
+    fixedInput.id = 'consumo-lote-fixed';
     document.getElementById('modal-consumo').appendChild(fixedInput);
   }
-  fixedInput.value = idUbicacion;
-  // Ocultar el selector — la ubicación ya está fijada
+  fixedInput.value = loteId;
+  // Ocultar el selector — el bote ya está fijado
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
 }
@@ -802,16 +804,18 @@ function _mostrarSelectorUbicConsumo(matId) {
     // Pre-seleccionar silenciosamente si hay exactamente 1 lote
     const sel = document.getElementById('consumo-ubicacion-sel');
     if (sel && lotes.length === 1) {
-      sel.innerHTML = `<option value="${lotes[0].ID_Ubicacion}">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</option>`;
+      sel.innerHTML = `<option value="${lotes[0].ID}">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</option>`;
     }
     ubiGrp.style.display = 'none';
     return;
   }
+  const mat = DATA.material.find(m => m.ID_Material === matId);
   const sel = document.getElementById('consumo-ubicacion-sel');
   if (sel) {
     sel.innerHTML = lotes.map(l => {
       const s = parseFloat(l.Stock_Local) || 0;
-      return `<option value="${l.ID_Ubicacion}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${DATA.material.find(m => m.ID_Material === matId)?.Unidad || ''})</option>`;
+      const u = l.Unidad_Lote || mat?.Unidad || '';
+      return `<option value="${l.ID}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
     }).join('');
   }
   ubiGrp.style.display = '';
@@ -825,6 +829,9 @@ function openModalEntrada() {
   sv('entrada-cantidad', ''); sv('entrada-obs', '');
   const ubiGrp = document.getElementById('entrada-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
+  // Limpiar bote fijo (puede venir de openModalEntradaLote anterior)
+  const fixedInput = document.getElementById('entrada-lote-fixed');
+  if (fixedInput) fixedInput.value = '';
   openModal('modal-entrada');
 }
 
@@ -839,22 +846,42 @@ function openModalEntradaMaterial(matId) {
   _mostrarSelectorUbicEntrada(matId);
 }
 
-function openModalEntradaLote(matId, idUbicacion) {
-  openModalEntradaMaterial(matId);
-  const sel = document.getElementById('entrada-ubicacion-sel');
-  if (sel) { sel.value = idUbicacion; }
+function openModalEntradaLote(loteId) {
+  const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
+  if (!lote) return;
+  openModalEntradaMaterial(lote.ID_Material);
+  // Bote fijo (no ubicación: puede haber más de un bote en la misma ubicación)
+  let fixedInput = document.getElementById('entrada-lote-fixed');
+  if (!fixedInput) {
+    fixedInput = document.createElement('input');
+    fixedInput.type = 'hidden';
+    fixedInput.id = 'entrada-lote-fixed';
+    document.getElementById('modal-entrada').appendChild(fixedInput);
+  }
+  fixedInput.value = loteId;
+  const ubiGrp = document.getElementById('entrada-ubicacion-group');
+  if (ubiGrp) ubiGrp.style.display = 'none';
 }
 
 function _mostrarSelectorUbicEntrada(matId) {
   const ubiGrp = document.getElementById('entrada-ubicacion-group');
   if (!ubiGrp) return;
   const lotes = getMatUbics(matId);
-  if (lotes.length <= 1) { ubiGrp.style.display = 'none'; return; }
+  if (lotes.length <= 1) {
+    const sel = document.getElementById('entrada-ubicacion-sel');
+    if (sel && lotes.length === 1) {
+      sel.innerHTML = `<option value="${lotes[0].ID}">${getNombreUbicacion(lotes[0].ID_Ubicacion)}</option>`;
+    }
+    ubiGrp.style.display = 'none';
+    return;
+  }
+  const mat = DATA.material.find(m => m.ID_Material === matId);
   const sel = document.getElementById('entrada-ubicacion-sel');
   if (sel) {
     sel.innerHTML = lotes.map(l => {
       const s = parseFloat(l.Stock_Local) || 0;
-      return `<option value="${l.ID_Ubicacion}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${DATA.material.find(m => m.ID_Material === matId)?.Unidad || ''})</option>`;
+      const u = l.Unidad_Lote || mat?.Unidad || '';
+      return `<option value="${l.ID}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
     }).join('');
   }
   ubiGrp.style.display = '';
@@ -965,17 +992,18 @@ async function guardarConsumo() {
   if (!mat) { showToast('Material no encontrado', 'error'); return; }
   const cantidad = parseFloat(cantStr);
   const lotes    = getMatUbics(matId);
-  // Primero: ubicación fija (viene de openModalConsumoLote). Si no, la del selector.
-  const fixedUbi = document.getElementById('consumo-ubicacion-fixed')?.value || '';
-  const ubiSel   = fixedUbi || document.getElementById('consumo-ubicacion-sel')?.value || '';
+  // Primero: bote fijo (viene de openModalConsumoLote). Si no, el del selector. Ambos son ID de lote, no de ubicación.
+  const loteFijo = document.getElementById('consumo-lote-fixed')?.value || '';
+  const loteSel  = loteFijo || document.getElementById('consumo-ubicacion-sel')?.value || '';
+  const loteElegido = loteSel ? DATA.materialUbicaciones.find(l => l.ID === loteSel) : null;
 
-  // Alumno: validar que la ubicación seleccionada sea de las permitidas
+  // Alumno: validar que la ubicación del bote elegido sea de las permitidas
   if (getUserRole() === 'Alumno') {
     const permitidas = getUbicacionesAlumno();
-    if (lotes.length > 0 && !ubiSel) {
+    if (lotes.length > 0 && !loteElegido) {
       showToast('Selecciona una ubicación', 'error'); return;
     }
-    if (ubiSel && !permitidas.includes(ubiSel)) {
+    if (loteElegido && !permitidas.includes(loteElegido.ID_Ubicacion)) {
       showToast('No tienes permiso para consumir de esa ubicación', 'error'); return;
     }
   }
@@ -988,8 +1016,8 @@ async function guardarConsumo() {
     await sheetsAppend('Movimientos', rowMov);
     DATA.movimientos.push(rowToObj(rowMov, 'movimientos'));
 
-    if (lotes.length > 0 && ubiSel) {
-      const loteIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === ubiSel);
+    if (lotes.length > 0 && loteElegido) {
+      const loteIdx = DATA.materialUbicaciones.indexOf(loteElegido);
       if (loteIdx !== -1) {
         const nuevoLocal = Math.max(0, (parseFloat(DATA.materialUbicaciones[loteIdx].Stock_Local) || 0) - cantidad);
         await actualizarStockLocal(loteIdx, nuevoLocal);
@@ -1019,7 +1047,9 @@ async function guardarEntrada() {
   if (!mat) { showToast('Material no encontrado', 'error'); return; }
   const cantidad = parseFloat(cantStr);
   const lotes    = getMatUbics(matId);
-  const ubiSel   = document.getElementById('entrada-ubicacion-sel')?.value || '';
+  // Bote fijo (viene de openModalEntradaLote). Si no, el del selector. Ambos son ID de lote, no de ubicación.
+  const loteFijo = document.getElementById('entrada-lote-fixed')?.value || '';
+  const loteSel  = loteFijo || document.getElementById('entrada-ubicacion-sel')?.value || '';
 
   showLoading('Registrando...');
   try {
@@ -1029,8 +1059,8 @@ async function guardarEntrada() {
     await sheetsAppend('Movimientos', rowMov);
     DATA.movimientos.push(rowToObj(rowMov, 'movimientos'));
 
-    if (lotes.length > 0 && ubiSel) {
-      const loteIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === ubiSel);
+    if (lotes.length > 0 && loteSel) {
+      const loteIdx = DATA.materialUbicaciones.findIndex(l => l.ID === loteSel);
       if (loteIdx !== -1) {
         const nuevoLocal = (parseFloat(DATA.materialUbicaciones[loteIdx].Stock_Local) || 0) + cantidad;
         await actualizarStockLocal(loteIdx, nuevoLocal);
@@ -1180,40 +1210,45 @@ async function confirmarTransferenciaArmario() {
 // ============================================================
 // TRASLADO entre ubicaciones (zona común → laboratorio y viceversa)
 // ============================================================
-function openModalTrasladoLote(matId, idUbicacionOrigen) {
+function openModalTrasladoLote(loteId) {
+  const loteOrigen = DATA.materialUbicaciones.find(l => l.ID === loteId);
+  if (!loteOrigen) return;
+  const matId = loteOrigen.ID_Material;
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
   sv('traslado-mat-id', matId);
-  sv('traslado-origen', idUbicacionOrigen);
+  sv('traslado-lote-origen-id', loteId);
+  sv('traslado-origen', loteOrigen.ID_Ubicacion);
   sv('traslado-cantidad', '');
   document.getElementById('traslado-mat-nombre').textContent = mat.Nombre;
-  const stockOrigen = DATA.materialUbicaciones.find(l => l.ID_Material === matId && l.ID_Ubicacion === idUbicacionOrigen);
   document.getElementById('traslado-stock-origen').textContent =
-    (parseFloat(stockOrigen?.Stock_Local) || 0) + ' ' + (mat.Unidad || '');
+    (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
   // Poblar destinos: cualquier ubicación activa (si no tiene lote aún, se crea al trasladar)
   const selDest = document.getElementById('traslado-destino');
   selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
     DATA.ubicaciones
-      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idUbicacionOrigen)
+      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== loteOrigen.ID_Ubicacion)
       .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
       .join('');
-  document.getElementById('traslado-origen-label').textContent = getNombreUbicacion(idUbicacionOrigen);
+  document.getElementById('traslado-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
   openModal('modal-traslado');
 }
 
 async function guardarTraslado() {
-  const matId     = v('traslado-mat-id');
-  const idOrigen  = v('traslado-origen');
-  const idDestino = v('traslado-destino');
-  const cant      = parseFloat(v('traslado-cantidad'));
+  const matId          = v('traslado-mat-id');
+  const loteOrigenId   = v('traslado-lote-origen-id');
+  const idDestino      = v('traslado-destino');
+  const cant           = parseFloat(v('traslado-cantidad'));
   if (!idDestino) { showToast('Selecciona el destino', 'error'); return; }
   if (!cant || cant <= 0) { showToast('Indica una cantidad válida', 'error'); return; }
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
-  const loteOrigenIdx  = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idOrigen);
-  if (loteOrigenIdx === -1) { showToast('Error: ubicación de origen no encontrada', 'error'); return; }
+  const loteOrigenIdx  = DATA.materialUbicaciones.findIndex(l => l.ID === loteOrigenId);
+  if (loteOrigenIdx === -1) { showToast('Error: bote de origen no encontrado', 'error'); return; }
+  const idOrigen = DATA.materialUbicaciones[loteOrigenIdx].ID_Ubicacion;
+  const unidadOrigen = DATA.materialUbicaciones[loteOrigenIdx].Unidad_Lote || mat.Unidad || '';
   const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
-  if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${mat.Unidad})`, 'error'); return; }
+  if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
   showLoading('Trasladando...');
   try {
     await actualizarStockLocal(loteOrigenIdx, stockOrigen - cant);
@@ -1230,7 +1265,7 @@ async function guardarTraslado() {
       `De: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(idDestino)}`, ''];
     await sheetsAppend('Movimientos', movRow);
     DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-    showToast(`Traslado registrado: ${cant} ${mat.Unidad} → ${getNombreUbicacion(idDestino)}`, 'success');
+    showToast(`Traslado registrado: ${cant} ${unidadOrigen} → ${getNombreUbicacion(idDestino)}`, 'success');
     closeModal('modal-traslado'); renderMaterial();
     renderDashboard();
     updateBadges();
@@ -1247,25 +1282,26 @@ async function guardarTraslado() {
 // y a partir de ahí el ítem pasa a funcionar en modo lote como cualquier otro.
 async function _asegurarLoteLegacy(matId) {
   const lotesExistentes = getMatUbics(matId);
-  if (lotesExistentes.length > 0) return lotesExistentes[0].ID_Ubicacion;
+  if (lotesExistentes.length > 0) return lotesExistentes[0].ID;
   const m = DATA.material.find(x => x.ID_Material === matId);
   if (!m || !m.Ubicacion) { showToast('Este ítem no tiene ubicación asignada todavía — edítalo primero', 'error'); return null; }
   showLoading('Preparando...');
+  let lote;
   try {
-    await añadirLote(matId, m.Ubicacion, m.Stock_Actual || 0, m.Stock_Minimo || 0, m.Stock_Optimo || 0);
+    lote = await añadirLote(matId, m.Ubicacion, m.Stock_Actual || 0, m.Stock_Minimo || 0, m.Stock_Optimo || 0);
   } catch(e) { hideLoading(); showToast('Error al preparar el ítem', 'error'); console.error(e); return null; }
   hideLoading();
-  return m.Ubicacion;
+  return lote.ID;
 }
 
 async function subdividirDesdeLegacy(matId) {
-  const idUbicacion = await _asegurarLoteLegacy(matId);
-  if (idUbicacion) openModalSubdividirLote(matId, idUbicacion);
+  const loteId = await _asegurarLoteLegacy(matId);
+  if (loteId) openModalSubdividirLote(loteId);
 }
 
 async function trasladarDesdeLegacy(matId) {
-  const idUbicacion = await _asegurarLoteLegacy(matId);
-  if (idUbicacion) openModalTrasladoLote(matId, idUbicacion);
+  const loteId = await _asegurarLoteLegacy(matId);
+  if (loteId) openModalTrasladoLote(loteId);
 }
 
 // ============================================================
@@ -1273,15 +1309,17 @@ async function trasladarDesdeLegacy(matId) {
 // ============================================================
 let _subdivTemp = [];
 
-function openModalSubdividirLote(matId, idUbicacionOrigen) {
+function openModalSubdividirLote(loteId) {
+  const loteOrigen = DATA.materialUbicaciones.find(l => l.ID === loteId);
+  if (!loteOrigen) return;
+  const matId = loteOrigen.ID_Material;
   const mat = DATA.material.find(m => m.ID_Material === matId);
-  const loteOrigen = DATA.materialUbicaciones.find(l => l.ID_Material === matId && l.ID_Ubicacion === idUbicacionOrigen);
-  if (!mat || !loteOrigen) return;
+  if (!mat) return;
   sv('subdiv-mat-id', matId);
-  sv('subdiv-origen-ubicacion', idUbicacionOrigen);
+  sv('subdiv-origen-ubicacion', loteOrigen.ID_Ubicacion);
   sv('subdiv-lote-origen-id', loteOrigen.ID);
   document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
-  document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(idUbicacionOrigen);
+  document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
   document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
   _subdivTemp = [{ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }];
   renderSubdivModal();
@@ -1326,10 +1364,11 @@ function buscarDestinoSubdiv(i, query) {
   const list = document.getElementById('subdiv-destino-autocomplete-' + i);
   if (!list) return;
   if (!query || query.length < 1) { list.classList.remove('open'); return; }
-  const idOrigen = v('subdiv-origen-ubicacion');
+  // Sin excluir la ubicación de origen: el bote de uso puede guardarse en el mismo sitio
+  // que la madre (caso habitual — alícuotas guardadas junto al bote grande).
   const q = query.toLowerCase();
   const resultados = DATA.ubicaciones.filter(u =>
-    u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen &&
+    u.Activa !== 'FALSE' &&
     (u.ID_Ubicacion.toLowerCase().includes(q) ||
      (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
      (u.Zona || '').toLowerCase().includes(q) ||
@@ -1361,14 +1400,14 @@ function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '', un
 
 async function guardarSubdivision() {
   const matId = v('subdiv-mat-id');
-  const idOrigen = v('subdiv-origen-ubicacion');
   const loteOrigenId = v('subdiv-lote-origen-id');
   const mat = DATA.material.find(m => m.ID_Material === matId);
-  const loteOrigenIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idOrigen);
+  const loteOrigenIdx = DATA.materialUbicaciones.findIndex(l => l.ID === loteOrigenId);
   if (!mat || loteOrigenIdx === -1) return;
   const filas = _subdivTemp.filter(f => f.idUbicacion && parseFloat(f.cantidad) > 0);
   if (!filas.length) { showToast('Añade al menos un destino con cantidad', 'error'); return; }
   const loteOrigen = DATA.materialUbicaciones[loteOrigenIdx];
+  const idOrigen = loteOrigen.ID_Ubicacion;
   const unidadOrigen = loteOrigen.Unidad_Lote || mat.Unidad || '';
   const stockOrigen = parseFloat(loteOrigen.Stock_Local) || 0;
   const totalRepartido = filas.reduce((s, f) => s + (parseFloat(f.cantidad) || 0), 0);
@@ -1379,13 +1418,9 @@ async function guardarSubdivision() {
     const fecha = new Date().toISOString().split('T')[0];
     for (const f of filas) {
       const cant = parseFloat(f.cantidad) || 0;
-      const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === f.idUbicacion);
-      if (loteDestinoIdx === -1) {
-        await añadirLote(matId, f.idUbicacion, cant, parseFloat(f.stockMin) || 0, parseFloat(f.stockOpt) || 0, loteOrigenId, f.unidad.trim());
-      } else {
-        const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
-        await actualizarStockLocal(loteDestinoIdx, stockDest + cant);
-      }
+      // Siempre se crea un bote nuevo (nunca se fusiona con uno existente): evita elegir
+      // a ciegas entre varios botes que pudiera haber ya en esa misma ubicación.
+      await añadirLote(matId, f.idUbicacion, cant, parseFloat(f.stockMin) || 0, parseFloat(f.stockOpt) || 0, loteOrigenId, f.unidad.trim());
       const movRow = [genId('MOV-'), mat.Nombre, 'Subdivisión', cant, currentUser?.name || 'Usuario', fecha,
         `Subdividido de: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(f.idUbicacion)}`, ''];
       await sheetsAppend('Movimientos', movRow);
@@ -1398,15 +1433,16 @@ async function guardarSubdivision() {
   hideLoading();
 }
 
-async function eliminarLoteDirecto(matId, idUbicacion) {
-  const mat = DATA.material.find(m => m.ID_Material === matId);
-  const lotes = getMatUbics(matId);
-  const lote = lotes.find(l => l.ID_Ubicacion === idUbicacion);
-  if (!mat || !lote) return;
+async function eliminarLoteDirecto(loteId) {
+  const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
+  if (!lote) return;
+  const mat = DATA.material.find(m => m.ID_Material === lote.ID_Material);
+  const lotes = getMatUbics(lote.ID_Material);
+  if (!mat) return;
   const stock = parseFloat(lote.Stock_Local) || 0;
   const unidad = lote.Unidad_Lote || mat.Unidad || '';
   const esMadre = lotes.some(o => o.ID_Lote_Padre === lote.ID);
-  let msg = `¿Eliminar el bote de "${getNombreUbicacion(idUbicacion)}"?`;
+  let msg = `¿Eliminar el bote de "${getNombreUbicacion(lote.ID_Ubicacion)}"?`;
   if (stock > 0) msg += ` Tiene ${stock} ${unidad} registrado — se perderá del stock total.`;
   if (esMadre) msg += ' Tiene botes de uso subdivididos a partir de él; seguirán existiendo pero perderán la referencia a este bote madre.';
   if (!confirm(msg)) return;

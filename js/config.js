@@ -106,6 +106,26 @@ function stockBajoMinimo(mat) {
   return min > 0 && total <= min;
 }
 
+/**
+ * Etiqueta de stock total para mostrar en la fila principal.
+ * Si todos los lotes comparten unidad (o no hay lotes), es "12 ml" como siempre.
+ * Si hay lotes con Unidad_Lote distinta (p.ej. bote madre + alícuotas), agrupa
+ * por unidad: "1 botella, 2 falcons".
+ */
+function getStockLabel(mat) {
+  const lotes = getMatUbics(mat.ID_Material);
+  if (!lotes.length) return `${getStockTotal(mat)} ${mat.Unidad || ''}`.trim();
+  const grupos = {};
+  const orden = [];
+  lotes.forEach(l => {
+    const u = (l.Unidad_Lote || mat.Unidad || '').trim();
+    if (!(u in grupos)) { grupos[u] = 0; orden.push(u); }
+    grupos[u] += parseFloat(l.Stock_Local) || 0;
+  });
+  if (orden.length <= 1) return `${getStockTotal(mat)} ${mat.Unidad || ''}`.trim();
+  return orden.map(u => `${grupos[u]} ${u}`.trim()).join(', ');
+}
+
 /** Nombre de la ubicación a partir de su ID */
 function getNombreUbicacion(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
