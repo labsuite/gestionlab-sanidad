@@ -320,6 +320,9 @@ function renderFilaMaterial(m) {
       <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLeg || '—'} / ${opLeg || '—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
         <button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>
+        ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaMaterial('${m.ID_Material}')" title="Entrada">📥</button>` : ''}
+        ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir en botes de uso">✂️</button>` : ''}
+        ${m.Ubicacion ? `<button class="icon-btn" onclick="trasladarDesdeLegacy('${m.ID_Material}')" title="Trasladar a otra ubicación">🔀</button>` : ''}
       </div></td>
     </tr>`;
   }
@@ -1233,6 +1236,36 @@ async function guardarTraslado() {
     updateBadges();
   } catch(e) { showToast('Error en el traslado', 'error'); console.error(e); }
   hideLoading();
+}
+
+// ============================================================
+// MIGRAR ÍTEM LEGACY A LOTE (bajo demanda, desde 🔀/✂️ en la sub-fila legacy)
+// ============================================================
+// Un ítem "legacy" (sin filas en Material_Ubicaciones, solo la col Ubicacion de Material)
+// no tiene ningún lote sobre el que trasladar/subdividir. Al usar esas acciones se crea
+// el lote reflejando exactamente lo que ya había (misma ubicación, mismo stock/mín/óptimo),
+// y a partir de ahí el ítem pasa a funcionar en modo lote como cualquier otro.
+async function _asegurarLoteLegacy(matId) {
+  const lotesExistentes = getMatUbics(matId);
+  if (lotesExistentes.length > 0) return lotesExistentes[0].ID_Ubicacion;
+  const m = DATA.material.find(x => x.ID_Material === matId);
+  if (!m || !m.Ubicacion) { showToast('Este ítem no tiene ubicación asignada todavía — edítalo primero', 'error'); return null; }
+  showLoading('Preparando...');
+  try {
+    await añadirLote(matId, m.Ubicacion, m.Stock_Actual || 0, m.Stock_Minimo || 0, m.Stock_Optimo || 0);
+  } catch(e) { hideLoading(); showToast('Error al preparar el ítem', 'error'); console.error(e); return null; }
+  hideLoading();
+  return m.Ubicacion;
+}
+
+async function subdividirDesdeLegacy(matId) {
+  const idUbicacion = await _asegurarLoteLegacy(matId);
+  if (idUbicacion) openModalSubdividirLote(matId, idUbicacion);
+}
+
+async function trasladarDesdeLegacy(matId) {
+  const idUbicacion = await _asegurarLoteLegacy(matId);
+  if (idUbicacion) openModalTrasladoLote(matId, idUbicacion);
 }
 
 // ============================================================
