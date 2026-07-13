@@ -759,8 +759,14 @@ function openModalEditarSolicitud(solId) {
   if (sel) {
     sel.innerHTML = '<option value="">Sin preferencia</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}"${sol.Proveedor_Requerido === p.Nombre_Proveedor ? ' selected' : ''}>${p.Nombre_Proveedor}</option>`).join('');
   }
-  // Mostrar nombre del material (solo lectura)
+  // Material: editable solo si el ítem todavía no está catalogado (evita desincronizar de un Material ya existente)
+  const esItemNuevo = !DATA.material.some(m => m.Nombre === sol.Material || sol.Material.startsWith(m.Nombre));
   const matLabel = document.getElementById('edit-sol-material-nombre');
+  const matInput = document.getElementById('edit-sol-material-input');
+  const matHint  = document.getElementById('edit-sol-material-hint');
+  if (matLabel) matLabel.style.display = esItemNuevo ? 'none' : '';
+  if (matInput) { matInput.style.display = esItemNuevo ? '' : 'none'; matInput.value = sol.Material; }
+  if (matHint)  matHint.style.display = esItemNuevo ? '' : 'none';
   if (matLabel) matLabel.textContent = sol.Material;
   openModal('modal-editar-solicitud');
 }
@@ -778,6 +784,12 @@ async function guardarEdicionSolicitud() {
   // Preservar etiquetas internas ([Unidad:...]) que pudieran existir en observaciones originales
   const tagUnidad = ((sol.Observaciones || '').match(/\[Unidad:[^\]]+\]/)||[])[0] || '';
   const obsFinal = (tagUnidad ? tagUnidad + ' ' : '') + obsBase;
+  const matInput = document.getElementById('edit-sol-material-input');
+  if (matInput && matInput.style.display !== 'none') {
+    const nombreNuevo = matInput.value.trim();
+    if (!nombreNuevo) { showToast('Indica el nombre del material', 'error'); return; }
+    sol.Material = nombreNuevo;
+  }
   sol.Cantidad_Solicitada = cant;
   sol.Urgencia = urgencia;
   sol.Motivo = motivo;

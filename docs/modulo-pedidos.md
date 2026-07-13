@@ -27,6 +27,12 @@
 - "En espera de recepción": automático al aprobar presupuesto del pedido vinculado
 - "Recibido": automático al registrar recepción completa de la línea
 
+## Editar solicitud — Gestor/Administrador (2026-07-13)
+`openModalEditarSolicitud` / `guardarEdicionSolicitud` en `js/pedidos-acciones.js`, solo con `Estado === 'Pendiente'`.
+- Antes solo el propio solicitante (Profesor/Alumno) podía editar su solicitud. Ahora Gestor/Administrador también pueden (`puedeEditarGestor` en `_renderFilaSolicitud`), para corregir cantidad (nombres mal escritos, ajustar lo que realmente se puede pedir...).
+- El **nombre del material solo es editable si el ítem todavía no está catalogado** (`!DATA.material.some(m => m.Nombre === sol.Material...)`) — si ya existe en `Material`, el nombre se muestra de solo lectura para no desincronizar la solicitud del ítem real del catálogo.
+- El botón 🗑️ "Cancelar solicitud" sigue siendo solo del solicitante — el Gestor ya tiene "✕ Rechazar" para el mismo efecto.
+
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
 - "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales
@@ -65,7 +71,8 @@ Al editar un ítem legacy, `editMaterial()` pre-rellena `_lotesTemp` con `_esPre
 - Si hay líneas ya recibidas, el `confirm()` lo advierte (no revierte stock).
 
 ## Snooze de solicitudes
-- Almacenado en `localStorage` bajo la clave `glab_sol_snooze` (`{ID_Solicitud: 'YYYY-MM-DD'}`).
+- **(2026-07-13) Migrado de `localStorage` a Sheets** — col `K` (`Snooze_Hasta`) en `Solicitudes`. Antes era local a cada navegador/dispositivo (el cambio hecho en el móvil no se veía en el PC); ahora se sincroniza porque vive en la misma fila de la solicitud. `_getSnoozes()` sigue devolviendo el mismo mapa `{ID_Solicitud: 'YYYY-MM-DD'}` para no romper el resto del código, pero ahora lo construye leyendo `DATA.solicitudes` en vez de `localStorage`. Efecto colateral: al ser compartido, cualquier Gestor/Administrador ve y puede tocar el snooze de cualquier otro.
+- (Histórico) Antes: almacenado en `localStorage` bajo la clave `glab_sol_snooze` (`{ID_Solicitud: 'YYYY-MM-DD'}`).
 - Solo aplicable a estados activos: `Pendiente`, `Añadida a pedido`, `En espera de recepción`.
 - Las solicitudes con snooze activo **no cuentan** en el badge del sidebar (ni en `updateBadges` de `ui.js` ni en `_actualizarBadgeSolicitudes` de `pedidos-render.js`).
 - El indicador de pospuestas es un pequeño botón `💤 N` alineado a la derecha, con opacidad reducida; el tooltip muestra la fecha más próxima. El toggle `_mostrarSnoozed` muestra/oculta las cards pospuestas en la lista.
@@ -91,6 +98,12 @@ Caso: se compra un envase "madre" (p.ej. un bote de tinción o DPX) y se reparte
 - `openModalSubdividirLote` / `guardarSubdivision` en `js/material.js`. Registra un movimiento tipo `'Subdivisión'` por cada destino.
 - En el listado de lotes se ve de un vistazo quién es madre y quién es hija: 🫙 en la fila que tiene subdivisiones, ↳🧪 en cada lote hijo (con tooltip indicando de dónde viene).
 - La recepción de pedidos sigue sin tocarse: se recibe lo que dice el albarán (la madre) tal cual; subdividir es una acción posterior e independiente, disponible en cualquier momento.
+
+### Unidad por bote y eliminar bote (2026-07-13)
+- Col `H` nueva en `Material_Ubicaciones`: `Unidad_Lote` — texto libre opcional (p.ej. "goteros", "falcons"). Si está vacío, el lote usa la `Unidad` del material como hasta ahora. Solo se rellena al crear el lote desde el modal de subdividir; si el destino ya existía, conserva su unidad.
+- El modal de subdividir permite fijar **Mínimo/Óptimo por destino** desde el principio (se guardan en `Stock_Minimo_Local`/`Stock_Optimo_Local` igual que cualquier lote). Para cambiarlos más tarde no hace falta nada nuevo: se edita como cualquier lote existente, desde ✏️ "Editar" en la fila del material → sección de ubicaciones (`_lotesTemp` en `js/material.js`).
+- El listado de lotes (fila expandida de cada ubicación) muestra `Unidad_Lote` si existe, si no cae de vuelta a `Unidad` del material.
+- Botón 🗑️ "Eliminar este bote" en cada fila de lote (`eliminarLoteDirecto` en `js/material.js`): antes solo se podía "quitar" un lote desde el modal de editar material, pero ese flujo no lo persistía en Sheets (solo lo hacía desaparecer del formulario hasta el siguiente recargo). Ahora hay un borrado real vía `eliminarLote()`, con aviso si el bote tiene stock o si es un bote madre con hijas (las hijas no se borran, solo pierden la referencia).
 
 ## Eliminar ítems del inventario (2026-05-22)
 - Permiso `eliminarItems: true` en **Administrador** únicamente (Gestor no lo tiene)

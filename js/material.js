@@ -288,7 +288,7 @@ function renderFilaMaterial(m) {
         <td>
           <div class="stock-bar-wrap">
             <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctL}%;background:${colL}"></div></div>
-            <span class="stock-val" style="color:${colL}">${sLocal} ${m.Unidad || ''}</span>
+            <span class="stock-val" style="color:${colL}">${sLocal} ${l.Unidad_Lote || m.Unidad || ''}</span>
           </div>
         </td>
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
@@ -296,6 +296,7 @@ function renderFilaMaterial(m) {
           <button class="icon-btn" onclick="openModalConsumoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Consumo en esta ubicación">📦</button>
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Entrada en esta ubicación">📥</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Subdividir en botes de uso">✂️</button>` : ''}
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="eliminarLoteDirecto('${m.ID_Material}','${l.ID_Ubicacion}')" title="Eliminar este bote">🗑️</button>` : ''}
           <button class="icon-btn" onclick="openModalTrasladoLote('${m.ID_Material}','${l.ID_Ubicacion}')" title="Trasladar a otra ubicación">🔀</button>
         </div></td>
       </tr>`;
@@ -1248,8 +1249,8 @@ function openModalSubdividirLote(matId, idUbicacionOrigen) {
   sv('subdiv-lote-origen-id', loteOrigen.ID);
   document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
   document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(idUbicacionOrigen);
-  document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (mat.Unidad || '');
-  _subdivTemp = [{ idUbicacion: '', cantidad: '' }];
+  document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
+  _subdivTemp = [{ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }];
   renderSubdivModal();
   openModal('modal-subdividir-lote');
 }
@@ -1259,19 +1260,32 @@ function renderSubdivModal() {
   const destinos = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
   const cont = document.getElementById('subdiv-filas');
   cont.innerHTML = _subdivTemp.map((f, i) => `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <select style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)" onchange="_subdivTemp[${i}].idUbicacion=this.value">
-        <option value="">Seleccionar destino...</option>
-        ${destinos.map(u => `<option value="${u.ID_Ubicacion}" ${f.idUbicacion === u.ID_Ubicacion ? 'selected' : ''}>${getNombreUbicacion(u.ID_Ubicacion)}</option>`).join('')}
-      </select>
-      <input type="number" min="0" step="0.01" placeholder="Cantidad" value="${f.cantidad}"
-        style="width:100px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
-        oninput="_subdivTemp[${i}].cantidad=this.value">
-      <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar">🗑️</button>
+    <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <select style="flex:1;min-width:140px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)" onchange="_subdivTemp[${i}].idUbicacion=this.value">
+          <option value="">Seleccionar destino...</option>
+          ${destinos.map(u => `<option value="${u.ID_Ubicacion}" ${f.idUbicacion === u.ID_Ubicacion ? 'selected' : ''}>${getNombreUbicacion(u.ID_Ubicacion)}</option>`).join('')}
+        </select>
+        <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar">🗑️</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="number" min="0" step="0.01" placeholder="Cantidad" value="${f.cantidad}"
+          style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
+          oninput="_subdivTemp[${i}].cantidad=this.value">
+        <input type="text" placeholder="Unidad (goteros...)" value="${f.unidad}"
+          style="width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
+          oninput="_subdivTemp[${i}].unidad=this.value">
+        <input type="number" min="0" step="0.01" placeholder="Mínimo" value="${f.stockMin}"
+          style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
+          oninput="_subdivTemp[${i}].stockMin=this.value">
+        <input type="number" min="0" step="0.01" placeholder="Óptimo" value="${f.stockOpt}"
+          style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
+          oninput="_subdivTemp[${i}].stockOpt=this.value">
+      </div>
     </div>`).join('');
 }
 
-function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '' }); renderSubdivModal(); }
+function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }); renderSubdivModal(); }
 
 async function guardarSubdivision() {
   const matId = v('subdiv-mat-id');
@@ -1282,9 +1296,11 @@ async function guardarSubdivision() {
   if (!mat || loteOrigenIdx === -1) return;
   const filas = _subdivTemp.filter(f => f.idUbicacion && parseFloat(f.cantidad) > 0);
   if (!filas.length) { showToast('Añade al menos un destino con cantidad', 'error'); return; }
-  const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
+  const loteOrigen = DATA.materialUbicaciones[loteOrigenIdx];
+  const unidadOrigen = loteOrigen.Unidad_Lote || mat.Unidad || '';
+  const stockOrigen = parseFloat(loteOrigen.Stock_Local) || 0;
   const totalRepartido = filas.reduce((s, f) => s + (parseFloat(f.cantidad) || 0), 0);
-  if (totalRepartido > stockOrigen) { showToast(`Stock insuficiente en el bote madre (${stockOrigen} ${mat.Unidad || ''})`, 'error'); return; }
+  if (totalRepartido > stockOrigen) { showToast(`Stock insuficiente en el bote madre (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
   showLoading('Subdividiendo...');
   try {
     await actualizarStockLocal(loteOrigenIdx, stockOrigen - totalRepartido);
@@ -1293,7 +1309,7 @@ async function guardarSubdivision() {
       const cant = parseFloat(f.cantidad) || 0;
       const loteDestinoIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === f.idUbicacion);
       if (loteDestinoIdx === -1) {
-        await añadirLote(matId, f.idUbicacion, cant, 0, 0, loteOrigenId);
+        await añadirLote(matId, f.idUbicacion, cant, parseFloat(f.stockMin) || 0, parseFloat(f.stockOpt) || 0, loteOrigenId, f.unidad.trim());
       } else {
         const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
         await actualizarStockLocal(loteDestinoIdx, stockDest + cant);
@@ -1307,6 +1323,28 @@ async function guardarSubdivision() {
     closeModal('modal-subdividir-lote');
     renderMaterial(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error al subdividir', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function eliminarLoteDirecto(matId, idUbicacion) {
+  const mat = DATA.material.find(m => m.ID_Material === matId);
+  const lotes = getMatUbics(matId);
+  const lote = lotes.find(l => l.ID_Ubicacion === idUbicacion);
+  if (!mat || !lote) return;
+  const stock = parseFloat(lote.Stock_Local) || 0;
+  const unidad = lote.Unidad_Lote || mat.Unidad || '';
+  const esMadre = lotes.some(o => o.ID_Lote_Padre === lote.ID);
+  let msg = `¿Eliminar el bote de "${getNombreUbicacion(idUbicacion)}"?`;
+  if (stock > 0) msg += ` Tiene ${stock} ${unidad} registrado — se perderá del stock total.`;
+  if (esMadre) msg += ' Tiene botes de uso subdivididos a partir de él; seguirán existiendo pero perderán la referencia a este bote madre.';
+  if (!confirm(msg)) return;
+  const idx = DATA.materialUbicaciones.indexOf(lote);
+  showLoading('Eliminando...');
+  try {
+    await eliminarLote(idx);
+    showToast('Bote eliminado', 'success');
+    renderMaterial(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error al eliminar', 'error'); console.error(e); }
   hideLoading();
 }
 

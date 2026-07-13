@@ -137,7 +137,8 @@ Rangos actuales relevantes:
 | Registro_Mantenimientos | `A2:I` | I = Observaciones |
 | Equipos | `A2:W` | W = Mes_Fin_Temporada |
 | Pedidos | `A2:U` | U = Gasto_Extra_Importe |
-| Material_Ubicaciones | `A2:G` | G = ID_Lote_Padre |
+| Material_Ubicaciones | `A2:H` | H = Unidad_Lote |
+| Solicitudes | `A2:K` | K = Snooze_Hasta |
 
 ---
 

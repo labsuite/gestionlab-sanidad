@@ -4,21 +4,40 @@
 let _mostrarSolicitudesArchivadas = false;
 let _mostrarSnoozed = false;
 
-// Snooze de solicitudes (localStorage)
-const _SNOOZE_KEY = 'glab_sol_snooze';
-function _getSnoozes() { return JSON.parse(localStorage.getItem(_SNOOZE_KEY) || '{}'); }
-function aplicarSnooze(solId) {
+// Snooze de solicitudes (col K de Solicitudes — compartido entre dispositivos)
+function _getSnoozes() {
+  const map = {};
+  DATA.solicitudes.forEach(s => { if (s.Snooze_Hasta) map[s.ID_Solicitud] = s.Snooze_Hasta; });
+  return map;
+}
+async function aplicarSnooze(solId) {
   const input = document.getElementById('snooze-date-' + solId);
   const fecha = input?.value;
   if (!fecha) { showToast('Indica una fecha', 'error'); return; }
-  const s = _getSnoozes(); s[solId] = fecha;
-  localStorage.setItem(_SNOOZE_KEY, JSON.stringify(s));
-  renderSolicitudes();
+  const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
+  if (!sol) return;
+  const idx = DATA.solicitudes.indexOf(sol);
+  const anterior = sol.Snooze_Hasta;
+  sol.Snooze_Hasta = fecha;
+  showLoading('Guardando...');
+  try {
+    await sheetsUpdate(`Solicitudes!K${idx + 2}`, [fecha]);
+    renderSolicitudes();
+  } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
 }
-function cancelarSnooze(solId) {
-  const s = _getSnoozes(); delete s[solId];
-  localStorage.setItem(_SNOOZE_KEY, JSON.stringify(s));
-  renderSolicitudes();
+async function cancelarSnooze(solId) {
+  const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
+  if (!sol) return;
+  const idx = DATA.solicitudes.indexOf(sol);
+  const anterior = sol.Snooze_Hasta;
+  sol.Snooze_Hasta = '';
+  showLoading('Guardando...');
+  try {
+    await sheetsUpdate(`Solicitudes!K${idx + 2}`, ['']);
+    renderSolicitudes();
+  } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
 }
 function toggleSnoozeInput(solId) {
   const el = document.getElementById('snooze-panel-' + solId);
@@ -51,7 +70,9 @@ function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
     ? `<div class="sol-card-hint">💡 <strong style="color:var(--accent)">${mejorProv.proveedor}</strong> · ${(mejorProv.media * 1.21).toFixed(2)} € c/IVA</div>`
     : '';
   const mostrarVerPedido = !esProfesor && s.Lista_Pedido && !['Pendiente','Rechazado'].includes(s.Estado);
-  const puedeEditar = esProfesor && s.Estado === 'Pendiente';
+  const puedeEditarProfesor = esProfesor && s.Estado === 'Pendiente';
+  const puedeEditarGestor   = puedeGestionar && s.Estado === 'Pendiente';
+  const puedeEditar = puedeEditarProfesor || puedeEditarGestor;
 
   const fechaNecesariaRaw = (s.Motivo || '').match(/Necesario:\s*(\d{4}-\d{2}-\d{2})/)?.[1];
   const fechaNecesaria = fechaNecesariaRaw
@@ -113,7 +134,7 @@ function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
         ${mostrarVerPedido ? `<button class="icon-btn" title="Ver pedido" onclick="verDetallePedido('${s.Lista_Pedido}')">📋</button>` : ''}
         ${puedeGestionar && s.Estado === 'Pendiente' ? `<button class="icon-btn" title="Rechazar" onclick="rechazarSolicitud('${s.ID_Solicitud}')">✕</button>` : ''}
         ${puedeEditar ? `<button class="icon-btn" title="Editar solicitud" onclick="openModalEditarSolicitud('${s.ID_Solicitud}')">✏️</button>` : ''}
-        ${puedeEditar ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
+        ${puedeEditarProfesor ? `<button class="icon-btn" title="Cancelar solicitud" onclick="cancelarSolicitud('${s.ID_Solicitud}')">🗑️</button>` : ''}
         ${btnSnooze}
       </div>
     </div>
