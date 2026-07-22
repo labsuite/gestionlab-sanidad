@@ -677,7 +677,10 @@ function openFichaIntervencion(intIdx) {
   const puedeRegistrar = puedeHacer('crearIntervenciones') &&
     (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
   const pendienteFactura = i.Estado === 'Pendiente factura';
-  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && i.Estado !== 'Cerrada' && i.Estado !== 'Pendiente factura';
+  // "Pendiente factura" solo significa que esta visita concreta se factura — no que el
+  // problema esté resuelto (una tarea puede quedar Resuelto siendo solo un diagnóstico).
+  // Por eso también se puede programar otra visita en ese estado, no solo desde "En gestión".
+  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && i.Estado !== 'Cerrada';
   const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea';
   const acciones = document.getElementById('ficha-int-acciones');
   let btns = '';
