@@ -716,10 +716,10 @@ async function guardarActuacion(finalizar) {
   const equipoDirecto = v('act-equipo-directo');
   const desc = v('act-descripcion');
 
-  // Nada nuevo que anotar: si solo se pide finalizar, cerramos sin más.
+  // Nada nuevo que anotar: si se pide finalizar, cerramos; si no, no hace falta
+  // avisar de error — "Guardar sin cerrar" sin una tarea nueva es solo un no-op.
   if (!desc) {
     if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); }
-    else showToast('Escribe una descripción para añadir la tarea', 'error');
     return;
   }
 
