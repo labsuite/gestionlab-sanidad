@@ -27,7 +27,7 @@
           <input type="time" id="reg-sesion-hora-inicio" step="60">
         </div>
         <div class="form-group">
-          <label>Hora fin *</label>
+          <label id="reg-sesion-hora-fin-label">Hora fin *</label>
           <input type="time" id="reg-sesion-hora-fin" step="60">
         </div>
       </div>
@@ -57,9 +57,7 @@
       <div style="background:var(--bg-soft,#f9f9f9);border-radius:6px;padding:10px 12px;margin-bottom:14px;text-align:left">
         <code id="reg-nfc-url-text" style="font-size:11px;color:var(--accent);word-break:break-all;line-height:1.5;display:block"></code>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
-        La misma etiqueta sirve para empezar y para terminar la sesión: la app detecta automáticamente si ya tienes una sesión abierta en este equipo.
-      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px" id="reg-nfc-desc"></div>
       <button class="btn btn-secondary" onclick="copiarUrlNfcRegistro()">Copiar URL</button>
     </div>
   </div>

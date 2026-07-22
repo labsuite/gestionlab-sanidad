@@ -6,6 +6,8 @@ const _regConfig = {
   cabina: {
     key: 'registrosCabina', sheet: 'Registros_Cabina', lastCol: 'L',
     tipoEquipo: 'Cabina de bioseguridad', prefix: 'RC', label: 'Cabina de bioseguridad',
+    // La cabina se usa con presencia continua → tiene sentido abrir sesión al entrar y cerrarla al salir.
+    permiteSesionAbierta: true,
     camposLabels: {
       Practica_Tecnica: 'Práctica / técnica', Nivel_Riesgo: 'Nivel de riesgo',
       Verificacion_Previa: 'Verificación previa', Descontaminacion_Posterior: 'Descontaminación posterior'
@@ -14,6 +16,8 @@ const _regConfig = {
   autoclave: {
     key: 'registrosAutoclave', sheet: 'Registros_Autoclave', lastCol: 'K',
     tipoEquipo: 'Autoclave', prefix: 'RA', label: 'Autoclave',
+    // El autoclave es un ciclo automático: se registra al ponerlo en marcha, no hay presencia que "cerrar" después.
+    permiteSesionAbierta: false,
     camposLabels: { Programa_Ciclo: 'Programa / ciclo', Tipo_Carga: 'Tipo de carga', Resultado_Control: 'Resultado del control' }
   }
 };
@@ -146,13 +150,26 @@ function _renderRegTab(tipo) {
   const horas = _horasAcumuladasReg(tipo, equipos.length > 1 ? idEquipoSel : '');
   const abiertasHtml = _renderSesionesAbiertasReg(tipo);
 
+  let botonPrincipal = `<button class="btn btn-primary" onclick="openModalSesionRegistro('${tipo}')">+ Registrar ciclo</button>`;
+  let notaManual = '';
+  if (cfg.permiteSesionAbierta) {
+    const email = (currentUser?.email || '').toLowerCase().trim();
+    const idxAbierta = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipoSel && (r.Usuario || '').toLowerCase().trim() === email);
+    botonPrincipal = idxAbierta >= 0
+      ? `<button class="btn btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idxAbierta})">■ Terminar mi sesión</button>`
+      : `<button class="btn btn-primary" onclick="_iniciarSesionRapida('${tipo}','${idEquipoSel}')">▶ Empezar sesión</button>
+         <button class="btn btn-secondary" onclick="openModalSesionRegistro('${tipo}')">📝 Registrar sesión completa</button>`;
+    notaManual = `<div style="font-size:11px;color:var(--text-muted);margin:-8px 0 16px">No hace falta NFC: usa "▶ Empezar sesión" al entrar y "■ Terminar mi sesión" al salir, o escanea/fotografía el QR de la etiqueta con la cámara.</div>`;
+  }
+
   return `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:${notaManual ? '4px' : '16px'}">
       ${selectorEquipo}
-      <button class="btn btn-primary" onclick="openModalSesionRegistro('${tipo}')">+ Nueva sesión</button>
+      ${botonPrincipal}
       <button class="btn btn-secondary" onclick="generarInformeRegistro('${tipo}')">🖨️ Informe</button>
       ${_puedeGestionarRegistros() ? `<button class="btn btn-secondary" onclick="openModalNfcRegistro('${tipo}','${idEquipoSel}')" style="margin-left:auto">🔗 NFC</button>` : ''}
     </div>
+    ${notaManual}
     <div class="card" style="padding:10px 18px;margin-bottom:20px;display:inline-block">
       <div style="font-size:20px;font-weight:700;color:var(--primary)">${horas.toFixed(1)} h</div>
       <div style="font-size:11px;color:var(--text-muted)">Horas de uso registradas — apoyo al plan de mantenimiento</div>
@@ -170,6 +187,7 @@ function _onRegEquipoCambio(tipo, idEquipo) {
 
 function _renderSesionesAbiertasReg(tipo) {
   const cfg = _regConfig[tipo];
+  if (!cfg.permiteSesionAbierta) return '';
   const email = (currentUser?.email || '').toLowerCase().trim();
   const esGestor = _puedeGestionarRegistros();
   const abiertas = DATA[cfg.key]
@@ -217,7 +235,7 @@ function _renderHistorialReg(tipo) {
     <tbody>
       ${cerradas.map(r => `<tr>
         <td>${_fmtFechaReg(r.Fecha)}</td>
-        <td style="white-space:nowrap">${r.Hora_Inicio}–${r.Hora_Fin}</td>
+        <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
         <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
         ${campos.map(c => `<td style="font-size:12px">${r[c] || '—'}</td>`).join('')}
         <td style="font-size:12px">${r.Incidencias || '—'}</td>
@@ -288,7 +306,7 @@ function _leerCamposSesion(tipo) {
 
 // ── Modal: nueva sesión completa / cerrar sesión ─────────────
 
-function openModalSesionRegistro(tipo) {
+function openModalSesionRegistro(tipo, idEquipoPreset = '') {
   _regCtx = { tipo, idx: null };
   const cfg = _regConfig[tipo];
   const equipos = _equiposDeTipo(tipo);
@@ -296,18 +314,26 @@ function openModalSesionRegistro(tipo) {
   const sel = document.getElementById('reg-sesion-equipo');
   sel.disabled = false;
   sel.innerHTML = equipos.map(e => `<option value="${e.ID_Activo}">${_nombreEquipoReg(e.ID_Activo)}</option>`).join('');
-  sel.value = _equipoRegDefault(tipo);
+  sel.value = idEquipoPreset || _equipoRegDefault(tipo);
 
   const ahora = new Date();
   sv('reg-sesion-fecha', ahora.toISOString().split('T')[0]);
   sv('reg-sesion-hora-inicio', ahora.toTimeString().slice(0, 5));
-  sv('reg-sesion-hora-fin', ahora.toTimeString().slice(0, 5));
+  sv('reg-sesion-hora-fin', cfg.permiteSesionAbierta ? ahora.toTimeString().slice(0, 5) : '');
   sv('reg-sesion-incidencias', '');
   _renderCamposSesion(tipo);
+  _actualizarLabelHoraFin(cfg);
 
-  document.getElementById('modal-reg-sesion-title').textContent = `Registrar sesión completa — ${cfg.label}`;
-  document.getElementById('reg-sesion-btn-guardar').textContent = 'Registrar sesión';
+  document.getElementById('modal-reg-sesion-title').textContent = cfg.permiteSesionAbierta
+    ? `Registrar sesión completa — ${cfg.label}`
+    : `Registrar ciclo — ${cfg.label}`;
+  document.getElementById('reg-sesion-btn-guardar').textContent = cfg.permiteSesionAbierta ? 'Registrar sesión' : 'Registrar ciclo';
   openModal('modal-reg-sesion');
+}
+
+function _actualizarLabelHoraFin(cfg) {
+  const label = document.getElementById('reg-sesion-hora-fin-label');
+  if (label) label.textContent = cfg.permiteSesionAbierta ? 'Hora fin *' : 'Hora fin (si la conoces)';
 }
 
 function openModalCerrarSesion(tipo, idx) {
@@ -326,6 +352,7 @@ function openModalCerrarSesion(tipo, idx) {
   sv('reg-sesion-hora-fin', new Date().toTimeString().slice(0, 5));
   sv('reg-sesion-incidencias', r.Incidencias || '');
   _renderCamposSesion(tipo, r);
+  _actualizarLabelHoraFin(cfg);
 
   document.getElementById('modal-reg-sesion-title').textContent = `Cerrar sesión — ${cfg.label}`;
   document.getElementById('reg-sesion-btn-guardar').textContent = 'Guardar y cerrar sesión';
@@ -341,8 +368,9 @@ async function guardarSesionRegistro() {
   const fecha    = v('reg-sesion-fecha');
   const horaIni  = v('reg-sesion-hora-inicio');
   const horaFin  = v('reg-sesion-hora-fin');
-  if (!idEquipo || !fecha || !horaIni || !horaFin) { showToast('Completa fecha y horas', 'error'); return; }
-  if (horaFin <= horaIni) { showToast('La hora de fin debe ser posterior a la de inicio', 'error'); return; }
+  if (!idEquipo || !fecha || !horaIni) { showToast('Completa fecha y hora de inicio', 'error'); return; }
+  if (cfg.permiteSesionAbierta && !horaFin) { showToast('Indica la hora de fin', 'error'); return; }
+  if (horaFin && horaFin <= horaIni) { showToast('La hora de fin debe ser posterior a la de inicio', 'error'); return; }
 
   const campos = _leerCamposSesion(tipo);
   const incidencias = v('reg-sesion-incidencias');
@@ -363,7 +391,7 @@ async function guardarSesionRegistro() {
     } else {
       await sheetsAppend(cfg.sheet, fila);
       DATA[cfg.key].push(rowToObj(fila, cfg.key));
-      showToast('Sesión registrada ✓', 'success');
+      showToast(cfg.permiteSesionAbierta ? 'Sesión registrada ✓' : 'Ciclo registrado ✓', 'success');
     }
     closeModal('modal-reg-sesion');
     renderRegistrosUso();
@@ -388,7 +416,7 @@ async function descartarSesionAbierta(tipo, idx) {
   } finally { hideLoading(); }
 }
 
-// ── NFC: inicio/cierre automático por escaneo ────────────────
+// ── Inicio/cierre rápido — manual (botón) o vía NFC/QR ───────
 
 function _abrirRegistroPorNfc(tipo, idEquipo) {
   const cfg = _regConfig[tipo];
@@ -397,13 +425,19 @@ function _abrirRegistroPorNfc(tipo, idEquipo) {
   showPage('registros-uso');
   renderRegistrosUso();
 
+  if (!cfg.permiteSesionAbierta) {
+    // El autoclave no tiene concepto de sesión abierta: la etiqueta abre directamente el registro del ciclo.
+    openModalSesionRegistro(tipo, idEquipo);
+    return;
+  }
+
   const email = (currentUser?.email || '').toLowerCase().trim();
   const idx = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipo && (r.Usuario || '').toLowerCase().trim() === email);
   if (idx >= 0) openModalCerrarSesion(tipo, idx);
-  else _crearSesionAbiertaNfc(tipo, idEquipo);
+  else _iniciarSesionRapida(tipo, idEquipo);
 }
 
-async function _crearSesionAbiertaNfc(tipo, idEquipo) {
+async function _iniciarSesionRapida(tipo, idEquipo) {
   const cfg = _regConfig[tipo];
   const email = (currentUser?.email || '').toLowerCase().trim();
   const ahora = new Date();
@@ -420,7 +454,7 @@ async function _crearSesionAbiertaNfc(tipo, idEquipo) {
     DATA[cfg.key].push(rowToObj(fila, cfg.key));
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
-    mostrarToastConAccion(`Sesión iniciada a las ${hora} ✓ — escanea de nuevo al terminar`, 'Deshacer', () => _deshacerInicioSesionReg(tipo, id), 6000);
+    mostrarToastConAccion(`Sesión iniciada a las ${hora} ✓ — vuelve aquí (o escanea de nuevo) para terminarla`, 'Deshacer', () => _deshacerInicioSesionReg(tipo, id), 6000);
   } catch (e) {
     showToast('Error al iniciar la sesión', 'error'); console.error(e);
   } finally { hideLoading(); }
@@ -451,6 +485,9 @@ function openModalNfcRegistro(tipo, idEquipo) {
   const url = `${base}?action=registro-uso&tipo=${encodeURIComponent(tipo)}&equipo=${encodeURIComponent(idEquipo)}`;
   document.getElementById('reg-nfc-label').textContent = `${cfg.label} · ${_nombreEquipoReg(idEquipo)}`;
   document.getElementById('reg-nfc-url-text').textContent = url;
+  document.getElementById('reg-nfc-desc').textContent = cfg.permiteSesionAbierta
+    ? 'La misma etiqueta sirve para empezar y para terminar la sesión: la app detecta automáticamente si ya tienes una abierta en este equipo. También se puede escanear con la cámara del móvil (código QR), sin necesidad de activar el NFC.'
+    : 'Al escanear (o fotografiar el QR con la cámara) se abre directamente el formulario para registrar el ciclo — no hace falta cerrar nada después.';
   const qrImg = document.getElementById('reg-nfc-qr');
   qrImg.src = '';
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(url)}`;
@@ -490,7 +527,7 @@ function generarInformeRegistro(tipo) {
 
   const filas = cerradas.map(r => `<tr>
     <td>${_fmtFechaReg(r.Fecha)}</td>
-    <td>${r.Hora_Inicio}–${r.Hora_Fin}</td>
+    <td>${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
     <td>${(r.Usuario || '').split('@')[0]}</td>
     ${campos.map(c => `<td>${r[c] || '—'}</td>`).join('')}
     <td>${r.Incidencias || '—'}</td>
