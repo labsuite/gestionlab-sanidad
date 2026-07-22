@@ -416,24 +416,15 @@ function generarTextoEmailPedido(pedidoId) {
     const unidad = _unidadLineaPedido(l);
     return `- ${l.Material}: ${l.Cantidad_Pedida}${unidad ? ' ' + unidad : ''}`;
   }).join('\n');
-  const nombreUsuario = currentUser?.name || '';
-  return `${saludo}\n\nOs escribo para solicitar el siguiente pedido para el CIFP Manuel Antonio (departamento de Sanidade):\n\n${cuerpoLineas}\n\nQuedo a la espera de presupuesto/confirmación.\n\nUn saludo,\n${nombreUsuario}`;
+  return `${saludo}\n\nOs escribo para solicitar el siguiente pedido para el CIFP Manuel Antonio (departamento de Sanidade):\n\n${cuerpoLineas}\n\nQuedo a la espera de presupuesto/confirmación.`;
 }
 
 function abrirModalEmailPedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
-  const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
   sv('email-ped-id', pedidoId);
-  const texto = generarTextoEmailPedido(pedidoId);
-  document.getElementById('email-ped-texto').value = texto;
-  const asunto = `Pedido — ${p.Nombre_Lista}`;
-  document.getElementById('email-ped-asunto').textContent = asunto;
-  const destinatario = prov?.Email_Contacto || '';
-  document.getElementById('email-ped-btn-mailto').href =
-    `mailto:${destinatario}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
-  const avisoSinEmail = document.getElementById('email-ped-sin-email');
-  if (avisoSinEmail) avisoSinEmail.style.display = destinatario ? 'none' : '';
+  document.getElementById('email-ped-texto').value = generarTextoEmailPedido(pedidoId);
+  document.getElementById('email-ped-asunto').textContent = `Pedido — ${p.Nombre_Lista}`;
   openModal('modal-email-pedido');
 }
 
