@@ -262,9 +262,9 @@ function _renderCamposSesion(tipo, valores = {}) {
             ${['No aplica', 'BSL-1', 'BSL-2', 'BSL-3'].map(n => `<option value="${n}" ${valores.Nivel_Riesgo === n ? 'selected' : ''}>${n}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group full" style="display:flex;gap:20px;align-items:center">
-          <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin:0"><input type="checkbox" id="reg-campo-verif" ${valores.Verificacion_Previa === 'Sí' ? 'checked' : ''}> Verificación previa del flujo</label>
-          <label style="display:flex;align-items:center;gap:6px;font-weight:400;margin:0"><input type="checkbox" id="reg-campo-descon" ${valores.Descontaminacion_Posterior === 'Sí' ? 'checked' : ''}> Descontaminación posterior realizada</label>
+        <div class="form-group full" style="display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:4px">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer"><input type="checkbox" id="reg-campo-verif" style="margin-top:3px;flex-shrink:0" ${valores.Verificacion_Previa === 'Sí' ? 'checked' : ''}> <span>Verificación previa del flujo</span></label>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer"><input type="checkbox" id="reg-campo-descon" style="margin-top:3px;flex-shrink:0" ${valores.Descontaminacion_Posterior === 'Sí' ? 'checked' : ''}> <span>Descontaminación posterior realizada</span></label>
         </div>
       </div>`;
   } else {
