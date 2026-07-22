@@ -265,7 +265,30 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-fecha', '');
   sv('plan-descripcion', '');
   sv('plan-tareas-previstas', '');
+
+  // Quién la va a hacer (opcional, se puede confirmar/cambiar al ejecutar)
+  sv('plan-realizado-por', '');
+  sv('plan-proveedor-ext', '');
+  const selUserPlan = document.getElementById('plan-realizado-por');
+  if (selUserPlan) {
+    selUserPlan.innerHTML = '<option value="">Seleccionar usuario...</option>' +
+      DATA.usuarios.filter(u => u.Activo !== 'FALSE').map(u => `<option value="${u.Nombre}">${u.Nombre}</option>`).join('');
+  }
+  const listProvPlan = document.getElementById('plan-proveedor-ext-list');
+  if (listProvPlan) {
+    listProvPlan.innerHTML = DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">`).join('');
+  }
+  const radInternaPlan = document.getElementById('plan-ejec-interna');
+  if (radInternaPlan) { radInternaPlan.checked = true; _toggleEjecucionPlan('Interna'); }
+
   openModal('modal-planificar-intervencion');
+}
+
+function _toggleEjecucionPlan(tipo) {
+  const intGrp = document.getElementById('plan-interna-group');
+  const extGrp = document.getElementById('plan-externa-group');
+  if (intGrp) intGrp.style.display = tipo === 'Interna' ? '' : 'none';
+  if (extGrp) extGrp.style.display = tipo === 'Externa' ? '' : 'none';
 }
 
 // Programar una NUEVA visita (otro día, posiblemente otro técnico) sobre una incidencia
@@ -284,6 +307,9 @@ async function guardarPlanificacion() {
   const equipo = v('plan-equipo');
   const fecha  = v('plan-fecha');
   const origenIntId = v('plan-origen-int');
+  const tipoEjecPlan = document.querySelector('input[name="plan-tipo-ejec"]:checked')?.value || 'Interna';
+  const realizadoPorPlan = tipoEjecPlan === 'Interna' ? v('plan-realizado-por') : '';
+  const proveedorPlan    = tipoEjecPlan === 'Externa' ? v('plan-proveedor-ext') : '';
 
   const id  = genId('INT-');
   const row = [
@@ -293,9 +319,9 @@ async function guardarPlanificacion() {
     origenIntId ? ('Seguimiento de ' + origenIntId) : 'Incidencia reportada', // D Origen
     fecha,         // E Fecha_Planificada
     '',            // F Fecha_Realizacion
-    '',            // G Realizado_Por
+    realizadoPorPlan, // G Realizado_Por
     '',            // H Tecnico_Externo
-    '',            // I Proveedor
+    proveedorPlan, // I Proveedor
     '',            // J Descripcion_Actuacion  (vacío hasta registrar)
     '',            // K Resultado
     '',            // L Equipo_Operativo
@@ -470,8 +496,13 @@ function openModalRegistrarActuacion(intIdx) {
   } else {
     sv('act-fecha-real', new Date().toISOString().split('T')[0]);
     sv('act-coste', '');
+    // Si ya se indicó quién la haría al planificar, se precarga aquí (editable, por si cambia)
+    const esExternaPlan = !!i.Proveedor;
     const radInterna = document.getElementById('act-ejec-interna');
-    if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
+    const radExterna = document.getElementById('act-ejec-externa');
+    if (esExternaPlan) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
+    else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
+    toggleActEjecucion(esExternaPlan ? 'Externa' : 'Interna');
   }
 
   _renderTareasEnModal(i.ID_Intervencion);

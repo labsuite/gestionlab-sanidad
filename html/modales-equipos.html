@@ -215,6 +215,28 @@
           <input id="plan-fecha" type="date">
         </div>
         <div class="form-group full">
+          <label>¿Quién la va a hacer? <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(opcional — se puede confirmar o cambiar al ejecutar)</span></label>
+          <div style="display:flex;gap:16px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+              <input type="radio" name="plan-tipo-ejec" id="plan-ejec-interna" value="Interna" onchange="_toggleEjecucionPlan('Interna')" checked>
+              Interna
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+              <input type="radio" name="plan-tipo-ejec" id="plan-ejec-externa" value="Externa" onchange="_toggleEjecucionPlan('Externa')">
+              Externa (SAT)
+            </label>
+          </div>
+        </div>
+        <div class="form-group" id="plan-interna-group">
+          <label>Realizado por</label>
+          <select id="plan-realizado-por"><option value="">Seleccionar usuario...</option></select>
+        </div>
+        <div class="form-group" id="plan-externa-group" style="display:none">
+          <label>Empresa / proveedor</label>
+          <input type="text" id="plan-proveedor-ext" list="plan-proveedor-ext-list" placeholder="Escribe o elige de tus proveedores..." autocomplete="off">
+          <datalist id="plan-proveedor-ext-list"></datalist>
+        </div>
+        <div class="form-group full">
           <label>Descripción planificada</label>
           <textarea id="plan-descripcion" placeholder="Qué se prevé hacer..." style="min-height:80px"></textarea>
         </div>
