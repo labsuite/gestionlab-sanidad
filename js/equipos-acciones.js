@@ -237,6 +237,7 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-fecha', '');
   sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
+  sv('plan-tareas-previstas', '');
   openModal('modal-planificar-intervencion');
 }
 
@@ -286,6 +287,13 @@ async function guardarPlanificacion() {
     await sheetsAppend('Intervenciones', row);
     DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
 
+    // Tareas ya previstas para esa visita: se guardan como Pendiente, sin tocar
+    // los datos de ejecución (fecha real, quién...) — eso se rellena al ejecutar.
+    const tareasPrevistas = v('plan-tareas-previstas').split('\n').map(s => s.trim()).filter(Boolean);
+    for (const desc of tareasPrevistas) {
+      await _guardarTarea(id, desc, 'Pendiente', '', '');
+    }
+
     // Actualizar incidencia: Estado → En gestión, y apuntar siempre a esta intervención
     // (tanto en la planificación inicial como al programar una visita de seguimiento).
     const incIdx = DATA.incidencias.findIndex(x => x.ID_Incidencia === incId);
@@ -332,7 +340,20 @@ function calcularEstadoIntervencion(resultadoAgregado, tipoEjec) {
   return 'Cerrada'; // Resuelto interno, o Descartado
 }
 
-async function _guardarTarea(intId, descripcion, resultado, operativo, observaciones) {
+// tareaOrigenId: si se está completando una tarea ya prevista en ESTA MISMA intervención
+// (ver plan-tareas-previstas), se actualiza esa fila en vez de crear una duplicada.
+// Las heredadas de una visita anterior nunca se actualizan así — esa se queda como
+// registro histórico de esa visita, y esta genera una fila nueva bajo la visita actual.
+async function _guardarTarea(intId, descripcion, resultado, operativo, observaciones, tareaOrigenId) {
+  if (tareaOrigenId) {
+    const idx = DATA.tareasIntervencion.findIndex(t => t.ID_Tarea === tareaOrigenId && t.ID_Intervencion === intId);
+    if (idx !== -1) {
+      const row = [tareaOrigenId, intId, descripcion, resultado, operativo, observaciones || ''];
+      await sheetsUpdate(`Tareas_Intervencion!A${idx + 2}:F${idx + 2}`, row);
+      DATA.tareasIntervencion[idx] = rowToObj(row, 'tareasIntervencion');
+      return tareaOrigenId;
+    }
+  }
   const idTarea = genId('TSK-');
   const row = [idTarea, intId, descripcion, resultado, operativo, observaciones || ''];
   await sheetsAppend('Tareas_Intervencion', row);
@@ -350,20 +371,39 @@ function _renderTareasEnModal(intId) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta visita.</div>';
     return;
   }
-  cont.innerHTML = tareas.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-    <span style="flex:1">${t.Descripcion}</span>
-    <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>
-  </div>`).join('');
+  cont.innerHTML = tareas.map(t => {
+    const sinResolver = !t.Resultado || t.Resultado === 'Pendiente';
+    const controles = sinResolver
+      ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn btn-secondary" style="padding:3px 8px;font-size:11px" onclick="marcarResultadoTarea('${t.ID_Tarea}','Resuelto')">✓ Resuelto</button>
+          <select style="font-size:11px;padding:3px 6px" onchange="if(this.value) marcarResultadoTarea('${t.ID_Tarea}', this.value); this.value=''">
+            <option value="">Otro resultado…</option>
+            <option value="Resuelto parcialmente">Resuelto parcialmente</option>
+            <option value="No resuelto">No resuelto</option>
+            <option value="Descartado">Descartado</option>
+          </select>
+        </div>`
+      : `<span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span style="flex:1;min-width:120px">${t.Descripcion}</span>
+      ${controles}
+    </div>`;
+  }).join('');
 }
 
 // ============================================================
-// TAREAS HEREDADAS — pendientes de la visita anterior de la misma cadena,
-// para no tener que reescribirlas cuando se programa una visita de seguimiento.
+// TAREAS HEREDADAS — quedaron sin resolver en la visita anterior de la cadena
+// (Seguimiento de X). Las de la propia intervención (previstas al planificar,
+// aún no ejecutadas) ya aparecen directamente en "Tareas registradas en esta
+// visita" con sus botones de resultado — no hace falta duplicarlas aquí.
+// Al usar una heredada se crea una fila nueva bajo la visita actual: el
+// registro de la visita anterior no se toca, queda como historial.
 // ============================================================
 function _tareasHeredadas(i) {
   if (!i || !i.Origen || !i.Origen.startsWith('Seguimiento de ')) return [];
+  const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
   const padreId = i.Origen.replace('Seguimiento de ', '');
-  return getTareasIntervencion(padreId).filter(t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado));
+  return getTareasIntervencion(padreId).filter(sinResolver);
 }
 
 function _renderTareasHeredadas(i) {
@@ -378,8 +418,9 @@ function _renderTareasHeredadas(i) {
   </button>`).join('');
 }
 
-function usarTareaHeredada(desc) {
+function usarTareaHeredada(desc, tareaOrigenId) {
   sv('act-descripcion', desc);
+  sv('act-tarea-origen-id', tareaOrigenId || '');
   document.getElementById('act-descripcion')?.focus();
 }
 
@@ -452,57 +493,95 @@ function toggleActEjecucion(tipo) {
   if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
 }
 
-// Resultado de la tarea nueva: botón ✓ Resuelto (atajo al caso más común)
-// + desplegable pequeño para el resto de resultados (Pendiente, No resuelto, Parcial, Descartado).
-function seleccionarResultadoTarea(valor) {
-  sv('act-resultado', valor);
-  const btnCheck = document.getElementById('act-resultado-check');
-  const selOtro  = document.getElementById('act-resultado-otro');
-  if (btnCheck) {
-    btnCheck.classList.toggle('btn-primary', valor === 'Resuelto');
-    btnCheck.classList.toggle('btn-secondary', valor !== 'Resuelto');
-  }
-  if (selOtro) selOtro.value = (valor && valor !== 'Resuelto') ? valor : '';
-}
-
-// Equipo operativo tras la tarea: botón ON/OFF en vez de desplegable Sí/No.
-function toggleOperativoTarea() {
-  const hidden = document.getElementById('act-operativo');
-  const btn    = document.getElementById('act-operativo-toggle');
-  if (!hidden) return;
-  const nuevo = hidden.value === 'Sí' ? 'No' : 'Sí';
-  sv('act-operativo', nuevo);
-  if (btn) {
-    btn.textContent = nuevo === 'Sí' ? '🟢 Operativo' : '🔴 No operativo';
-    btn.classList.toggle('btn-danger', nuevo === 'No');
-    btn.classList.toggle('btn-secondary', nuevo === 'Sí');
-  }
-}
-
-// Vuelve a poner el bloque "Nueva tarea" en su estado inicial: sin resultado
-// elegido y equipo operativo por defecto.
+// Vuelve a poner el bloque "Nueva tarea" en su estado inicial.
 function _resetCamposTarea() {
   sv('act-descripcion', '');
   sv('act-observaciones', '');
-  sv('act-resultado', '');
-  sv('act-operativo', 'Sí');
-  const btnCheck = document.getElementById('act-resultado-check');
-  if (btnCheck) { btnCheck.classList.remove('btn-primary'); btnCheck.classList.add('btn-secondary'); }
-  const selOtro = document.getElementById('act-resultado-otro');
-  if (selOtro) selOtro.value = '';
-  const btnOp = document.getElementById('act-operativo-toggle');
-  if (btnOp) { btnOp.textContent = '🟢 Operativo'; btnOp.classList.remove('btn-danger'); btnOp.classList.add('btn-secondary'); }
+  sv('act-tarea-origen-id', '');
+}
+
+// Resultado por defecto según el botón/opción elegida en la lista de tareas
+// (se puede corregir el estado operativo del equipo a mano desde la ficha del equipo).
+const _OPERATIVO_POR_DEFECTO = { 'Resuelto': 'Sí', 'Descartado': 'Sí', 'No resuelto': 'No', 'Resuelto parcialmente': 'Sí', 'Pendiente': 'Sí' };
+
+// ============================================================
+// SINCRONIZAR INTERVENCIÓN — recalcula Resultado/Estado a partir de las
+// tareas actuales, guarda la fila y propaga a Estado_Operativo del equipo
+// y al estado de la incidencia vinculada. Se llama tras cualquier cambio
+// en las tareas (añadir una, o marcar el resultado de una ya existente).
+// ============================================================
+async function _sincronizarIntervencion(intIdx, operativoTarea) {
+  const i = DATA.intervenciones[intIdx];
+  const tareas       = getTareasIntervencion(i.ID_Intervencion);
+  const resultadoAgg = calcularResultadoAgregado(tareas);
+  const tipoEjec      = i.Proveedor ? 'Externa' : 'Interna';
+  const estadoAgg     = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
+
+  const updatedRow = [
+    i.ID_Intervencion, i.Equipo, i.Tipo,
+    i.Origen || 'Incidencia reportada',
+    i.Fecha_Planificada || '', i.Fecha_Realizacion || '', i.Realizado_Por || '', '', i.Proveedor || '',
+    i.Descripcion_Actuacion || '', // legado — solo relevante en intervenciones previas a este cambio
+    resultadoAgg, operativoTarea || i.Equipo_Operativo_Tras_Intervencion || '',
+    i.URL_Adjunto || '', '', '',
+    i.Observaciones || '', i.Nombre_Adjunto || '', estadoAgg,
+    i.Fecha_Estimada_Resolucion || '', i.Coste_Intervencion || ''
+  ];
+  await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
+  DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
+
+  if (operativoTarea) {
+    const estadoEquipo = (resultadoAgg === 'Resuelto' || resultadoAgg === 'Descartado')
+      ? (operativoTarea === 'Sí' ? 'Operativo' : 'No operativo')
+      : (operativoTarea === 'Sí' ? 'Operativo con fallos' : 'No operativo');
+    try { await actualizarEstadoEquipo(i.Equipo, estadoEquipo); } catch(e) { console.warn(e); }
+  }
+
+  const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
+  if (incIdx !== -1) {
+    const inc = DATA.incidencias[incIdx];
+    if (!['Resuelta','Descartada'].includes(inc.Estado)) {
+      const nuevoEstadoInc = estadoAgg === 'Cerrada' ? (resultadoAgg === 'Descartado' ? 'Descartada' : 'Resuelta') : 'En gestión';
+      if (nuevoEstadoInc !== inc.Estado) {
+        inc.Estado = nuevoEstadoInc;
+        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
+        await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
+      }
+    }
+  }
+  return { resultadoAgg, estadoAgg };
+}
+
+// Marca el resultado de una tarea YA guardada, desde su botón en la lista.
+async function marcarResultadoTarea(tareaId, resultado) {
+  const tarea = DATA.tareasIntervencion.find(t => t.ID_Tarea === tareaId);
+  if (!tarea) return;
+  const intIdx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === tarea.ID_Intervencion);
+  if (intIdx === -1) return;
+  const operativo = _OPERATIVO_POR_DEFECTO[resultado] || 'Sí';
+  showLoading('Actualizando...');
+  try {
+    await _guardarTarea(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
+    const { estadoAgg } = await _sincronizarIntervencion(intIdx, operativo);
+    _renderTareasEnModal(tarea.ID_Intervencion);
+    showToast(`Tarea → ${resultado}. Visita → ${estadoAgg}`, 'success');
+    renderEquipos(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error actualizando la tarea', 'error'); console.error(e); }
+  hideLoading();
 }
 
 async function guardarActuacion(finalizar) {
   const equipoDirecto = v('act-equipo-directo');
-  const desc      = v('act-descripcion');
-  const resultado = v('act-resultado');
-  const operativo = v('act-operativo');
-  if (!desc)      { showToast('La descripción de la tarea es obligatoria', 'error'); return; }
-  if (!resultado) { showToast('El resultado de la tarea es obligatorio', 'error'); return; }
+  const desc = v('act-descripcion');
 
-  // ── MODO DIRECTO: crear nueva intervención + primera tarea ───────────────
+  // Nada nuevo que anotar: si solo se pide finalizar, cerramos sin más.
+  if (!desc) {
+    if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); }
+    else showToast('Escribe una descripción para añadir la tarea', 'error');
+    return;
+  }
+
+  // ── MODO DIRECTO: crear nueva intervención + primera tarea (Pendiente) ───
   if (equipoDirecto) {
     const fechaReal = v('act-fecha-real');
     if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
@@ -521,25 +600,21 @@ async function guardarActuacion(finalizar) {
       } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
       _pendingActFileBase64 = null;
     }
-    const resultadoAgg = calcularResultadoAgregado([{ Resultado: resultado }]);
-    const estadoInt = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
     const row = [
       nuevoId, equipoDirecto, tipoInt, 'Manual', '',
       fechaReal, realizadoPor, '', proveedorExt, '',
-      resultadoAgg, operativo, urlAdjunto, '', '',
-      '', nombreAdjunto, estadoInt, '', coste
+      '', '', urlAdjunto, '', '',
+      '', nombreAdjunto, 'Planificada', '', coste
     ];
     showLoading('Guardando intervención...');
     try {
       await sheetsAppend('Intervenciones', row);
       DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-      await _guardarTarea(nuevoId, desc, resultado, operativo, v('act-observaciones'));
-      const estadoEquipo = (resultado === 'Resuelto' || resultado === 'Descartado')
-        ? (operativo === 'Sí' ? 'Operativo' : 'No operativo')
-        : (operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo');
-      try { await actualizarEstadoEquipo(equipoDirecto, estadoEquipo); } catch(e) { console.warn(e); }
+      const intIdx = DATA.intervenciones.length - 1;
+      await _guardarTarea(nuevoId, desc, 'Pendiente', '', v('act-observaciones'));
+      await _sincronizarIntervencion(intIdx);
       closeModal('modal-registrar-actuacion');
-      showToast(`Intervención ${nuevoId} registrada`, 'success');
+      showToast(`Intervención ${nuevoId} registrada. Tarea → Pendiente`, 'success');
       renderAll();
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
     hideLoading();
@@ -552,81 +627,64 @@ async function guardarActuacion(finalizar) {
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
 
   const visitaIniciada = !!i.Fecha_Realizacion;
-  let fechaReal = i.Fecha_Realizacion, realizadoPor = i.Realizado_Por, proveedorExt = i.Proveedor, coste = i.Coste_Intervencion || '';
-  let tipoEjec = i.Proveedor ? 'Externa' : 'Interna';
-  let urlAdjunto = i.URL_Adjunto || '', nombreAdjunto = i.Nombre_Adjunto || '';
 
   if (!visitaIniciada) {
-    fechaReal = v('act-fecha-real');
+    const fechaReal = v('act-fecha-real');
     if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
-    tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
-    realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
-    proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
-    coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
+    const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
+    const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
+    const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
+    const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
+    showLoading('Guardando...');
+    // Fijar los datos de la visita ahora, la primera vez — el resultado de las
+    // tareas se marca luego, una a una, desde la lista.
+    const rowVisita = [
+      i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen || 'Incidencia reportada',
+      i.Fecha_Planificada || '', fechaReal, realizadoPor, '', proveedorExt,
+      i.Descripcion_Actuacion || '', i.Resultado || '', i.Equipo_Operativo_Tras_Intervencion || '',
+      i.URL_Adjunto || '', '', '', i.Observaciones || '', i.Nombre_Adjunto || '', i.Estado || 'Planificada',
+      i.Fecha_Estimada_Resolucion || '', coste
+    ];
+    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowVisita);
+    DATA.intervenciones[intIdx] = rowToObj(rowVisita, 'intervenciones');
   }
+
   if (_pendingActFileBase64) {
     showLoading('Subiendo documento...');
+    let urlAdjunto, nombreAdjunto;
     try {
       urlAdjunto    = await uploadFileToDrive(_pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
       nombreAdjunto = _pendingActFileBase64.name;
     } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
     _pendingActFileBase64 = null;
+    const iAct = DATA.intervenciones[intIdx];
+    const rowAdj = [
+      iAct.ID_Intervencion, iAct.Equipo, iAct.Tipo, iAct.Origen, iAct.Fecha_Planificada || '',
+      iAct.Fecha_Realizacion || '', iAct.Realizado_Por || '', '', iAct.Proveedor || '',
+      iAct.Descripcion_Actuacion || '', iAct.Resultado || '', iAct.Equipo_Operativo_Tras_Intervencion || '',
+      urlAdjunto, '', '', iAct.Observaciones || '', nombreAdjunto, iAct.Estado,
+      iAct.Fecha_Estimada_Resolucion || '', iAct.Coste_Intervencion || ''
+    ];
+    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowAdj);
+    DATA.intervenciones[intIdx] = rowToObj(rowAdj, 'intervenciones');
   }
+
+  const tareaOrigenId = v('act-tarea-origen-id');
 
   showLoading('Guardando tarea...');
   try {
-    await _guardarTarea(i.ID_Intervencion, desc, resultado, operativo, v('act-observaciones'));
-
-    const tareas       = getTareasIntervencion(i.ID_Intervencion);
-    const resultadoAgg = calcularResultadoAgregado(tareas);
-    const estadoAgg     = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
-
-    const updatedRow = [
-      i.ID_Intervencion, i.Equipo, i.Tipo,
-      i.Origen || 'Incidencia reportada',
-      i.Fecha_Planificada || '',
-      fechaReal, realizadoPor, '', proveedorExt,
-      i.Descripcion_Actuacion || '', // legado — solo relevante en intervenciones previas a este cambio
-      resultadoAgg, operativo,
-      urlAdjunto, '', '',
-      i.Observaciones || '',
-      nombreAdjunto, estadoAgg,
-      i.Fecha_Estimada_Resolucion || '', coste
-    ];
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
-    DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
-
-    // Estado operativo del equipo según la señal más reciente (esta tarea)
-    const estadoEquipo = (resultado === 'Resuelto' || resultado === 'Descartado')
-      ? (operativo === 'Sí' ? 'Operativo' : 'No operativo')
-      : (operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo');
-    try { await actualizarEstadoEquipo(i.Equipo, estadoEquipo); } catch(e) { console.warn(e); }
-
-    // Sincronizar la incidencia vinculada según el estado agregado de la intervención
-    const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-    if (incIdx !== -1) {
-      const inc = DATA.incidencias[incIdx];
-      if (!['Resuelta','Descartada'].includes(inc.Estado)) {
-        let nuevoEstadoInc = inc.Estado;
-        if (estadoAgg === 'Cerrada') nuevoEstadoInc = resultadoAgg === 'Descartado' ? 'Descartada' : 'Resuelta';
-        else nuevoEstadoInc = 'En gestión'; // Pendiente factura o En gestión → incidencia sigue en gestión
-        if (nuevoEstadoInc !== inc.Estado) {
-          inc.Estado = nuevoEstadoInc;
-          const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
-          await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
-        }
-      }
-    }
+    await _guardarTarea(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'), tareaOrigenId);
+    await _sincronizarIntervencion(intIdx);
 
     if (finalizar) {
       closeModal('modal-registrar-actuacion');
-      showToast(`Tarea guardada. Visita → ${estadoAgg}`, 'success');
+      showToast('Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.', 'success');
       renderAll();
     } else {
       _resetCamposTarea();
       ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
       _renderTareasEnModal(i.ID_Intervencion);
-      showToast('Tarea guardada. Añade otra o finaliza la visita.', 'success');
+      showToast('Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.', 'success');
       renderEquipos(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
