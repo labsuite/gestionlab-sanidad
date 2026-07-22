@@ -159,11 +159,11 @@ function _renderRegTab(tipo) {
       ? `<button class="btn btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idxAbierta})">■ Terminar mi sesión</button>`
       : `<button class="btn btn-primary" onclick="_iniciarSesionRapida('${tipo}','${idEquipoSel}')">▶ Empezar sesión</button>
          <button class="btn btn-secondary" onclick="openModalSesionRegistro('${tipo}')">📝 Registrar sesión completa</button>`;
-    notaManual = `<div style="font-size:11px;color:var(--text-muted);margin:-8px 0 16px">No hace falta NFC: usa "▶ Empezar sesión" al entrar y "■ Terminar mi sesión" al salir, o escanea/fotografía el QR de la etiqueta con la cámara.</div>`;
+    notaManual = `<div style="font-size:11px;color:var(--text-muted);margin:0 0 20px">No hace falta NFC: usa "▶ Empezar sesión" al entrar y "■ Terminar mi sesión" al salir, o escanea/fotografía el QR de la etiqueta con la cámara.</div>`;
   }
 
   return `
-    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:${notaManual ? '4px' : '16px'}">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:${notaManual ? '10px' : '16px'}">
       ${selectorEquipo}
       ${botonPrincipal}
       <button class="btn btn-secondary" onclick="generarInformeRegistro('${tipo}')">🖨️ Informe</button>
