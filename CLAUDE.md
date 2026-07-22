@@ -133,6 +133,15 @@ Una fila por equipo, ordenados por ubicación y tipo. Columnas:
 
 ---
 
+## Email al proveedor (detalle de pedido)
+
+Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `verDetallePedido` (`js/pedidos-render.js`), visible para Administrador/Gestor cuando el pedido tiene al menos una línea. Abre el modal `modal-email-pedido` (`html/modales-pedidos.html`).
+
+- `generarTextoEmailPedido(pedidoId)` construye el texto: saludo (usa `Persona_Contacto` del proveedor si existe, si no genérico "Buenos días,"), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre sin firma — la firma la añade el cliente de correo de la usuaria.
+- Solo tiene botón **📋 Copiar texto** (`copiarTextoEmailPedido`, vía `navigator.clipboard`). No hay envío ni apertura directa del cliente de correo: la usuaria prefiere copiar, pegar y revisar antes de enviar.
+
+---
+
 ## Rangos de carga en sheets.js
 
 ⚠ Al añadir una columna nueva a una hoja de Sheets, **actualizar el rango** en `loadAllData()` (`js/sheets.js`) y las columnas en `COLS` (`js/config.js`). Si no, el campo llega siempre `undefined` en el navegador.
