@@ -492,6 +492,35 @@
   </div>
 </div>
 
+<!-- Modal Email al Proveedor -->
+<div class="modal-overlay" id="modal-email-pedido">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">✉️ Enviar pedido por email</div>
+      <button class="modal-close" onclick="closeModal('modal-email-pedido')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="email-ped-id">
+      <div id="email-ped-sin-email" style="display:none;margin-bottom:12px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--text-soft)">
+        ⚠️ Este proveedor no tiene email de contacto guardado. Copia el texto y pégalo en tu cliente de correo.
+      </div>
+      <div class="form-group">
+        <label>Asunto</label>
+        <div id="email-ped-asunto" style="font-weight:500;font-size:13px;padding:6px 0"></div>
+      </div>
+      <div class="form-group">
+        <label>Mensaje (listo para copiar y pegar)</label>
+        <textarea id="email-ped-texto" readonly style="min-height:260px;font-family:inherit;font-size:13px" onclick="this.select()"></textarea>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-email-pedido')">Cerrar</button>
+        <button class="btn btn-secondary" onclick="copiarTextoEmailPedido()">📋 Copiar texto</button>
+        <a id="email-ped-btn-mailto" class="btn btn-primary" href="#" target="_blank" rel="noopener">✉️ Abrir en mi correo</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Recepción Masiva (albarán) -->
 <div class="modal-overlay" id="modal-recepcion-masiva">
   <div class="modal" style="max-width:700px">

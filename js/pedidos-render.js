@@ -393,6 +393,61 @@ function renderPedidos(filtroEstado = '') {
 }
 function filtrarPedidosEstado(v) { renderPedidos(v); }
 
+// Unidad de una línea: catálogo de material, o si no está catalogado, la solicitud vinculada
+function _unidadLineaPedido(l) {
+  const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+  if (mat?.Unidad) return mat.Unidad;
+  const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
+  if (solIdM) {
+    const solVinc = DATA.solicitudes.find(s => s.ID_Solicitud === solIdM[1]);
+    const uMatch = (solVinc?.Observaciones || '').match(/\[Unidad:\s*([^\]]+)\]/);
+    if (uMatch) return uMatch[1].trim();
+  }
+  return '';
+}
+
+function generarTextoEmailPedido(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return '';
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
+  const saludo = prov?.Persona_Contacto ? `Hola ${prov.Persona_Contacto},` : 'Buenos días,';
+  const cuerpoLineas = lineas.map(l => {
+    const unidad = _unidadLineaPedido(l);
+    return `- ${l.Material}: ${l.Cantidad_Pedida}${unidad ? ' ' + unidad : ''}`;
+  }).join('\n');
+  const nombreUsuario = currentUser?.name || '';
+  return `${saludo}\n\nOs escribo para solicitar el siguiente pedido para el CIFP Manuel Antonio (departamento de Sanidade):\n\n${cuerpoLineas}\n\nQuedo a la espera de presupuesto/confirmación.\n\nUn saludo,\n${nombreUsuario}`;
+}
+
+function abrirModalEmailPedido(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
+  sv('email-ped-id', pedidoId);
+  const texto = generarTextoEmailPedido(pedidoId);
+  document.getElementById('email-ped-texto').value = texto;
+  const asunto = `Pedido — ${p.Nombre_Lista}`;
+  document.getElementById('email-ped-asunto').textContent = asunto;
+  const destinatario = prov?.Email_Contacto || '';
+  document.getElementById('email-ped-btn-mailto').href =
+    `mailto:${destinatario}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(texto)}`;
+  const avisoSinEmail = document.getElementById('email-ped-sin-email');
+  if (avisoSinEmail) avisoSinEmail.style.display = destinatario ? 'none' : '';
+  openModal('modal-email-pedido');
+}
+
+async function copiarTextoEmailPedido() {
+  const ta = document.getElementById('email-ped-texto');
+  try {
+    await navigator.clipboard.writeText(ta.value);
+  } catch (e) {
+    ta.select();
+    document.execCommand('copy');
+  }
+  showToast('Texto copiado al portapapeles', 'success');
+}
+
 function verDetallePedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
@@ -445,6 +500,7 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
         <div style="display:flex;gap:8px">
+          ${puedeEditar && lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
           ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
         </div>
@@ -452,17 +508,7 @@ function verDetallePedido(pedidoId) {
       <div style="padding:12px 16px">
         ${!lineas.length ? `<div class="empty-state" style="padding:24px"><div class="empty-state-icon">📝</div><div class="empty-state-title">Sin líneas todavía</div></div>` :
           lineas.map(l => {
-            const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-            let unidadLinea = mat?.Unidad || '';
-            if (!unidadLinea) {
-              // Material no catalogado: buscar unidad en observaciones de la solicitud vinculada
-              const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
-              if (solIdM) {
-                const solVinc = DATA.solicitudes.find(s => s.ID_Solicitud === solIdM[1]);
-                const uMatch = (solVinc?.Observaciones || '').match(/\[Unidad:\s*([^\]]+)\]/);
-                if (uMatch) unidadLinea = uMatch[1].trim();
-              }
-            }
+            let unidadLinea = _unidadLineaPedido(l);
             unidadLinea = unidadLinea ? ' ' + unidadLinea : '';
             const estadoLinea = {'Pendiente':'badge-orange','Recibido parcialmente':'badge-blue','Recibido':'badge-green'}[l.Estado_Linea] || 'badge-gray';
             const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
