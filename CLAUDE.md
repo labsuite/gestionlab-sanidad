@@ -19,6 +19,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-incidencias.md` — flujo Incidencia → Intervención (visita) → Tarea, estados derivados, visitas de seguimiento
 - `docs/modulo-residuos.md` — GHS, ciclo de vida de contenedores, consultas, NFC/QR
 - `docs/modulo-reservas.md` — políticas BLOCK/COMPATIBLE, estados, 23 equipos configurados
+- `docs/modulo-registros-uso.md` — registros de calidad por sesión (cabina/autoclave), check-in/check-out NFC flexible
 - `docs/modulo-usuarios.md` — columnas Usuarios, lógica alumnos, ciclos/módulos, usuarios _sbOnly
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
