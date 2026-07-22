@@ -373,10 +373,7 @@ function openModalRegistrarActuacion(intIdx) {
   if (eqLbl) eqLbl.textContent = i.Equipo || '—';
 
   // Campos de la nueva tarea — siempre en blanco
-  sv('act-descripcion', '');
-  sv('act-observaciones', '');
-  sv('act-resultado', 'Resuelto');
-  sv('act-operativo', 'Sí');
+  _resetCamposTarea();
   sv('act-pdf-url', '');
 
   poblarSelects();
@@ -426,8 +423,46 @@ function toggleActEjecucion(tipo) {
   if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
 }
 
-function toggleActResultado(val) {
-  // Reservado para lógica futura de mostrar/ocultar campos según resultado
+// Resultado de la tarea nueva: botón ✓ Resuelto (atajo al caso más común)
+// + desplegable pequeño para el resto de resultados (Pendiente, No resuelto, Parcial, Descartado).
+function seleccionarResultadoTarea(valor) {
+  sv('act-resultado', valor);
+  const btnCheck = document.getElementById('act-resultado-check');
+  const selOtro  = document.getElementById('act-resultado-otro');
+  if (btnCheck) {
+    btnCheck.classList.toggle('btn-primary', valor === 'Resuelto');
+    btnCheck.classList.toggle('btn-secondary', valor !== 'Resuelto');
+  }
+  if (selOtro) selOtro.value = (valor && valor !== 'Resuelto') ? valor : '';
+}
+
+// Equipo operativo tras la tarea: botón ON/OFF en vez de desplegable Sí/No.
+function toggleOperativoTarea() {
+  const hidden = document.getElementById('act-operativo');
+  const btn    = document.getElementById('act-operativo-toggle');
+  if (!hidden) return;
+  const nuevo = hidden.value === 'Sí' ? 'No' : 'Sí';
+  sv('act-operativo', nuevo);
+  if (btn) {
+    btn.textContent = nuevo === 'Sí' ? '🟢 Operativo' : '🔴 No operativo';
+    btn.classList.toggle('btn-danger', nuevo === 'No');
+    btn.classList.toggle('btn-secondary', nuevo === 'Sí');
+  }
+}
+
+// Vuelve a poner el bloque "Nueva tarea" en su estado inicial: sin resultado
+// elegido y equipo operativo por defecto.
+function _resetCamposTarea() {
+  sv('act-descripcion', '');
+  sv('act-observaciones', '');
+  sv('act-resultado', '');
+  sv('act-operativo', 'Sí');
+  const btnCheck = document.getElementById('act-resultado-check');
+  if (btnCheck) { btnCheck.classList.remove('btn-primary'); btnCheck.classList.add('btn-secondary'); }
+  const selOtro = document.getElementById('act-resultado-otro');
+  if (selOtro) selOtro.value = '';
+  const btnOp = document.getElementById('act-operativo-toggle');
+  if (btnOp) { btnOp.textContent = '🟢 Operativo'; btnOp.classList.remove('btn-danger'); btnOp.classList.add('btn-secondary'); }
 }
 
 async function guardarActuacion(finalizar) {
@@ -559,7 +594,7 @@ async function guardarActuacion(finalizar) {
       showToast(`Tarea guardada. Visita → ${estadoAgg}`, 'success');
       renderAll();
     } else {
-      sv('act-descripcion', ''); sv('act-observaciones', ''); sv('act-resultado', 'Resuelto'); sv('act-operativo', 'Sí');
+      _resetCamposTarea();
       ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
       _renderTareasEnModal(i.ID_Intervencion);
       showToast('Tarea guardada. Añade otra o finaliza la visita.', 'success');
@@ -800,10 +835,7 @@ function openModalRegistrarActuacionDirecta(equipoId) {
   if (tareasLista) tareasLista.innerHTML = '';
 
   sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
-  sv('act-descripcion',   '');
-  sv('act-observaciones', '');
-  sv('act-resultado',     'Resuelto');
-  sv('act-operativo',     'Sí');
+  _resetCamposTarea();
   sv('act-coste',         '');
   sv('act-pdf-url',       '');
 

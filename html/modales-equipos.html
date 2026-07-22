@@ -305,20 +305,22 @@
         </div>
         <div class="form-group">
           <label>Resultado *</label>
-          <select id="act-resultado" onchange="toggleActResultado(this.value)">
-            <option>Resuelto</option>
-            <option>Resuelto parcialmente</option>
-            <option>Pendiente</option>
-            <option>No resuelto</option>
-            <option>Descartado</option>
-          </select>
+          <input type="hidden" id="act-resultado" value="">
+          <div style="display:flex;gap:8px">
+            <button type="button" id="act-resultado-check" class="btn btn-secondary" style="flex:1" onclick="seleccionarResultadoTarea('Resuelto')">✓ Resuelto</button>
+            <select id="act-resultado-otro" style="flex:1" onchange="seleccionarResultadoTarea(this.value)">
+              <option value="">Otro resultado…</option>
+              <option value="Resuelto parcialmente">Resuelto parcialmente</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="No resuelto">No resuelto</option>
+              <option value="Descartado">Descartado</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
-          <label>¿Equipo operativo tras esta tarea?</label>
-          <select id="act-operativo">
-            <option value="Sí">Sí</option>
-            <option value="No">No</option>
-          </select>
+          <label>Equipo tras esta tarea</label>
+          <input type="hidden" id="act-operativo" value="Sí">
+          <button type="button" id="act-operativo-toggle" class="btn btn-secondary" style="width:100%" onclick="toggleOperativoTarea()">🟢 Operativo</button>
         </div>
         <div class="form-group full">
           <label>Observaciones</label>
