@@ -232,7 +232,17 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const label = document.getElementById('plan-inc-label');
   if (label) label.textContent = incId + ' (' + equipo + ')';
   const intro = document.getElementById('plan-intro-texto');
-  if (intro) intro.textContent = origenIntId ? 'Programando una nueva visita de seguimiento sobre' : 'Creando intervención en respuesta a la incidencia';
+  const titulo = document.getElementById('plan-modal-title');
+  const ayuda  = document.getElementById('plan-ayuda-texto');
+  if (origenIntId) {
+    if (intro) intro.textContent = 'Programando una nueva visita de seguimiento sobre la incidencia';
+    if (titulo) titulo.textContent = '📅 Programar próxima visita';
+    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Anota qué se va a hacer en esa próxima visita — no hace falta que ya sepas cuándo.';
+  } else {
+    if (intro) intro.textContent = 'Creando intervención en respuesta a la incidencia';
+    if (titulo) titulo.textContent = '🗓 Responder a la incidencia';
+    if (ayuda) ayuda.innerHTML = 'Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas visitas".';
+  }
   sv('plan-tipo', 'Correctivo');
   sv('plan-fecha', '');
   sv('plan-fecha-estimada', '');
@@ -565,7 +575,7 @@ async function marcarResultadoTarea(tareaId, resultado) {
     const { estadoAgg } = await _sincronizarIntervencion(intIdx, operativo);
     _renderTareasEnModal(tarea.ID_Intervencion);
     showToast(`Tarea → ${resultado}. Visita → ${estadoAgg}`, 'success');
-    renderEquipos(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+    renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error actualizando la tarea', 'error'); console.error(e); }
   hideLoading();
 }
@@ -685,7 +695,7 @@ async function guardarActuacion(finalizar) {
       ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
       _renderTareasEnModal(i.ID_Intervencion);
       showToast('Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.', 'success');
-      renderEquipos(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+      renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();

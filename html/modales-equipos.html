@@ -180,14 +180,14 @@
 <div class="modal-overlay" id="modal-planificar-intervencion">
   <div class="modal" style="max-width:500px">
     <div class="modal-header">
-      <div class="modal-title">🗓 Planificar intervención</div>
+      <div class="modal-title" id="plan-modal-title">🗓 Responder a la incidencia</div>
       <button class="modal-close" onclick="closeModal('modal-planificar-intervencion')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="plan-inc-id">
       <input type="hidden" id="plan-equipo">
-      <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-soft);margin-bottom:10px;line-height:1.5">
-        <strong>Planificar</strong> es decir "esto se va a atender" — no hace falta que ya sepas cuánd­o ni tener la visita hecha. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde el botón "Ejecutar".
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-soft);margin-bottom:10px;line-height:1.5" id="plan-ayuda-texto">
+        Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas visitas".
       </div>
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);margin-bottom:14px">
         <span id="plan-intro-texto">Creando intervención en respuesta a la incidencia</span> <strong id="plan-inc-label"></strong>

@@ -300,6 +300,7 @@ function renderAll() {
   renderDashboard();
   renderTareas();
   renderEquipos();
+  renderProximasVisitas();
   renderIntervenciones();
   renderIncidencias();
   renderProveedores();

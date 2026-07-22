@@ -63,12 +63,28 @@ sigue `En gestión`.
 
 ## UI
 
+- **Página Intervenciones, dos bloques** (`js/equipos-render.js`): una Intervención sirve
+  tanto de "cita" (recién planificada, casi sin datos) como de "registro" (ya ejecutada, con
+  fecha real/resultado/etc.) — mezclar ambas en una sola tabla hacía que las planificadas se
+  vieran como filas rotas llenas de guiones. Por eso:
+  - `renderProximasVisitas()` → tabla compacta arriba ("📅 Próximas visitas") solo con
+    `Estado='Planificada'`: Equipo, Tipo (+ nº de tareas previstas si las hay), Fecha (o "Por
+    concretar"), Incidencia vinculada, botón Ejecutar. Se oculta si no hay ninguna.
+  - `renderIntervenciones()` → la tabla de siempre, pero ahora excluye `Planificada`: solo
+    entran intervenciones que ya tienen datos reales (incluidas las de modo directo, que nunca
+    pasan por `Planificada` porque nacen ya con una tarea).
 - Ficha de intervención (`openFichaIntervencion`): timeline (Reportada → Planificada →
   Ejecutando → Cerrada), lista de tareas de la visita, coste total del hilo completo
   (`getChainIntervencion` + suma de `Coste_Intervencion`).
 - Cards de incidencias: mientras está `En gestión`, muestran cuántas tareas de la visita
   activa están resueltas (o la fecha planificada si aún no hay ninguna); si `Relacionada_Con`
   está informado, muestran "↳ continúa de INC-XXX".
+- El modal de planificación (`modal-planificar-intervencion`) cambia de título y texto de
+  ayuda según el contexto: "🗓 Responder a la incidencia" (primera respuesta, vía
+  `abrirPlanificacion(incId, equipo)`) vs "📅 Programar próxima visita" (desde
+  `programarOtraVisita`, que pasa un tercer argumento `origenIntId`) — mismo modal y misma
+  operación de datos, pero framing distinto para no confundir "estoy respondiendo a algo
+  recién abierto" con "ya llevo un rato gestionando este caso".
 
 ## Antes de usar este flujo en producción
 

@@ -322,9 +322,65 @@ function filtrarEquiposEstado(val) { renderEquipos(undefined, val); }
 // ============================================================
 // INTERVENCIONES — RENDER
 // ============================================================
+// ============================================================
+// PRÓXIMAS VISITAS — intervenciones aún sin ejecutar (Estado='Planificada'),
+// separadas de la tabla principal para que no se pierdan entre las que ya
+// tienen datos reales, y agrupadas por incidencia para no dispersar una
+// misma cadena de visitas.
+// ============================================================
+function renderProximasVisitas() {
+  const card = document.getElementById('card-proximas-visitas');
+  const tbody = document.getElementById('tabla-proximas-visitas');
+  if (!card || !tbody) return;
+  const rol = getUserRole();
+  let items = DATA.intervenciones.filter(i => i.Estado === 'Planificada');
+  if (rol === 'Profesor') {
+    items = items.filter(i => {
+      const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
+      return equipo ? esResponsableDeEquipo(equipo) : false;
+    });
+  }
+  if (!items.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  // Agrupar por incidencia vinculada (cada incidencia solo tiene una visita activa a la vez)
+  const grupos = items.map(i => {
+    const inc = DATA.incidencias.find(x => x.Intervencion_Generada === i.ID_Intervencion);
+    return { i, inc };
+  }).sort((a, b) => {
+    if (!a.i.Fecha_Planificada && !b.i.Fecha_Planificada) return 0;
+    if (!a.i.Fecha_Planificada) return 1;
+    if (!b.i.Fecha_Planificada) return -1;
+    return new Date(a.i.Fecha_Planificada) - new Date(b.i.Fecha_Planificada);
+  });
+
+  const tipoBadge = {'Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Validación':'badge-blue','Limpieza':'badge-gray','Descontaminación':'badge-gray','Sustitución de pieza':'badge-orange','Cambio de consumibles':'badge-orange','Control de temperatura':'badge-blue','Puesta en marcha':'badge-green','Actualización de software':'badge-blue'};
+  tbody.innerHTML = grupos.map(({ i, inc }) => {
+    const intIdx = DATA.intervenciones.indexOf(i);
+    const nTareas = getTareasIntervencion(i.ID_Intervencion).length;
+    const puedeEjecutar = puedeHacer('crearIntervenciones') &&
+      (rol !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)) || {}));
+    return `<tr>
+      <td>${i.Equipo||'—'}</td>
+      <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span>${nTareas ? ` <span class="badge badge-blue" style="font-size:10px">${nTareas} prevista${nTareas>1?'s':''}</span>` : ''}</td>
+      <td>${i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : '<span class="text-muted">Por concretar</span>'}</td>
+      <td>${inc ? `<span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
+      <td><div class="row-actions">
+        <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
+        ${puedeEjecutar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">🔧 Ejecutar</button>` : ''}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// REGISTRO DE INTERVENCIONES — solo las que ya se han ejecutado (o están en
+// gestión/cerradas/pendientes de factura); las Planificadas viven arriba,
+// en "Próximas visitas", para no mezclarse con filas sin datos aún.
+// ============================================================
 function renderIntervenciones(filtroTipo = '') {
   const tbody = document.getElementById('tabla-intervenciones');
-  let items = DATA.intervenciones;
+  let items = DATA.intervenciones.filter(i => i.Estado !== 'Planificada');
   const rol = getUserRole();
   // Profesor: ve todas las intervenciones de los equipos de los que es responsable
   // (no solo las que él mismo creó — así puede ejecutar intervenciones planificadas por Gestores)
@@ -349,22 +405,21 @@ function renderIntervenciones(filtroTipo = '') {
   tbody.innerHTML = items.map(i => {
     const pdfLink = i.URL_Adjunto ? `<a href="${i.URL_Adjunto}" target="_blank" title="${i.Nombre_Adjunto||'Ver documento'}" style="color:var(--accent);font-size:16px">📄</a>` : '<span class="text-muted">—</span>';
     const intIdx  = DATA.intervenciones.indexOf(i);
-    const puedeRegistrar    = puedeHacer('crearIntervenciones') && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
+    const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
-    const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir actuación';
     return `<tr>
       <td><strong>${i.ID_Intervencion}</strong></td>
       <td>${i.Equipo||'—'}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span></td>
       <td>${i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—'}</td>
       <td>${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</td>
-      <td>${i.Realizado_Por||i.Tecnico_Externo||'—'}</td>
+      <td>${i.Realizado_Por||i.Tecnico_Externo||i.Proveedor||'—'}</td>
       <td>${i.Resultado||'—'}</td>
       <td>${i.Equipo_Operativo_Tras_Intervencion==='Sí'?'<span class="badge badge-green">Sí</span>':i.Equipo_Operativo_Tras_Intervencion==='No'?'<span class="badge badge-red">No</span>':'—'}</td>
       <td>${pdfLink}</td>
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
-        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">${btnLabel}</button>` : ''}
+        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">📋 Añadir tarea</button>` : ''}
         ${pendienteFactura ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalAdjuntarFactura(${intIdx})">📎 Factura</button>` : ''}
       </div></td>
     </tr>`;
