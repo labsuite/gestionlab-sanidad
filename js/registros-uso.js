@@ -22,6 +22,9 @@ const _regConfig = {
   }
 };
 
+const PROGRAMAS_AUTOCLAVE = ['121°C / 15 min', '121°C / 20 min'];
+const CARGAS_AUTOCLAVE    = ['Descontaminación', 'Líquidos', 'Sólidos'];
+
 let _regTab          = 'cabina';
 let _regEquipoSel    = { cabina: '', autoclave: '' };
 let _regCtx          = null;   // {tipo, idx: number|null}
@@ -268,15 +271,24 @@ function _renderCamposSesion(tipo, valores = {}) {
         </div>
       </div>`;
   } else {
+    const progActual   = valores.Programa_Ciclo || '';
+    const progEsPreset = PROGRAMAS_AUTOCLAVE.includes(progActual);
+    const progSelValue = progActual && !progEsPreset ? 'Otro' : progActual;
+
     el.innerHTML = `
       <div class="form-grid-2" style="margin-top:12px">
         <div class="form-group">
           <label>Programa / ciclo</label>
-          <input type="text" id="reg-campo-programa" value="${valores.Programa_Ciclo || ''}" placeholder="ej. 121°C / 20 min">
+          <select id="reg-campo-programa" onchange="_onProgramaCicloChange()">
+            ${[...PROGRAMAS_AUTOCLAVE, 'Otro'].map(p => `<option value="${p}" ${progSelValue === p ? 'selected' : ''}>${p}</option>`).join('')}
+          </select>
+          <input type="text" id="reg-campo-programa-otro" placeholder="Especifica el programa" value="${progEsPreset ? '' : progActual}" style="margin-top:6px;${progSelValue === 'Otro' ? '' : 'display:none'}">
         </div>
         <div class="form-group">
           <label>Tipo de carga</label>
-          <input type="text" id="reg-campo-carga" value="${valores.Tipo_Carga || ''}" placeholder="instrumental, medios, residuo biológico…">
+          <select id="reg-campo-carga">
+            ${CARGAS_AUTOCLAVE.map(n => `<option value="${n}" ${valores.Tipo_Carga === n ? 'selected' : ''}>${n}</option>`).join('')}
+          </select>
         </div>
         <div class="form-group full">
           <label>Resultado del control biológico/químico</label>
@@ -288,6 +300,13 @@ function _renderCamposSesion(tipo, valores = {}) {
   }
 }
 
+function _onProgramaCicloChange() {
+  const sel  = document.getElementById('reg-campo-programa');
+  const otro = document.getElementById('reg-campo-programa-otro');
+  if (!sel || !otro) return;
+  otro.style.display = sel.value === 'Otro' ? '' : 'none';
+}
+
 function _leerCamposSesion(tipo) {
   if (tipo === 'cabina') {
     return {
@@ -297,8 +316,9 @@ function _leerCamposSesion(tipo) {
       Descontaminacion_Posterior: document.getElementById('reg-campo-descon')?.checked ? 'Sí' : 'No'
     };
   }
+  const progSel = v('reg-campo-programa');
   return {
-    Programa_Ciclo: v('reg-campo-programa'),
+    Programa_Ciclo: progSel === 'Otro' ? v('reg-campo-programa-otro') : progSel,
     Tipo_Carga: v('reg-campo-carga'),
     Resultado_Control: v('reg-campo-resultado')
   };
