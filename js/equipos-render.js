@@ -221,6 +221,17 @@ function renderEquipos(filtro, filtroEstado) {
   }).join('');
 }
 
+// Resumen de una intervención para vistas de tabla: usa las tareas registradas
+// (modelo nuevo) o cae al campo de descripción legado (intervenciones previas al cambio).
+function _resumenIntervencion(i) {
+  const tareas = getTareasIntervencion(i.ID_Intervencion);
+  if (tareas.length) {
+    const ultima = tareas[tareas.length - 1];
+    return tareas.length > 1 ? `${tareas.length} tareas · última: ${ultima.Descripcion}` : ultima.Descripcion;
+  }
+  return i.Descripcion_Actuacion || i.Observaciones || '—';
+}
+
 function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
@@ -276,16 +287,17 @@ function buildIntervencionesEquipo(equipoId) {
       const intIdx = origIdx;
       const _puedeAct = puedeHacer('crearIntervenciones') &&
         (getUserRole() !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(eq => eq.ID_Activo === equipoId) || {}));
-      const puedeRegistrar   = _puedeAct && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado) && i.Resultado !== 'Resuelto';
+      const puedeRegistrar   = _puedeAct && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
       const pendienteFactura = _puedeAct && i.Estado === 'Pendiente factura';
-      const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir actuación';
+      const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea';
       const quien = i.Realizado_Por || i.Tecnico_Externo || i.Proveedor || '—';
+      const resumen = _resumenIntervencion(i);
       return `<div class="intervencion-mini-row">
         <span><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}" style="font-size:10px">${i.Tipo||'—'}</span></span>
         <span>${i.Estado ? `<span class="badge ${estadoBadgeI[i.Estado]||'badge-gray'}" style="font-size:10px">${i.Estado}</span>` : '—'}</span>
         <span>${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</span>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${quien}">${quien}</span>
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${i.Descripcion_Actuacion||i.Descripcion_Planificada||''}">${i.Descripcion_Actuacion||i.Descripcion_Planificada||'—'}</span>
+        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)" title="${resumen}">${resumen}</span>
         <span>${i.Resultado||'—'}</span>
         <span style="white-space:nowrap">
           ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();openModalActuacionDerivada(${intIdx})">${btnLabel}</button>` : ''}
@@ -330,7 +342,7 @@ function renderIntervenciones(filtroTipo = '') {
   tbody.innerHTML = items.map(i => {
     const pdfLink = i.URL_Adjunto ? `<a href="${i.URL_Adjunto}" target="_blank" title="${i.Nombre_Adjunto||'Ver documento'}" style="color:var(--accent);font-size:16px">📄</a>` : '<span class="text-muted">—</span>';
     const intIdx  = DATA.intervenciones.indexOf(i);
-    const puedeRegistrar    = puedeHacer('crearIntervenciones') && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado) && i.Resultado !== 'Resuelto';
+    const puedeRegistrar    = puedeHacer('crearIntervenciones') && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
     const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir actuación';
     return `<tr>
@@ -369,23 +381,28 @@ function renderIncidencias(filtroEstado = '') {
     });
   }
   if (filtroEstado) items = items.filter(i => i.Estado === filtroEstado);
-  if (filtroEstado !== 'Archivada') items = items.filter(i => i.Estado !== 'Archivada');
+  else items = items.filter(i => !['Resuelta','Descartada'].includes(i.Estado));
   items = [...items].sort((a,b) => new Date(b.Fecha_Hora) - new Date(a.Fecha_Hora));
   if (!items.length) {
     container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin incidencias pendientes</div></div>`;
     return;
   }
-  const estadoBadge  = {'Abierta':'badge-red','En gestión':'badge-orange','Resuelta':'badge-green','Cerrada':'badge-gray'};
+  const estadoBadge  = {'Abierta':'badge-red','En gestión':'badge-orange','Resuelta':'badge-green','Descartada':'badge-gray'};
   const impactoBadge = {'Equipo fuera de servicio':'badge-red','Uso limitado':'badge-orange','No bloquea':'badge-gray'};
   const esProfesor = getUserRole() === 'Profesor';
   container.innerHTML = items.map(i => {
     let btnAccion = '';
-    if (puedeHacer('crearIntervenciones') && !esProfesor) {
-      if (i.Estado === 'Abierta') {
-        btnAccion = `<button class="btn btn-secondary btn-sm" onclick="abrirPlanificacion('${i.ID_Incidencia}','${i.Equipo}')">Responder</button>`;
-      } else if (i.Estado === 'En gestión' && i.Intervencion_Generada) {
-        const intEnl = DATA.intervenciones.find(x => x.ID_Intervencion === i.Intervencion_Generada);
-        const intIdx = intEnl ? DATA.intervenciones.indexOf(intEnl) : -1;
+    let metaGestion = '';
+    if (i.Estado === 'En gestión' && i.Intervencion_Generada) {
+      const intEnl = DATA.intervenciones.find(x => x.ID_Intervencion === i.Intervencion_Generada);
+      const intIdx = intEnl ? DATA.intervenciones.indexOf(intEnl) : -1;
+      if (intEnl) {
+        const tareasEnl = getTareasIntervencion(intEnl.ID_Intervencion);
+        metaGestion = tareasEnl.length
+          ? `<span class="inc-fecha">${tareasEnl.filter(t => t.Resultado==='Resuelto'||t.Resultado==='Descartado').length}/${tareasEnl.length} tareas</span>`
+          : (intEnl.Fecha_Planificada ? `<span class="inc-fecha">📅 ${formatDate(intEnl.Fecha_Planificada)}</span>` : '');
+      }
+      if (puedeHacer('crearIntervenciones') && !esProfesor) {
         if (intEnl && intEnl.Estado === 'Pendiente factura') {
           btnAccion = intIdx >= 0
             ? `<button class="btn btn-secondary btn-sm" onclick="openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura</button>`
@@ -396,10 +413,15 @@ function renderIncidencias(filtroEstado = '') {
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         }
       }
+    } else if (i.Estado === 'Abierta' && puedeHacer('crearIntervenciones') && !esProfesor) {
+      btnAccion = `<button class="btn btn-secondary btn-sm" onclick="abrirPlanificacion('${i.ID_Incidencia}','${i.Equipo}')">Responder</button>`;
     }
     const urgenteCls = i.Urgencia === 'Urgente' ? ' inc-urgente' : '';
-    const btnEliminar = puedeHacer('eliminarItems') && i.Estado !== 'Archivada'
+    const btnEliminar = puedeHacer('eliminarItems') && !['Resuelta','Descartada'].includes(i.Estado)
       ? `<button class="btn btn-danger btn-sm" onclick="eliminarIncidencia('${i.ID_Incidencia}')">Eliminar</button>`
+      : '';
+    const relacionada = i.Relacionada_Con
+      ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">↳ continúa de ${i.Relacionada_Con}</div>`
       : '';
     return `
 <div class="inc-card${urgenteCls}">
@@ -411,10 +433,12 @@ function renderIncidencias(filtroEstado = '') {
     <div class="inc-card-meta">
       ${i.Urgencia === 'Urgente' ? '<span class="badge badge-red">Urgente</span>' : ''}
       <span class="badge ${estadoBadge[i.Estado] || 'badge-gray'}">${i.Estado || '—'}</span>
+      ${metaGestion}
       <span class="inc-fecha">${formatDate(i.Fecha_Hora) || '—'}</span>
     </div>
   </div>
   <div class="inc-problema">${i.Descripcion_Problema || '—'}</div>
+  ${relacionada}
   <div class="inc-card-footer">
     <div class="inc-footer-meta">
       <span class="badge ${impactoBadge[i.Impacto] || 'badge-gray'}">${i.Impacto || '—'}</span>
@@ -464,6 +488,27 @@ function getChainIntervencion(intId) {
 // ============================================================
 // FICHA DE INTERVENCIÓN — modal de solo lectura con acciones
 // ============================================================
+function _buildTimelineIncidencia(inc, i, tareas) {
+  const cerrada = i.Estado === 'Cerrada' || i.Estado === 'Pendiente factura';
+  const pasos = [
+    { label: 'Reportada',   fecha: inc?.Fecha_Hora,       activo: true },
+    { label: 'Planificada', fecha: i.Fecha_Planificada,   activo: !!i.Fecha_Planificada },
+    { label: 'Ejecutando',  fecha: i.Fecha_Realizacion,   activo: tareas.length > 0 },
+    { label: cerrada ? 'Cerrada' : 'En curso', fecha: cerrada ? i.Fecha_Realizacion : '', activo: cerrada }
+  ];
+  return `<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:16px">${pasos.map((p, idx) => {
+    const ultimo = idx === pasos.length - 1;
+    return `<div style="display:flex;align-items:center;${ultimo ? '' : 'flex:1'}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${p.activo ? 'var(--accent)' : 'var(--border)'}"></div>
+        <span style="font-size:10px;font-weight:600;color:${p.activo ? 'var(--text)' : 'var(--text-muted)'};white-space:nowrap">${p.label}</span>
+        <span style="font-size:9px;color:var(--text-muted)">${p.fecha ? formatDate(p.fecha) : '—'}</span>
+      </div>
+      ${ultimo ? '' : `<div style="flex:1;height:2px;background:${p.activo ? 'var(--accent)' : 'var(--border)'};margin:0 4px 14px"></div>`}
+    </div>`;
+  }).join('')}</div>`;
+}
+
 function openFichaIntervencion(intIdx) {
   const i = DATA.intervenciones[intIdx];
   if (!i) return;
@@ -484,27 +529,44 @@ function openFichaIntervencion(intIdx) {
     ? `<span class="badge badge-orange">${incVinculada.ID_Incidencia} · ${incVinculada.Impacto} · ${incVinculada.Estado}</span>`
     : '<span style="color:var(--text-muted);font-size:12px">—</span>';
 
+  const tareas = getTareasIntervencion(i.ID_Intervencion);
+  const timelineEl = document.getElementById('ficha-int-timeline');
+  if (timelineEl) timelineEl.innerHTML = _buildTimelineIncidencia(incVinculada, i, tareas);
+
   document.getElementById('ficha-int-fecha-plan').textContent     = formatDate(i.Fecha_Planificada) || '—';
   document.getElementById('ficha-int-fecha-estimada').textContent = formatDate(i.Fecha_Estimada_Resolucion) || '—';
   document.getElementById('ficha-int-fecha-real').textContent     = formatDate(i.Fecha_Realizacion) || '—';
   const quienRealizo = i.Realizado_Por || (i.Proveedor ? 'SAT: ' + i.Proveedor : '') || i.Tecnico_Externo || '—';
   document.getElementById('ficha-int-realizado').textContent      = quienRealizo;
-  document.getElementById('ficha-int-descripcion').textContent    = i.Descripcion_Actuacion || i.Descripcion_Planificada || '—';
   document.getElementById('ficha-int-resultado').textContent      = i.Resultado || '—';
   document.getElementById('ficha-int-operativo').innerHTML        = i.Equipo_Operativo_Tras_Intervencion === 'Sí'
     ? '<span class="badge badge-green">Sí</span>'
     : i.Equipo_Operativo_Tras_Intervencion === 'No'
       ? '<span class="badge badge-red">No</span>'
       : '—';
-  document.getElementById('ficha-int-coste').textContent = i.Coste_Intervencion
-    ? parseFloat(i.Coste_Intervencion).toLocaleString('es-ES', { style:'currency', currency:'EUR' })
+
+  // Tareas de esta visita (o descripción legada si es una intervención previa a este cambio)
+  const elTareas = document.getElementById('ficha-int-tareas');
+  if (elTareas) {
+    elTareas.innerHTML = tareas.length
+      ? tareas.map(t => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="flex:1">${t.Descripcion}${t.Observaciones ? `<div style="color:var(--text-muted);font-size:11px;margin-top:2px">${t.Observaciones}</div>` : ''}</span>
+          <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px;white-space:nowrap">${t.Resultado}</span>
+        </div>`).join('')
+      : `<span style="color:var(--text-muted)">${i.Descripcion_Actuacion || i.Observaciones || 'Sin tareas registradas'}</span>`;
+  }
+
+  // Coste total de la incidencia, sumando todas las visitas del hilo
+  const costeTotal = chain.reduce((sum, c) => sum + (parseFloat(c.Coste_Intervencion) || 0), 0);
+  document.getElementById('ficha-int-coste').textContent = costeTotal
+    ? costeTotal.toLocaleString('es-ES', { style:'currency', currency:'EUR' }) + (chain.length > 1 ? ' (total del hilo)' : '')
     : '—';
   document.getElementById('ficha-int-observaciones').textContent = i.Observaciones || '—';
   document.getElementById('ficha-int-doc').innerHTML = i.URL_Adjunto
     ? `<a href="${i.URL_Adjunto}" target="_blank" class="btn btn-secondary" style="font-size:12px">📄 ${i.Nombre_Adjunto || 'Ver documento'}</a>`
     : '<span style="color:var(--text-muted);font-size:12px">Sin documento adjunto</span>';
 
-  // Historial de cadena (solo si hay más de una intervención en el hilo)
+  // Historial de cadena (solo si hay más de una visita en el hilo)
   const historialWrap = document.getElementById('ficha-int-historial-wrap');
   const historialEl   = document.getElementById('ficha-int-historial');
   if (chain.length > 1) {
@@ -512,13 +574,15 @@ function openFichaIntervencion(intIdx) {
     historialEl.innerHTML = chain.map((c, idx) => {
       const esCurrent = c.ID_Intervencion === i.ID_Intervencion;
       const esBadge = estadoBadge[c.Estado] || 'badge-gray';
+      const tareasC = getTareasIntervencion(c.ID_Intervencion);
+      const resueltas = tareasC.filter(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado').length;
       return `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
         <div style="width:18px;height:18px;border-radius:50%;background:${esCurrent ? 'var(--accent)' : 'var(--border)'};flex-shrink:0;margin-top:2px"></div>
         <div style="font-size:12px;flex:1">
           <span style="font-weight:${esCurrent ? '600' : '400'}">${c.ID_Intervencion}</span>
           <span class="badge ${esBadge}" style="font-size:10px;margin-left:6px">${c.Estado||'—'}</span>
           ${c.Fecha_Realizacion ? `<span style="color:var(--text-muted);margin-left:6px">${formatDate(c.Fecha_Realizacion)}</span>` : ''}
-          ${c.Resultado ? `<span style="color:var(--text-muted);margin-left:6px">· ${c.Resultado}</span>` : ''}
+          ${tareasC.length ? `<span style="color:var(--text-muted);margin-left:6px">· ${resueltas}/${tareasC.length} tareas resueltas</span>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -528,18 +592,18 @@ function openFichaIntervencion(intIdx) {
 
   // Botones de acción
   const puedeRegistrar = puedeHacer('crearIntervenciones') &&
-    (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado) &&
-    i.Resultado !== 'Resuelto';
+    (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
   const pendienteFactura = i.Estado === 'Pendiente factura';
-  const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir actuación';
+  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && i.Estado !== 'Cerrada' && i.Estado !== 'Pendiente factura';
+  const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea';
   const acciones = document.getElementById('ficha-int-acciones');
   let btns = '';
   if (puedeRegistrar)
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
   if (pendienteFactura && puedeHacer('crearIntervenciones'))
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
-  if (puedeHacer('crearIntervenciones'))
-    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');editIntervencion(${intIdx})">✏️ Editar</button>`;
+  if (puedeNuevaVisita)
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');programarOtraVisita(${intIdx})">📅 Programar otra visita</button>`;
   acciones.innerHTML = btns;
 
   openModal('modal-ficha-intervencion');

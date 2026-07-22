@@ -15,13 +15,12 @@ const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 let accessToken;  // tokenClient se declara en auth.js
 let currentUser  = null;
 let editingRow   = null;
-let pendingFileBase64   = null;
 let pendingEqFileBase64 = null;
 let _pendingSolicitudParaPedido = null;
 let _pendingRecepcion           = null;
 
 let DATA = {
-  equipos: [], intervenciones: [], incidencias: [],
+  equipos: [], intervenciones: [], incidencias: [], tareasIntervencion: [],
   proveedores: [], ubicaciones: [], usuarios: [],
   material: [], movimientos: [], solicitudes: [],
   pedidos: [], lineasPedido: [], ciclosModulos: [],
@@ -41,7 +40,8 @@ let DATA = {
 const COLS = {
   equipos:            ['ID_Activo','Tipo_Equipo','Marca','Modelo','Numero_Serie','Ubicacion','Responsable','Fecha_Adquisicion','Origen_Financiacion','Proveedor_Compra','Proveedor_Servicio_Tecnico','Estado_Operativo','Periodicidad_Mantenimiento','Periodicidad_Custom','Fecha_Ultimo_Preventivo','Fecha_Proximo_Preventivo','Manual_Ficha_Tecnica','Observaciones','Coste','Protocolo_Uso','Tipo_Mantenimiento','Mes_Inicio_Temporada','Mes_Fin_Temporada'],
   intervenciones:     ['ID_Intervencion','Equipo','Tipo','Origen','Fecha_Planificada','Fecha_Realizacion','Realizado_Por','Tecnico_Externo','Proveedor','Descripcion_Actuacion','Resultado','Equipo_Operativo_Tras_Intervencion','URL_Adjunto','Factura_Asociada','Actualiza_Proximo_Preventivo','Observaciones','Nombre_Adjunto','Estado','Fecha_Estimada_Resolucion','Coste_Intervencion'],
-  incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada'],
+  incidencias:        ['ID_Incidencia','Equipo','Reportado_Por','Fecha_Hora','Descripcion_Problema','Impacto','Urgencia','Estado','Intervencion_Generada','Relacionada_Con'],
+  tareasIntervencion: ['ID_Tarea','ID_Intervencion','Descripcion','Resultado','Operativo','Observaciones'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
   ubicaciones:        ['ID_Ubicacion','Laboratorio_Aula','Zona','Subzona','Descripcion_Completa','Activa'],
   usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas','Modulo','Ciclo_Principal','Puede_Revisar_Inventario'],

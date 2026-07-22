@@ -16,6 +16,7 @@ La app se sirve directamente desde `main` en GitHub Pages — sin commit y push,
 
 Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-mantenimiento.md` — hojas Planes_Mantenimiento / Registro_Mantenimientos, lógica de periodos
+- `docs/modulo-incidencias.md` — flujo Incidencia → Intervención (visita) → Tarea, estados derivados, visitas de seguimiento
 - `docs/modulo-residuos.md` — GHS, ciclo de vida de contenedores, consultas, NFC/QR
 - `docs/modulo-reservas.md` — políticas BLOCK/COMPATIBLE, estados, 23 equipos configurados
 - `docs/modulo-usuarios.md` — columnas Usuarios, lógica alumnos, ciclos/módulos, usuarios _sbOnly
@@ -145,6 +146,8 @@ Rangos actuales relevantes:
 | Pedidos | `A2:U` | U = Gasto_Extra_Importe |
 | Material_Ubicaciones | `A2:H` | H = Unidad_Lote |
 | Solicitudes | `A2:K` | K = Snooze_Hasta |
+| Incidencias | `A2:J` | J = Relacionada_Con |
+| Tareas_Intervencion | `A2:F` | F = Observaciones |
 
 ---
 

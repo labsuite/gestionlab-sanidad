@@ -322,14 +322,10 @@ function poblarSelects() {
   };
 
   const ubicNames    = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE').map(u => u.ID_Ubicacion + (u.Laboratorio_Aula ? ' – ' + u.Laboratorio_Aula : ''));
-  const usuariosNames = DATA.usuarios.filter(u => u.Activo !== 'FALSE').map(u => u.Nombre);
   const proveedoresNames = DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => p.Nombre_Proveedor);
-  const equiposIds   = DATA.equipos.map(e => e.ID_Activo + (e.Tipo_Equipo ? ' – ' + e.Tipo_Equipo : '') + (e.Marca ? ' ' + e.Marca : ''));
 
   // eq-ubicacion y eq-responsable son autocompletes, no selects estáticos
-  ['eq-proveedor-compra', 'eq-proveedor-sat', 'int-proveedor'].forEach(id => setOptions(id, proveedoresNames));
-  ['int-realizado-por'].forEach(id => setOptions(id, usuariosNames));
-  ['int-equipo-dummy'].forEach(id => setOptions(id, equiposIds));
+  ['eq-proveedor-compra', 'eq-proveedor-sat'].forEach(id => setOptions(id, proveedoresNames));
 }
 
 // ============================================================

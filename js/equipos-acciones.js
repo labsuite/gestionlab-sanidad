@@ -2,7 +2,6 @@
 // VARIABLE DE ESTADO — intervención pendiente de archivo
 // ============================================================
 let _pendingActFileBase64 = null;  // para modal-registrar-actuacion
-let _incidenciaOrigen     = null;  // ID incidencia al crear intervención desde ella
 
 // ============================================================
 // MULTI-TAG — RESPONSABLE(S) DEL EQUIPO
@@ -180,81 +179,35 @@ async function eliminarEquipo() {
 }
 
 // ============================================================
-// MODAL INTERVENCIÓN (modo manual / edición directa)
-// ============================================================
-function openModalIntervencion() {
-  editingRow = null; pendingFileBase64 = null; _incidenciaOrigen = null; removeFile();
-  document.getElementById('modal-intervencion-title').textContent = 'Nueva intervención';
-  ['int-realizado-por','int-proveedor','int-tecnico-ext','int-fecha-plan','int-fecha-real','int-descripcion','int-observaciones'].forEach(id => sv(id,''));
-  // Limpiar autocomplete de equipo
-  sv('int-equipo', '');
-  const srch = document.getElementById('int-equipo-search'); if (srch) srch.value = '';
-  const sel2 = document.getElementById('int-equipo-selected'); if (sel2) sel2.style.display = 'none';
-  const ac = document.getElementById('int-equipo-autocomplete'); if (ac) ac.classList.remove('open');
-  sv('int-tipo','Correctivo'); sv('int-resultado','Resuelto');
-  sv('int-operativo','Sí'); sv('int-estado-manual','Planificada');
-  const grp = document.getElementById('int-equipo-group');
-  if (grp) grp.style.display = '';
-  poblarSelects(); openModal('modal-intervencion');
-}
-
-function openModalIntervencionEquipo(equipoId) {
-  openModalIntervencion();
-  setTimeout(() => {
-    const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
-    if (e) {
-      const label = [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ');
-      seleccionarEquipoIntervencion(e.ID_Activo, label);
-    }
-    const grp = document.getElementById('int-equipo-group');
-    if (grp) grp.style.display = 'none';
-  }, 50);
-}
-
-function editIntervencion(idx) {
-  const i = DATA.intervenciones[idx];
-  editingRow = { sheet: 'Intervenciones', rowIndex: idx };
-  poblarSelects();
-  document.getElementById('modal-intervencion-title').textContent = 'Editar intervención';
-  sv('int-equipo',i.Equipo);
-  // Pre-rellenar el autocomplete visual
-  const eqObj = DATA.equipos.find(e => (i.Equipo||'').startsWith(e.ID_Activo));
-  if (eqObj) {
-    const lbl = [eqObj.Tipo_Equipo, eqObj.Marca, eqObj.Modelo].filter(Boolean).join(' ');
-    seleccionarEquipoIntervencion(eqObj.ID_Activo, lbl);
-  } else if (i.Equipo) {
-    const sel2 = document.getElementById('int-equipo-selected');
-    const txt2 = document.getElementById('int-equipo-selected-text');
-    if (sel2) sel2.style.display = 'flex';
-    if (txt2) txt2.textContent = i.Equipo;
-  }
-  sv('int-tipo',i.Tipo);
-  sv('int-fecha-plan',i.Fecha_Planificada); sv('int-fecha-real',i.Fecha_Realizacion);
-  sv('int-realizado-por',i.Realizado_Por); sv('int-tecnico-ext',i.Tecnico_Externo);
-  sv('int-proveedor',i.Proveedor); sv('int-descripcion',i.Descripcion_Actuacion||i.Descripcion_Planificada||'');
-  sv('int-resultado',i.Resultado); sv('int-operativo',i.Equipo_Operativo_Tras_Intervencion);
-  sv('int-observaciones',i.Observaciones);
-  sv('int-estado-manual',i.Estado||'Planificada');
-  sv('int-pdf-url',i.URL_Adjunto||'');
-  if (i.URL_Adjunto) { document.getElementById('int-pdf-preview').style.display = 'flex'; document.getElementById('int-pdf-name').textContent = i.Nombre_Adjunto || 'Documento adjunto'; }
-  else document.getElementById('int-pdf-preview').style.display = 'none';
-  openModal('modal-intervencion');
-}
-
-// ============================================================
 // MODAL INCIDENCIA
 // ============================================================
 function openModalIncidencia() {
   editingRow = null;
-  sv('inc-equipo',''); sv('inc-descripcion','');
+  sv('inc-equipo',''); sv('inc-descripcion',''); sv('inc-relacionada','');
   sv('inc-impacto','No bloquea'); sv('inc-urgencia','Normal');
   const srch = document.getElementById('inc-equipo-search'); if (srch) srch.value = '';
   const sel  = document.getElementById('inc-equipo-selected'); if (sel) sel.style.display = 'none';
   const ac   = document.getElementById('inc-equipo-autocomplete'); if (ac) ac.classList.remove('open');
   const grp  = document.getElementById('inc-equipo-group');
   if (grp) grp.style.display = '';
+  poblarIncidenciasRelacionadas('');
   openModal('modal-incidencia');
   setTimeout(() => document.getElementById('inc-equipo-search')?.focus(), 100);
+}
+
+// ============================================================
+// SELECT — incidencias resueltas/descartadas del mismo equipo,
+// para enlazar una reapertura sin reabrir el hilo original
+// ============================================================
+function poblarIncidenciasRelacionadas(equipoId) {
+  const sel = document.getElementById('inc-relacionada');
+  if (!sel) return;
+  const previas = DATA.incidencias.filter(i =>
+    equipoId && i.Equipo && i.Equipo.startsWith(equipoId) &&
+    (i.Estado === 'Resuelta' || i.Estado === 'Descartada')
+  );
+  sel.innerHTML = '<option value="">Ninguna (incidencia nueva)</option>' +
+    previas.map(i => `<option value="${i.ID_Incidencia}">${i.ID_Incidencia} · ${formatDate(i.Fecha_Hora)||''} · ${(i.Descripcion_Problema||'').slice(0,40)}</option>`).join('');
 }
 
 function openModalIncidenciaEquipo(equipoId) {
@@ -272,9 +225,10 @@ function openModalIncidenciaEquipo(equipoId) {
 // ============================================================
 // FLUJO PASO 1 — Planificar desde incidencia
 // ============================================================
-function abrirPlanificacion(incId, equipo) {
+function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-inc-id', incId);
   sv('plan-equipo', equipo);
+  sv('plan-origen-int', origenIntId || '');
   const label = document.getElementById('plan-inc-label');
   if (label) label.textContent = incId + ' (' + equipo + ')';
   sv('plan-tipo', 'Correctivo');
@@ -284,10 +238,22 @@ function abrirPlanificacion(incId, equipo) {
   openModal('modal-planificar-intervencion');
 }
 
+// Programar una NUEVA visita (otro día, posiblemente otro técnico) sobre una incidencia
+// ya en curso — distinto de añadir otra tarea a la visita actual (ver guardarActuacion).
+function programarOtraVisita(intIdx) {
+  const i = DATA.intervenciones[intIdx];
+  if (!i) return;
+  const chainIds = getChainIntervencion(i.ID_Intervencion).map(c => c.ID_Intervencion);
+  const inc = DATA.incidencias.find(x => chainIds.includes(x.Intervencion_Generada));
+  if (!inc) { showToast('No se encontró la incidencia vinculada', 'error'); return; }
+  abrirPlanificacion(inc.ID_Incidencia, i.Equipo, i.ID_Intervencion);
+}
+
 async function guardarPlanificacion() {
   const incId  = v('plan-inc-id');
   const equipo = v('plan-equipo');
   const fecha  = v('plan-fecha');
+  const origenIntId = v('plan-origen-int');
   if (!fecha) { showToast('La fecha planificada es obligatoria', 'error'); return; }
 
   const id  = genId('INT-');
@@ -295,7 +261,7 @@ async function guardarPlanificacion() {
     id,            // A ID_Intervencion
     equipo,        // B Equipo
     v('plan-tipo'),// C Tipo
-    'Incidencia reportada', // D Origen
+    origenIntId ? ('Seguimiento de ' + origenIntId) : 'Incidencia reportada', // D Origen
     fecha,         // E Fecha_Planificada
     '',            // F Fecha_Realizacion
     '',            // G Realizado_Por
@@ -318,22 +284,16 @@ async function guardarPlanificacion() {
   try {
     await sheetsAppend('Intervenciones', row);
     DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-    // Recuperar el obj recién creado para poder leerlo con sus campos
-    const newInt = DATA.intervenciones[DATA.intervenciones.length - 1];
-    newInt.Descripcion_Planificada = v('plan-descripcion'); // campo virtual para UI
 
-    // Actualizar incidencia: Estado → En gestión
-    // Solo actualizar Intervencion_Generada si aún no tiene ninguna (no sobreescribir en derivadas)
+    // Actualizar incidencia: Estado → En gestión, y apuntar siempre a esta intervención
+    // (tanto en la planificación inicial como al programar una visita de seguimiento).
     const incIdx = DATA.incidencias.findIndex(x => x.ID_Incidencia === incId);
     if (incIdx !== -1) {
       const inc = DATA.incidencias[incIdx];
-      const yaEnGestion = inc.Estado === 'En gestión';
       inc.Estado = 'En gestión';
-      if (!inc.Intervencion_Generada) inc.Intervencion_Generada = id;
-      if (!yaEnGestion) {
-        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada];
-        await sheetsUpdate(`Incidencias!A${incIdx + 2}:I${incIdx + 2}`, incRow);
-      }
+      inc.Intervencion_Generada = id;
+      const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
+      await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
     }
 
     showToast('Intervención planificada. Incidencia → En gestión', 'success');
@@ -347,7 +307,56 @@ async function guardarPlanificacion() {
 }
 
 // ============================================================
-// FLUJO PASO 2 — Registrar actuación
+// TAREAS DE INTERVENCIÓN — helpers de agregación
+// Una Intervención es una visita; cada Tarea es una acción concreta
+// dentro de esa visita, con su propio resultado.
+// ============================================================
+function getTareasIntervencion(intId) {
+  return DATA.tareasIntervencion.filter(t => t.ID_Intervencion === intId);
+}
+
+function calcularResultadoAgregado(tareas) {
+  if (!tareas.length) return '';
+  if (tareas.some(t => t.Resultado === 'Pendiente')) return 'Pendiente';
+  if (tareas.every(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado')) {
+    return tareas.some(t => t.Resultado === 'Resuelto') ? 'Resuelto' : 'Descartado';
+  }
+  return 'Resuelto parcialmente';
+}
+
+function calcularEstadoIntervencion(resultadoAgregado, tipoEjec) {
+  if (!resultadoAgregado) return 'Planificada';
+  if (resultadoAgregado === 'Pendiente' || resultadoAgregado === 'Resuelto parcialmente') return 'En gestión';
+  if (resultadoAgregado === 'Resuelto' && tipoEjec === 'Externa') return 'Pendiente factura';
+  return 'Cerrada'; // Resuelto interno, o Descartado
+}
+
+async function _guardarTarea(intId, descripcion, resultado, operativo, observaciones) {
+  const idTarea = genId('TSK-');
+  const row = [idTarea, intId, descripcion, resultado, operativo, observaciones || ''];
+  await sheetsAppend('Tareas_Intervencion', row);
+  DATA.tareasIntervencion.push(rowToObj(row, 'tareasIntervencion'));
+  return idTarea;
+}
+
+const _RESULTADO_BADGE = {'Resuelto':'badge-green','Resuelto parcialmente':'badge-orange','Pendiente':'badge-blue','No resuelto':'badge-red','Descartado':'badge-gray'};
+
+function _renderTareasEnModal(intId) {
+  const cont = document.getElementById('act-tareas-lista');
+  if (!cont) return;
+  const tareas = getTareasIntervencion(intId);
+  if (!tareas.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta visita.</div>';
+    return;
+  }
+  cont.innerHTML = tareas.map(t => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="flex:1">${t.Descripcion}</span>
+    <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>
+  </div>`).join('');
+}
+
+// ============================================================
+// FLUJO PASO 2 — Registrar actuación (tareas de una visita)
 // ============================================================
 function openModalRegistrarActuacion(intIdx) {
   _pendingActFileBase64 = null;
@@ -363,16 +372,13 @@ function openModalRegistrarActuacion(intIdx) {
   if (label) label.textContent = i.ID_Intervencion;
   if (eqLbl) eqLbl.textContent = i.Equipo || '—';
 
-  // Fecha por defecto = hoy
-  sv('act-fecha-real', new Date().toISOString().split('T')[0]);
+  // Campos de la nueva tarea — siempre en blanco
   sv('act-descripcion', '');
   sv('act-observaciones', '');
   sv('act-resultado', 'Resuelto');
   sv('act-operativo', 'Sí');
-  sv('act-coste', '');
   sv('act-pdf-url', '');
 
-  // Poblar selects
   poblarSelects();
   const selUser = document.getElementById('act-realizado-por');
   if (selUser) {
@@ -385,10 +391,29 @@ function openModalRegistrarActuacion(intIdx) {
       DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
   }
 
-  // Restablecer radio a Interna
-  const radInterna = document.getElementById('act-ejec-interna');
-  if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
+  // Los campos de visita (fecha, ejecución, coste) solo se piden la primera vez;
+  // si la visita ya empezó, se muestran fijos para no reescribirlos por accidente.
+  const visitaIniciada = !!i.Fecha_Realizacion;
+  const camposVisita = ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'];
+  camposVisita.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = visitaIniciada; });
 
+  if (visitaIniciada) {
+    sv('act-fecha-real', i.Fecha_Realizacion);
+    sv('act-coste', i.Coste_Intervencion || '');
+    const esExterna = !!i.Proveedor;
+    const radInterna = document.getElementById('act-ejec-interna');
+    const radExterna = document.getElementById('act-ejec-externa');
+    if (esExterna) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
+    else { if (radInterna) radInterna.checked = true; sv('act-realizado-por', i.Realizado_Por); }
+    toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
+  } else {
+    sv('act-fecha-real', new Date().toISOString().split('T')[0]);
+    sv('act-coste', '');
+    const radInterna = document.getElementById('act-ejec-interna');
+    if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
+  }
+
+  _renderTareasEnModal(i.ID_Intervencion);
   openModal('modal-registrar-actuacion');
 }
 
@@ -405,22 +430,22 @@ function toggleActResultado(val) {
   // Reservado para lógica futura de mostrar/ocultar campos según resultado
 }
 
-async function guardarActuacion() {
+async function guardarActuacion(finalizar) {
   const equipoDirecto = v('act-equipo-directo');
-  const fechaReal = v('act-fecha-real');
   const desc      = v('act-descripcion');
-  if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
-  if (!desc)      { showToast('La descripción es obligatoria', 'error'); return; }
+  const resultado = v('act-resultado');
+  const operativo = v('act-operativo');
+  if (!desc)      { showToast('La descripción de la tarea es obligatoria', 'error'); return; }
+  if (!resultado) { showToast('El resultado de la tarea es obligatorio', 'error'); return; }
 
-  const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
-  const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
-  const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
-  const resultado    = v('act-resultado');
-  const operativo    = v('act-operativo');
-  const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
-
-  // ── MODO DIRECTO: crear nueva intervención desde el equipo ───────────────
+  // ── MODO DIRECTO: crear nueva intervención + primera tarea ───────────────
   if (equipoDirecto) {
+    const fechaReal = v('act-fecha-real');
+    if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
+    const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
+    const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
+    const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
+    const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
     const tipoInt = v('act-tipo-int') || 'Correctivo';
     const nuevoId = genId('INT-');
     let urlAdjunto = '', nombreAdjunto = '';
@@ -432,20 +457,23 @@ async function guardarActuacion() {
       } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
       _pendingActFileBase64 = null;
     }
-    const nuevoEstado = (tipoEjec === 'Externa' && resultado === 'Resuelto') ? 'Pendiente factura' : 'Cerrada';
+    const resultadoAgg = calcularResultadoAgregado([{ Resultado: resultado }]);
+    const estadoInt = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
     const row = [
       nuevoId, equipoDirecto, tipoInt, 'Manual', '',
-      fechaReal, realizadoPor, '', proveedorExt, desc,
-      resultado, operativo, urlAdjunto, '', '',
-      v('act-observaciones'), nombreAdjunto, nuevoEstado, '', coste
+      fechaReal, realizadoPor, '', proveedorExt, '',
+      resultadoAgg, operativo, urlAdjunto, '', '',
+      '', nombreAdjunto, estadoInt, '', coste
     ];
     showLoading('Guardando intervención...');
     try {
       await sheetsAppend('Intervenciones', row);
       DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-      if (resultado === 'Resuelto') {
-        try { await actualizarEstadoEquipo(equipoDirecto, operativo === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
-      }
+      await _guardarTarea(nuevoId, desc, resultado, operativo, v('act-observaciones'));
+      const estadoEquipo = (resultado === 'Resuelto' || resultado === 'Descartado')
+        ? (operativo === 'Sí' ? 'Operativo' : 'No operativo')
+        : (operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo');
+      try { await actualizarEstadoEquipo(equipoDirecto, estadoEquipo); } catch(e) { console.warn(e); }
       closeModal('modal-registrar-actuacion');
       showToast(`Intervención ${nuevoId} registrada`, 'success');
       renderAll();
@@ -454,32 +482,24 @@ async function guardarActuacion() {
     return;
   }
 
-  // ── MODO VINCULADO: actualizar intervención existente ───────────────────
+  // ── MODO VINCULADO: añadir una tarea a una intervención existente ────────
   const intIdx = parseInt(v('act-int-idx'));
   const i = DATA.intervenciones[intIdx];
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
 
-  // Determinar nuevo estado según reglas de cierre
-  let nuevoEstadoInt, nuevoEstadoInc;
-  if (resultado === 'Resuelto') {
-    if (tipoEjec === 'Interna') {
-      nuevoEstadoInt = 'Cerrada';
-      nuevoEstadoInc = 'Resuelta';
-    } else {
-      nuevoEstadoInt = 'Pendiente factura';
-      nuevoEstadoInc = 'En gestión'; // sigue hasta adjuntar factura
-    }
-  } else if (resultado === 'Resuelto parcialmente') {
-    // Pregunta diferida — se hace después de guardar
-    nuevoEstadoInt = 'En gestión';
-    nuevoEstadoInc = 'En gestión';
-  } else {
-    nuevoEstadoInt = 'En gestión';
-    nuevoEstadoInc = 'En gestión';
-  }
+  const visitaIniciada = !!i.Fecha_Realizacion;
+  let fechaReal = i.Fecha_Realizacion, realizadoPor = i.Realizado_Por, proveedorExt = i.Proveedor, coste = i.Coste_Intervencion || '';
+  let tipoEjec = i.Proveedor ? 'Externa' : 'Interna';
+  let urlAdjunto = i.URL_Adjunto || '', nombreAdjunto = i.Nombre_Adjunto || '';
 
-  // Subir adjunto si hay
-  let urlAdjunto = v('act-pdf-url') || '', nombreAdjunto = '';
+  if (!visitaIniciada) {
+    fechaReal = v('act-fecha-real');
+    if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
+    tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
+    realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
+    proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
+    coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
+  }
   if (_pendingActFileBase64) {
     showLoading('Subiendo documento...');
     try {
@@ -489,144 +509,64 @@ async function guardarActuacion() {
     _pendingActFileBase64 = null;
   }
 
-  // Acumular descripción: si hay actuaciones previas (Resuelto parcialmente), añadir con separador
-  const descAnterior = i.Descripcion_Actuacion || i.Descripcion_Planificada || '';
-  const descAcumulada = (descAnterior && resultado === 'Resuelto parcialmente' && descAnterior !== desc)
-    ? descAnterior + '\n── ' + fechaReal + ' ──\n' + desc
-    : desc;
-
-  const updatedRow = [
-    i.ID_Intervencion,           // A
-    i.Equipo,                    // B
-    i.Tipo,                      // C
-    i.Origen || 'Incidencia reportada', // D
-    i.Fecha_Planificada || '',   // E
-    fechaReal,                   // F Fecha_Realizacion
-    realizadoPor,                // G Realizado_Por
-    '',                          // H Tecnico_Externo
-    proveedorExt,                // I Proveedor
-    descAcumulada,               // J Descripcion_Actuacion (acumulada)
-    resultado,                   // K Resultado
-    operativo,                   // L Equipo_Operativo
-    urlAdjunto,                  // M URL_Adjunto
-    '',                          // N Factura_Asociada
-    '',                          // O (legacy)
-    v('act-observaciones'),      // P Observaciones
-    nombreAdjunto,               // Q Nombre_Adjunto
-    nuevoEstadoInt,              // R Estado
-    i.Fecha_Estimada_Resolucion || '', // S Fecha_Estimada_Resolucion (se preserva)
-    coste                        // T Coste_Intervencion
-  ];
-
-  showLoading('Guardando actuación...');
+  showLoading('Guardando tarea...');
   try {
-    // ── Guardar datos de la actuación en la intervención actual ────────────
+    await _guardarTarea(i.ID_Intervencion, desc, resultado, operativo, v('act-observaciones'));
+
+    const tareas       = getTareasIntervencion(i.ID_Intervencion);
+    const resultadoAgg = calcularResultadoAgregado(tareas);
+    const estadoAgg     = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
+
+    const updatedRow = [
+      i.ID_Intervencion, i.Equipo, i.Tipo,
+      i.Origen || 'Incidencia reportada',
+      i.Fecha_Planificada || '',
+      fechaReal, realizadoPor, '', proveedorExt,
+      i.Descripcion_Actuacion || '', // legado — solo relevante en intervenciones previas a este cambio
+      resultadoAgg, operativo,
+      urlAdjunto, '', '',
+      i.Observaciones || '',
+      nombreAdjunto, estadoAgg,
+      i.Fecha_Estimada_Resolucion || '', coste
+    ];
     await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
     DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
 
-    // ── Estado operativo del equipo según resultado + campo operativo ─────
-    if (resultado === 'Resuelto') {
-      try { await actualizarEstadoEquipo(i.Equipo, operativo === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
-    } else if (resultado === 'Pendiente' || resultado === 'Resuelto parcialmente') {
-      try { await actualizarEstadoEquipo(i.Equipo, operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
+    // Estado operativo del equipo según la señal más reciente (esta tarea)
+    const estadoEquipo = (resultado === 'Resuelto' || resultado === 'Descartado')
+      ? (operativo === 'Sí' ? 'Operativo' : 'No operativo')
+      : (operativo === 'Sí' ? 'Operativo con fallos' : 'No operativo');
+    try { await actualizarEstadoEquipo(i.Equipo, estadoEquipo); } catch(e) { console.warn(e); }
+
+    // Sincronizar la incidencia vinculada según el estado agregado de la intervención
+    const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
+    if (incIdx !== -1) {
+      const inc = DATA.incidencias[incIdx];
+      if (!['Resuelta','Descartada'].includes(inc.Estado)) {
+        let nuevoEstadoInc = inc.Estado;
+        if (estadoAgg === 'Cerrada') nuevoEstadoInc = resultadoAgg === 'Descartado' ? 'Descartada' : 'Resuelta';
+        else nuevoEstadoInc = 'En gestión'; // Pendiente factura o En gestión → incidencia sigue en gestión
+        if (nuevoEstadoInc !== inc.Estado) {
+          inc.Estado = nuevoEstadoInc;
+          const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
+          await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
+        }
+      }
     }
 
-
-    // ── Si el resultado NO es definitivo: crear nueva intervención de seguimiento ──
-    // Así cada actuación queda como registro histórico independiente y la cadena
-    // es trazable. La incidencia apunta siempre a la última intervención activa.
-    if (resultado === 'Pendiente' || resultado === 'Resuelto parcialmente') {
-      const nuevaId  = genId('INT-');
-      const nuevaRow = [
-        nuevaId,                          // A ID
-        i.Equipo,                         // B Equipo
-        i.Tipo,                           // C Tipo
-        'Seguimiento de ' + i.ID_Intervencion, // D Origen
-        '',                               // E Fecha_Planificada
-        '', '', '', '',                   // F-I vacíos
-        '',                               // J Descripción
-        '', '', '', '', '',               // K-O
-        '',                               // P Observaciones
-        '',                               // Q Nombre_Adjunto
-        'En gestión',                     // R Estado
-        i.Fecha_Estimada_Resolucion || '', // S (heredada del padre)
-        ''                                // T Coste
-      ];
-      await sheetsAppend('Intervenciones', nuevaRow);
-      const nuevaObj = rowToObj(nuevaRow, 'intervenciones');
-      DATA.intervenciones.push(nuevaObj);
-
-      // Actualizar incidencia vinculada → apuntar a la nueva intervención
-      const incId = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-      if (incId !== -1) {
-        const inc = DATA.incidencias[incId];
-        inc.Intervencion_Generada = nuevaId;
-        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'En gestión', nuevaId];
-        await sheetsUpdate(`Incidencias!A${incId + 2}:I${incId + 2}`, incRow);
-      }
-
+    if (finalizar) {
       closeModal('modal-registrar-actuacion');
-      const msg = resultado === 'Resuelto parcialmente'
-        ? `Actuación guardada. Creada nueva intervención de seguimiento (${nuevaId}).`
-        : `Actuación guardada como pendiente. Creada nueva intervención (${nuevaId}).`;
-      showToast(msg, 'success');
+      showToast(`Tarea guardada. Visita → ${estadoAgg}`, 'success');
       renderAll();
-      hideLoading();
-      return;
+    } else {
+      sv('act-descripcion', ''); sv('act-observaciones', ''); sv('act-resultado', 'Resuelto'); sv('act-operativo', 'Sí');
+      ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
+      _renderTareasEnModal(i.ID_Intervencion);
+      showToast('Tarea guardada. Añade otra o finaliza la visita.', 'success');
+      renderEquipos(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
-
-    // ── Resultado definitivo (Resuelto): cerrar incidencia ─────────────────
-    const incId = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-    if (incId !== -1) {
-      const inc = DATA.incidencias[incId];
-      if (!['Resuelta','Cerrada','Archivada'].includes(inc.Estado)) {
-        const nuevoEstadoInc = nuevoEstadoInt === 'Cerrada' ? 'Archivada' : 'En gestión';
-        inc.Estado = nuevoEstadoInc;
-        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, nuevoEstadoInc, inc.Intervencion_Generada];
-        await sheetsUpdate(`Incidencias!A${incId + 2}:I${incId + 2}`, incRow);
-      }
-    }
-
-    closeModal('modal-registrar-actuacion');
-    const msgFinal = nuevoEstadoInt === 'Pendiente factura'
-      ? 'Actuación registrada. Intervención queda "Pendiente factura"'
-      : `Actuación registrada. Intervención → ${nuevoEstadoInt}`;
-    showToast(msgFinal, 'success');
-    renderAll();
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
-}
-
-// ============================================================
-// FLUJO PASO 3b — Resolución parcial
-// ============================================================
-// resolverParcialSeguir / resolverParcialCerrar ya no se usan:
-// el nuevo flujo crea directamente una intervención de seguimiento en guardarActuacion().
-// Se mantienen como stubs para evitar errores si el modal antiguo sigue en el HTML.
-function resolverParcialSeguir() { closeModal('modal-resolucion-parcial'); renderAll(); }
-function resolverParcialCerrar() { closeModal('modal-resolucion-parcial'); renderAll(); }
-
-// ============================================================
-// ADJUNTOS — INTERVENCIÓN MANUAL
-// ============================================================
-function handleFileSelect(input) {
-  const file = input.files[0]; if (!file) return;
-  document.getElementById('int-pdf-name').textContent = file.name;
-  document.getElementById('int-pdf-preview').style.display = 'flex';
-  const reader = new FileReader();
-  reader.onload = e => { pendingFileBase64 = { name: file.name, type: file.type, data: e.target.result.split(',')[1] }; };
-  reader.readAsDataURL(file);
-}
-function removeFile() {
-  pendingFileBase64 = null;
-  const preview = document.getElementById('int-pdf-preview');
-  const name    = document.getElementById('int-pdf-name');
-  const input   = document.getElementById('int-pdf-input');
-  const url     = document.getElementById('int-pdf-url');
-  if (preview) preview.style.display = 'none';
-  if (name)    name.textContent = '';
-  if (input)   input.value = '';
-  if (url)     url.value = '';
 }
 
 // ============================================================
@@ -790,66 +730,6 @@ async function guardarEquipo() {
 }
 
 // ============================================================
-// GUARDAR INTERVENCIÓN (modal manual / edición directa)
-// ============================================================
-async function guardarIntervencion() {
-  const equipo = v('int-equipo'); const desc = v('int-descripcion');
-  if (!equipo || !desc) { showToast('Equipo y descripción son obligatorios', 'error'); return; }
-
-  const fechaReal = v('int-fecha-real') || new Date().toISOString().split('T')[0];
-  let urlAdjunto = v('int-pdf-url') || '', nombreAdjunto = '';
-
-  if (pendingFileBase64) {
-    showLoading('Subiendo documento...');
-    try { urlAdjunto = await uploadFileToDrive(pendingFileBase64.data, pendingFileBase64.name, pendingFileBase64.type); nombreAdjunto = pendingFileBase64.name; }
-    catch(e) { showToast('Error subiendo el PDF. Revisa permisos de Drive.', 'error'); hideLoading(); return; }
-  }
-
-  const tipo    = v('int-tipo');
-  const estado  = v('int-estado-manual') || 'Planificada';
-  const existente = editingRow ? DATA.intervenciones[editingRow.rowIndex] : null;
-  const row     = [
-    existente ? existente.ID_Intervencion : genId('INT-'),
-    equipo, tipo, '',
-    v('int-fecha-plan'), fechaReal,
-    v('int-realizado-por'), v('int-tecnico-ext'), v('int-proveedor'),
-    desc, v('int-resultado'), v('int-operativo'),
-    urlAdjunto, '', '',
-    v('int-observaciones'), nombreAdjunto, estado,
-    existente ? (existente.Fecha_Estimada_Resolucion || '') : '', // S
-    existente ? (existente.Coste_Intervencion || '') : ''         // T
-  ];
-
-  showLoading('Guardando...');
-  try {
-    if (editingRow && editingRow.sheet === 'Intervenciones') {
-      await sheetsUpdate(`Intervenciones!A${editingRow.rowIndex + 2}:T${editingRow.rowIndex + 2}`, row);
-      DATA.intervenciones[editingRow.rowIndex] = rowToObj(row, 'intervenciones');
-      showToast('Intervención actualizada', 'success');
-    } else {
-      await sheetsAppend('Intervenciones', row);
-      DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-      showToast('Intervención guardada', 'success');
-    }
-
-    // Actualizar Estado_Operativo del equipo según resultado
-    const resultadoInt = v('int-resultado');
-    const operativoInt = v('int-operativo');
-    if (resultadoInt === 'Resuelto') {
-      try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo' : 'No operativo'); } catch(e) { console.warn(e); }
-    } else if (resultadoInt === 'Pendiente' || resultadoInt === 'Resuelto parcialmente') {
-      try { await actualizarEstadoEquipo(equipo, operativoInt === 'Sí' ? 'Operativo con fallos' : 'No operativo'); } catch(e) { console.warn(e); }
-    }
-    // Nota: el cierre de incidencias solo se gestiona desde el flujo guiado (guardarActuacion)
-    // para evitar cerrar incidencias equivocadas en equipos con múltiples incidencias abiertas.
-
-    pendingFileBase64 = null;
-    closeModal('modal-intervencion'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
-  hideLoading(); editingRow = null;
-}
-
-// ============================================================
 // GUARDAR INCIDENCIA
 // ============================================================
 async function guardarIncidencia() {
@@ -859,7 +739,7 @@ async function guardarIncidencia() {
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const usuarioApp = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   const reportadoPor = usuarioApp?.Nombre || currentUser?.name || 'Usuario';
-  const row = [id, equipo, reportadoPor, new Date().toISOString().replace('T',' ').slice(0,16), desc, v('inc-impacto'), v('inc-urgencia'), 'Abierta', ''];
+  const row = [id, equipo, reportadoPor, new Date().toISOString().replace('T',' ').slice(0,16), desc, v('inc-impacto'), v('inc-urgencia'), 'Abierta', '', v('inc-relacionada') || ''];
   showLoading('Guardando...');
   try {
     await sheetsAppend('Incidencias', row);
@@ -890,19 +770,6 @@ async function eliminarIncidencia(incId) {
   hideLoading();
 }
 
-async function cambiarEstadoIncidencia(idx) {
-  const i = DATA.incidencias[idx];
-  const estados = ['Abierta','En gestión','Resuelta','Cerrada'];
-  const next = estados[(estados.indexOf(i.Estado) + 1) % estados.length];
-  if (!confirm(`¿Cambiar estado de "${i.ID_Incidencia}" a "${next}"?`)) return;
-  i.Estado = next;
-  const row = [i.ID_Incidencia, i.Equipo, i.Reportado_Por, i.Fecha_Hora, i.Descripcion_Problema, i.Impacto, i.Urgencia, i.Estado, i.Intervencion_Generada];
-  showLoading('Actualizando...');
-  try { await sheetsUpdate(`Incidencias!A${idx + 2}:I${idx + 2}`, row); showToast('Estado actualizado', 'success'); renderAll(); }
-  catch(e) { showToast('Error', 'error'); }
-  hideLoading();
-}
-
 // ============================================================
 // ALIAS
 // ============================================================
@@ -926,6 +793,11 @@ function openModalRegistrarActuacionDirecta(equipoId) {
 
   const tipoGrp = document.getElementById('act-tipo-int-group');
   if (tipoGrp) tipoGrp.style.display = '';
+  // Reactivar los campos de visita (una llamada previa a openModalRegistrarActuacion
+  // pudo haberlos dejado bloqueados tras registrar una tarea sobre otra intervención)
+  ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = false; });
+  const tareasLista = document.getElementById('act-tareas-lista');
+  if (tareasLista) tareasLista.innerHTML = '';
 
   sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
   sv('act-descripcion',   '');
@@ -1021,11 +893,11 @@ async function guardarFactura() {
     const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
     if (incIdx !== -1) {
       const inc = DATA.incidencias[incIdx];
-      if (!['Resuelta','Cerrada','Archivada'].includes(inc.Estado)) {
-        inc.Estado = 'Archivada';
+      if (!['Resuelta','Descartada'].includes(inc.Estado)) {
+        inc.Estado = 'Resuelta';
         const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora,
-          inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Archivada', inc.Intervencion_Generada];
-        await sheetsUpdate(`Incidencias!A${incIdx + 2}:I${incIdx + 2}`, incRow);
+          inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Resuelta', inc.Intervencion_Generada, inc.Relacionada_Con || ''];
+        await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
       }
     }
 
@@ -1120,6 +992,7 @@ function seleccionarEquipoIncidencia(id, label) {
   if (txt) txt.textContent = id + (label ? ' – ' + label : '');
   const list = document.getElementById('inc-equipo-autocomplete');
   if (list) list.classList.remove('open');
+  poblarIncidenciasRelacionadas(id);
 }
 
 function limpiarEquipoIncidencia() {
@@ -1128,58 +1001,6 @@ function limpiarEquipoIncidencia() {
   const sel  = document.getElementById('inc-equipo-selected'); if (sel) sel.style.display = 'none';
   const list = document.getElementById('inc-equipo-autocomplete'); if (list) list.classList.remove('open');
   document.getElementById('inc-equipo-search')?.focus();
-}
-
-// ============================================================
-// AUTOCOMPLETE EQUIPO EN INTERVENCIÓN
-// ============================================================
-function buscarEquipoIntervencion(query) {
-  const list = document.getElementById('int-equipo-autocomplete');
-  if (!list) return;
-  if (!query || query.length < 1) { list.classList.remove('open'); return; }
-  const q = query.toLowerCase();
-  // Profesor: solo puede intervenir en equipos de los que es responsable
-  const pool = getUserRole() === 'Profesor'
-    ? DATA.equipos.filter(e => esResponsableDeEquipo(e))
-    : DATA.equipos;
-  const resultados = pool.filter(e =>
-    e.ID_Activo.toLowerCase().includes(q) ||
-    (e.Tipo_Equipo || '').toLowerCase().includes(q) ||
-    (e.Marca || '').toLowerCase().includes(q) ||
-    (e.Modelo || '').toLowerCase().includes(q) ||
-    (e.Ubicacion || '').toLowerCase().includes(q)
-  ).slice(0, 8);
-  if (!resultados.length) { list.classList.remove('open'); return; }
-  list.innerHTML = resultados.map(e => {
-    const label = [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ');
-    const meta  = e.Ubicacion ? getNombreUbicacion(e.Ubicacion) : '';
-    return `<div class="autocomplete-item" onclick="seleccionarEquipoIntervencion('${e.ID_Activo}','${label.replace(/'/g,"\\'")}')">
-      <div>
-        <div class="autocomplete-item-name">${e.ID_Activo} – ${label}</div>
-        ${meta ? `<div class="autocomplete-item-meta">${meta}</div>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-  list.classList.add('open');
-}
-
-function seleccionarEquipoIntervencion(id, label) {
-  document.getElementById('int-equipo').value = id + (label ? ' – ' + label : '');
-  const srch = document.getElementById('int-equipo-search'); if (srch) srch.value = '';
-  const sel  = document.getElementById('int-equipo-selected');
-  const txt  = document.getElementById('int-equipo-selected-text');
-  if (sel) sel.style.display = 'flex';
-  if (txt) txt.textContent = id + (label ? ' – ' + label : '');
-  const list = document.getElementById('int-equipo-autocomplete');
-  if (list) list.classList.remove('open');
-}
-
-function limpiarEquipoIntervencion() {
-  sv('int-equipo', '');
-  const srch = document.getElementById('int-equipo-search'); if (srch) srch.value = '';
-  const sel  = document.getElementById('int-equipo-selected'); if (sel) sel.style.display = 'none';
-  const list = document.getElementById('int-equipo-autocomplete'); if (list) list.classList.remove('open');
-  document.getElementById('int-equipo-search')?.focus();
 }
 
 // ============================================================
@@ -1208,7 +1029,7 @@ async function guardarAvisoAlumno() {
   const id  = genId('INC-');
   const row = [id, equipo, currentUser?.name || 'Usuario',
     new Date().toISOString().replace('T',' ').slice(0,16),
-    desc, impacto, 'Normal', 'Abierta', ''];
+    desc, impacto, 'Normal', 'Abierta', '', ''];
 
   showLoading('Enviando aviso...');
   try {

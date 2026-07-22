@@ -189,6 +189,7 @@
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);margin-bottom:14px">
         Creando intervención en respuesta a la incidencia <strong id="plan-inc-label"></strong>
       </div>
+      <input type="hidden" id="plan-origen-int">
       <div class="form-grid form-grid-2">
         <div class="form-group">
           <label>Tipo de intervención *</label>
@@ -243,6 +244,7 @@
       <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px">
         Intervención <strong id="act-int-label"></strong> · Equipo: <strong id="act-equipo-label"></strong>
       </div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Datos de la visita</div>
       <div class="form-grid form-grid-2">
         <div class="form-group" id="act-tipo-int-group" style="display:none">
           <label>Tipo de intervención *</label>
@@ -290,8 +292,15 @@
           <label>Coste (€, sin IVA)</label>
           <input id="act-coste" type="number" min="0" step="0.01" placeholder="0.00">
         </div>
+      </div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas registradas en esta visita</div>
+      <div id="act-tareas-lista"></div>
+
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Nueva tarea</div>
+      <div class="form-grid form-grid-2">
         <div class="form-group full">
-          <label>Descripción de la actuación *</label>
+          <label>Descripción de la tarea *</label>
           <textarea id="act-descripcion" placeholder="Describe qué se hizo exactamente..."></textarea>
         </div>
         <div class="form-group">
@@ -301,10 +310,11 @@
             <option>Resuelto parcialmente</option>
             <option>Pendiente</option>
             <option>No resuelto</option>
+            <option>Descartado</option>
           </select>
         </div>
         <div class="form-group">
-          <label>¿Equipo operativo tras intervención?</label>
+          <label>¿Equipo operativo tras esta tarea?</label>
           <select id="act-operativo">
             <option value="Sí">Sí</option>
             <option value="No">No</option>
@@ -332,149 +342,8 @@
       </div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-registrar-actuacion')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarActuacion()">Guardar actuación</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- PASO 3b — Modal Resolución Parcial                          -->
-<!-- ============================================================ -->
-<div class="modal-overlay" id="modal-resolucion-parcial">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-header">
-      <div class="modal-title">⚠️ Resuelto parcialmente</div>
-      <button class="modal-close" onclick="closeModal('modal-resolucion-parcial')">✕</button>
-    </div>
-    <div class="modal-body">
-      <input type="hidden" id="rp-int-idx">
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">
-        La intervención está resuelta parcialmente. ¿Se realizarán actuaciones futuras sobre este equipo?
-      </p>
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="resolverParcialSeguir()">
-          <strong>Sí, habrá más actuaciones</strong>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">La intervención sigue En gestión</div>
-        </button>
-        <button class="btn btn-secondary" style="text-align:left;padding:12px 16px" onclick="resolverParcialCerrar()">
-          <strong>No, no hay más actuaciones previstas</strong>
-          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">La intervención se cierra y la incidencia queda Resuelta</div>
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- Modal Intervención (modo manual / edición directa)          -->
-<!-- ============================================================ -->
-<div class="modal-overlay" id="modal-intervencion">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="modal-intervencion-title">Nueva intervención</div>
-      <button class="modal-close" onclick="closeModal('modal-intervencion')">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="form-grid form-grid-2">
-        <div class="form-group full" id="int-equipo-group">
-          <label>Equipo *</label>
-          <div style="position:relative">
-            <input type="text" id="int-equipo-search" placeholder="Buscar por ID, tipo o marca..."
-              oninput="buscarEquipoIntervencion(this.value)" autocomplete="off"
-              style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px">
-            <div class="autocomplete-list" id="int-equipo-autocomplete"></div>
-          </div>
-          <input type="hidden" id="int-equipo">
-          <div id="int-equipo-selected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);display:flex;align-items:center;justify-content:space-between">
-            <span id="int-equipo-selected-text"></span>
-            <button type="button" onclick="limpiarEquipoIntervencion()" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:14px;padding:0 2px">✕</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>Tipo de intervención *</label>
-          <select id="int-tipo">
-            <option>Correctivo</option>
-            <option>Calibración</option>
-            <option>Verificación funcional</option>
-            <option>Validación</option>
-            <option>Limpieza</option>
-            <option>Descontaminación</option>
-            <option>Sustitución de pieza</option>
-            <option>Cambio de consumibles</option>
-            <option>Control de temperatura</option>
-            <option>Puesta en marcha</option>
-            <option>Actualización de software</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Estado</label>
-          <select id="int-estado-manual">
-            <option>Planificada</option>
-            <option>En gestión</option>
-            <option>Cerrada</option>
-            <option>Pendiente factura</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Fecha planificada</label>
-          <input id="int-fecha-plan" type="date">
-        </div>
-        <div class="form-group">
-          <label>Fecha realización</label>
-          <input id="int-fecha-real" type="date">
-        </div>
-        <div class="form-group">
-          <label>Realizado por (interno)</label>
-          <select id="int-realizado-por"><option value="">Seleccionar...</option></select>
-        </div>
-        <div class="form-group">
-          <label>Técnico externo</label>
-          <input id="int-tecnico-ext" placeholder="Nombre del técnico externo">
-        </div>
-        <div class="form-group">
-          <label>Proveedor</label>
-          <select id="int-proveedor"><option value="">Ninguno</option></select>
-        </div>
-        <div class="form-group">
-          <label>Resultado</label>
-          <select id="int-resultado">
-            <option>Resuelto</option><option>Resuelto parcialmente</option>
-            <option>Pendiente</option><option>No resuelto</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>¿Equipo operativo tras intervención?</label>
-          <select id="int-operativo">
-            <option value="Sí">Sí</option><option value="No">No</option>
-          </select>
-        </div>
-        <div class="form-group full">
-          <label>Descripción de la actuación *</label>
-          <textarea id="int-descripcion" placeholder="Describe qué se hizo exactamente..."></textarea>
-        </div>
-        <div class="form-group full">
-          <label>Observaciones</label>
-          <textarea id="int-observaciones" placeholder="Notas adicionales..."></textarea>
-        </div>
-        <div class="form-group full">
-          <label>Documento adjunto (factura, informe técnico...)</label>
-          <div class="upload-area" onclick="document.getElementById('int-pdf-input').click()">
-            <div>📎 Haz clic para adjuntar un PDF</div>
-            <div class="upload-area-text">Facturas, informes de servicio técnico, certificados de calibración...</div>
-            <input type="file" id="int-pdf-input" accept=".pdf,image/*" onchange="handleFileSelect(this)">
-          </div>
-          <div id="int-pdf-preview" style="display:none" class="upload-preview">
-            <span>📄</span>
-            <span id="int-pdf-name"></span>
-            <span class="remove-file" onclick="removeFile()">✕</span>
-          </div>
-          <input type="hidden" id="int-pdf-url" value="">
-        </div>
-      </div>
-      <div class="form-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-intervencion')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarIntervencion()">Guardar intervención</button>
+        <button class="btn btn-secondary" onclick="guardarActuacion(false)">Guardar y añadir otra tarea</button>
+        <button class="btn btn-primary" onclick="guardarActuacion(true)">Guardar y finalizar visita</button>
       </div>
     </div>
   </div>
@@ -518,6 +387,10 @@
         <div class="form-group full">
           <label>Descripción del problema *</label>
           <textarea id="inc-descripcion" placeholder="Describe el problema con el mayor detalle posible..."></textarea>
+        </div>
+        <div class="form-group full">
+          <label>¿Reaparece un problema ya resuelto?</label>
+          <select id="inc-relacionada"><option value="">Ninguna (incidencia nueva)</option></select>
         </div>
       </div>
       <div class="form-footer">
@@ -577,6 +450,7 @@
       <button class="modal-close" onclick="closeModal('modal-ficha-intervencion')">✕</button>
     </div>
     <div class="modal-body">
+      <div id="ficha-int-timeline"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 20px;margin-bottom:16px">
         <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Equipo</div>
@@ -627,8 +501,8 @@
           <div id="ficha-int-doc"></div>
         </div>
         <div style="grid-column:1/-1">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Descripción</div>
-          <div id="ficha-int-descripcion" style="font-size:13px;color:var(--text-soft);line-height:1.5;white-space:pre-line"></div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Tareas de esta visita</div>
+          <div id="ficha-int-tareas" style="font-size:13px;color:var(--text-soft);line-height:1.5"></div>
         </div>
         <div style="grid-column:1/-1">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Observaciones</div>

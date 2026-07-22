@@ -119,7 +119,7 @@ async function eliminarLote(loteIndex) {
 async function loadAllData() {
   showLoading('Cargando datos...');
   try {
-    const [equipos, intervenciones, incidencias, proveedores, ubicaciones, usuarios,
+    const [equipos, intervenciones, incidencias, tareasIntervencion, proveedores, ubicaciones, usuarios,
            material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
            materialUbicaciones, historicoPrecio, tareas,
            planesMantenimiento, registroMantenimientos,
@@ -129,7 +129,8 @@ async function loadAllData() {
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
-      sheetsGet('Incidencias!A2:I'),
+      sheetsGet('Incidencias!A2:J'),
+      sheetsGet('Tareas_Intervencion!A2:F').catch(() => []),
       sheetsGet('Proveedores!A2:I'),
       sheetsGet('Ubicaciones!A2:F'),
       sheetsGet('Usuarios!A2:I'),
@@ -164,6 +165,7 @@ async function loadAllData() {
     DATA.equipos             = toObj(equipos,             'equipos');
     DATA.intervenciones      = toObj(intervenciones,      'intervenciones');
     DATA.incidencias         = toObj(incidencias,         'incidencias');
+    DATA.tareasIntervencion  = toObj(tareasIntervencion || [], 'tareasIntervencion');
     DATA.proveedores         = toObj(proveedores,         'proveedores');
     DATA.ubicaciones         = toObj(ubicaciones,         'ubicaciones');
     DATA.usuarios            = toObj(usuarios,            'usuarios');
