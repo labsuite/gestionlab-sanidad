@@ -400,6 +400,12 @@
 
     .search-input input::placeholder { color: var(--text-muted); }
 
+    /* Red de seguridad a cualquier ancho: si una tabla dentro de una .card
+       (que tiene overflow:hidden) no cabe, que se pueda hacer scroll en vez
+       de recortar columnas sin avisar — no debería hacer falta si las tablas
+       están bien dimensionadas, pero evita perder acciones silenciosamente. */
+    .card > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
     table {
       width: 100%;
       border-collapse: collapse;

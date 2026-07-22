@@ -409,11 +409,11 @@ function renderIntervenciones(filtroTipo = '') {
     .sort((ga, gb) => Math.max(...gb.map(fechaOrden)) - Math.max(...ga.map(fechaOrden)));
   items = gruposOrdenados.flat();
 
-  if (!items.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-title">Sin intervenciones registradas</div></div></td></tr>`; return; }
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-title">Sin intervenciones registradas</div></div></td></tr>`; return; }
   const tipoBadge  = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   tbody.innerHTML = items.map(i => {
-    const pdfLink = i.URL_Adjunto ? `<a href="${i.URL_Adjunto}" target="_blank" title="${i.Nombre_Adjunto||'Ver documento'}" style="color:var(--accent);font-size:16px">📄</a>` : '<span class="text-muted">—</span>';
+    const pdfLink = i.URL_Adjunto ? `<a href="${i.URL_Adjunto}" target="_blank" title="${i.Nombre_Adjunto||'Ver documento'}" class="icon-btn">📄</a>` : '';
     const intIdx  = DATA.intervenciones.indexOf(i);
     const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
@@ -426,6 +426,7 @@ function renderIntervenciones(filtroTipo = '') {
       ? `<span style="white-space:nowrap"><span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>${chain.length > 1 ? ` <span class="text-muted" style="font-size:10px">${posicion}/${chain.length}</span>` : ''}</span>`
       : '<span class="text-muted">—</span>';
     const idCelda = esContinuacion ? `<span style="color:var(--text-muted)">↳</span> ${i.ID_Intervencion}` : `<strong>${i.ID_Intervencion}</strong>`;
+    const operativoIcono = i.Equipo_Operativo_Tras_Intervencion === 'Sí' ? ' 🟢' : i.Equipo_Operativo_Tras_Intervencion === 'No' ? ' 🔴' : '';
 
     return `<tr${esContinuacion ? ' style="background:var(--surface2)"' : ''}>
       <td style="white-space:nowrap">${idCelda}</td>
@@ -433,13 +434,12 @@ function renderIntervenciones(filtroTipo = '') {
       <td>${incCelda}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span></td>
       <td>${i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—'}</td>
-      <td>${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</td>
-      <td>${i.Realizado_Por||i.Tecnico_Externo||i.Proveedor||'—'}</td>
-      <td>${i.Resultado||'—'}</td>
-      <td>${i.Equipo_Operativo_Tras_Intervencion==='Sí'?'<span class="badge badge-green">Sí</span>':i.Equipo_Operativo_Tras_Intervencion==='No'?'<span class="badge badge-red">No</span>':'—'}</td>
-      <td>${pdfLink}</td>
+      <td style="white-space:nowrap">${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</td>
+      <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${i.Realizado_Por||i.Tecnico_Externo||i.Proveedor||''}">${i.Realizado_Por||i.Tecnico_Externo||i.Proveedor||'—'}</td>
+      <td style="white-space:nowrap">${i.Resultado||'—'}${operativoIcono}</td>
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
+        ${pdfLink}
         ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">📋 Añadir tarea</button>` : ''}
         ${pendienteFactura ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalAdjuntarFactura(${intIdx})">📎 Factura</button>` : ''}
       </div></td>
