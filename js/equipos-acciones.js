@@ -596,32 +596,17 @@ function openModalRegistrarActuacion(intIdx) {
   }
   sv('act-proveedor-ext', ''); // es un input de texto, no se limpia solo al repoblar el datalist
 
-  // Los campos de visita (fecha, ejecución, coste) solo se piden la primera vez;
-  // si la visita ya empezó, se muestran fijos para no reescribirlos por accidente.
-  const visitaIniciada = !!i.Fecha_Realizacion;
-  const camposVisita = ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'];
-  camposVisita.forEach(id => { const el = document.getElementById(id); if (el) el.disabled = visitaIniciada; });
-
-  if (visitaIniciada) {
-    sv('act-fecha-real', i.Fecha_Realizacion);
-    sv('act-coste', i.Coste_Intervencion || '');
-    const esExterna = !!i.Proveedor;
-    const radInterna = document.getElementById('act-ejec-interna');
-    const radExterna = document.getElementById('act-ejec-externa');
-    if (esExterna) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
-    else { if (radInterna) radInterna.checked = true; sv('act-realizado-por', i.Realizado_Por); }
-    toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
-  } else {
-    sv('act-fecha-real', new Date().toISOString().split('T')[0]);
-    sv('act-coste', '');
-    // Si ya se indicó quién la haría al planificar, se precarga aquí (editable, por si cambia)
-    const esExternaPlan = !!i.Proveedor;
-    const radInterna = document.getElementById('act-ejec-interna');
-    const radExterna = document.getElementById('act-ejec-externa');
-    if (esExternaPlan) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
-    else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
-    toggleActEjecucion(esExternaPlan ? 'Externa' : 'Interna');
-  }
+  // Los campos de visita (fecha, ejecución, quién, coste) se precargan con lo que
+  // ya hubiera (de una tarea anterior o de la planificación), pero se quedan
+  // siempre editables — por si hace falta corregirlos más adelante.
+  sv('act-fecha-real', i.Fecha_Realizacion || new Date().toISOString().split('T')[0]);
+  sv('act-coste', i.Coste_Intervencion || '');
+  const esExterna = !!i.Proveedor;
+  const radInterna = document.getElementById('act-ejec-interna');
+  const radExterna = document.getElementById('act-ejec-externa');
+  if (esExterna) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
+  else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
+  toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
 
   _renderTareasEnModal(i.ID_Intervencion);
   openModal('modal-registrar-actuacion');
@@ -768,28 +753,24 @@ async function guardarActuacion(finalizar) {
   const i = DATA.intervenciones[intIdx];
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
 
-  const visitaIniciada = !!i.Fecha_Realizacion;
-
-  if (!visitaIniciada) {
-    const fechaReal = v('act-fecha-real');
-    if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
-    const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
-    const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
-    const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
-    const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
-    showLoading('Guardando...');
-    // Fijar los datos de la visita ahora, la primera vez — el resultado de las
-    // tareas se marca luego, una a una, desde la lista.
-    const rowVisita = [
-      i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen || 'Incidencia reportada',
-      i.Fecha_Planificada || '', fechaReal, realizadoPor, '', proveedorExt,
-      i.Descripcion_Actuacion || '', i.Resultado || '', i.Equipo_Operativo_Tras_Intervencion || '',
-      i.URL_Adjunto || '', '', '', i.Observaciones || '', i.Nombre_Adjunto || '', i.Estado || 'Planificada',
-      i.Fecha_Estimada_Resolucion || '', coste
-    ];
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowVisita);
-    DATA.intervenciones[intIdx] = rowToObj(rowVisita, 'intervenciones');
-  }
+  // Los campos de visita se leen y se guardan siempre (no solo la primera vez),
+  // ya que se quedan editables para poder corregirlos más adelante si hiciera falta.
+  const fechaReal = v('act-fecha-real');
+  if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
+  const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
+  const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
+  const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
+  const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
+  showLoading('Guardando...');
+  const rowVisita = [
+    i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen || 'Incidencia reportada',
+    i.Fecha_Planificada || '', fechaReal, realizadoPor, '', proveedorExt,
+    i.Descripcion_Actuacion || '', i.Resultado || '', i.Equipo_Operativo_Tras_Intervencion || '',
+    i.URL_Adjunto || '', '', '', i.Observaciones || '', i.Nombre_Adjunto || '', i.Estado || 'Planificada',
+    i.Fecha_Estimada_Resolucion || '', coste
+  ];
+  await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowVisita);
+  DATA.intervenciones[intIdx] = rowToObj(rowVisita, 'intervenciones');
 
   if (_pendingActFileBase64) {
     showLoading('Subiendo documento...');
@@ -822,7 +803,6 @@ async function guardarActuacion(finalizar) {
       renderAll();
     } else {
       _resetCamposTarea();
-      ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = true; });
       _renderTareasEnModal(i.ID_Intervencion);
       showToast('Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.', 'success');
       renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
