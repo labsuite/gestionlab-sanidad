@@ -234,23 +234,38 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const intro = document.getElementById('plan-intro-texto');
   const titulo = document.getElementById('plan-modal-title');
   const ayuda  = document.getElementById('plan-ayuda-texto');
-  let tareasPendientesTexto = '';
+  const pendWrap  = document.getElementById('plan-pendientes-wrap');
+  const pendLista = document.getElementById('plan-pendientes-lista');
   if (origenIntId) {
     if (intro) intro.textContent = 'Programando una nueva visita de seguimiento sobre la incidencia';
     if (titulo) titulo.textContent = '📅 Programar próxima visita';
-    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Lo pendiente de la visita anterior ya está anotado abajo — revísalo, edítalo si hace falta, y añade lo que se sepa de más.';
+    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Marca abajo lo pendiente que corresponda a esta visita — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
     const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
-    tareasPendientesTexto = getTareasIntervencion(origenIntId).filter(sinResolver).map(t => t.Descripcion).join('\n');
+    const pendientes = getTareasIntervencion(origenIntId).filter(sinResolver);
+    if (pendWrap && pendLista) {
+      if (pendientes.length) {
+        pendWrap.style.display = '';
+        pendLista.innerHTML = pendientes.map((t, idx) => `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" class="plan-pendiente-check" value="${t.Descripcion.replace(/"/g, '&quot;')}" style="margin-top:2px">
+          <span>${t.Descripcion} <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span></span>
+        </label>`).join('');
+      } else {
+        pendWrap.style.display = 'none';
+        pendLista.innerHTML = '';
+      }
+    }
   } else {
     if (intro) intro.textContent = 'Creando intervención en respuesta a la incidencia';
     if (titulo) titulo.textContent = '🗓 Responder a la incidencia';
     if (ayuda) ayuda.innerHTML = 'Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas visitas".';
+    if (pendWrap) pendWrap.style.display = 'none';
+    if (pendLista) pendLista.innerHTML = '';
   }
   sv('plan-tipo', 'Correctivo');
   sv('plan-fecha', '');
   sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
-  sv('plan-tareas-previstas', tareasPendientesTexto);
+  sv('plan-tareas-previstas', '');
   openModal('modal-planificar-intervencion');
 }
 
@@ -300,10 +315,12 @@ async function guardarPlanificacion() {
     await sheetsAppend('Intervenciones', row);
     DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
 
-    // Tareas ya previstas para esa visita: se guardan como Pendiente, sin tocar
-    // los datos de ejecución (fecha real, quién...) — eso se rellena al ejecutar.
-    const tareasPrevistas = v('plan-tareas-previstas').split('\n').map(s => s.trim()).filter(Boolean);
-    for (const desc of tareasPrevistas) {
+    // Tareas ya previstas para esa visita: las marcadas de "pendiente de la visita
+    // anterior" + las escritas a mano. Se guardan como Pendiente, sin tocar los
+    // datos de ejecución (fecha real, quién...) — eso se rellena al ejecutar.
+    const pendientesMarcadas = Array.from(document.querySelectorAll('.plan-pendiente-check:checked')).map(el => el.value);
+    const tareasEscritas = v('plan-tareas-previstas').split('\n').map(s => s.trim()).filter(Boolean);
+    for (const desc of [...pendientesMarcadas, ...tareasEscritas]) {
       await _guardarTarea(id, desc, 'Pendiente', '', '');
     }
 

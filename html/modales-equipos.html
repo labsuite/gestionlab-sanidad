@@ -222,8 +222,12 @@
           <label>Descripción planificada</label>
           <textarea id="plan-descripcion" placeholder="Qué se prevé hacer..." style="min-height:80px"></textarea>
         </div>
+        <div class="form-group full" id="plan-pendientes-wrap" style="display:none">
+          <label>Pendiente de la visita anterior <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(marca solo lo que corresponda a esta visita — el resto sigue pendiente para otra)</span></label>
+          <div id="plan-pendientes-lista" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
         <div class="form-group full">
-          <label>Tareas ya previstas para esa visita <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(opcional — una por línea; se podrán completar sin reescribirlas cuando llegue la visita)</span></label>
+          <label>Otras tareas ya previstas para esa visita <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(opcional — una por línea; se podrán completar sin reescribirlas cuando llegue la visita)</span></label>
           <textarea id="plan-tareas-previstas" placeholder="Ej:&#10;Desmontar la tapa y revisar el motor&#10;Sustituir la correa" style="min-height:70px"></textarea>
         </div>
       </div>
