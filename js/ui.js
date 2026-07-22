@@ -1,6 +1,22 @@
 // ============================================================
 // CARGA DINÁMICA DE MODALES
 // ============================================================
+// Reintenta un fetch varias veces antes de rendirse — los 503 de GitHub Pages
+// suelen ser puntuales (CDN propagando un despliegue reciente) y desaparecen
+// al segundo intento.
+async function _fetchConReintentos(url, intentos = 3, esperaMs = 500) {
+  for (let i = 1; i <= intentos; i++) {
+    try {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${url}: ${r.status}`);
+      return await r.text();
+    } catch (e) {
+      if (i === intentos) throw e;
+      await new Promise(res => setTimeout(res, esperaMs * i));
+    }
+  }
+}
+
 async function loadModales() {
   const archivos = [
     'html/modales-equipos.html',
@@ -12,10 +28,7 @@ async function loadModales() {
     'html/modales-reservas.html'
   ];
   try {
-    const htmls = await Promise.all(archivos.map(f => fetch(f).then(r => {
-      if (!r.ok) throw new Error(`No se pudo cargar ${f}: ${r.status}`);
-      return r.text();
-    })));
+    const htmls = await Promise.all(archivos.map(f => _fetchConReintentos(f)));
     document.getElementById('modales-container').innerHTML = htmls.join('\n');
   } catch(e) {
     console.error('Error cargando modales:', e);
