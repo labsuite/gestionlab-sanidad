@@ -423,13 +423,13 @@ function renderIntervenciones(filtroTipo = '') {
     const esContinuacion = chain.length > 1 && posicion > 1;
     const inc = DATA.incidencias.find(x => chain.some(c => c.ID_Intervencion === x.Intervencion_Generada));
     const incCelda = inc
-      ? `<span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>${chain.length > 1 ? ` <span class="text-muted" style="font-size:10px">${posicion}/${chain.length}</span>` : ''}`
+      ? `<span style="white-space:nowrap"><span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>${chain.length > 1 ? ` <span class="text-muted" style="font-size:10px">${posicion}/${chain.length}</span>` : ''}</span>`
       : '<span class="text-muted">—</span>';
     const idCelda = esContinuacion ? `<span style="color:var(--text-muted)">↳</span> ${i.ID_Intervencion}` : `<strong>${i.ID_Intervencion}</strong>`;
 
     return `<tr${esContinuacion ? ' style="background:var(--surface2)"' : ''}>
-      <td>${idCelda}</td>
-      <td>${i.Equipo||'—'}</td>
+      <td style="white-space:nowrap">${idCelda}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${i.Equipo||''}">${i.Equipo||'—'}</td>
       <td>${incCelda}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span></td>
       <td>${i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—'}</td>
