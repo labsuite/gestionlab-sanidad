@@ -231,8 +231,10 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-origen-int', origenIntId || '');
   const label = document.getElementById('plan-inc-label');
   if (label) label.textContent = incId + ' (' + equipo + ')';
+  const intro = document.getElementById('plan-intro-texto');
+  if (intro) intro.textContent = origenIntId ? 'Programando una nueva visita de seguimiento sobre' : 'Creando intervención en respuesta a la incidencia';
   sv('plan-tipo', 'Correctivo');
-  sv('plan-fecha', new Date().toISOString().split('T')[0]);
+  sv('plan-fecha', '');
   sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
   openModal('modal-planificar-intervencion');
@@ -254,7 +256,6 @@ async function guardarPlanificacion() {
   const equipo = v('plan-equipo');
   const fecha  = v('plan-fecha');
   const origenIntId = v('plan-origen-int');
-  if (!fecha) { showToast('La fecha planificada es obligatoria', 'error'); return; }
 
   const id  = genId('INT-');
   const row = [
@@ -356,6 +357,33 @@ function _renderTareasEnModal(intId) {
 }
 
 // ============================================================
+// TAREAS HEREDADAS — pendientes de la visita anterior de la misma cadena,
+// para no tener que reescribirlas cuando se programa una visita de seguimiento.
+// ============================================================
+function _tareasHeredadas(i) {
+  if (!i || !i.Origen || !i.Origen.startsWith('Seguimiento de ')) return [];
+  const padreId = i.Origen.replace('Seguimiento de ', '');
+  return getTareasIntervencion(padreId).filter(t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado));
+}
+
+function _renderTareasHeredadas(i) {
+  const wrap = document.getElementById('act-heredadas-wrap');
+  const cont = document.getElementById('act-heredadas-lista');
+  if (!wrap || !cont) return;
+  const heredadas = _tareasHeredadas(i);
+  if (!heredadas.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  cont.innerHTML = heredadas.map(t => `<button type="button" class="btn btn-secondary" style="text-align:left;font-size:12px" onclick="usarTareaHeredada('${t.Descripcion.replace(/'/g, "\\'")}')">
+    ➜ ${t.Descripcion} <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px;margin-left:6px">${t.Resultado}</span>
+  </button>`).join('');
+}
+
+function usarTareaHeredada(desc) {
+  sv('act-descripcion', desc);
+  document.getElementById('act-descripcion')?.focus();
+}
+
+// ============================================================
 // FLUJO PASO 2 — Registrar actuación (tareas de una visita)
 // ============================================================
 function openModalRegistrarActuacion(intIdx) {
@@ -382,11 +410,11 @@ function openModalRegistrarActuacion(intIdx) {
     selUser.innerHTML = '<option value="">Seleccionar usuario...</option>' +
       DATA.usuarios.filter(u => u.Activo !== 'FALSE').map(u => `<option value="${u.Nombre}">${u.Nombre}</option>`).join('');
   }
-  const selProv = document.getElementById('act-proveedor-ext');
-  if (selProv) {
-    selProv.innerHTML = '<option value="">Seleccionar proveedor...</option>' +
-      DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
+  const listProv = document.getElementById('act-proveedor-ext-list');
+  if (listProv) {
+    listProv.innerHTML = DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">`).join('');
   }
+  sv('act-proveedor-ext', ''); // es un input de texto, no se limpia solo al repoblar el datalist
 
   // Los campos de visita (fecha, ejecución, coste) solo se piden la primera vez;
   // si la visita ya empezó, se muestran fijos para no reescribirlos por accidente.
@@ -411,6 +439,7 @@ function openModalRegistrarActuacion(intIdx) {
   }
 
   _renderTareasEnModal(i.ID_Intervencion);
+  _renderTareasHeredadas(i);
   openModal('modal-registrar-actuacion');
 }
 
@@ -833,6 +862,8 @@ function openModalRegistrarActuacionDirecta(equipoId) {
   ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = false; });
   const tareasLista = document.getElementById('act-tareas-lista');
   if (tareasLista) tareasLista.innerHTML = '';
+  const heredadasWrap = document.getElementById('act-heredadas-wrap');
+  if (heredadasWrap) heredadasWrap.style.display = 'none';
 
   sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
   _resetCamposTarea();
@@ -845,11 +876,11 @@ function openModalRegistrarActuacionDirecta(equipoId) {
     selUser.innerHTML = '<option value="">Seleccionar usuario...</option>' +
       DATA.usuarios.filter(u => u.Activo !== 'FALSE').map(u => `<option value="${u.Nombre}">${u.Nombre}</option>`).join('');
   }
-  const selProv = document.getElementById('act-proveedor-ext');
-  if (selProv) {
-    selProv.innerHTML = '<option value="">Seleccionar proveedor...</option>' +
-      DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
+  const listProv = document.getElementById('act-proveedor-ext-list');
+  if (listProv) {
+    listProv.innerHTML = DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">`).join('');
   }
+  sv('act-proveedor-ext', '');
 
   const radInterna = document.getElementById('act-ejec-interna');
   if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }

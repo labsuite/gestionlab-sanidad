@@ -173,11 +173,18 @@ function renderEquipos(filtro, filtroEstado) {
       impactoBadge = `<span class="badge badge-orange" style="font-size:10px;margin-left:4px" title="Incidencia ${incAbierta.ID_Incidencia}">⚠️ ${incAbierta.Impacto}</span>`;
     } else if (e.Estado_Operativo === 'Revisión planificada') {
       // Buscar la intervención planificada más reciente para este equipo
+      // (las que tienen fecha van primero, ordenadas; las que no, al final)
       const intPlan = DATA.intervenciones
-        .filter(i => i.Equipo && i.Equipo.startsWith(e.ID_Activo) && i.Estado === 'Planificada' && i.Fecha_Planificada)
-        .sort((a, b) => new Date(a.Fecha_Planificada) - new Date(b.Fecha_Planificada))[0];
+        .filter(i => i.Equipo && i.Equipo.startsWith(e.ID_Activo) && i.Estado === 'Planificada')
+        .sort((a, b) => {
+          if (!a.Fecha_Planificada && !b.Fecha_Planificada) return 0;
+          if (!a.Fecha_Planificada) return 1;
+          if (!b.Fecha_Planificada) return -1;
+          return new Date(a.Fecha_Planificada) - new Date(b.Fecha_Planificada);
+        })[0];
       if (intPlan) {
-        impactoBadge = `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">📅 ${formatDate(intPlan.Fecha_Planificada)}</span>`;
+        const fechaTxt = intPlan.Fecha_Planificada ? formatDate(intPlan.Fecha_Planificada) : 'Por concretar';
+        impactoBadge = `<span class="badge badge-blue" style="font-size:10px;margin-left:4px">📅 ${fechaTxt}</span>`;
       }
     }
     const planStatus = (() => {
@@ -400,7 +407,7 @@ function renderIncidencias(filtroEstado = '') {
         const tareasEnl = getTareasIntervencion(intEnl.ID_Intervencion);
         metaGestion = tareasEnl.length
           ? `<span class="inc-fecha">${tareasEnl.filter(t => t.Resultado==='Resuelto'||t.Resultado==='Descartado').length}/${tareasEnl.length} tareas</span>`
-          : (intEnl.Fecha_Planificada ? `<span class="inc-fecha">📅 ${formatDate(intEnl.Fecha_Planificada)}</span>` : '');
+          : `<span class="inc-fecha">📅 ${intEnl.Fecha_Planificada ? formatDate(intEnl.Fecha_Planificada) : 'Por concretar'}</span>`;
       }
       if (puedeHacer('crearIntervenciones') && !esProfesor) {
         if (intEnl && intEnl.Estado === 'Pendiente factura') {
@@ -491,10 +498,10 @@ function getChainIntervencion(intId) {
 function _buildTimelineIncidencia(inc, i, tareas) {
   const cerrada = i.Estado === 'Cerrada' || i.Estado === 'Pendiente factura';
   const pasos = [
-    { label: 'Reportada',   fecha: inc?.Fecha_Hora,       activo: true },
-    { label: 'Planificada', fecha: i.Fecha_Planificada,   activo: !!i.Fecha_Planificada },
-    { label: 'Ejecutando',  fecha: i.Fecha_Realizacion,   activo: tareas.length > 0 },
-    { label: cerrada ? 'Cerrada' : 'En curso', fecha: cerrada ? i.Fecha_Realizacion : '', activo: cerrada }
+    { label: 'Reportada',   texto: formatDate(inc?.Fecha_Hora) || '—', activo: true },
+    { label: 'Planificada', texto: i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : 'Por concretar', activo: true },
+    { label: 'Ejecutando',  texto: formatDate(i.Fecha_Realizacion) || '—', activo: tareas.length > 0 },
+    { label: cerrada ? 'Cerrada' : 'En curso', texto: cerrada ? (formatDate(i.Fecha_Realizacion) || '—') : '—', activo: cerrada }
   ];
   return `<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:16px">${pasos.map((p, idx) => {
     const ultimo = idx === pasos.length - 1;
@@ -502,7 +509,7 @@ function _buildTimelineIncidencia(inc, i, tareas) {
       <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px">
         <div style="width:10px;height:10px;border-radius:50%;background:${p.activo ? 'var(--accent)' : 'var(--border)'}"></div>
         <span style="font-size:10px;font-weight:600;color:${p.activo ? 'var(--text)' : 'var(--text-muted)'};white-space:nowrap">${p.label}</span>
-        <span style="font-size:9px;color:var(--text-muted)">${p.fecha ? formatDate(p.fecha) : '—'}</span>
+        <span style="font-size:9px;color:var(--text-muted)">${p.texto}</span>
       </div>
       ${ultimo ? '' : `<div style="flex:1;height:2px;background:${p.activo ? 'var(--accent)' : 'var(--border)'};margin:0 4px 14px"></div>`}
     </div>`;

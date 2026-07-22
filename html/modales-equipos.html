@@ -186,8 +186,11 @@
     <div class="modal-body">
       <input type="hidden" id="plan-inc-id">
       <input type="hidden" id="plan-equipo">
+      <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-soft);margin-bottom:10px;line-height:1.5">
+        <strong>Planificar</strong> es decir "esto se va a atender" — no hace falta que ya sepas cuánd­o ni tener la visita hecha. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde el botón "Ejecutar".
+      </div>
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);margin-bottom:14px">
-        Creando intervención en respuesta a la incidencia <strong id="plan-inc-label"></strong>
+        <span id="plan-intro-texto">Creando intervención en respuesta a la incidencia</span> <strong id="plan-inc-label"></strong>
       </div>
       <input type="hidden" id="plan-origen-int">
       <div class="form-grid form-grid-2">
@@ -208,7 +211,7 @@
           </select>
         </div>
         <div class="form-group">
-          <label>Fecha planificada *</label>
+          <label>Fecha planificada <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(si aún no se sabe, déjala en blanco y la añades luego)</span></label>
           <input id="plan-fecha" type="date">
         </div>
         <div class="form-group">
@@ -241,6 +244,9 @@
       <input type="hidden" id="act-int-id">
       <input type="hidden" id="act-int-idx">
       <input type="hidden" id="act-equipo-directo">
+      <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);margin-bottom:10px;line-height:1.5">
+        Esta <strong>Intervención</strong> es la visita completa de hoy. Cada cosa concreta que hagas (revisar, cambiar una pieza, limpiar...) es una <strong>Tarea</strong> distinta, con su propio resultado — añade tantas como necesites antes de finalizar la visita.
+      </div>
       <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px">
         Intervención <strong id="act-int-label"></strong> · Equipo: <strong id="act-equipo-label"></strong>
       </div>
@@ -286,7 +292,8 @@
         </div>
         <div class="form-group" id="act-externa-group" style="display:none">
           <label>Empresa / proveedor *</label>
-          <select id="act-proveedor-ext"><option value="">Seleccionar proveedor...</option></select>
+          <input type="text" id="act-proveedor-ext" list="act-proveedor-ext-list" placeholder="Escribe o elige de tus proveedores..." autocomplete="off">
+          <datalist id="act-proveedor-ext-list"></datalist>
         </div>
         <div class="form-group" id="act-coste-group" style="display:none">
           <label>Coste (€, sin IVA)</label>
@@ -296,6 +303,12 @@
 
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas registradas en esta visita</div>
       <div id="act-tareas-lista"></div>
+
+      <div id="act-heredadas-wrap" style="display:none">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Pendiente de la visita anterior</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Toca una para copiarla en "Nueva tarea" y completarla sin volver a escribirla.</div>
+        <div id="act-heredadas-lista" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
 
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Nueva tarea</div>
       <div class="form-grid form-grid-2">

@@ -48,13 +48,15 @@ sigue `En gestión`.
 ## Flujo end-to-end
 
 1. **Reportar** (`guardarIncidencia` / `guardarAvisoAlumno`) → `Incidencias` con `Estado='Abierta'`; el equipo pasa a `En revisión` u `Operativo con fallos` según impacto.
-2. **Planificar** (`abrirPlanificacion` → `guardarPlanificacion`) → crea `Intervencion` con `Estado='Planificada'` y `Fecha_Planificada`; la incidencia pasa a `En gestión` y apunta a esa intervención; el equipo pasa a `Revisión planificada`.
+2. **Planificar** (`abrirPlanificacion` → `guardarPlanificacion`) → crea `Intervencion` con `Estado='Planificada'`; la incidencia pasa a `En gestión` y apunta a esa intervención; el equipo pasa a `Revisión planificada`. `Fecha_Planificada` es **opcional** — si aún no se sabe cuándo, se deja en blanco (se muestra "Por concretar" en badges/cards) y se añade más tarde reabriendo la planificación.
 3. **Registrar tareas de la visita** (`openModalRegistrarActuacion` → `guardarActuacion(finalizar)`):
-   - Primera tarea: además fija los datos de la visita (fecha real, interna/externa, quién, coste) — quedan bloqueados para las tareas siguientes de esa misma visita.
+   - Primera tarea: además fija los datos de la visita (fecha real, interna/externa, quién, coste) — quedan bloqueados para las tareas siguientes de esa misma visita. El campo de proveedor externo admite texto libre además del catálogo (`<input list>` con `datalist`), para técnicos puntuales no dados de alta.
    - Cada tarea añadida recalcula el Resultado/Estado agregado de la intervención y sincroniza la incidencia y el `Estado_Operativo` del equipo.
-   - Botón **"Guardar y añadir otra tarea"**: guarda, refresca la lista, deja el modal abierto — para cuando surgen más acciones sobre la marcha.
-   - Botón **"Guardar y finalizar visita"**: guarda y cierra el modal.
+   - Botón **"➕ Guardar esta tarea y añadir otra"** (junto a los campos, no en el pie): guarda, refresca la lista, deja el modal abierto — para cuando surgen más acciones sobre la marcha.
+   - Botón **"Guardar y finalizar visita"** (pie del modal): guarda y cierra el modal.
+   - Resultado se elige con un botón "✓ Resuelto" (atajo al caso común) + un desplegable pequeño para el resto (Pendiente/No resuelto/Resuelto parcialmente/Descartado); "¿Operativo?" es un botón toggle 🟢/🔴 en vez de un desplegable Sí/No.
 4. **Nueva visita** (`programarOtraVisita` → reutiliza `abrirPlanificacion` con un tercer argumento `origenIntId`) — para cuando hace falta volver otro día (pieza pendiente, otro técnico...). Crea una intervención encadenada (`Origen: 'Seguimiento de <ID>'`), reconstruible con `getChainIntervencion`. Distinto de añadir una tarea: eso es la misma visita, esto es una visita nueva.
+   - Al abrir el registro de actuación de esa nueva visita, las tareas del padre con resultado no definitivo (`Pendiente`/`Resuelto parcialmente`/`No resuelto`) aparecen en "Pendiente de la visita anterior" (`_tareasHeredadas`) — un clic copia la descripción a "Nueva tarea" sin reescribirla.
 5. **Factura** (`guardarFactura`, solo si `Estado='Pendiente factura'`) → cierra la intervención y la incidencia (`Resuelta`).
 6. **Modo directo** (`openModalRegistrarActuacionDirecta`, botón 🔧 en la tabla de equipos) — crea una intervención sin pasar por una incidencia, con su primera tarea.
 
