@@ -321,7 +321,7 @@ async function guardarPlanificacion() {
     const pendientesMarcadas = Array.from(document.querySelectorAll('.plan-pendiente-check:checked')).map(el => el.value);
     const tareasEscritas = v('plan-tareas-previstas').split('\n').map(s => s.trim()).filter(Boolean);
     for (const desc of [...pendientesMarcadas, ...tareasEscritas]) {
-      await _guardarTarea(id, desc, 'Pendiente', '', '');
+      await _guardarTareaIntervencion(id, desc, 'Pendiente', '', '');
     }
 
     // Actualizar incidencia: Estado → En gestión, y apuntar siempre a esta intervención
@@ -373,7 +373,7 @@ function calcularEstadoIntervencion(resultadoAgregado, tipoEjec) {
 // tareaOrigenId: si se pasa, actualiza esa fila de Tareas_Intervencion en vez de
 // crear una nueva — lo usa marcarResultadoTarea() para fijar el resultado de una
 // tarea ya guardada (p.ej. una prevista al planificar, ver plan-tareas-previstas).
-async function _guardarTarea(intId, descripcion, resultado, operativo, observaciones, tareaOrigenId) {
+async function _guardarTareaIntervencion(intId, descripcion, resultado, operativo, observaciones, tareaOrigenId) {
   if (tareaOrigenId) {
     const idx = DATA.tareasIntervencion.findIndex(t => t.ID_Tarea === tareaOrigenId && t.ID_Intervencion === intId);
     if (idx !== -1) {
@@ -555,7 +555,7 @@ async function marcarResultadoTarea(tareaId, resultado) {
   const operativo = _OPERATIVO_POR_DEFECTO[resultado] || 'Sí';
   showLoading('Actualizando...');
   try {
-    await _guardarTarea(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
+    await _guardarTareaIntervencion(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
     const { estadoAgg } = await _sincronizarIntervencion(intIdx, operativo);
     _renderTareasEnModal(tarea.ID_Intervencion);
     showToast(`Tarea → ${resultado}. Visita → ${estadoAgg}`, 'success');
@@ -605,7 +605,7 @@ async function guardarActuacion(finalizar) {
       await sheetsAppend('Intervenciones', row);
       DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
       const intIdx = DATA.intervenciones.length - 1;
-      await _guardarTarea(nuevoId, desc, 'Pendiente', '', v('act-observaciones'));
+      await _guardarTareaIntervencion(nuevoId, desc, 'Pendiente', '', v('act-observaciones'));
       await _sincronizarIntervencion(intIdx);
       closeModal('modal-registrar-actuacion');
       showToast(`Intervención ${nuevoId} registrada. Tarea → Pendiente`, 'success');
@@ -665,7 +665,7 @@ async function guardarActuacion(finalizar) {
 
   showLoading('Guardando tarea...');
   try {
-    await _guardarTarea(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
+    await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
     await _sincronizarIntervencion(intIdx);
 
     if (finalizar) {
