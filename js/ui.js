@@ -25,7 +25,8 @@ async function loadModales() {
     'html/modales-pedidos.html',
     'html/modales-mantenimiento.html',
     'html/modales-residuos.html',
-    'html/modales-reservas.html'
+    'html/modales-reservas.html',
+    'html/modales-registros.html'
   ];
   try {
     const htmls = await Promise.all(archivos.map(f => _fetchConReintentos(f)));
@@ -131,7 +132,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     crearIncidencias: false,
     gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,
@@ -144,7 +145,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias',
           'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas'],
+          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
@@ -163,7 +164,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: false, configurarReservas: false,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -173,7 +174,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -211,7 +212,7 @@ function showPage(page) {
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
     contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo',
     'residuos-guia': 'Guía de residuos', 'residuos-contenedores': 'Contenedores de residuos',
-    reservas: 'Reservas de equipos'
+    reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 }
@@ -321,6 +322,9 @@ function renderAll() {
   _updateBadgeResiduos();
   renderReservas();
   _updateBadgeReservas();
+  renderRegistrosUso();
+  _updateBadgeRegistrosUso();
+  _avisarSesionesAbiertasAntiguas();
 }
 
 // ============================================================
@@ -368,6 +372,17 @@ function _checkPendingNfcAction() {
     setTimeout(() => {
       if (typeof _abrirAdicionPorNfc === 'function') {
         _abrirAdicionPorNfc(categoria, lab);
+      }
+    }, 400);
+  }
+
+  if (action === 'registro-uso') {
+    const tipo   = params.get('tipo');
+    const equipo = params.get('equipo');
+    if (!tipo || !equipo) return;
+    setTimeout(() => {
+      if (typeof _abrirRegistroPorNfc === 'function') {
+        _abrirRegistroPorNfc(tipo, equipo);
       }
     }, 400);
   }

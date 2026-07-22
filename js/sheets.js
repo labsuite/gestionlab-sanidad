@@ -125,7 +125,7 @@ async function loadAllData() {
            planesMantenimiento, registroMantenimientos,
            tiposResiduo, contenedoresResiduo, adicionesResiduo,
            revisionesInventario, consultasResiduo,
-           configReservas, reservas,
+           configReservas, reservas, registrosCabina, registrosAutoclave,
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
@@ -152,6 +152,8 @@ async function loadAllData() {
       sheetsGet('Consultas_Residuo!A2:F').catch(() => []),
       sheetsGet('Config_Reservas!A2:E').catch(() => []),
       sheetsGet('Reservas_Equipos!A2:L').catch(() => []),
+      sheetsGet('Registros_Cabina!A2:L').catch(() => []),
+      sheetsGet('Registros_Autoclave!A2:K').catch(() => []),
       // Supabase — en paralelo con Sheets (usar .then(r=>r, fallback) porque el builder no tiene .catch())
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -194,6 +196,8 @@ async function loadAllData() {
     DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
     DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
     DATA.reservas               = toObj(reservas               || [], 'reservas');
+    DATA.registrosCabina        = toObj(registrosCabina        || [], 'registrosCabina');
+    DATA.registrosAutoclave     = toObj(registrosAutoclave     || [], 'registrosAutoclave');
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];

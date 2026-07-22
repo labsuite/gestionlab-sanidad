@@ -1,0 +1,66 @@
+<!-- ============================================================
+     REGISTROS DE USO (Cabina de bioseguridad / Autoclave) — modales
+     ============================================================ -->
+
+<!-- NUEVA SESIÓN / CERRAR SESIÓN (modal unificado) -->
+<div class="modal-overlay" id="modal-reg-sesion">
+  <div class="modal" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-reg-sesion-title">Registrar sesión</div>
+      <button class="modal-close" onclick="closeModal('modal-reg-sesion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Equipo *</label>
+          <select id="reg-sesion-equipo">
+            <option value="">Seleccionar equipo…</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Fecha *</label>
+          <input type="date" id="reg-sesion-fecha">
+        </div>
+        <div class="form-group"></div>
+        <div class="form-group">
+          <label>Hora inicio *</label>
+          <input type="time" id="reg-sesion-hora-inicio" step="60">
+        </div>
+        <div class="form-group">
+          <label>Hora fin *</label>
+          <input type="time" id="reg-sesion-hora-fin" step="60">
+        </div>
+      </div>
+      <div id="reg-sesion-campos"></div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Incidencias</label>
+        <textarea id="reg-sesion-incidencias" rows="2" placeholder="Cualquier incidencia durante la sesión (opcional)"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-reg-sesion')">Cancelar</button>
+      <button class="btn btn-primary" id="reg-sesion-btn-guardar" onclick="guardarSesionRegistro()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ETIQUETA NFC / QR -->
+<div class="modal-overlay" id="modal-reg-nfc">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Etiqueta NFC / QR</div>
+      <button class="modal-close" onclick="closeModal('modal-reg-nfc')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">📍 <span id="reg-nfc-label"></span></div>
+      <img id="reg-nfc-qr" src="" alt="QR" style="width:200px;height:200px;border:1px solid var(--border);border-radius:8px;margin-bottom:14px">
+      <div style="background:var(--bg-soft,#f9f9f9);border-radius:6px;padding:10px 12px;margin-bottom:14px;text-align:left">
+        <code id="reg-nfc-url-text" style="font-size:11px;color:var(--accent);word-break:break-all;line-height:1.5;display:block"></code>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:16px">
+        La misma etiqueta sirve para empezar y para terminar la sesión: la app detecta automáticamente si ya tienes una sesión abierta en este equipo.
+      </div>
+      <button class="btn btn-secondary" onclick="copiarUrlNfcRegistro()">Copiar URL</button>
+    </div>
+  </div>
+</div>
