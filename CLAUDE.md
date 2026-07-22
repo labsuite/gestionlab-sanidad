@@ -158,6 +158,16 @@ Rangos actuales relevantes:
 | Solicitudes | `A2:K` | K = Snooze_Hasta |
 | Incidencias | `A2:J` | J = Relacionada_Con |
 | Tareas_Intervencion | `A2:F` | F = Observaciones |
+| Registros_Cabina | `A2:L` | L = Estado |
+| Registros_Autoclave | `A2:K` | K = Estado |
+
+---
+
+## Tablas dentro de tarjetas `.card`
+
+⚠ **Nunca** poner `display: block` en un `<table>` (ni en el propio `<table>` ni vía un selector tipo `.card > table`) para darle scroll horizontal. Con `display: block` el navegador genera una caja de tabla anónima interna que ignora el `width`/`min-width` del `<table>` y lo encoge a su contenido, dejando una franja vacía en la tarjeta. Además, sin `display: block` los navegadores ignoran directamente `overflow` en un elemento con `display: table`, así que ponerlo en la propia tabla tampoco sirve.
+
+El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:has(table) { overflow-x: auto; overflow-y: hidden }` en `css/styles.css` — se aplica a la tarjeta, no a la tabla. La tabla se queda con su `display: table` normal para que `width: 100%` funcione bien. No reintroducir la variante `display:block` en ningún sitio.
 
 ---
 
