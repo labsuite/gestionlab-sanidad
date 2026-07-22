@@ -56,8 +56,7 @@ sigue `En gestión`.
    - Botón **"➕ Añadir tarea a la lista"** (junto al campo de descripción): guarda como Pendiente, refresca la lista, deja el modal abierto.
    - Botón **"Guardar y finalizar visita"** (pie del modal): si hay una descripción sin guardar la añade primero; si no hay nada nuevo, simplemente cierra — no exige escribir algo para poder finalizar.
 4. **Nueva visita** (`programarOtraVisita` → reutiliza `abrirPlanificacion` con un tercer argumento `origenIntId`) — para cuando hace falta volver otro día (pieza pendiente, otro técnico...). Crea una intervención encadenada (`Origen: 'Seguimiento de <ID>'`), reconstruible con `getChainIntervencion`. Distinto de añadir una tarea: eso es la misma visita, esto es una visita nueva.
-   - Al abrir el registro de actuación de esa nueva visita, las tareas del padre con resultado no definitivo (`Pendiente`/`Resuelto parcialmente`/`No resuelto`) aparecen en "Pendiente de la visita anterior" (`_tareasHeredadas`) — un clic copia la descripción a "Nueva tarea" sin reescribirla (se guarda como una tarea nueva bajo la visita actual; el registro de la visita anterior no se toca).
-   - Las tareas previstas al planificar (`plan-tareas-previstas`, ver paso 2) ya aparecen directamente en "Tareas registradas en esta visita" con sus botones de resultado — no hace falta una sección aparte para ellas.
+   - Al abrir la planificación de esa nueva visita, el campo "Tareas ya previstas" se precarga automáticamente con las descripciones de las tareas sin resolver (`Pendiente`/`Resuelto parcialmente`/`No resuelto`) de la visita anterior (`abrirPlanificacion`, join por `\n`) — editable antes de guardar, así queda anotado qué falta sin esperar a la ejecución. Al guardar la planificación se crean como tareas `Pendiente` en la nueva intervención (igual que cualquier tarea prevista), ya listas para marcar su resultado desde "Ejecutar".
 5. **Factura** (`guardarFactura`, solo si `Estado='Pendiente factura'`) → cierra la intervención y la incidencia (`Resuelta`).
 6. **Modo directo** (`openModalRegistrarActuacionDirecta`, botón 🔧 en la tabla de equipos) — crea una intervención sin pasar por una incidencia, con su primera tarea.
 
@@ -72,7 +71,11 @@ sigue `En gestión`.
     concretar"), Incidencia vinculada, botón Ejecutar. Se oculta si no hay ninguna.
   - `renderIntervenciones()` → la tabla de siempre, pero ahora excluye `Planificada`: solo
     entran intervenciones que ya tienen datos reales (incluidas las de modo directo, que nunca
-    pasan por `Planificada` porque nacen ya con una tarea).
+    pasan por `Planificada` porque nacen ya con una tarea). Las filas se agrupan por cadena
+    (misma incidencia, vía `getChainIntervencion`) en vez de ordenarse solo por fecha, para que
+    varias visitas de un mismo caso no se dispersen entre el resto: columna "Incidencia" con
+    el ID + posición ("2/3"), fondo distinto y prefijo "↳" en las filas que continúan una
+    cadena.
 - Ficha de intervención (`openFichaIntervencion`): timeline (Reportada → Planificada →
   Ejecutando → Cerrada), lista de tareas de la visita, coste total del hilo completo
   (`getChainIntervencion` + suma de `Coste_Intervencion`).

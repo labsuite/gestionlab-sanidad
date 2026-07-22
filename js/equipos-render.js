@@ -391,15 +391,25 @@ function renderIntervenciones(filtroTipo = '') {
     });
   }
   if (filtroTipo) items = items.filter(i => i.Tipo === filtroTipo);
-  items = [...items].map((i, _) => ({ i, origIdx: DATA.intervenciones.indexOf(i) }))
-    .sort((a, b) => {
-      const dA = new Date(a.i.Fecha_Realizacion || a.i.Fecha_Planificada || 0);
-      const dB = new Date(b.i.Fecha_Realizacion || b.i.Fecha_Planificada || 0);
-      if (dB - dA !== 0) return dB - dA;
-      return b.origIdx - a.origIdx;
-    })
-    .map(x => x.i);
-  if (!items.length) { tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-title">Sin intervenciones registradas</div></div></td></tr>`; return; }
+
+  // Agrupar por cadena (misma incidencia) para que las visitas relacionadas no se
+  // pierdan dispersas por fecha entre el resto — dentro de cada cadena, orden
+  // cronológico (para leer la historia en orden); los grupos se ordenan por su
+  // actividad más reciente, como el orden por fecha de siempre.
+  const fechaOrden = i => new Date(i.Fecha_Realizacion || i.Fecha_Planificada || 0).getTime();
+  const grupos = new Map();
+  items.forEach(i => {
+    const chain = getChainIntervencion(i.ID_Intervencion);
+    const rootId = chain.length ? chain[0].ID_Intervencion : i.ID_Intervencion;
+    if (!grupos.has(rootId)) grupos.set(rootId, []);
+    grupos.get(rootId).push(i);
+  });
+  const gruposOrdenados = [...grupos.values()]
+    .map(g => [...g].sort((a, b) => fechaOrden(a) - fechaOrden(b)))
+    .sort((ga, gb) => Math.max(...gb.map(fechaOrden)) - Math.max(...ga.map(fechaOrden)));
+  items = gruposOrdenados.flat();
+
+  if (!items.length) { tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="empty-state-icon">🔧</div><div class="empty-state-title">Sin intervenciones registradas</div></div></td></tr>`; return; }
   const tipoBadge  = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   tbody.innerHTML = items.map(i => {
@@ -407,9 +417,20 @@ function renderIntervenciones(filtroTipo = '') {
     const intIdx  = DATA.intervenciones.indexOf(i);
     const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
-    return `<tr>
-      <td><strong>${i.ID_Intervencion}</strong></td>
+
+    const chain = getChainIntervencion(i.ID_Intervencion);
+    const posicion = chain.findIndex(c => c.ID_Intervencion === i.ID_Intervencion) + 1;
+    const esContinuacion = chain.length > 1 && posicion > 1;
+    const inc = DATA.incidencias.find(x => chain.some(c => c.ID_Intervencion === x.Intervencion_Generada));
+    const incCelda = inc
+      ? `<span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>${chain.length > 1 ? ` <span class="text-muted" style="font-size:10px">${posicion}/${chain.length}</span>` : ''}`
+      : '<span class="text-muted">—</span>';
+    const idCelda = esContinuacion ? `<span style="color:var(--text-muted)">↳</span> ${i.ID_Intervencion}` : `<strong>${i.ID_Intervencion}</strong>`;
+
+    return `<tr${esContinuacion ? ' style="background:var(--surface2)"' : ''}>
+      <td>${idCelda}</td>
       <td>${i.Equipo||'—'}</td>
+      <td>${incCelda}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span></td>
       <td>${i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—'}</td>
       <td>${formatDate(i.Fecha_Realizacion)||formatDate(i.Fecha_Planificada)||'—'}</td>

@@ -248,7 +248,6 @@
       <input type="hidden" id="act-int-id">
       <input type="hidden" id="act-int-idx">
       <input type="hidden" id="act-equipo-directo">
-      <input type="hidden" id="act-tarea-origen-id">
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);margin-bottom:10px;line-height:1.5">
         Esta <strong>Intervención</strong> es la visita completa de hoy. Cada cosa concreta que hagas (revisar, cambiar una pieza, limpiar...) es una <strong>Tarea</strong> distinta, con su propio resultado — añade tantas como necesites antes de finalizar la visita.
       </div>
@@ -310,11 +309,6 @@
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Las tareas sin resultado aún quedan "Pendiente" — márcalas con el botón ✓ cuando sepas cómo quedaron, no hace falta decidirlo al escribirlas.</div>
       <div id="act-tareas-lista"></div>
 
-      <div id="act-heredadas-wrap" style="display:none">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Pendiente de la visita anterior</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Toca una para copiarla en "Nueva tarea" y completarla sin volver a escribirla.</div>
-        <div id="act-heredadas-lista" style="display:flex;flex-direction:column;gap:6px"></div>
-      </div>
 
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Nueva tarea</div>
       <div class="form-grid form-grid-2">

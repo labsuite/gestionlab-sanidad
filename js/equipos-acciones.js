@@ -234,10 +234,13 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const intro = document.getElementById('plan-intro-texto');
   const titulo = document.getElementById('plan-modal-title');
   const ayuda  = document.getElementById('plan-ayuda-texto');
+  let tareasPendientesTexto = '';
   if (origenIntId) {
     if (intro) intro.textContent = 'Programando una nueva visita de seguimiento sobre la incidencia';
     if (titulo) titulo.textContent = '📅 Programar próxima visita';
-    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Anota qué se va a hacer en esa próxima visita — no hace falta que ya sepas cuándo.';
+    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Lo pendiente de la visita anterior ya está anotado abajo — revísalo, edítalo si hace falta, y añade lo que se sepa de más.';
+    const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
+    tareasPendientesTexto = getTareasIntervencion(origenIntId).filter(sinResolver).map(t => t.Descripcion).join('\n');
   } else {
     if (intro) intro.textContent = 'Creando intervención en respuesta a la incidencia';
     if (titulo) titulo.textContent = '🗓 Responder a la incidencia';
@@ -247,7 +250,7 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-fecha', '');
   sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
-  sv('plan-tareas-previstas', '');
+  sv('plan-tareas-previstas', tareasPendientesTexto);
   openModal('modal-planificar-intervencion');
 }
 
@@ -350,10 +353,9 @@ function calcularEstadoIntervencion(resultadoAgregado, tipoEjec) {
   return 'Cerrada'; // Resuelto interno, o Descartado
 }
 
-// tareaOrigenId: si se está completando una tarea ya prevista en ESTA MISMA intervención
-// (ver plan-tareas-previstas), se actualiza esa fila en vez de crear una duplicada.
-// Las heredadas de una visita anterior nunca se actualizan así — esa se queda como
-// registro histórico de esa visita, y esta genera una fila nueva bajo la visita actual.
+// tareaOrigenId: si se pasa, actualiza esa fila de Tareas_Intervencion en vez de
+// crear una nueva — lo usa marcarResultadoTarea() para fijar el resultado de una
+// tarea ya guardada (p.ej. una prevista al planificar, ver plan-tareas-previstas).
 async function _guardarTarea(intId, descripcion, resultado, operativo, observaciones, tareaOrigenId) {
   if (tareaOrigenId) {
     const idx = DATA.tareasIntervencion.findIndex(t => t.ID_Tarea === tareaOrigenId && t.ID_Intervencion === intId);
@@ -399,39 +401,6 @@ function _renderTareasEnModal(intId) {
       ${controles}
     </div>`;
   }).join('');
-}
-
-// ============================================================
-// TAREAS HEREDADAS — quedaron sin resolver en la visita anterior de la cadena
-// (Seguimiento de X). Las de la propia intervención (previstas al planificar,
-// aún no ejecutadas) ya aparecen directamente en "Tareas registradas en esta
-// visita" con sus botones de resultado — no hace falta duplicarlas aquí.
-// Al usar una heredada se crea una fila nueva bajo la visita actual: el
-// registro de la visita anterior no se toca, queda como historial.
-// ============================================================
-function _tareasHeredadas(i) {
-  if (!i || !i.Origen || !i.Origen.startsWith('Seguimiento de ')) return [];
-  const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
-  const padreId = i.Origen.replace('Seguimiento de ', '');
-  return getTareasIntervencion(padreId).filter(sinResolver);
-}
-
-function _renderTareasHeredadas(i) {
-  const wrap = document.getElementById('act-heredadas-wrap');
-  const cont = document.getElementById('act-heredadas-lista');
-  if (!wrap || !cont) return;
-  const heredadas = _tareasHeredadas(i);
-  if (!heredadas.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
-  cont.innerHTML = heredadas.map(t => `<button type="button" class="btn btn-secondary" style="text-align:left;font-size:12px" onclick="usarTareaHeredada('${t.Descripcion.replace(/'/g, "\\'")}')">
-    ➜ ${t.Descripcion} <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px;margin-left:6px">${t.Resultado}</span>
-  </button>`).join('');
-}
-
-function usarTareaHeredada(desc, tareaOrigenId) {
-  sv('act-descripcion', desc);
-  sv('act-tarea-origen-id', tareaOrigenId || '');
-  document.getElementById('act-descripcion')?.focus();
 }
 
 // ============================================================
@@ -490,7 +459,6 @@ function openModalRegistrarActuacion(intIdx) {
   }
 
   _renderTareasEnModal(i.ID_Intervencion);
-  _renderTareasHeredadas(i);
   openModal('modal-registrar-actuacion');
 }
 
@@ -507,7 +475,6 @@ function toggleActEjecucion(tipo) {
 function _resetCamposTarea() {
   sv('act-descripcion', '');
   sv('act-observaciones', '');
-  sv('act-tarea-origen-id', '');
 }
 
 // Resultado por defecto según el botón/opción elegida en la lista de tareas
@@ -679,11 +646,9 @@ async function guardarActuacion(finalizar) {
     DATA.intervenciones[intIdx] = rowToObj(rowAdj, 'intervenciones');
   }
 
-  const tareaOrigenId = v('act-tarea-origen-id');
-
   showLoading('Guardando tarea...');
   try {
-    await _guardarTarea(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'), tareaOrigenId);
+    await _guardarTarea(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
     await _sincronizarIntervencion(intIdx);
 
     if (finalizar) {
@@ -930,8 +895,6 @@ function openModalRegistrarActuacionDirecta(equipoId) {
   ['act-fecha-real','act-ejec-interna','act-ejec-externa','act-realizado-por','act-proveedor-ext','act-coste'].forEach(id => { const el = document.getElementById(id); if (el) el.disabled = false; });
   const tareasLista = document.getElementById('act-tareas-lista');
   if (tareasLista) tareasLista.innerHTML = '';
-  const heredadasWrap = document.getElementById('act-heredadas-wrap');
-  if (heredadasWrap) heredadasWrap.style.display = 'none';
 
   sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
   _resetCamposTarea();
