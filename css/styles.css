@@ -403,8 +403,13 @@
     /* Red de seguridad a cualquier ancho: si una tabla dentro de una .card
        (que tiene overflow:hidden) no cabe, que se pueda hacer scroll en vez
        de recortar columnas sin avisar — no debería hacer falta si las tablas
-       están bien dimensionadas, pero evita perder acciones silenciosamente. */
-    .card > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+       están bien dimensionadas, pero evita perder acciones silenciosamente.
+       El overflow se aplica a la .card (no a la tabla): los navegadores
+       ignoran overflow en elementos con display:table, y forzar
+       display:block en la tabla para que sí lo respete rompe width:100%
+       (el navegador genera una caja de tabla anónima interna que se encoge
+       a su contenido). Con :has() no hace falta envolver cada tabla en un div. */
+    .card:has(table) { overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 
     table {
       width: 100%;
@@ -1275,9 +1280,7 @@
   .form-grid-2 { grid-template-columns: 1fr !important; }
   .form-group.full { grid-column: 1 !important; }
 
-  /* Tablas: scroll horizontal */
-  .card > table,
-  .card > div > table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Tablas: scroll horizontal — gestionado por .card:has(table) en la regla base */
 
   /* Campos del panel expandido solo visibles en móvil */
   .detail-mobile-only { display: block; }
@@ -1394,14 +1397,8 @@
   /* ── Contenido más compacto ── */
   .content { padding: 8px 12px; }
 
-  /* ── Tablas: scroll horizontal ──
-     El selector específico evita conflictos con .card { overflow:hidden }.
-     white-space en td/th (no en table) para que las celdas no colapsen. */
-  .card > table {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+  /* ── Tablas en móvil: celdas sin wrap para que la tabla, ya scrolleable
+     por .card:has(table) en la regla base, no colapse el texto ── */
   .card > table td,
   .card > table th { white-space: nowrap; }
 
