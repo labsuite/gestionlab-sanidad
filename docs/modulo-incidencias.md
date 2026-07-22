@@ -48,7 +48,8 @@ sigue `En gestión`.
 ## Flujo end-to-end
 
 1. **Reportar** (`guardarIncidencia` / `guardarAvisoAlumno`) → `Incidencias` con `Estado='Abierta'`; el equipo pasa a `En revisión` u `Operativo con fallos` según impacto.
-2. **Planificar** (`abrirPlanificacion` → `guardarPlanificacion`) → crea `Intervencion` con `Estado='Planificada'`; la incidencia pasa a `En gestión` y apunta a esa intervención; el equipo pasa a `Revisión planificada`. `Fecha_Planificada` es **opcional** — si aún no se sabe cuándo, se deja en blanco (se muestra "Por concretar" en badges/cards) y se añade más tarde reabriendo la planificación. El campo "Tareas ya previstas" (una por línea) crea tareas `Pendiente` en esa misma intervención sin esperar a la visita. "¿Quién la va a hacer?" (Interna/Externa + `Realizado_Por`/`Proveedor`) también es opcional aquí — si se indica, queda precargado (editable) al abrir "Ejecutar"; si no, se pide en ese momento como hasta ahora.
+2. **Planificar** (`abrirPlanificacion` → `_asegurarIntervencionPlanificada` / `guardarPlanificacion(finalizar)` / `agregarTareaPrevista`) → crea `Intervencion` con `Estado='Planificada'`; la incidencia pasa a `En gestión` y apunta a esa intervención; el equipo pasa a `Revisión planificada`. `Fecha_Planificada` es **opcional** — si aún no se sabe cuándo, se deja en blanco (se muestra "Por concretar" en badges/cards). "¿Quién la va a hacer?" (Interna/Externa + `Realizado_Por`/`Proveedor`) también es opcional aquí — si se indica, queda precargado (editable) al abrir "Ejecutar"; si no, se pide en ese momento como hasta ahora.
+   - El modal no obliga a cerrar para guardar: **"💾 Guardar sin cerrar"** persiste los cambios (crea la intervención la primera vez que hace falta, o actualiza sus datos si ya existe) sin cerrar el modal; **"Crear intervención planificada"** (pasa a "Guardar y cerrar" una vez creada) hace lo mismo y cierra. Las tareas previstas se añaden una a una con `agregarTareaPrevista()` (input + botón "➕ Añadir", o tocando una sugerencia de "Pendiente de la visita anterior") y quedan visibles al momento en la lista — sin esperar a "guardar" el conjunto, para poder ir anotando ideas sueltas en distintos momentos.
 3. **Registrar tareas de la visita** (`openModalRegistrarActuacion` → `guardarActuacion(finalizar)`):
    - Añadir una tarea solo pide **descripción** (+ observaciones/adjunto opcionales) — el resultado NO se elige al escribirla, se guarda como `Pendiente` y se marca después. Esto evita forzar una decisión antes de tiempo (p.ej. cuando aún no se sabe si algo se pudo arreglar).
    - Primera tarea de la visita: además fija los datos de la visita (fecha real, interna/externa, quién, coste) — quedan bloqueados para las tareas siguientes de esa misma visita. El proveedor externo admite texto libre además del catálogo (`<input list>` con `datalist`), para técnicos puntuales no dados de alta.
@@ -79,6 +80,14 @@ sigue `En gestión`.
 - Ficha de intervención (`openFichaIntervencion`): timeline (Reportada → Planificada →
   Ejecutando → Cerrada), lista de tareas de la visita, coste total del hilo completo
   (`getChainIntervencion` + suma de `Coste_Intervencion`).
+- **Modal "Hilo de la incidencia"** (`abrirHiloIncidencia`, `modal-hilo-incidencia`): todas
+  las visitas de una incidencia (planificadas y ejecutadas) en una sola lista vertical, con
+  posición, estado, fecha, quién y resumen de tareas de cada una; la visita activa
+  (`Intervencion_Generada`) lleva su acción principal (Ejecutar / Añadir tarea / Factura /
+  Programar otra visita) directamente ahí. Entradas: botón "🔗 Hilo" en la card de la
+  incidencia, badge "🔗 &lt;incidencia&gt;" en "Próximas visitas", y botón "🔗 Ver hilo
+  completo" en la ficha de intervención. Pensado para no tener que ir a buscar las visitas de
+  un mismo caso por separado en "Próximas visitas" y en el registro de intervenciones.
 - Cards de incidencias: mientras está `En gestión`, muestran cuántas tareas de la visita
   activa están resueltas (o la fecha planificada si aún no hay ninguna); si `Relacionada_Con`
   está informado, muestran "↳ continúa de INC-XXX".

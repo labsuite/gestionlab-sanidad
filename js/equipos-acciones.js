@@ -229,6 +229,7 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-inc-id', incId);
   sv('plan-equipo', equipo);
   sv('plan-origen-int', origenIntId || '');
+  sv('plan-int-idx', '');
   const label = document.getElementById('plan-inc-label');
   if (label) label.textContent = incId + ' (' + equipo + ')';
   const intro = document.getElementById('plan-intro-texto');
@@ -239,16 +240,15 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   if (origenIntId) {
     if (intro) intro.textContent = 'Programando una nueva visita de seguimiento sobre la incidencia';
     if (titulo) titulo.textContent = '📅 Programar próxima visita';
-    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Marca abajo lo pendiente que corresponda a esta visita — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
+    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Toca abajo lo pendiente que corresponda a esta visita — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
     const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
     const pendientes = getTareasIntervencion(origenIntId).filter(sinResolver);
     if (pendWrap && pendLista) {
       if (pendientes.length) {
         pendWrap.style.display = '';
-        pendLista.innerHTML = pendientes.map((t, idx) => `<label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:13px">
-          <input type="checkbox" class="plan-pendiente-check" value="${t.Descripcion.replace(/"/g, '&quot;')}" style="margin-top:2px">
-          <span>${t.Descripcion} <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span></span>
-        </label>`).join('');
+        pendLista.innerHTML = pendientes.map(t => `<button type="button" class="btn btn-secondary plan-sugerencia-btn" data-desc="${t.Descripcion.replace(/"/g, '&quot;')}" style="text-align:left;font-size:12px" onclick="agregarTareaPrevista(this.dataset.desc, this)">
+          ➜ ${t.Descripcion} <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px;margin-left:6px">${t.Resultado}</span>
+        </button>`).join('');
       } else {
         pendWrap.style.display = 'none';
         pendLista.innerHTML = '';
@@ -264,7 +264,9 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   sv('plan-tipo', 'Correctivo');
   sv('plan-fecha', '');
   sv('plan-descripcion', '');
-  sv('plan-tareas-previstas', '');
+  sv('plan-nueva-tarea', '');
+  const tareasListaEl = document.getElementById('plan-tareas-lista');
+  if (tareasListaEl) tareasListaEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Aún no hay tareas previstas.</div>';
 
   // Quién la va a hacer (opcional, se puede confirmar/cambiar al ejecutar)
   sv('plan-realizado-por', '');
@@ -281,6 +283,9 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const radInternaPlan = document.getElementById('plan-ejec-interna');
   if (radInternaPlan) { radInternaPlan.checked = true; _toggleEjecucionPlan('Interna'); }
 
+  const btnCrear = document.getElementById('plan-btn-crear');
+  if (btnCrear) btnCrear.textContent = 'Crear intervención planificada';
+
   openModal('modal-planificar-intervencion');
 }
 
@@ -289,6 +294,72 @@ function _toggleEjecucionPlan(tipo) {
   const extGrp = document.getElementById('plan-externa-group');
   if (intGrp) intGrp.style.display = tipo === 'Interna' ? '' : 'none';
   if (extGrp) extGrp.style.display = tipo === 'Externa' ? '' : 'none';
+}
+
+// ============================================================
+// HILO DE LA INCIDENCIA — todas sus visitas (planificadas y ejecutadas) en un
+// solo sitio, para no tener que ir a buscarlas por separado en "Próximas
+// visitas" y en la tabla de intervenciones.
+// ============================================================
+function abrirHiloIncidencia(incId) {
+  const inc = DATA.incidencias.find(x => x.ID_Incidencia === incId);
+  if (!inc) return;
+  const label = document.getElementById('hilo-inc-label');
+  if (label) label.textContent = `${inc.ID_Incidencia} · ${inc.Equipo || ''} · ${inc.Estado}`;
+
+  const cont = document.getElementById('hilo-lista');
+  if (!cont) return;
+
+  if (!inc.Intervencion_Generada) {
+    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin planificar</div><div class="empty-state-text">Pulsa "Responder" en la incidencia para crear la primera visita.</div></div>`;
+    openModal('modal-hilo-incidencia');
+    return;
+  }
+
+  const chain = getChainIntervencion(inc.Intervencion_Generada);
+  const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
+  cont.innerHTML = chain.map((c, idx) => {
+    const cIdx = DATA.intervenciones.indexOf(c);
+    const esActiva = c.ID_Intervencion === inc.Intervencion_Generada;
+    const tareas = getTareasIntervencion(c.ID_Intervencion);
+    const resumenTareas = tareas.length
+      ? `${tareas.filter(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado').length}/${tareas.length} tareas`
+      : 'sin tareas aún';
+    const quien = c.Realizado_Por || c.Proveedor || '—';
+    const fechaTxt = c.Fecha_Realizacion
+      ? formatDate(c.Fecha_Realizacion)
+      : (c.Fecha_Planificada ? formatDate(c.Fecha_Planificada) + ' (planificada)' : 'Por concretar');
+
+    let accion = '';
+    if (esActiva && puedeHacer('crearIntervenciones')) {
+      if (c.Estado === 'Planificada')
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">🔧 Ejecutar</button>`;
+      else if (c.Estado === 'En gestión')
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">📋 Añadir tarea</button>`;
+      else if (c.Estado === 'Pendiente factura')
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalAdjuntarFactura(${cIdx})">📎 Factura</button>`;
+      if (c.Estado !== 'Cerrada')
+        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');programarOtraVisita(${cIdx})">📅 Otra visita</button>`;
+    }
+
+    return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
+      <div style="width:22px;height:22px;border-radius:50%;background:${esActiva ? 'var(--accent)' : 'var(--border)'};color:${esActiva ? '#fff' : 'var(--text-muted)'};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0">${idx + 1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
+          <strong style="font-size:13px">${c.ID_Intervencion}</strong>
+          <span class="badge ${estadoBadge[c.Estado]||'badge-gray'}" style="font-size:10px">${c.Estado||'—'}</span>
+          ${esActiva ? '<span class="badge badge-blue" style="font-size:9px">visita activa</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text-soft)">${fechaTxt} · ${quien} · ${resumenTareas}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <button class="icon-btn" onclick="closeModal('modal-hilo-incidencia');openFichaIntervencion(${cIdx})" title="Ver ficha">🔍</button>
+        ${accion}
+      </div>
+    </div>`;
+  }).join('');
+
+  openModal('modal-hilo-incidencia');
 }
 
 // Programar una NUEVA visita (otro día, posiblemente otro técnico) sobre una incidencia
@@ -302,7 +373,14 @@ function programarOtraVisita(intIdx) {
   abrirPlanificacion(inc.ID_Incidencia, i.Equipo, i.ID_Intervencion);
 }
 
-async function guardarPlanificacion() {
+// Crea la fila de Intervención la primera vez que hace falta guardar algo (botón
+// "Guardar sin cerrar", "Crear intervención planificada", o al añadir la primera
+// tarea prevista) y devuelve su índice en DATA.intervenciones. Si ya se creó en
+// esta misma sesión del modal, simplemente devuelve ese índice.
+async function _asegurarIntervencionPlanificada() {
+  const idxExistente = v('plan-int-idx');
+  if (idxExistente !== '') return parseInt(idxExistente);
+
   const incId  = v('plan-inc-id');
   const equipo = v('plan-equipo');
   const fecha  = v('plan-fecha');
@@ -313,41 +391,22 @@ async function guardarPlanificacion() {
 
   const id  = genId('INT-');
   const row = [
-    id,            // A ID_Intervencion
-    equipo,        // B Equipo
-    v('plan-tipo'),// C Tipo
+    id, equipo, v('plan-tipo'),
     origenIntId ? ('Seguimiento de ' + origenIntId) : 'Incidencia reportada', // D Origen
-    fecha,         // E Fecha_Planificada
-    '',            // F Fecha_Realizacion
-    realizadoPorPlan, // G Realizado_Por
-    '',            // H Tecnico_Externo
-    proveedorPlan, // I Proveedor
-    '',            // J Descripcion_Actuacion  (vacío hasta registrar)
-    '',            // K Resultado
-    '',            // L Equipo_Operativo
-    '',            // M URL_Adjunto
-    '',            // N Factura_Asociada
-    '',            // O (legacy)
-    v('plan-descripcion'), // P Observaciones
-    '',            // Q Nombre_Adjunto
-    'Planificada', // R Estado
-    '',            // S Fecha_Estimada_Resolucion (ya no se pide al planificar)
-    ''             // T Coste_Intervencion
+    fecha, '', realizadoPorPlan, '', proveedorPlan,
+    '', '', '',
+    '', '', '',
+    v('plan-descripcion'), '', 'Planificada',
+    '', ''
   ];
 
-  showLoading('Guardando...');
   try {
     await sheetsAppend('Intervenciones', row);
     DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-
-    // Tareas ya previstas para esa visita: las marcadas de "pendiente de la visita
-    // anterior" + las escritas a mano. Se guardan como Pendiente, sin tocar los
-    // datos de ejecución (fecha real, quién...) — eso se rellena al ejecutar.
-    const pendientesMarcadas = Array.from(document.querySelectorAll('.plan-pendiente-check:checked')).map(el => el.value);
-    const tareasEscritas = v('plan-tareas-previstas').split('\n').map(s => s.trim()).filter(Boolean);
-    for (const desc of [...pendientesMarcadas, ...tareasEscritas]) {
-      await _guardarTareaIntervencion(id, desc, 'Pendiente', '', '');
-    }
+    const intIdx = DATA.intervenciones.length - 1;
+    sv('plan-int-idx', String(intIdx));
+    const btnCrear = document.getElementById('plan-btn-crear');
+    if (btnCrear) btnCrear.textContent = 'Guardar y cerrar';
 
     // Actualizar incidencia: Estado → En gestión, y apuntar siempre a esta intervención
     // (tanto en la planificación inicial como al programar una visita de seguimiento).
@@ -359,13 +418,72 @@ async function guardarPlanificacion() {
       const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
       await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
     }
-
-    showToast('Intervención planificada. Incidencia → En gestión', 'success');
-    // El equipo ya debería estar En mantenimiento desde guardarIncidencia,
-    // pero lo reforzamos aquí por si la incidencia llegó por otra vía.
     try { await actualizarEstadoEquipo(equipo, 'Revisión planificada'); } catch(e) { console.warn(e); }
-    closeModal('modal-planificar-intervencion');
-    renderAll();
+
+    return intIdx;
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); return null; }
+}
+
+function _renderTareasPrevistasEnModal(intId) {
+  const cont = document.getElementById('plan-tareas-lista');
+  if (!cont) return;
+  const tareas = getTareasIntervencion(intId);
+  if (!tareas.length) { cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Aún no hay tareas previstas.</div>'; return; }
+  cont.innerHTML = tareas.map(t => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+    <span style="flex:1">${t.Descripcion}</span>
+    <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>
+  </div>`).join('');
+}
+
+// Añade una tarea prevista de inmediato (crea la intervención planificada si aún
+// no existe). btnSugerencia: si viene de "Pendiente de la visita anterior", se
+// desactiva ese botón tras usarlo para no añadirla dos veces.
+async function agregarTareaPrevista(descPredefinida, btnSugerencia) {
+  const desc = descPredefinida || v('plan-nueva-tarea');
+  if (!desc) { showToast('Escribe una tarea', 'error'); return; }
+  showLoading('Guardando...');
+  const intIdx = await _asegurarIntervencionPlanificada();
+  if (intIdx === null) { hideLoading(); return; }
+  const i = DATA.intervenciones[intIdx];
+  try {
+    await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', '');
+    if (!descPredefinida) sv('plan-nueva-tarea', '');
+    if (btnSugerencia) { btnSugerencia.disabled = true; btnSugerencia.style.opacity = '0.4'; }
+    _renderTareasPrevistasEnModal(i.ID_Intervencion);
+    renderProximasVisitas();
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function guardarPlanificacion(finalizar) {
+  showLoading('Guardando...');
+  const intIdx = await _asegurarIntervencionPlanificada();
+  if (intIdx === null) { hideLoading(); return; }
+  const i = DATA.intervenciones[intIdx];
+
+  const tipoEjecPlan = document.querySelector('input[name="plan-tipo-ejec"]:checked')?.value || 'Interna';
+  const realizadoPorPlan = tipoEjecPlan === 'Interna' ? v('plan-realizado-por') : '';
+  const proveedorPlan    = tipoEjecPlan === 'Externa' ? v('plan-proveedor-ext') : '';
+  const updatedRow = [
+    i.ID_Intervencion, i.Equipo, v('plan-tipo'), i.Origen,
+    v('plan-fecha'), '', realizadoPorPlan, '', proveedorPlan,
+    '', '', '',
+    '', '', '',
+    v('plan-descripcion'), '', 'Planificada',
+    '', ''
+  ];
+  try {
+    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
+    DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
+
+    if (finalizar) {
+      closeModal('modal-planificar-intervencion');
+      showToast('Intervención planificada guardada', 'success');
+      renderAll();
+    } else {
+      showToast('Guardado. Puedes seguir añadiendo tareas previstas o cerrar cuando quieras.', 'success');
+      renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+    }
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
 }

@@ -364,7 +364,7 @@ function renderProximasVisitas() {
       <td>${i.Equipo||'—'}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span>${nTareas ? ` <span class="badge badge-blue" style="font-size:10px">${nTareas} prevista${nTareas>1?'s':''}</span>` : ''}</td>
       <td>${i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : '<span class="text-muted">Por concretar</span>'}</td>
-      <td>${inc ? `<span class="badge badge-orange" style="font-size:10px">${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
+      <td>${inc ? `<span class="badge badge-orange" style="font-size:10px;cursor:pointer" onclick="abrirHiloIncidencia('${inc.ID_Incidencia}')" title="Ver hilo completo">🔗 ${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
         ${puedeEjecutar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">🔧 Ejecutar</button>` : ''}
@@ -500,6 +500,9 @@ function renderIncidencias(filtroEstado = '') {
       btnAccion = `<button class="btn btn-secondary btn-sm" onclick="abrirPlanificacion('${i.ID_Incidencia}','${i.Equipo}')">Responder</button>`;
     }
     const urgenteCls = i.Urgencia === 'Urgente' ? ' inc-urgente' : '';
+    const btnHilo = i.Intervencion_Generada
+      ? `<button class="btn btn-secondary btn-sm" onclick="abrirHiloIncidencia('${i.ID_Incidencia}')">🔗 Hilo</button>`
+      : '';
     const btnEliminar = puedeHacer('eliminarItems') && !['Resuelta','Descartada'].includes(i.Estado)
       ? `<button class="btn btn-danger btn-sm" onclick="eliminarIncidencia('${i.ID_Incidencia}')">Eliminar</button>`
       : '';
@@ -527,7 +530,7 @@ function renderIncidencias(filtroEstado = '') {
       <span class="badge ${impactoBadge[i.Impacto] || 'badge-gray'}">${i.Impacto || '—'}</span>
       <span class="inc-reporter">👤 ${i.Reportado_Por || '—'}</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center">${btnAccion}${btnEliminar}</div>
+    <div style="display:flex;gap:8px;align-items:center">${btnHilo}${btnAccion}${btnEliminar}</div>
   </div>
 </div>`;
   }).join('');
@@ -690,6 +693,8 @@ function openFichaIntervencion(intIdx) {
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
   if (puedeNuevaVisita)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');programarOtraVisita(${intIdx})">📅 Programar otra visita</button>`;
+  if (incVinculada)
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
   acciones.innerHTML = btns;
 
   openModal('modal-ficha-intervencion');
