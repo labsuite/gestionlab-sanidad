@@ -33,7 +33,7 @@ def main():
         print("✓ La columna 'Relacionada_Con' ya existe en Incidencias, no se toca.")
     else:
         col_letra = chr(ord('A') + len(headers))  # siguiente columna libre
-        inc.update(f'{col_letra}1', [['Relacionada_Con']])
+        inc.update(range_name=f'{col_letra}1', values=[['Relacionada_Con']])
         print(f"✓ Columna 'Relacionada_Con' añadida en Incidencias!{col_letra}1.")
 
 if __name__ == '__main__':
