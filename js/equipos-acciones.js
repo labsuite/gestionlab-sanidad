@@ -263,7 +263,6 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   }
   sv('plan-tipo', 'Correctivo');
   sv('plan-fecha', '');
-  sv('plan-fecha-estimada', '');
   sv('plan-descripcion', '');
   sv('plan-tareas-previstas', '');
   openModal('modal-planificar-intervencion');
@@ -306,7 +305,7 @@ async function guardarPlanificacion() {
     v('plan-descripcion'), // P Observaciones
     '',            // Q Nombre_Adjunto
     'Planificada', // R Estado
-    v('plan-fecha-estimada') || '', // S Fecha_Estimada_Resolucion
+    '',            // S Fecha_Estimada_Resolucion (ya no se pide al planificar)
     ''             // T Coste_Intervencion
   ];
 
