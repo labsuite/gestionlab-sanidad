@@ -1073,9 +1073,11 @@
     .card-equipment-table table {
       width: 100%;
     }
-    .equipo-row-expand td {
-      max-width: 0;
-    }
+    /* NO poner max-width:0 aquí: en móvil esta celda pasa a display:block y el
+       navegador lo respeta al pie de la letra, comprimiendo el texto a una
+       columna de 1 carácter (se parte letra por letra). El bloque de columnas
+       fijas ("Últimas intervenciones") ya se contiene solo con su propio
+       min-width:0 + overflow-x:auto (ver js/equipos-render.js). */
     .intervenciones-mini-header {
       display: grid;
       grid-template-columns: 90px 90px 80px 120px 1fr 90px auto;

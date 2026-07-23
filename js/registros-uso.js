@@ -18,6 +18,8 @@ const _regConfig = {
     tipoEquipo: 'Autoclave', prefix: 'RA', label: 'Autoclave',
     // El autoclave es un ciclo automático: se registra al ponerlo en marcha, no hay presencia que "cerrar" después.
     permiteSesionAbierta: false,
+    // Trazabilidad del modelo de calidad: quién usó el autoclave debe quedar ligado a su ciclo/módulo.
+    mostrarCicloModulo: true,
     camposLabels: { Programa_Ciclo: 'Programa / ciclo', Tipo_Carga: 'Tipo de carga', Resultado_Control: 'Resultado del control' }
   }
 };
@@ -65,6 +67,12 @@ function _duracionHorasReg(r) {
   if (!r.Fecha || !r.Hora_Inicio || !r.Hora_Fin) return 0;
   const h = (new Date(`${r.Fecha}T${r.Hora_Fin}`) - new Date(`${r.Fecha}T${r.Hora_Inicio}`)) / 3600000;
   return h > 0 ? h : 0;
+}
+
+function _cicloModuloUsuario(email) {
+  const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === (email || '').toLowerCase().trim());
+  if (!u) return '—';
+  return [u.Ciclo_Principal, u.Modulo].filter(Boolean).join(' · ') || '—';
 }
 
 function _horasAcumuladasReg(tipo, idEquipo) {
@@ -232,6 +240,7 @@ function _renderHistorialReg(tipo) {
   return `<div class="card" style="padding:0;overflow:hidden">
     <table><thead><tr>
       <th>Fecha</th><th>Horario</th><th>Usuario</th>
+      ${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}
       ${campos.map(c => `<th>${cfg.camposLabels[c]}</th>`).join('')}
       <th>Incidencias</th>
     </tr></thead>
@@ -240,6 +249,7 @@ function _renderHistorialReg(tipo) {
         <td>${_fmtFechaReg(r.Fecha)}</td>
         <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
         <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
+        ${cfg.mostrarCicloModulo ? `<td style="font-size:12px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
         ${campos.map(c => `<td style="font-size:12px">${r[c] || '—'}</td>`).join('')}
         <td style="font-size:12px">${r.Incidencias || '—'}</td>
       </tr>`).join('')}
@@ -549,6 +559,7 @@ function generarInformeRegistro(tipo) {
     <td>${_fmtFechaReg(r.Fecha)}</td>
     <td>${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
     <td>${(r.Usuario || '').split('@')[0]}</td>
+    ${cfg.mostrarCicloModulo ? `<td>${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
     ${campos.map(c => `<td>${r[c] || '—'}</td>`).join('')}
     <td>${r.Incidencias || '—'}</td>
   </tr>`).join('');
@@ -573,7 +584,7 @@ function generarInformeRegistro(tipo) {
   <h1>Registro de uso — ${cfg.label}</h1>
   <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${nombreEquipo} &nbsp;·&nbsp; Generado el ${hoy} &nbsp;·&nbsp; ${cerradas.length} sesión${cerradas.length > 1 ? 'es' : ''}</div>
   <table>
-    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${campos.map(c => `<th>${cfg.camposLabels[c]}</th>`).join('')}<th>Incidencias</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${campos.map(c => `<th>${cfg.camposLabels[c]}</th>`).join('')}<th>Incidencias</th></tr></thead>
     <tbody>${filas}</tbody>
   </table>
 </body>

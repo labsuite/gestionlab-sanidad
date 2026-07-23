@@ -701,15 +701,13 @@ async function guardarActuacion(finalizar) {
   const equipoDirecto = v('act-equipo-directo');
   const desc = v('act-descripcion');
 
-  // Nada nuevo que anotar: si se pide finalizar, cerramos; si no, no hace falta
-  // avisar de error — "Guardar sin cerrar" sin una tarea nueva es solo un no-op.
-  if (!desc) {
-    if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); }
-    return;
-  }
-
   // ── MODO DIRECTO: crear nueva intervención + primera tarea (Pendiente) ───
+  // Aquí sí hace falta una tarea: sin ella no hay nada que crear todavía.
   if (equipoDirecto) {
+    if (!desc) {
+      if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); }
+      return;
+    }
     const fechaReal = v('act-fecha-real');
     if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
     const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
@@ -792,19 +790,22 @@ async function guardarActuacion(finalizar) {
     DATA.intervenciones[intIdx] = rowToObj(rowAdj, 'intervenciones');
   }
 
-  showLoading('Guardando tarea...');
+  // La tarea nueva es opcional aquí: "Guardar sin cerrar"/"Guardar y finalizar" deben
+  // guardar los datos de la visita (fecha, ejecución, observaciones, adjunto) aunque
+  // no se haya escrito ninguna tarea — para eso está el botón aparte "Añadir tarea".
+  showLoading(desc ? 'Guardando tarea...' : 'Guardando...');
   try {
-    await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
+    if (desc) await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
     await _sincronizarIntervencion(intIdx);
 
     if (finalizar) {
       closeModal('modal-registrar-actuacion');
-      showToast('Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.', 'success');
+      showToast(desc ? 'Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.' : 'Visita guardada', 'success');
       renderAll();
     } else {
-      _resetCamposTarea();
+      if (desc) _resetCamposTarea();
       _renderTareasEnModal(i.ID_Intervencion);
-      showToast('Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.', 'success');
+      showToast(desc ? 'Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.' : 'Datos de la visita guardados', 'success');
       renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
