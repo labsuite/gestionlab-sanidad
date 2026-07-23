@@ -42,8 +42,8 @@ Alta abierta a cualquier usuario logueado, incluidos Alumnos (`registros-uso` en
 ## Informe imprimible
 `generarInformeRegistro()` — vista HTML propia con `window.print()` (mismo patrón que el informe de Consenur en `residuos.js`), sin plantilla oficial de fondo porque no existe una para este registro.
 
-## Ciclo / Módulo del usuario (solo autoclave)
-`_regConfig.autoclave.mostrarCicloModulo = true` añade una columna "Ciclo / Módulo" al historial y al informe, con `_cicloModuloUsuario(email)` haciendo lookup en `DATA.usuarios` (`Ciclo_Principal` + `Modulo`) por email. No aplica a cabina (no se pidió).
+## Ciclo / Módulo del usuario
+`mostrarCicloModulo = true` en `_regConfig` (cabina y autoclave) añade una columna "Ciclo / Módulo" al historial y al informe, con `_cicloModuloUsuario(email)` haciendo lookup en `DATA.usuarios` (`Ciclo_Principal` + `Modulo`) por email.
 
 ## Navegación
 Ítem "📝 Registros de uso" en el sidebar, dentro de la sección **Equipos**, justo debajo de "📅 Reservas".

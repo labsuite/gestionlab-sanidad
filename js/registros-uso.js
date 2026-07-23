@@ -8,6 +8,8 @@ const _regConfig = {
     tipoEquipo: 'Cabina de bioseguridad', prefix: 'RC', label: 'Cabina de bioseguridad',
     // La cabina se usa con presencia continua → tiene sentido abrir sesión al entrar y cerrarla al salir.
     permiteSesionAbierta: true,
+    // Trazabilidad del modelo de calidad: quién usó la cabina debe quedar ligado a su ciclo/módulo.
+    mostrarCicloModulo: true,
     camposLabels: {
       Practica_Tecnica: 'Práctica / técnica', Nivel_Riesgo: 'Nivel de riesgo',
       Verificacion_Previa: 'Verificación previa', Descontaminacion_Posterior: 'Descontaminación posterior'
