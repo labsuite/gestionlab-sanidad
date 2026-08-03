@@ -37,6 +37,7 @@ let _regAvisoMostrado = false;
 // ── Helpers ──────────────────────────────────────────────────
 
 function _puedeGestionarRegistros() { return ['Administrador', 'Gestor'].includes(getUserRole()); }
+function _puedeVerNfcRegistros() { return ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole()); }
 
 function _equiposDeTipo(tipo) {
   return DATA.equipos.filter(e => e.Tipo_Equipo === _regConfig[tipo].tipoEquipo);
@@ -179,8 +180,8 @@ function _renderRegTab(tipo) {
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:${notaManual ? '10px' : '16px'}">
       ${selectorEquipo}
       ${botonPrincipal}
-      <button class="btn btn-secondary" onclick="generarInformeRegistro('${tipo}')">🖨️ Informe</button>
-      ${_puedeGestionarRegistros() ? `<button class="btn btn-secondary" onclick="openModalNfcRegistro('${tipo}','${idEquipoSel}')" style="margin-left:auto">🔗 NFC</button>` : ''}
+      ${_puedeGestionarRegistros() ? `<button class="btn btn-secondary" onclick="generarInformeRegistro('${tipo}')">🖨️ Informe</button>` : ''}
+      ${_puedeVerNfcRegistros() ? `<button class="btn btn-secondary" onclick="openModalNfcRegistro('${tipo}','${idEquipoSel}')" style="margin-left:auto">🔗 NFC</button>` : ''}
     </div>
     ${notaManual}
     <div class="card" style="padding:10px 18px;margin-bottom:20px;display:inline-block">
