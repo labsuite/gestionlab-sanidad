@@ -269,18 +269,18 @@ function _renderCamposSesion(tipo, valores = {}) {
     el.innerHTML = `
       <div class="form-grid-2" style="margin-top:12px">
         <div class="form-group full">
-          <label>Práctica / técnica</label>
+          <label>Práctica / técnica *</label>
           <input type="text" id="reg-campo-practica" value="${valores.Practica_Tecnica || ''}" placeholder="ej. Siembra en medio de cultivo">
         </div>
         <div class="form-group">
-          <label>Nivel de riesgo del agente manipulado</label>
+          <label>Nivel de riesgo del agente manipulado *</label>
           <select id="reg-campo-riesgo">
             ${['No aplica', 'BSL-1', 'BSL-2', 'BSL-3'].map(n => `<option value="${n}" ${valores.Nivel_Riesgo === n ? 'selected' : ''}>${n}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group full" style="display:flex;flex-wrap:wrap;gap:10px 24px;margin-top:4px">
-          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer"><input type="checkbox" id="reg-campo-verif" style="margin-top:3px;flex-shrink:0" ${valores.Verificacion_Previa === 'Sí' ? 'checked' : ''}> <span>Verificación previa del flujo</span></label>
-          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer"><input type="checkbox" id="reg-campo-descon" style="margin-top:3px;flex-shrink:0" ${valores.Descontaminacion_Posterior === 'Sí' ? 'checked' : ''}> <span>Descontaminación posterior realizada</span></label>
+        <div class="form-group full" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;min-width:0">
+          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="reg-campo-verif" style="margin-top:3px;flex-shrink:0" ${valores.Verificacion_Previa === 'Sí' ? 'checked' : ''}> <span style="min-width:0">Verificación previa del flujo</span></label>
+          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="reg-campo-descon" style="margin-top:3px;flex-shrink:0" ${valores.Descontaminacion_Posterior === 'Sí' ? 'checked' : ''}> <span style="min-width:0">Descontaminación posterior realizada</span></label>
         </div>
       </div>`;
   } else {
@@ -406,6 +406,10 @@ async function guardarSesionRegistro() {
   if (horaFin && horaFin <= horaIni) { showToast('La hora de fin debe ser posterior a la de inicio', 'error'); return; }
 
   const campos = _leerCamposSesion(tipo);
+  if (tipo === 'cabina' && (!campos.Practica_Tecnica.trim() || !campos.Nivel_Riesgo)) {
+    showToast('Indica la práctica/técnica y el nivel de riesgo', 'error');
+    return;
+  }
   const incidencias = v('reg-sesion-incidencias');
   const email = idx != null ? DATA[cfg.key][idx].Usuario : (currentUser?.email || '').toLowerCase().trim();
   const id    = idx != null ? DATA[cfg.key][idx].ID_Registro : _nextIdReg(tipo);
