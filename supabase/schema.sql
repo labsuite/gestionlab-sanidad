@@ -99,6 +99,14 @@ create table proveedores (
   activo               boolean not null default true
 );
 
+-- Nota: los campos "proveedor" de otras tablas (equipos, intervenciones,
+-- material, pedidos, historico_precio) NO llevan FK a esta tabla — el
+-- código actual los rellena con el nombre libre desde un <input list>/
+-- datalist que admite tanto elegir del catálogo como escribir un proveedor
+-- puntual no dado de alta (ver docs/modulo-incidencias.md, "técnicos
+-- puntuales"). Forzar la FK rompería ese caso de uso y bloquearía datos
+-- históricos con nombres que ya no coinciden exactamente con el catálogo.
+
 -- ============================================================
 -- 2. EQUIPOS, INTERVENCIONES, INCIDENCIAS
 -- ============================================================
@@ -113,8 +121,8 @@ create table equipos (
   responsable                     text,   -- nombres separados por coma, texto libre
   fecha_adquisicion               date,
   origen_financiacion             text,
-  proveedor_compra_id             text references proveedores(id_proveedor),
-  proveedor_servicio_tecnico_id   text references proveedores(id_proveedor),
+  proveedor_compra                text,   -- nombre libre, no FK: ver nota más abajo
+  proveedor_servicio_tecnico      text,   -- nombre libre, no FK: ver nota más abajo
   estado_operativo                text,
   manual_ficha_tecnica            text,   -- pasará a ser ruta de Supabase Storage
   observaciones                   text,
@@ -134,7 +142,7 @@ create table intervenciones (
   fecha_realizacion                      date,
   realizado_por                          text,
   tecnico_externo                        text,
-  proveedor_id                           text references proveedores(id_proveedor),
+  proveedor                              text,   -- nombre libre (admite SAT puntual no dado de alta), no FK
   descripcion_actuacion                  text,
   resultado                              text,   -- derivado de tareas_intervencion, no editable a mano
   equipo_operativo_tras_intervencion     boolean,
@@ -312,7 +320,7 @@ create table material (
   nombre                 text not null,
   categoria              text,
   referencia_proveedor   text,
-  proveedor_id           text references proveedores(id_proveedor),
+  proveedor              text,   -- nombre libre, no FK
   unidad                 text,
   ubicacion              text,   -- legacy: solo ubicación primaria, ver docs/modulo-pedidos.md
   stock_actual           numeric,
@@ -336,7 +344,7 @@ create table material_ubicaciones (
 create table pedidos (
   id_pedido                    text primary key,
   nombre_lista                 text,
-  proveedor_id                 text references proveedores(id_proveedor),
+  proveedor                    text,   -- nombre libre, no FK
   fecha_creacion                date,
   fecha_presupuesto              date,
   fecha_aprobacion                date,
@@ -386,7 +394,7 @@ create table historico_precio (
   id_historico       text primary key,
   nombre_material    text,
   id_pedido          text references pedidos(id_pedido),
-  proveedor_id       text references proveedores(id_proveedor),
+  proveedor          text,   -- nombre libre, no FK
   fecha              date,
   precio_unitario    numeric
 );
