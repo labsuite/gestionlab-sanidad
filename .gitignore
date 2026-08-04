@@ -2,6 +2,8 @@
 scripts/credentials.json
 scripts/supabase_credentials.json
 scripts/sanidad_cma_credentials.json
+scripts/supabase_admins_bootstrap.json
+supabase/.temp/
 scripts/__pycache__/
 *.pyc
 exports/

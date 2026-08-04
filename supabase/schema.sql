@@ -447,3 +447,27 @@ begin
     execute format('alter table public.%I enable row level security;', t);
   end loop;
 end $$;
+
+-- ============================================================
+-- 10. PERMISOS DE TABLA (GRANTs)
+-- ============================================================
+-- RLS decide QUÉ filas se ven; los GRANT deciden si el rol puede tocar la
+-- tabla siquiera. Al crear las tablas conectados como superusuario (postgres)
+-- en vez de vía las migraciones propias de Supabase, estos GRANT no se
+-- aplican solos — hay que darlos a mano. Sin esto, service_role (usada desde
+-- las Edge Functions) recibe "permission denied" aunque tenga vía libre de
+-- RLS. anon/authenticated se conceden ya también: como RLS sigue sin
+-- políticas, no abre ningún acceso real todavía, pero evita este mismo
+-- problema cuando se añadan las políticas en la tarea de Auth (#8).
+
+grant usage on schema public to anon, authenticated, service_role;
+
+grant all on all tables in schema public to service_role;
+grant all on all sequences in schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
+
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant select on all tables in schema public to anon;
+alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
+alter default privileges in schema public grant select on tables to anon;
