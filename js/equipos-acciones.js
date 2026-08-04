@@ -238,9 +238,9 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const pendWrap  = document.getElementById('plan-pendientes-wrap');
   const pendLista = document.getElementById('plan-pendientes-lista');
   if (origenIntId) {
-    if (intro) intro.textContent = 'Programando una nueva visita de seguimiento sobre la incidencia';
+    if (intro) intro.textContent = 'Programando una nueva actuación de seguimiento sobre la incidencia';
     if (titulo) titulo.textContent = '📅 Programar próxima actuación';
-    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Toca abajo lo pendiente que corresponda a esta visita — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
+    if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Toca abajo lo pendiente que corresponda a esta actuación — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
     const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
     const pendientes = getTareasIntervencion(origenIntId).filter(sinResolver);
     if (pendWrap && pendLista) {
@@ -257,7 +257,7 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   } else {
     if (intro) intro.textContent = 'Creando intervención en respuesta a la incidencia';
     if (titulo) titulo.textContent = '🗓 Responder a la incidencia';
-    if (ayuda) ayuda.innerHTML = 'Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas visitas".';
+    if (ayuda) ayuda.innerHTML = 'Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la actuación ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas actuaciones".';
     if (pendWrap) pendWrap.style.display = 'none';
     if (pendLista) pendLista.innerHTML = '';
   }
@@ -311,7 +311,7 @@ function abrirHiloIncidencia(incId) {
   if (!cont) return;
 
   if (!inc.Intervencion_Generada) {
-    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin planificar</div><div class="empty-state-text">Pulsa "Responder" en la incidencia para crear la primera visita.</div></div>`;
+    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin planificar</div><div class="empty-state-text">Pulsa "Responder" en la incidencia para crear la primera actuación.</div></div>`;
     openModal('modal-hilo-incidencia');
     return;
   }
@@ -339,7 +339,7 @@ function abrirHiloIncidencia(incId) {
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalAdjuntarFactura(${cIdx})">📎 Factura</button>`;
       if (c.Estado !== 'Cerrada')
-        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');programarOtraVisita(${cIdx})">📅 Otra visita</button>`;
+        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');programarOtraVisita(${cIdx})">📅 Otra actuación</button>`;
     }
 
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -348,7 +348,7 @@ function abrirHiloIncidencia(incId) {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px">
           <strong style="font-size:13px">${c.ID_Intervencion}</strong>
           <span class="badge ${estadoBadge[c.Estado]||'badge-gray'}" style="font-size:10px">${c.Estado||'—'}</span>
-          ${esActiva ? '<span class="badge badge-blue" style="font-size:9px">visita activa</span>' : ''}
+          ${esActiva ? '<span class="badge badge-blue" style="font-size:9px">actuación activa</span>' : ''}
         </div>
         <div style="font-size:12px;color:var(--text-soft)">${fechaTxt} · ${quien} · ${resumenTareas}</div>
       </div>
@@ -540,7 +540,7 @@ function _renderTareasEnModal(intId) {
   if (!cont) return;
   const tareas = getTareasIntervencion(intId);
   if (!tareas.length) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta visita.</div>';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta actuación.</div>';
     return;
   }
   cont.innerHTML = tareas.map(t => {
@@ -691,7 +691,7 @@ async function marcarResultadoTarea(tareaId, resultado) {
     await _guardarTareaIntervencion(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
     const { estadoAgg } = await _sincronizarIntervencion(intIdx, operativo);
     _renderTareasEnModal(tarea.ID_Intervencion);
-    showToast(`Tarea → ${resultado}. Visita → ${estadoAgg}`, 'success');
+    showToast(`Tarea → ${resultado}. Actuación → ${estadoAgg}`, 'success');
     renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error actualizando la tarea', 'error'); console.error(e); }
   hideLoading();
@@ -800,12 +800,12 @@ async function guardarActuacion(finalizar) {
 
     if (finalizar) {
       closeModal('modal-registrar-actuacion');
-      showToast(desc ? 'Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.' : 'Visita guardada', 'success');
+      showToast(desc ? 'Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.' : 'Actuación guardada', 'success');
       renderAll();
     } else {
       if (desc) _resetCamposTarea();
       _renderTareasEnModal(i.ID_Intervencion);
-      showToast(desc ? 'Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.' : 'Datos de la visita guardados', 'success');
+      showToast(desc ? 'Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.' : 'Datos de la actuación guardados', 'success');
       renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); }

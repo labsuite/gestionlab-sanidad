@@ -188,7 +188,7 @@
       <input type="hidden" id="plan-equipo">
       <input type="hidden" id="plan-int-idx">
       <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:12px;color:var(--text-soft);margin-bottom:10px;line-height:1.5" id="plan-ayuda-texto">
-        Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la visita ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas visitas".
+        Esto solo deja anotado "esto se va a atender" — no hace falta que ya sepas cuándo. Cuando la actuación ocurra, la registrarás como una <strong>Intervención</strong> con sus <strong>Tareas</strong> desde "Ejecutar", en "Próximas actuaciones".
       </div>
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);margin-bottom:14px">
         <span id="plan-intro-texto">Creando intervención en respuesta a la incidencia</span> <strong id="plan-inc-label"></strong>
@@ -242,12 +242,12 @@
           <textarea id="plan-descripcion" placeholder="Qué se prevé hacer..." style="min-height:80px"></textarea>
         </div>
         <div class="form-group full" id="plan-pendientes-wrap" style="display:none">
-          <label>Pendiente de la visita anterior <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(toca la que corresponda a esta visita — el resto sigue pendiente para otra)</span></label>
+          <label>Pendiente de la actuación anterior <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">(toca la que corresponda a esta actuación — el resto sigue pendiente para otra)</span></label>
           <div id="plan-pendientes-lista" style="display:flex;flex-direction:column;gap:6px"></div>
         </div>
       </div>
 
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas previstas para esta visita</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas previstas para esta actuación</div>
       <div id="plan-tareas-lista"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <input type="text" id="plan-nueva-tarea" placeholder="Ej: Sustituir la correa..." style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px" onkeydown="if(event.key==='Enter'){event.preventDefault();agregarTareaPrevista();}">
@@ -276,12 +276,12 @@
       <input type="hidden" id="act-int-idx">
       <input type="hidden" id="act-equipo-directo">
       <div style="padding:10px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);margin-bottom:10px;line-height:1.5">
-        Esta <strong>Intervención</strong> es la visita completa de hoy. Cada cosa concreta que hagas (revisar, cambiar una pieza, limpiar...) es una <strong>Tarea</strong> distinta, con su propio resultado — añade tantas como necesites antes de finalizar la visita.
+        Esta <strong>Intervención</strong> es la actuación completa de hoy. Cada cosa concreta que hagas (revisar, cambiar una pieza, limpiar...) es una <strong>Tarea</strong> distinta, con su propio resultado — añade tantas como necesites antes de finalizar la actuación.
       </div>
       <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);font-size:13px;margin-bottom:14px">
         Intervención <strong id="act-int-label"></strong> · Equipo: <strong id="act-equipo-label"></strong>
       </div>
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Datos de la visita</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">Datos de la actuación</div>
       <div class="form-grid form-grid-2">
         <div class="form-group" id="act-tipo-int-group" style="display:none">
           <label>Tipo de intervención *</label>
@@ -332,7 +332,7 @@
         </div>
       </div>
 
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas registradas en esta visita</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas registradas en esta actuación</div>
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Las tareas sin resultado aún quedan "Pendiente" — márcalas con el botón ✓ cuando sepas cómo quedaron, no hace falta decidirlo al escribirlas.</div>
       <div id="act-tareas-lista"></div>
 
@@ -529,7 +529,7 @@
           <div id="ficha-int-doc"></div>
         </div>
         <div style="grid-column:1/-1">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Tareas de esta visita</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Tareas de esta actuación</div>
           <div id="ficha-int-tareas" style="font-size:13px;color:var(--text-soft);line-height:1.5"></div>
         </div>
         <div style="grid-column:1/-1">
