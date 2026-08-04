@@ -9,7 +9,18 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ROLES_PERMITIDOS = ["Administrador", "Gestor"];
 
-export async function requireAdminOrGestor(req: Request) {
+// El client_id público de GestionLab (js/config.js) — comprobamos que el
+// token venga de nuestro propio login, no de cualquier token de Google.
+const GESTIONLAB_CLIENT_ID = "617390713769-milqb8jfdk9l6bd63bh52bbronivablb.apps.googleusercontent.com";
+
+function adminClient() {
+  return createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+}
+
+async function verificarTokenGoogle(req: Request): Promise<{ email: string } | { error: Response }> {
   const googleToken = req.headers.get("x-google-token");
   if (!googleToken) {
     return { error: jsonError("Falta el token de Google (header x-google-token)", 401) };
@@ -22,15 +33,31 @@ export async function requireAdminOrGestor(req: Request) {
     return { error: jsonError("Token de Google inválido o caducado", 401) };
   }
   const info = await infoRes.json();
+  if (info.aud !== GESTIONLAB_CLIENT_ID && info.azp !== GESTIONLAB_CLIENT_ID) {
+    return { error: jsonError("Token de Google de otra aplicación, no válido aquí", 401) };
+  }
   const email = (info.email || "").toLowerCase().trim();
   if (!email) {
     return { error: jsonError("No se pudo verificar el email de Google", 401) };
   }
+  return { email };
+}
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+// Cualquier persona con sesión válida de GestionLab (Admin/Gestor/Profesor/Alumno).
+// No exige que ya exista fila en public.users — útil mientras la importación
+// de alumnado (tarea #4) todavía no se ha ejecutado para todo el mundo.
+export async function requireValidSession(req: Request) {
+  const resultado = await verificarTokenGoogle(req);
+  if ("error" in resultado) return resultado;
+  return { email: resultado.email, supabaseAdmin: adminClient() };
+}
+
+export async function requireAdminOrGestor(req: Request) {
+  const resultado = await verificarTokenGoogle(req);
+  if ("error" in resultado) return resultado;
+  const { email } = resultado;
+
+  const supabaseAdmin = adminClient();
 
   const { data: user, error } = await supabaseAdmin
     .from("users")
