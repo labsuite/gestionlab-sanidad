@@ -496,3 +496,5 @@ create policy "equipos_select_anon" on equipos for select to anon using (true);
 create policy "intervenciones_select_anon" on intervenciones for select to anon using (true);
 create policy "incidencias_select_anon" on incidencias for select to anon using (true);
 create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to anon using (true);
+create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to anon using (true);
+create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to anon using (true);

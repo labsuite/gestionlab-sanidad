@@ -265,15 +265,15 @@ async function guardarRegistroMant() {
   if (!fecha) { showToast('Indica la fecha de realización', 'error'); return; }
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
 
-  const id  = genId('RM');
-  const row = [id, idPlan, idEquipo, curso, periodo, fecha, quien,
-    document.getElementById('mant-supervisado-por').value.trim(),
-    document.getElementById('mant-observaciones').value.trim()];
-
   showLoading('Guardando...');
   try {
-    await sheetsAppend('Registro_Mantenimientos', row);
-    DATA.registroMantenimientos.push(rowToObj(row, 'registroMantenimientos'));
+    const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'registrar', id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso,
+      periodo, fecha_realizacion: fecha, realizado_por: quien,
+      supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
+      observaciones: document.getElementById('mant-observaciones').value.trim(),
+    });
+    DATA.registroMantenimientos.push(_registroMantSbToObj(registro));
     closeModal('modal-registrar-mant');
     showToast('Mantenimiento registrado', 'success');
     renderEquipos();
@@ -333,15 +333,18 @@ async function guardarPlan() {
     if (_planEditingId) {
       const idx = DATA.planesMantenimiento.findIndex(p => p.ID_Plan === _planEditingId);
       if (idx !== -1) {
-        const row = [_planEditingId, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones, conAlumnado];
-        await sheetsUpdate(`Planes_Mantenimiento!A${idx + 2}:H${idx + 2}`, row);
-        DATA.planesMantenimiento[idx] = rowToObj(row, 'planesMantenimiento');
+        const { plan } = await callEdgeFunction('gestionar-mantenimiento', {
+          accion: 'actualizar_plan', id_plan: _planEditingId, id_equipo: _planEditingEquipoId,
+          tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, con_alumnado: conAlumnado,
+        });
+        DATA.planesMantenimiento[idx] = _planMantenimientoSbToObj(plan);
       }
     } else {
-      const id  = genId('PM');
-      const row = [id, _planEditingEquipoId, tipo, period, operacion, 'TRUE', instrucciones, conAlumnado];
-      await sheetsAppend('Planes_Mantenimiento', row);
-      DATA.planesMantenimiento.push(rowToObj(row, 'planesMantenimiento'));
+      const { plan } = await callEdgeFunction('gestionar-mantenimiento', {
+        accion: 'crear_plan', id_equipo: _planEditingEquipoId,
+        tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, con_alumnado: conAlumnado,
+      });
+      DATA.planesMantenimiento.push(_planMantenimientoSbToObj(plan));
     }
     closeModal('modal-gestionar-plan');
     showToast('Plan guardado', 'success');
@@ -362,7 +365,7 @@ async function eliminarPlan(idPlan) {
   if (idx === -1) return;
   showLoading('Eliminando...');
   try {
-    await sheetsDeleteRow('Planes_Mantenimiento', idx);
+    await callEdgeFunction('gestionar-mantenimiento', { accion: 'eliminar_plan', id_plan: idPlan });
     DATA.planesMantenimiento.splice(idx, 1);
     showToast('Plan eliminado', 'success');
     renderMantenimiento();

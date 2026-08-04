@@ -209,6 +209,33 @@ function _incidenciaSbToObj(i) {
   };
 }
 
+function _planMantenimientoSbToObj(p) {
+  return {
+    ID_Plan: p.id_plan || '',
+    ID_Equipo: p.id_equipo || '',
+    Tipo_Intervencion: p.tipo_intervencion || '',
+    Periodicidad: p.periodicidad || '',
+    Operacion: p.operacion || '',
+    Activo: p.activo ? 'TRUE' : 'FALSE',
+    Instrucciones: p.instrucciones || '',
+    Con_Alumnado: p.con_alumnado ? 'Sí' : 'No',
+  };
+}
+
+function _registroMantSbToObj(r) {
+  return {
+    ID_Registro: r.id_registro || '',
+    ID_Plan: r.id_plan || '',
+    ID_Equipo: r.id_equipo || '',
+    Curso_Academico: r.curso_academico || '',
+    Periodo: r.periodo || '',
+    Fecha_Realizacion: r.fecha_realizacion || '',
+    Realizado_Por: r.realizado_por || '',
+    Supervisado_Por: r.supervisado_por || '',
+    Observaciones: r.observaciones || '',
+  };
+}
+
 function _tareaSbToObj(t) {
   return {
     ID_Tarea: t.id_tarea || '',
@@ -273,7 +300,8 @@ async function loadAllData() {
            configReservas, reservas, registrosCabina, registrosAutoclave,
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
            sbProveedoresRes, sbUbicacionesRes, sbEquiposRes,
-           sbIntervencionesRes, sbIncidenciasRes, sbTareasRes] = await Promise.all([
+           sbIntervencionesRes, sbIncidenciasRes, sbTareasRes,
+           sbPlanesRes, sbRegistroMantRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -312,7 +340,9 @@ async function loadAllData() {
       _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('intervenciones').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('incidencias').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('tareas_intervencion').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('tareas_intervencion').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('planes_mantenimiento').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('registro_mantenimientos').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -365,7 +395,11 @@ async function loadAllData() {
     DATA.historicoPrecio        = toObj(historicoPrecio        || [], 'historicoPrecio');
     DATA.tareas                 = toObj(tareas                 || [], 'tareas');
     DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
+    const sbPlanes = sbPlanesRes?.data || [];
+    if (sbPlanes.length) DATA.planesMantenimiento = sbPlanes.map(_planMantenimientoSbToObj);
     DATA.registroMantenimientos = toObj(registroMantenimientos || [], 'registroMantenimientos');
+    const sbRegistroMant = sbRegistroMantRes?.data || [];
+    if (sbRegistroMant.length) DATA.registroMantenimientos = sbRegistroMant.map(_registroMantSbToObj);
     DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
     DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
     DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
