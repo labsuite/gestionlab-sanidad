@@ -5,15 +5,12 @@
 // accion "actualizar_estado" es un atajo ligero: solo cambia estado_operativo,
 // usado por actualizarEstadoEquipo() cuando se reporta una incidencia o se
 // cierra una intervención — no exige el resto de campos obligatorios.
-import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
-
-  const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
-  if (authError) return authError;
 
   let body: Record<string, unknown>;
   try {
@@ -25,6 +22,14 @@ Deno.serve(async (req) => {
   const accion = String(body.accion || "");
   const idActivo = String(body.id_activo || "").trim();
   if (!idActivo) return jsonError("id_activo es obligatorio", 400);
+
+  // actualizar_estado la dispara el Profesor indirectamente al reportar una
+  // incidencia o cerrar una intervención de su equipo — el resto (editar
+  // ficha completa, crear, eliminar) sigue reservado a Admin/Gestor.
+  const { error: authError, supabaseAdmin } = accion === "actualizar_estado"
+    ? await requireStaff(req)
+    : await requireAdminOrGestor(req);
+  if (authError) return authError;
 
   if (accion === "actualizar_estado") {
     const estadoOperativo = String(body.estado_operativo || "").trim();

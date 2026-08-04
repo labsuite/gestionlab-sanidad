@@ -8,6 +8,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ROLES_PERMITIDOS = ["Administrador", "Gestor"];
+const ROLES_STAFF = ["Administrador", "Gestor", "Profesor"];
 
 // El client_id público de GestionLab (js/config.js) — comprobamos que el
 // token venga de nuestro propio login, no de cualquier token de Google.
@@ -52,7 +53,7 @@ export async function requireValidSession(req: Request) {
   return { email: resultado.email, supabaseAdmin: adminClient() };
 }
 
-export async function requireAdminOrGestor(req: Request) {
+async function requireRoles(req: Request, roles: string[], etiqueta: string) {
   const resultado = await verificarTokenGoogle(req);
   if ("error" in resultado) return resultado;
   const { email } = resultado;
@@ -65,11 +66,21 @@ export async function requireAdminOrGestor(req: Request) {
     .eq("email", email)
     .maybeSingle();
 
-  if (error || !user || !user.activo || !ROLES_PERMITIDOS.includes(user.rol)) {
-    return { error: jsonError("No tienes permiso para esta acción (solo Admin/Gestor)", 403) };
+  if (error || !user || !user.activo || !roles.includes(user.rol)) {
+    return { error: jsonError(`No tienes permiso para esta acción (solo ${etiqueta})`, 403) };
   }
 
   return { user, supabaseAdmin };
+}
+
+export async function requireAdminOrGestor(req: Request) {
+  return requireRoles(req, ROLES_PERMITIDOS, "Admin/Gestor");
+}
+
+// Intervenciones/Incidencias: el Profesor también puede gestionar las de sus
+// propios equipos (ver crearIntervenciones/crearIncidencias en js/ui.js).
+export async function requireStaff(req: Request) {
+  return requireRoles(req, ROLES_STAFF, "Admin/Gestor/Profesor");
 }
 
 // Las Edge Functions de Supabase no añaden cabeceras CORS por defecto: sin

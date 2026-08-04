@@ -155,6 +155,71 @@ function _equipoSbToObj(e) {
   };
 }
 
+// "ID – Tipo Marca Modelo", igual que ya construía seleccionarEquipoIncidencia()
+// a mano — se reconstruye aquí para que el campo Equipo de intervenciones/
+// incidencias siga mostrándose igual que antes de migrar (DATA.equipos ya
+// está poblado en loadAllData() cuando se llama a esto).
+function _equipoConLabel(idEquipo) {
+  if (!idEquipo) return '';
+  const eq = DATA.equipos.find(e => e.ID_Activo === idEquipo);
+  if (!eq) return idEquipo;
+  const label = [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ');
+  return label ? `${idEquipo} – ${label}` : idEquipo;
+}
+
+const _boolSb = v => v === true ? 'Sí' : (v === false ? 'No' : '');
+
+function _intervencionSbToObj(i) {
+  return {
+    ID_Intervencion: i.id_intervencion || '',
+    Equipo: _equipoConLabel(i.id_equipo),
+    Tipo: i.tipo || '',
+    Origen: i.origen || '',
+    Fecha_Planificada: i.fecha_planificada || '',
+    Fecha_Realizacion: i.fecha_realizacion || '',
+    Realizado_Por: i.realizado_por || '',
+    Tecnico_Externo: i.tecnico_externo || '',
+    Proveedor: i.proveedor || '',
+    Descripcion_Actuacion: i.descripcion_actuacion || '',
+    Resultado: i.resultado || '',
+    Equipo_Operativo_Tras_Intervencion: _boolSb(i.equipo_operativo_tras_intervencion),
+    URL_Adjunto: i.url_adjunto || '',
+    Factura_Asociada: i.factura_asociada || '',
+    Actualiza_Proximo_Preventivo: _boolSb(i.actualiza_proximo_preventivo),
+    Observaciones: i.observaciones || '',
+    Nombre_Adjunto: i.nombre_adjunto || '',
+    Estado: i.estado || '',
+    Fecha_Estimada_Resolucion: i.fecha_estimada_resolucion || '',
+    Coste_Intervencion: i.coste_intervencion != null ? String(i.coste_intervencion) : '',
+  };
+}
+
+function _incidenciaSbToObj(i) {
+  return {
+    ID_Incidencia: i.id_incidencia || '',
+    Equipo: _equipoConLabel(i.id_equipo),
+    Reportado_Por: i.reportado_por || '',
+    Fecha_Hora: (i.fecha_hora || '').replace('T', ' ').slice(0, 16),
+    Descripcion_Problema: i.descripcion_problema || '',
+    Impacto: i.impacto || '',
+    Urgencia: i.urgencia || '',
+    Estado: i.estado || '',
+    Intervencion_Generada: i.intervencion_generada || '',
+    Relacionada_Con: i.relacionada_con || '',
+  };
+}
+
+function _tareaSbToObj(t) {
+  return {
+    ID_Tarea: t.id_tarea || '',
+    ID_Intervencion: t.id_intervencion || '',
+    Descripcion: t.descripcion || '',
+    Resultado: t.resultado || '',
+    Operativo: _boolSb(t.operativo),
+    Observaciones: t.observaciones || '',
+  };
+}
+
 // ============================================================
 // HELPERS MATERIAL_UBICACIONES
 // ============================================================
@@ -207,7 +272,8 @@ async function loadAllData() {
            revisionesInventario, consultasResiduo,
            configReservas, reservas, registrosCabina, registrosAutoclave,
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
-           sbProveedoresRes, sbUbicacionesRes, sbEquiposRes] = await Promise.all([
+           sbProveedoresRes, sbUbicacionesRes, sbEquiposRes,
+           sbIntervencionesRes, sbIncidenciasRes, sbTareasRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -243,7 +309,10 @@ async function loadAllData() {
       _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('intervenciones').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('incidencias').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('tareas_intervencion').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -254,8 +323,20 @@ async function loadAllData() {
       DATA.equipos = sbEquipos.map(_equipoSbToObj);
     }
     DATA.intervenciones      = toObj(intervenciones,      'intervenciones');
+    const sbIntervenciones = sbIntervencionesRes?.data || [];
+    if (sbIntervenciones.length) {
+      DATA.intervenciones = sbIntervenciones.map(_intervencionSbToObj);
+    }
     DATA.incidencias         = toObj(incidencias,         'incidencias');
+    const sbIncidencias = sbIncidenciasRes?.data || [];
+    if (sbIncidencias.length) {
+      DATA.incidencias = sbIncidencias.map(_incidenciaSbToObj);
+    }
     DATA.tareasIntervencion  = toObj(tareasIntervencion || [], 'tareasIntervencion');
+    const sbTareas = sbTareasRes?.data || [];
+    if (sbTareas.length) {
+      DATA.tareasIntervencion = sbTareas.map(_tareaSbToObj);
+    }
     DATA.proveedores         = toObj(proveedores,         'proveedores');
     const sbProveedores = sbProveedoresRes?.data || [];
     if (sbProveedores.length) {

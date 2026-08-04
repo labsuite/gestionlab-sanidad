@@ -383,36 +383,33 @@ async function _asegurarIntervencionPlanificada() {
   const realizadoPorPlan = tipoEjecPlan === 'Interna' ? v('plan-realizado-por') : '';
   const proveedorPlan    = tipoEjecPlan === 'Externa' ? v('plan-proveedor-ext') : '';
 
-  const id  = genId('INT-');
-  const row = [
-    id, equipo, v('plan-tipo'),
-    origenIntId ? ('Seguimiento de ' + origenIntId) : 'Incidencia reportada', // D Origen
-    fecha, '', realizadoPorPlan, '', proveedorPlan,
-    '', '', '',
-    '', '', '',
-    v('plan-descripcion'), '', 'Planificada',
-    '', ''
-  ];
-
   try {
-    await sheetsAppend('Intervenciones', row);
-    DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'crear',
+      id_equipo: (equipo || '').split(' – ')[0].trim(),
+      tipo: v('plan-tipo'),
+      origen: origenIntId ? ('Seguimiento de ' + origenIntId) : 'Incidencia reportada',
+      fecha_planificada: fecha,
+      realizado_por: realizadoPorPlan,
+      proveedor: proveedorPlan,
+      descripcion_actuacion: v('plan-descripcion'),
+      estado: 'Planificada',
+      incidencia_id: incId || undefined,
+      estado_equipo: 'Revisión planificada',
+    });
+    DATA.intervenciones.push(_intervencionSbToObj(intervencion));
     const intIdx = DATA.intervenciones.length - 1;
     sv('plan-int-idx', String(intIdx));
     const btnCrear = document.getElementById('plan-btn-crear');
     if (btnCrear) btnCrear.textContent = 'Guardar y cerrar';
 
-    // Actualizar incidencia: Estado → En gestión, y apuntar siempre a esta intervención
-    // (tanto en la planificación inicial como al programar una visita de seguimiento).
+    // Reflejar en memoria el cambio que la Edge Function ya hizo en la incidencia
+    // (Estado → En gestión, Intervencion_Generada → esta intervención).
     const incIdx = DATA.incidencias.findIndex(x => x.ID_Incidencia === incId);
     if (incIdx !== -1) {
-      const inc = DATA.incidencias[incIdx];
-      inc.Estado = 'En gestión';
-      inc.Intervencion_Generada = id;
-      const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
-      await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
+      DATA.incidencias[incIdx].Estado = 'En gestión';
+      DATA.incidencias[incIdx].Intervencion_Generada = intervencion.id_intervencion;
     }
-    try { await actualizarEstadoEquipo(equipo, 'Revisión planificada'); } catch(e) { console.warn(e); }
 
     return intIdx;
   } catch(e) { showToast('Error guardando', 'error'); console.error(e); return null; }
@@ -458,17 +455,14 @@ async function guardarPlanificacion(finalizar) {
   const tipoEjecPlan = document.querySelector('input[name="plan-tipo-ejec"]:checked')?.value || 'Interna';
   const realizadoPorPlan = tipoEjecPlan === 'Interna' ? v('plan-realizado-por') : '';
   const proveedorPlan    = tipoEjecPlan === 'Externa' ? v('plan-proveedor-ext') : '';
-  const updatedRow = [
-    i.ID_Intervencion, i.Equipo, v('plan-tipo'), i.Origen,
-    v('plan-fecha'), '', realizadoPorPlan, '', proveedorPlan,
-    '', '', '',
-    '', '', '',
-    v('plan-descripcion'), '', 'Planificada',
-    '', ''
-  ];
   try {
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
-    DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'actualizar', id_intervencion: i.ID_Intervencion,
+      tipo: v('plan-tipo'), fecha_planificada: v('plan-fecha'),
+      realizado_por: realizadoPorPlan, proveedor: proveedorPlan,
+      descripcion_actuacion: v('plan-descripcion'), estado: 'Planificada',
+    });
+    DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
 
     if (finalizar) {
       closeModal('modal-planificar-intervencion');
@@ -491,40 +485,24 @@ function getTareasIntervencion(intId) {
   return DATA.tareasIntervencion.filter(t => t.ID_Intervencion === intId);
 }
 
-function calcularResultadoAgregado(tareas) {
-  if (!tareas.length) return '';
-  if (tareas.some(t => t.Resultado === 'Pendiente')) return 'Pendiente';
-  if (tareas.every(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado')) {
-    return tareas.some(t => t.Resultado === 'Resuelto') ? 'Resuelto' : 'Descartado';
-  }
-  return 'Resuelto parcialmente';
-}
-
-function calcularEstadoIntervencion(resultadoAgregado, tipoEjec) {
-  if (!resultadoAgregado) return 'Planificada';
-  if (resultadoAgregado === 'Pendiente' || resultadoAgregado === 'Resuelto parcialmente') return 'En gestión';
-  if (resultadoAgregado === 'Resuelto' && tipoEjec === 'Externa') return 'Pendiente factura';
-  return 'Cerrada'; // Resuelto interno, o Descartado
-}
-
 // tareaOrigenId: si se pasa, actualiza esa fila de Tareas_Intervencion en vez de
 // crear una nueva — lo usa marcarResultadoTarea() para fijar el resultado de una
 // tarea ya guardada (p.ej. una prevista al planificar, ver plan-tareas-previstas).
+// Crea o actualiza una tarea. La Edge Function recalcula en el mismo golpe
+// el Resultado/Estado agregados de la intervención y los propaga al estado
+// del equipo y de la incidencia vinculada (antes era _sincronizarIntervencion,
+// una llamada aparte que había que acordarse de hacer después).
 async function _guardarTareaIntervencion(intId, descripcion, resultado, operativo, observaciones, tareaOrigenId) {
-  if (tareaOrigenId) {
-    const idx = DATA.tareasIntervencion.findIndex(t => t.ID_Tarea === tareaOrigenId && t.ID_Intervencion === intId);
-    if (idx !== -1) {
-      const row = [tareaOrigenId, intId, descripcion, resultado, operativo, observaciones || ''];
-      await sheetsUpdate(`Tareas_Intervencion!A${idx + 2}:F${idx + 2}`, row);
-      DATA.tareasIntervencion[idx] = rowToObj(row, 'tareasIntervencion');
-      return tareaOrigenId;
-    }
-  }
-  const idTarea = genId('TSK-');
-  const row = [idTarea, intId, descripcion, resultado, operativo, observaciones || ''];
-  await sheetsAppend('Tareas_Intervencion', row);
-  DATA.tareasIntervencion.push(rowToObj(row, 'tareasIntervencion'));
-  return idTarea;
+  const resp = await callEdgeFunction('gestionar-intervencion', {
+    accion: 'guardar_tarea', id_intervencion: intId, id_tarea: tareaOrigenId || undefined,
+    descripcion, resultado, operativo, observaciones: observaciones || '',
+  });
+  const idx = DATA.tareasIntervencion.findIndex(t => t.ID_Tarea === resp.tarea.id_tarea);
+  const obj = _tareaSbToObj(resp.tarea);
+  if (idx !== -1) DATA.tareasIntervencion[idx] = obj; else DATA.tareasIntervencion.push(obj);
+  const intIdx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === intId);
+  if (intIdx !== -1) DATA.intervenciones[intIdx] = _intervencionSbToObj(resp.intervencion);
+  return resp;
 }
 
 const _RESULTADO_BADGE = {'Resuelto':'badge-green','Resuelto parcialmente':'badge-orange','Pendiente':'badge-blue','No resuelto':'badge-red','Descartado':'badge-gray'};
@@ -625,65 +603,16 @@ function _resetCamposTarea() {
 // (se puede corregir el estado operativo del equipo a mano desde la ficha del equipo).
 const _OPERATIVO_POR_DEFECTO = { 'Resuelto': 'Sí', 'Descartado': 'Sí', 'No resuelto': 'No', 'Resuelto parcialmente': 'Sí', 'Pendiente': 'Sí' };
 
-// ============================================================
-// SINCRONIZAR INTERVENCIÓN — recalcula Resultado/Estado a partir de las
-// tareas actuales, guarda la fila y propaga a Estado_Operativo del equipo
-// y al estado de la incidencia vinculada. Se llama tras cualquier cambio
-// en las tareas (añadir una, o marcar el resultado de una ya existente).
-// ============================================================
-async function _sincronizarIntervencion(intIdx, operativoTarea) {
-  const i = DATA.intervenciones[intIdx];
-  const tareas       = getTareasIntervencion(i.ID_Intervencion);
-  const resultadoAgg = calcularResultadoAgregado(tareas);
-  const tipoEjec      = i.Proveedor ? 'Externa' : 'Interna';
-  const estadoAgg     = calcularEstadoIntervencion(resultadoAgg, tipoEjec);
-
-  const updatedRow = [
-    i.ID_Intervencion, i.Equipo, i.Tipo,
-    i.Origen || 'Incidencia reportada',
-    i.Fecha_Planificada || '', i.Fecha_Realizacion || '', i.Realizado_Por || '', '', i.Proveedor || '',
-    i.Descripcion_Actuacion || '', // legado — solo relevante en intervenciones previas a este cambio
-    resultadoAgg, operativoTarea || i.Equipo_Operativo_Tras_Intervencion || '',
-    i.URL_Adjunto || '', '', '',
-    i.Observaciones || '', i.Nombre_Adjunto || '', estadoAgg,
-    i.Fecha_Estimada_Resolucion || '', i.Coste_Intervencion || ''
-  ];
-  await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
-  DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
-
-  if (operativoTarea) {
-    const estadoEquipo = (resultadoAgg === 'Resuelto' || resultadoAgg === 'Descartado')
-      ? (operativoTarea === 'Sí' ? 'Operativo' : 'No operativo')
-      : (operativoTarea === 'Sí' ? 'Operativo con fallos' : 'No operativo');
-    try { await actualizarEstadoEquipo(i.Equipo, estadoEquipo); } catch(e) { console.warn(e); }
-  }
-
-  const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-  if (incIdx !== -1) {
-    const inc = DATA.incidencias[incIdx];
-    if (!['Resuelta','Descartada'].includes(inc.Estado)) {
-      const nuevoEstadoInc = estadoAgg === 'Cerrada' ? (resultadoAgg === 'Descartado' ? 'Descartada' : 'Resuelta') : 'En gestión';
-      if (nuevoEstadoInc !== inc.Estado) {
-        inc.Estado = nuevoEstadoInc;
-        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora, inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, inc.Estado, inc.Intervencion_Generada, inc.Relacionada_Con || ''];
-        await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
-      }
-    }
-  }
-  return { resultadoAgg, estadoAgg };
-}
-
 // Marca el resultado de una tarea YA guardada, desde su botón en la lista.
+// La sincronización (Resultado/Estado agregados, equipo, incidencia) ahora
+// la hace la Edge Function dentro de _guardarTareaIntervencion.
 async function marcarResultadoTarea(tareaId, resultado) {
   const tarea = DATA.tareasIntervencion.find(t => t.ID_Tarea === tareaId);
   if (!tarea) return;
-  const intIdx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === tarea.ID_Intervencion);
-  if (intIdx === -1) return;
   const operativo = _OPERATIVO_POR_DEFECTO[resultado] || 'Sí';
   showLoading('Actualizando...');
   try {
-    await _guardarTareaIntervencion(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
-    const { estadoAgg } = await _sincronizarIntervencion(intIdx, operativo);
+    const { estadoAgg } = await _guardarTareaIntervencion(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
     _renderTareasEnModal(tarea.ID_Intervencion);
     showToast(`Tarea → ${resultado}. Actuación → ${estadoAgg}`, 'success');
     renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
@@ -709,7 +638,6 @@ async function guardarActuacion(finalizar) {
     const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
     const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
     const tipoInt = v('act-tipo-int') || 'Correctivo';
-    const nuevoId = genId('INT-');
     let urlAdjunto = '', nombreAdjunto = '';
     if (_pendingActFileBase64) {
       showLoading('Subiendo documento...');
@@ -719,21 +647,18 @@ async function guardarActuacion(finalizar) {
       } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
       _pendingActFileBase64 = null;
     }
-    const row = [
-      nuevoId, equipoDirecto, tipoInt, 'Manual', '',
-      fechaReal, realizadoPor, '', proveedorExt, '',
-      '', '', urlAdjunto, '', '',
-      '', nombreAdjunto, 'Planificada', '', coste
-    ];
     showLoading('Guardando intervención...');
     try {
-      await sheetsAppend('Intervenciones', row);
-      DATA.intervenciones.push(rowToObj(row, 'intervenciones'));
-      const intIdx = DATA.intervenciones.length - 1;
-      await _guardarTareaIntervencion(nuevoId, desc, 'Pendiente', '', v('act-observaciones'));
-      await _sincronizarIntervencion(intIdx);
+      const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+        accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
+        fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
+        coste_intervencion: coste, url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto,
+        estado: 'Planificada',
+      });
+      DATA.intervenciones.push(_intervencionSbToObj(intervencion));
+      await _guardarTareaIntervencion(intervencion.id_intervencion, desc, 'Pendiente', '', v('act-observaciones'));
       closeModal('modal-registrar-actuacion');
-      showToast(`Intervención ${nuevoId} registrada. Tarea → Pendiente`, 'success');
+      showToast(`Intervención ${intervencion.id_intervencion} registrada. Tarea → Pendiente`, 'success');
       renderAll();
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
     hideLoading();
@@ -754,35 +679,26 @@ async function guardarActuacion(finalizar) {
   const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
   const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
   showLoading('Guardando...');
-  const rowVisita = [
-    i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen || 'Incidencia reportada',
-    i.Fecha_Planificada || '', fechaReal, realizadoPor, '', proveedorExt,
-    i.Descripcion_Actuacion || '', i.Resultado || '', i.Equipo_Operativo_Tras_Intervencion || '',
-    i.URL_Adjunto || '', '', '', i.Observaciones || '', i.Nombre_Adjunto || '', i.Estado || 'Planificada',
-    i.Fecha_Estimada_Resolucion || '', coste
-  ];
-  await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowVisita);
-  DATA.intervenciones[intIdx] = rowToObj(rowVisita, 'intervenciones');
 
+  let urlAdjunto, nombreAdjunto;
   if (_pendingActFileBase64) {
     showLoading('Subiendo documento...');
-    let urlAdjunto, nombreAdjunto;
     try {
       urlAdjunto    = await uploadFileToDrive(_pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
       nombreAdjunto = _pendingActFileBase64.name;
     } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
     _pendingActFileBase64 = null;
-    const iAct = DATA.intervenciones[intIdx];
-    const rowAdj = [
-      iAct.ID_Intervencion, iAct.Equipo, iAct.Tipo, iAct.Origen, iAct.Fecha_Planificada || '',
-      iAct.Fecha_Realizacion || '', iAct.Realizado_Por || '', '', iAct.Proveedor || '',
-      iAct.Descripcion_Actuacion || '', iAct.Resultado || '', iAct.Equipo_Operativo_Tras_Intervencion || '',
-      urlAdjunto, '', '', iAct.Observaciones || '', nombreAdjunto, iAct.Estado,
-      iAct.Fecha_Estimada_Resolucion || '', iAct.Coste_Intervencion || ''
-    ];
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, rowAdj);
-    DATA.intervenciones[intIdx] = rowToObj(rowAdj, 'intervenciones');
   }
+
+  try {
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'actualizar', id_intervencion: i.ID_Intervencion,
+      fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
+      coste_intervencion: coste,
+      ...(urlAdjunto ? { url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto } : {}),
+    });
+    DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+  } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
 
   // La tarea nueva es opcional aquí: "Guardar sin cerrar"/"Guardar y finalizar" deben
   // guardar los datos de la visita (fecha, ejecución, observaciones, adjunto) aunque
@@ -790,7 +706,6 @@ async function guardarActuacion(finalizar) {
   showLoading(desc ? 'Guardando tarea...' : 'Guardando...');
   try {
     if (desc) await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
-    await _sincronizarIntervencion(intIdx);
 
     if (finalizar) {
       closeModal('modal-registrar-actuacion');
@@ -981,15 +896,19 @@ async function guardarEquipo() {
 async function guardarIncidencia() {
   const equipo = v('inc-equipo'); const desc = v('inc-descripcion');
   if (!equipo || !desc) { showToast('Equipo y descripción son obligatorios', 'error'); return; }
-  const id  = genId('INC-');
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const usuarioApp = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   const reportadoPor = usuarioApp?.Nombre || currentUser?.name || 'Usuario';
-  const row = [id, equipo, reportadoPor, new Date().toISOString().replace('T',' ').slice(0,16), desc, v('inc-impacto'), v('inc-urgencia'), 'Abierta', '', v('inc-relacionada') || ''];
   showLoading('Guardando...');
   try {
-    await sheetsAppend('Incidencias', row);
-    DATA.incidencias.push(rowToObj(row, 'incidencias'));
+    const { incidencia } = await callEdgeFunction('gestionar-incidencia', {
+      accion: 'crear',
+      id_equipo: (equipo || '').split(' – ')[0].trim(),
+      reportado_por: reportadoPor, descripcion_problema: desc,
+      impacto: v('inc-impacto'), urgencia: v('inc-urgencia'),
+      relacionada_con: v('inc-relacionada') || undefined,
+    });
+    DATA.incidencias.push(_incidenciaSbToObj(incidencia));
     const estadoXImpacto = v('inc-impacto') === 'Equipo fuera de servicio' ? 'En revisión' : 'Operativo con fallos';
     try { await actualizarEstadoEquipo(equipo, estadoXImpacto); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
     showToast('Incidencia reportada', 'success');
@@ -1008,7 +927,7 @@ async function eliminarIncidencia(incId) {
   if (!confirm(msg)) return;
   showLoading('Eliminando...');
   try {
-    await sheetsDeleteRow('Incidencias', idx);
+    await callEdgeFunction('gestionar-incidencia', { accion: 'eliminar', id_incidencia: incId });
     DATA.incidencias.splice(idx, 1);
     showToast('Incidencia eliminada', 'success');
     renderIncidencias();
@@ -1120,33 +1039,18 @@ async function guardarFactura() {
 
   showLoading('Cerrando intervención...');
   try {
-    const updatedRow = [
-      i.ID_Intervencion, i.Equipo, i.Tipo, i.Origen,
-      i.Fecha_Planificada, i.Fecha_Realizacion,
-      i.Realizado_Por, i.Tecnico_Externo, i.Proveedor,
-      i.Descripcion_Actuacion, i.Resultado, i.Equipo_Operativo_Tras_Intervencion,
-      urlAdjunto, i.Factura_Asociada, '',
-      i.Observaciones, nombreAdjunto, 'Cerrada',
-      i.Fecha_Estimada_Resolucion || '', i.Coste_Intervencion || ''
-    ];
-    await sheetsUpdate(`Intervenciones!A${intIdx + 2}:T${intIdx + 2}`, updatedRow);
-    DATA.intervenciones[intIdx] = rowToObj(updatedRow, 'intervenciones');
-
-    // Cerrar incidencia vinculada
-    const incIdx = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-    if (incIdx !== -1) {
-      const inc = DATA.incidencias[incIdx];
-      if (!['Resuelta','Descartada'].includes(inc.Estado)) {
-        inc.Estado = 'Resuelta';
-        const incRow = [inc.ID_Incidencia, inc.Equipo, inc.Reportado_Por, inc.Fecha_Hora,
-          inc.Descripcion_Problema, inc.Impacto, inc.Urgencia, 'Resuelta', inc.Intervencion_Generada, inc.Relacionada_Con || ''];
-        await sheetsUpdate(`Incidencias!A${incIdx + 2}:J${incIdx + 2}`, incRow);
-      }
-    }
-
-    // Restaurar estado del equipo
     const operativo = i.Equipo_Operativo_Tras_Intervencion;
-    try { await actualizarEstadoEquipo(i.Equipo, operativo === 'No' ? 'No operativo' : 'Operativo'); } catch(e) { console.warn(e); }
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'actualizar', id_intervencion: i.ID_Intervencion,
+      url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto, estado: 'Cerrada',
+      estado_equipo: operativo === 'No' ? 'No operativo' : 'Operativo',
+      incidencia_estado: 'Resuelta',
+    });
+    DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    const incIdxLocal = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
+    if (incIdxLocal !== -1 && !['Resuelta','Descartada'].includes(DATA.incidencias[incIdxLocal].Estado)) {
+      DATA.incidencias[incIdxLocal].Estado = 'Resuelta';
+    }
 
     closeModal('modal-adjuntar-factura');
     showToast('Intervención cerrada. Factura adjunta.', 'success');
@@ -1267,17 +1171,14 @@ async function guardarAvisoAlumno() {
   if (!impacto) { showToast('Indica cómo afecta al uso del equipo', 'error'); return; }
   if (!desc)    { showToast('Describe el problema', 'error'); return; }
 
-  const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
-  const equipo = e ? equipoId + ' – ' + [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ') : equipoId;
-  const id  = genId('INC-');
-  const row = [id, equipo, currentUser?.name || 'Usuario',
-    new Date().toISOString().replace('T',' ').slice(0,16),
-    desc, impacto, 'Normal', 'Abierta', '', ''];
-
   showLoading('Enviando aviso...');
   try {
-    await sheetsAppend('Incidencias', row);
-    DATA.incidencias.push(rowToObj(row, 'incidencias'));
+    const { incidencia } = await callEdgeFunction('gestionar-incidencia', {
+      accion: 'crear', id_equipo: equipoId,
+      reportado_por: currentUser?.name || 'Usuario',
+      descripcion_problema: desc, impacto, urgencia: 'Normal',
+    });
+    DATA.incidencias.push(_incidenciaSbToObj(incidencia));
     showToast('Aviso enviado. El profesorado será notificado.', 'success');
     closeModal('modal-aviso-alumno');
     renderIncidencias();
