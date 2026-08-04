@@ -3,13 +3,15 @@
 // (proveedores es catálogo, no datos sensibles — mismo criterio que
 // ciclos/modulos hoy); solo las escrituras pasan por aquí, porque el
 // navegador aún no tiene sesión real de Supabase Auth (eso es la tarea #8).
-import { requireAdminOrGestor, jsonError, jsonOk } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarIdProveedor(): string {
   return "PRV-" + Date.now().toString(36).toUpperCase().slice(-6);
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);

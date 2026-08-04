@@ -4,7 +4,7 @@
 //   POST ?action=import         -> body { emails: string[] } crea cuenta+perfil+módulo
 // Replica el patrón de BioDesk (lib/sanidadCma.ts + importar-action.ts), pero
 // contra el proyecto Supabase propio de GestionLab.
-import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal, handleCorsPreflight } from "../_shared/auth.ts";
 
 interface AlumnoCMA {
   nombre: string;
@@ -34,6 +34,8 @@ function cursoAcademicoActual(): string {
 }
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
   if (authError) return authError;
 

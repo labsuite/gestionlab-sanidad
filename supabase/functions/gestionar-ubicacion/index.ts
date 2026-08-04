@@ -3,9 +3,11 @@
 // (no se genera solo) y puede cambiarlo al editar — por eso "actualizar"
 // necesita id_original (la fila que se edita) además de id_ubicacion (el
 // valor nuevo, que puede ser el mismo o uno corregido).
-import { requireAdminOrGestor, jsonError, jsonOk } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);

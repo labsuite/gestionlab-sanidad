@@ -72,17 +72,38 @@ export async function requireAdminOrGestor(req: Request) {
   return { user, supabaseAdmin };
 }
 
+// Las Edge Functions de Supabase no añaden cabeceras CORS por defecto: sin
+// esto, el navegador bloquea la respuesta al preflight (OPTIONS) con
+// "Failed to fetch" aunque la función funcione perfectamente por curl/Python
+// (esas herramientas no aplican CORS). Se detectó este bug con Playwright
+// (fetch real desde el navegador) — las pruebas anteriores por HTTP directo
+// no lo habían detectado porque no simulaban un navegador real.
+export const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-google-token",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
+
+// Llamar al principio de cada Deno.serve, antes de cualquier otra lógica:
+// devuelve la respuesta al preflight si aplica, o null si hay que continuar.
+export function handleCorsPreflight(req: Request): Response | null {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  return null;
+}
+
 export function jsonError(mensaje: string, status: number) {
   return new Response(JSON.stringify({ error: mensaje }), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
 }
 
 export function jsonOk(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
 }
 

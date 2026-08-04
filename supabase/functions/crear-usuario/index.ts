@@ -1,9 +1,11 @@
 // Tarea #5 — Alta individual de usuario desde la app.
 // Solo Admin/Gestor (comprobado en _shared/auth.ts). Crea la cuenta con
 // contraseña temporal + el perfil en public.users + sus módulos si se indican.
-import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal, handleCorsPreflight } from "../_shared/auth.ts";
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);

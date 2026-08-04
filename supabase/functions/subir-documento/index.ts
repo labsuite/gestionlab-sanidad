@@ -3,12 +3,14 @@
 // que ya tiene el propio bucket) — nunca confiar solo en la validación del
 // navegador. Body JSON con el archivo en base64 (mismo patrón que ya usa
 // GestionLab para adjuntos, ver pendingEqFileBase64 en js/config.js).
-import { requireAdminOrGestor, jsonError, jsonOk } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const TIPOS_MIME_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png"];
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024; // 10 MB — igual que el límite del bucket
 
 Deno.serve(async (req) => {
+  const preflight = handleCorsPreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
