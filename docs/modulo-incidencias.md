@@ -77,9 +77,14 @@ sigue `En gestión`.
     varias visitas de un mismo caso no se dispersen entre el resto: columna "Incidencia" con
     el ID + posición ("2/3"), fondo distinto y prefijo "↳" en las filas que continúan una
     cadena.
-- Ficha de intervención (`openFichaIntervencion`): timeline (Reportada → Planificada →
-  Ejecutando → Cerrada), lista de tareas de la visita, coste total del hilo completo
-  (`getChainIntervencion` + suma de `Coste_Intervencion`).
+- Ficha de intervención (`openFichaIntervencion`): eje cronológico real (`_buildTimelineIncidencia`)
+  con un nodo "Incidencia" seguido de un nodo por cada actuación de `getChainIntervencion` (en vez
+  del timeline de estados genérico Reportada→Planificada→Ejecutando→Cerrada que había antes) — cada
+  nodo de actuación muestra estado, fecha, quién la hizo (Interna: `Realizado_Por` / SAT: `Proveedor`)
+  y tareas resueltas; el nodo de la actuación abierta actualmente se resalta. Sustituye también al
+  bloque "Historial de intervenciones" que existía aparte (misma información, ahora unificada arriba).
+  Debajo: lista de tareas de la actuación actual, coste total del hilo completo (suma de
+  `Coste_Intervencion`).
 - **Modal "Hilo de la incidencia"** (`abrirHiloIncidencia`, `modal-hilo-incidencia`): todas
   las visitas de una incidencia (planificadas y ejecutadas) en una sola lista vertical, con
   posición, estado, fecha, quién y resumen de tareas de cada una; la visita activa

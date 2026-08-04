@@ -574,23 +574,46 @@ function getChainIntervencion(intId) {
 // ============================================================
 // FICHA DE INTERVENCIÓN — modal de solo lectura con acciones
 // ============================================================
-function _buildTimelineIncidencia(inc, i, tareas) {
-  const cerrada = i.Estado === 'Cerrada' || i.Estado === 'Pendiente factura';
-  const pasos = [
-    { label: 'Reportada',   texto: formatDate(inc?.Fecha_Hora) || '—', activo: true },
-    { label: 'Planificada', texto: i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : 'Por concretar', activo: true },
-    { label: 'Ejecutando',  texto: formatDate(i.Fecha_Realizacion) || '—', activo: tareas.length > 0 },
-    { label: cerrada ? 'Cerrada' : 'En curso', texto: cerrada ? (formatDate(i.Fecha_Realizacion) || '—') : '—', activo: cerrada }
-  ];
-  return `<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:16px">${pasos.map((p, idx) => {
-    const ultimo = idx === pasos.length - 1;
-    return `<div style="display:flex;align-items:center;${ultimo ? '' : 'flex:1'}">
-      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:56px">
-        <div style="width:10px;height:10px;border-radius:50%;background:${p.activo ? 'var(--accent)' : 'var(--border)'}"></div>
-        <span style="font-size:10px;font-weight:600;color:${p.activo ? 'var(--text)' : 'var(--text-muted)'};white-space:nowrap">${p.label}</span>
-        <span style="font-size:9px;color:var(--text-muted)">${p.texto}</span>
+function _buildTimelineIncidencia(inc, chain, currentIntId) {
+  const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
+  const nodos = [];
+  if (inc) {
+    nodos.push({
+      titulo: 'Incidencia',
+      fecha: formatDate(inc.Fecha_Hora) || '—',
+      detalle: inc.Impacto || '',
+      current: false
+    });
+  }
+  chain.forEach((c, idx) => {
+    const quien = c.Proveedor ? `SAT: ${c.Proveedor}` : (c.Realizado_Por ? `Interna: ${c.Realizado_Por}` : '');
+    const fecha = c.Fecha_Realizacion
+      ? formatDate(c.Fecha_Realizacion)
+      : (c.Fecha_Planificada ? formatDate(c.Fecha_Planificada) + ' (prevista)' : 'Por concretar');
+    const tareasC = getTareasIntervencion(c.ID_Intervencion);
+    const resueltas = tareasC.filter(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado').length;
+    nodos.push({
+      titulo: chain.length > 1 ? `Actuación ${idx + 1}` : 'Actuación',
+      fecha,
+      detalle: quien,
+      tareasTxt: tareasC.length ? `${resueltas}/${tareasC.length} tareas` : '',
+      estado: c.Estado,
+      current: c.ID_Intervencion === currentIntId
+    });
+  });
+
+  return `<div style="display:flex;align-items:flex-start;gap:0;margin-bottom:16px;overflow-x:auto">${nodos.map((n, idx) => {
+    const ultimo = idx === nodos.length - 1;
+    return `<div style="display:flex;align-items:flex-start;${ultimo ? '' : 'flex:1'}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:2px;min-width:84px;text-align:center">
+        <div style="width:10px;height:10px;border-radius:50%;background:${n.current ? 'var(--accent)' : 'var(--text-muted)'}"></div>
+        <span style="font-size:10px;font-weight:600;color:${n.current ? 'var(--text)' : 'var(--text-soft)'}">${n.titulo}</span>
+        <span style="font-size:9px;color:var(--text-muted)">${n.fecha}</span>
+        ${n.estado ? `<span class="badge ${estadoBadge[n.estado]||'badge-gray'}" style="font-size:9px">${n.estado}</span>` : ''}
+        ${n.detalle ? `<span style="font-size:9px;color:var(--text-muted)">${n.detalle}</span>` : ''}
+        ${n.tareasTxt ? `<span style="font-size:9px;color:var(--text-muted)">${n.tareasTxt}</span>` : ''}
       </div>
-      ${ultimo ? '' : `<div style="flex:1;height:2px;background:${p.activo ? 'var(--accent)' : 'var(--border)'};margin:0 4px 14px"></div>`}
+      ${ultimo ? '' : `<div style="flex:1;height:2px;background:var(--border);margin:5px 4px 0"></div>`}
     </div>`;
   }).join('')}</div>`;
 }
@@ -617,7 +640,7 @@ function openFichaIntervencion(intIdx) {
 
   const tareas = getTareasIntervencion(i.ID_Intervencion);
   const timelineEl = document.getElementById('ficha-int-timeline');
-  if (timelineEl) timelineEl.innerHTML = _buildTimelineIncidencia(incVinculada, i, tareas);
+  if (timelineEl) timelineEl.innerHTML = _buildTimelineIncidencia(incVinculada, chain, i.ID_Intervencion);
 
   document.getElementById('ficha-int-fecha-plan').textContent     = formatDate(i.Fecha_Planificada) || '—';
   document.getElementById('ficha-int-fecha-estimada').textContent = formatDate(i.Fecha_Estimada_Resolucion) || '—';
@@ -651,30 +674,6 @@ function openFichaIntervencion(intIdx) {
   document.getElementById('ficha-int-doc').innerHTML = i.URL_Adjunto
     ? `<a href="${i.URL_Adjunto}" target="_blank" class="btn btn-secondary" style="font-size:12px">📄 ${i.Nombre_Adjunto || 'Ver documento'}</a>`
     : '<span style="color:var(--text-muted);font-size:12px">Sin documento adjunto</span>';
-
-  // Historial de cadena (solo si hay más de una visita en el hilo)
-  const historialWrap = document.getElementById('ficha-int-historial-wrap');
-  const historialEl   = document.getElementById('ficha-int-historial');
-  if (chain.length > 1) {
-    historialWrap.style.display = '';
-    historialEl.innerHTML = chain.map((c, idx) => {
-      const esCurrent = c.ID_Intervencion === i.ID_Intervencion;
-      const esBadge = estadoBadge[c.Estado] || 'badge-gray';
-      const tareasC = getTareasIntervencion(c.ID_Intervencion);
-      const resueltas = tareasC.filter(t => t.Resultado === 'Resuelto' || t.Resultado === 'Descartado').length;
-      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:6px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
-        <div style="width:18px;height:18px;border-radius:50%;background:${esCurrent ? 'var(--accent)' : 'var(--border)'};flex-shrink:0;margin-top:2px"></div>
-        <div style="font-size:12px;flex:1">
-          <span style="font-weight:${esCurrent ? '600' : '400'}">${c.ID_Intervencion}</span>
-          <span class="badge ${esBadge}" style="font-size:10px;margin-left:6px">${c.Estado||'—'}</span>
-          ${c.Fecha_Realizacion ? `<span style="color:var(--text-muted);margin-left:6px">${formatDate(c.Fecha_Realizacion)}</span>` : ''}
-          ${tareasC.length ? `<span style="color:var(--text-muted);margin-left:6px">· ${resueltas}/${tareasC.length} tareas resueltas</span>` : ''}
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    historialWrap.style.display = 'none';
-  }
 
   // Botones de acción
   const puedeRegistrar = puedeHacer('crearIntervenciones') &&
