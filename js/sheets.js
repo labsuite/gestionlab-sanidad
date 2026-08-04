@@ -75,6 +75,47 @@ async function sheetsClear(range) {
   );
 }
 
+// ----------------------------------------------------------------
+// callEdgeFunction — wrapper para las Edge Functions de Supabase que hacen
+// de "servidor" de GestionLab (crear-usuario, gestionar-proveedor...).
+// Reenvía el access_token de Google actual para que la función verifique
+// el rol server-side — el navegador nunca habla con Supabase Auth directo
+// hasta la migración del login (tarea #8).
+// ----------------------------------------------------------------
+async function callEdgeFunction(nombre, body) {
+  const r = await fetch(`${SUPABASE_URL}/functions/v1/${nombre}`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_ANON}`,
+      'Content-Type': 'application/json',
+      'x-google-token': accessToken,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
+  return data;
+}
+
+// ----------------------------------------------------------------
+// Mapeo de filas de Supabase → mismo formato de objeto que ya usa la app
+// (rowToObj de Sheets), para no tener que tocar el resto del código que
+// lee DATA.proveedores con nombres tipo Nombre_Proveedor.
+// ----------------------------------------------------------------
+function _proveedorSbToObj(p) {
+  return {
+    ID_Proveedor: p.id_proveedor || '',
+    Nombre_Proveedor: p.nombre_proveedor || '',
+    Tipo_Proveedor: p.tipo_proveedor || '',
+    Persona_Contacto: p.persona_contacto || '',
+    Email_Contacto: p.email_contacto || '',
+    Telefono: p.telefono || '',
+    Web: p.web || '',
+    Observaciones: p.observaciones || '',
+    Activo: p.activo ? 'TRUE' : 'FALSE',
+  };
+}
+
 // ============================================================
 // HELPERS MATERIAL_UBICACIONES
 // ============================================================
@@ -126,7 +167,8 @@ async function loadAllData() {
            tiposResiduo, contenedoresResiduo, adicionesResiduo,
            revisionesInventario, consultasResiduo,
            configReservas, reservas, registrosCabina, registrosAutoclave,
-           sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes] = await Promise.all([
+           sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
+           sbProveedoresRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -159,7 +201,8 @@ async function loadAllData() {
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
       _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
-      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] }))
+      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
+      _sb.from('proveedores').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -169,6 +212,10 @@ async function loadAllData() {
     DATA.incidencias         = toObj(incidencias,         'incidencias');
     DATA.tareasIntervencion  = toObj(tareasIntervencion || [], 'tareasIntervencion');
     DATA.proveedores         = toObj(proveedores,         'proveedores');
+    const sbProveedores = sbProveedoresRes?.data || [];
+    if (sbProveedores.length) {
+      DATA.proveedores = sbProveedores.map(_proveedorSbToObj);
+    }
     DATA.ubicaciones         = toObj(ubicaciones,         'ubicaciones');
     DATA.usuarios            = toObj(usuarios,            'usuarios');
     DATA.material            = toObj(material,            'material');

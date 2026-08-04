@@ -623,22 +623,29 @@ function clearTiposProveedor() {
 async function guardarProveedor() {
   const nombre = v('prov-nombre');
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
-  const tipos = getTiposProveedorSeleccionados();
-  const id = genId('PRV-');
-  const row = [id, nombre, tipos, v('prov-contacto'), v('prov-email'), v('prov-telefono'), v('prov-web'), v('prov-observaciones'), 'TRUE'];
+  const datos = {
+    nombre_proveedor: nombre,
+    tipo_proveedor: getTiposProveedorSeleccionados(),
+    persona_contacto: v('prov-contacto'),
+    email_contacto: v('prov-email'),
+    telefono: v('prov-telefono'),
+    web: v('prov-web'),
+    observaciones: v('prov-observaciones'),
+  };
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Proveedores') {
-      await sheetsUpdate(`Proveedores!A${editingRow.rowIndex+2}:I${editingRow.rowIndex+2}`, row);
-      DATA.proveedores[editingRow.rowIndex] = rowToObj(row, 'proveedores');
+      const idProveedor = DATA.proveedores[editingRow.rowIndex].ID_Proveedor;
+      const { proveedor } = await callEdgeFunction('gestionar-proveedor', { accion: 'actualizar', id_proveedor: idProveedor, ...datos });
+      DATA.proveedores[editingRow.rowIndex] = _proveedorSbToObj(proveedor);
       showToast('Proveedor actualizado', 'success');
     } else {
-      await sheetsAppend('Proveedores', row);
-      DATA.proveedores.push(rowToObj(row, 'proveedores'));
+      const { proveedor } = await callEdgeFunction('gestionar-proveedor', { accion: 'crear', ...datos });
+      DATA.proveedores.push(_proveedorSbToObj(proveedor));
       showToast('Proveedor guardado', 'success');
     }
     closeModal('modal-proveedor'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); }
+  } catch(e) { showToast('Error guardando: ' + e.message, 'error'); }
   hideLoading(); editingRow = null;
 }
 
@@ -649,12 +656,12 @@ async function borrarProveedor(idx) {
   if (!confirm(`¿Eliminar el proveedor "${p.Nombre_Proveedor}"? Esta acción no se puede deshacer.`)) return;
   showLoading('Eliminando...');
   try {
-    await sheetsDeleteRow('Proveedores', idx);
+    await callEdgeFunction('gestionar-proveedor', { accion: 'eliminar', id_proveedor: p.ID_Proveedor });
     DATA.proveedores.splice(idx, 1);
     showToast('Proveedor eliminado', 'success');
     if (document.getElementById('proveedor-detalle')?.style.display !== 'none') showPage('proveedores');
     renderAll();
-  } catch(e) { showToast('Error eliminando', 'error'); console.error(e); }
+  } catch(e) { showToast('Error eliminando: ' + e.message, 'error'); console.error(e); }
   hideLoading();
 }
 

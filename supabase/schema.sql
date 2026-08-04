@@ -479,3 +479,15 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant select on all tables in schema public to anon;
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public grant select on tables to anon;
+
+-- ============================================================
+-- 11. POLÍTICAS RLS — catálogos no sensibles, lectura pública
+-- ============================================================
+-- Mismo criterio que ciclos/modulos en el proyecto compartido: catálogos sin
+-- datos personales, de lectura libre para cualquiera con la anon key (igual
+-- que ya pasa hoy). Las escrituras siguen exigiendo Admin/Gestor vía Edge
+-- Function (gestionar-proveedor) porque el navegador no tiene sesión real de
+-- Supabase Auth todavía (tarea #8) — sin eso, una policy de escritura para
+-- "authenticated" no protegería nada real.
+
+create policy "proveedores_select_anon" on proveedores for select to anon using (true);
