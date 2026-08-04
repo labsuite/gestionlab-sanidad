@@ -83,10 +83,10 @@ async function sheetsClear(range) {
 // hasta la migración del login (tarea #8).
 // ----------------------------------------------------------------
 async function callEdgeFunction(nombre, body) {
-  const r = await fetch(`${SUPABASE_URL}/functions/v1/${nombre}`, {
+  const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${SUPABASE_ANON}`,
+      'Authorization': `Bearer ${SUPABASE_MIGRACION_ANON}`,
       'Content-Type': 'application/json',
       'x-google-token': accessToken,
     },
@@ -213,8 +213,8 @@ async function loadAllData() {
       _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
       _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
-      _sb.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
-      _sb.from('ubicaciones').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));

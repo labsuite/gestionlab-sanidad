@@ -5,9 +5,15 @@ const CLIENT_ID = '617390713769-milqb8jfdk9l6bd63bh52bbronivablb.apps.googleuser
 const SHEET_ID  = '1YeoIPn3UqvcljptbgJIX-1CdrDLwIiT_3vcOy8k2Acg';
 const SCOPES    = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file profile email';
 
+// Proyecto Supabase compartido con la app de Vercel (ciclos, módulos, asignaciones usuario-módulo)
 const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
 const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// Proyecto Supabase propio de GestionLab (migración módulo a módulo desde Sheets) — tablas migradas y Edge Functions propias
+const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
+const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
+const _sbMigracion = supabase.createClient(SUPABASE_MIGRACION_URL, SUPABASE_MIGRACION_ANON);
 
 // ============================================================
 // ESTADO GLOBAL
