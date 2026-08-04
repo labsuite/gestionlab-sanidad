@@ -116,6 +116,17 @@ function _proveedorSbToObj(p) {
   };
 }
 
+function _ubicacionSbToObj(u) {
+  return {
+    ID_Ubicacion: u.id_ubicacion || '',
+    Laboratorio_Aula: u.laboratorio_aula || '',
+    Zona: u.zona || '',
+    Subzona: u.subzona || '',
+    Descripcion_Completa: u.descripcion_completa || '',
+    Activa: u.activa ? 'TRUE' : 'FALSE',
+  };
+}
+
 // ============================================================
 // HELPERS MATERIAL_UBICACIONES
 // ============================================================
@@ -168,7 +179,7 @@ async function loadAllData() {
            revisionesInventario, consultasResiduo,
            configReservas, reservas, registrosCabina, registrosAutoclave,
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
-           sbProveedoresRes] = await Promise.all([
+           sbProveedoresRes, sbUbicacionesRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -202,7 +213,8 @@ async function loadAllData() {
       _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
       _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
-      _sb.from('proveedores').select('*').then(r => r, () => ({ data: [] }))
+      _sb.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
+      _sb.from('ubicaciones').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -217,6 +229,10 @@ async function loadAllData() {
       DATA.proveedores = sbProveedores.map(_proveedorSbToObj);
     }
     DATA.ubicaciones         = toObj(ubicaciones,         'ubicaciones');
+    const sbUbicaciones = sbUbicacionesRes?.data || [];
+    if (sbUbicaciones.length) {
+      DATA.ubicaciones = sbUbicaciones.map(_ubicacionSbToObj);
+    }
     DATA.usuarios            = toObj(usuarios,            'usuarios');
     DATA.material            = toObj(material,            'material');
     DATA.movimientos         = toObj(movimientos,         'movimientos');

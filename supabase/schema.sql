@@ -491,3 +491,4 @@ alter default privileges in schema public grant select on tables to anon;
 -- "authenticated" no protegería nada real.
 
 create policy "proveedores_select_anon" on proveedores for select to anon using (true);
+create policy "ubicaciones_select_anon" on ubicaciones for select to anon using (true);

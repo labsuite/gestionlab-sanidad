@@ -668,20 +668,27 @@ async function borrarProveedor(idx) {
 async function guardarUbicacion() {
   const id = v('ubi-id'), lab = v('ubi-lab');
   if (!id || !lab) { showToast('ID y laboratorio/aula son obligatorios', 'error'); return; }
-  const row = [id, lab, v('ubi-zona'), v('ubi-subzona'), v('ubi-desc'), 'TRUE'];
+  const datos = {
+    id_ubicacion: id,
+    laboratorio_aula: lab,
+    zona: v('ubi-zona'),
+    subzona: v('ubi-subzona'),
+    descripcion_completa: v('ubi-desc'),
+  };
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Ubicaciones') {
-      await sheetsUpdate(`Ubicaciones!A${editingRow.rowIndex+2}:F${editingRow.rowIndex+2}`, row);
-      DATA.ubicaciones[editingRow.rowIndex] = rowToObj(row, 'ubicaciones');
+      const idOriginal = DATA.ubicaciones[editingRow.rowIndex].ID_Ubicacion;
+      const { ubicacion } = await callEdgeFunction('gestionar-ubicacion', { accion: 'actualizar', id_original: idOriginal, ...datos });
+      DATA.ubicaciones[editingRow.rowIndex] = _ubicacionSbToObj(ubicacion);
       showToast('Ubicación actualizada', 'success');
     } else {
-      await sheetsAppend('Ubicaciones', row);
-      DATA.ubicaciones.push(rowToObj(row, 'ubicaciones'));
+      const { ubicacion } = await callEdgeFunction('gestionar-ubicacion', { accion: 'crear', ...datos });
+      DATA.ubicaciones.push(_ubicacionSbToObj(ubicacion));
       showToast('Ubicación guardada', 'success');
     }
     closeModal('modal-ubicacion'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); }
+  } catch(e) { showToast('Error guardando: ' + e.message, 'error'); }
   hideLoading(); editingRow = null;
 }
 
