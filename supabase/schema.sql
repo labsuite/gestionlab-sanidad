@@ -119,7 +119,7 @@ create table equipos (
   numero_serie                    text,
   ubicacion                       text,   -- sin FK: datos pendientes de limpiar (ver CLAUDE.md)
   responsable                     text,   -- nombres separados por coma, texto libre
-  fecha_adquisicion               date,
+  fecha_adquisicion               text,   -- texto libre, no date: hay valores como "ND", "2015", "5/2016" en el origen
   origen_financiacion             text,
   proveedor_compra                text,   -- nombre libre, no FK: ver nota más abajo
   proveedor_servicio_tecnico      text,   -- nombre libre, no FK: ver nota más abajo
@@ -492,3 +492,4 @@ alter default privileges in schema public grant select on tables to anon;
 
 create policy "proveedores_select_anon" on proveedores for select to anon using (true);
 create policy "ubicaciones_select_anon" on ubicaciones for select to anon using (true);
+create policy "equipos_select_anon" on equipos for select to anon using (true);

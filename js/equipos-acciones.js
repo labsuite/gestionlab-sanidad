@@ -87,13 +87,7 @@ async function actualizarEstadoEquipo(equipoStr, nuevoEstado) {
   const eq = DATA.equipos[eqIdx];
   if (eq.Estado_Operativo === nuevoEstado) return; // sin cambios
   eq.Estado_Operativo = nuevoEstado;
-  const eqRow = [eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo, eq.Numero_Serie,
-    eq.Ubicacion, eq.Responsable, eq.Fecha_Adquisicion, eq.Origen_Financiacion,
-    eq.Proveedor_Compra, eq.Proveedor_Servicio_Tecnico, nuevoEstado,
-    eq.Periodicidad_Mantenimiento, eq.Periodicidad_Custom, eq.Fecha_Ultimo_Preventivo,
-    eq.Fecha_Proximo_Preventivo, eq.Manual_Ficha_Tecnica, eq.Observaciones, eq.Coste||'',
-    eq.Protocolo_Uso||'', eq.Tipo_Mantenimiento||'', eq.Mes_Inicio_Temporada||'', eq.Mes_Fin_Temporada||''];
-  await sheetsUpdate(`Equipos!A${eqIdx + 2}:W${eqIdx + 2}`, eqRow);
+  await callEdgeFunction('gestionar-equipo', { accion: 'actualizar_estado', id_activo: eq.ID_Activo, estado_operativo: nuevoEstado });
 }
 
 // ============================================================
@@ -165,7 +159,7 @@ async function eliminarEquipo() {
   if (!confirm(`¿Eliminar "${e.ID_Activo} — ${e.Marca} ${e.Modelo}" del inventario? Esta acción no se puede deshacer.`)) return;
   showLoading('Eliminando...');
   try {
-    await sheetsDeleteRow('Equipos', editingRow.rowIndex);
+    await callEdgeFunction('gestionar-equipo', { accion: 'eliminar', id_activo: e.ID_Activo });
     DATA.equipos.splice(editingRow.rowIndex, 1);
     closeModal('modal-equipo');
     editingRow = null;
@@ -951,24 +945,33 @@ async function guardarEquipo() {
     pendingEqFileBase64 = null;
   }
 
-  // Columnas M-P (Periodicidad_Mantenimiento, Periodicidad_Custom, Fecha_Ultimo_Preventivo, Fecha_Proximo_Preventivo)
-  // gestionadas ahora por Planes_Mantenimiento + Registro_Mantenimientos — se mantienen vacías
-  // Columna U (Tipo_Mantenimiento) eliminada del modal — se deja vacía
-  const row = [id, tipo, marca, v('eq-modelo'), v('eq-serie'), v('eq-ubicacion'), v('eq-responsable'), v('eq-fecha-adq'), v('eq-financiacion'), v('eq-proveedor-compra'), v('eq-proveedor-sat'), v('eq-estado'), '', '', '', '', manualUrl, v('eq-observaciones'), v('eq-coste'), v('eq-protocolo-uso'), '', v('eq-mes-inicio'), v('eq-mes-fin')];
+  // Periodicidad_Mantenimiento/Periodicidad_Custom/Fecha_Ultimo_Preventivo/Fecha_Proximo_Preventivo
+  // (legado) gestionadas ahora por Planes_Mantenimiento + Registro_Mantenimientos — no se envían.
+  // Tipo_Mantenimiento eliminado del modal — tampoco se envía, se queda vacío.
+  const datos = {
+    id_activo: id, tipo_equipo: tipo, marca,
+    modelo: v('eq-modelo'), numero_serie: v('eq-serie'), ubicacion: v('eq-ubicacion'),
+    responsable: v('eq-responsable'), fecha_adquisicion: v('eq-fecha-adq'),
+    origen_financiacion: v('eq-financiacion'), proveedor_compra: v('eq-proveedor-compra'),
+    proveedor_servicio_tecnico: v('eq-proveedor-sat'), estado_operativo: v('eq-estado'),
+    manual_ficha_tecnica: manualUrl, observaciones: v('eq-observaciones'),
+    coste: v('eq-coste'), protocolo_uso: v('eq-protocolo-uso'),
+    mes_inicio_temporada: v('eq-mes-inicio'), mes_fin_temporada: v('eq-mes-fin'),
+  };
 
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Equipos') {
-      await sheetsUpdate(`Equipos!A${editingRow.rowIndex + 2}:W${editingRow.rowIndex + 2}`, row);
-      DATA.equipos[editingRow.rowIndex] = rowToObj(row, 'equipos');
+      const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'actualizar', ...datos });
+      DATA.equipos[editingRow.rowIndex] = _equipoSbToObj(equipo);
       showToast('Equipo actualizado', 'success');
     } else {
-      await sheetsAppend('Equipos', row);
-      DATA.equipos.push(rowToObj(row, 'equipos'));
+      const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'crear', ...datos });
+      DATA.equipos.push(_equipoSbToObj(equipo));
       showToast('Equipo guardado', 'success');
     }
     closeModal('modal-equipo'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast('Error guardando: ' + e.message, 'error'); console.error(e); }
   hideLoading(); editingRow = null;
 }
 

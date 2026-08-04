@@ -195,7 +195,7 @@ async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
   const esServicio = pedido?.Tipo === 'Servicio';
-  let materialNombre = '', equipoId = '', eqRowToCreate = null;
+  let materialNombre = '', equipoId = '', nuevoEquipoDatos = null;
 
   if (esServicio) {
     const esNuevo = document.getElementById('btn-seq-nuevo').classList.contains('active');
@@ -208,14 +208,13 @@ async function guardarLineaPedido() {
       if (DATA.equipos.find(e => e.ID_Activo === newEqId)) { showToast('Ya existe un equipo con ese ID', 'error'); return; }
       materialNombre = [newEqTipo, newEqMarca, newEqModelo].filter(Boolean).join(' ');
       equipoId = newEqId;
-      const eqRow = new Array(23).fill('');
-      eqRow[0] = newEqId;   eqRow[1] = newEqTipo;
-      eqRow[2] = newEqMarca; eqRow[3] = newEqModelo;
-      eqRow[9]  = pedido?.Proveedor || '';
-      eqRow[11] = 'En pedido';
-      eqRow[17] = 'Creado desde pedido ' + pedidoId;
-      eqRow[18] = v('linea-precio') || '';
-      eqRowToCreate = eqRow;
+      nuevoEquipoDatos = {
+        id_activo: newEqId, tipo_equipo: newEqTipo, marca: newEqMarca, modelo: newEqModelo,
+        proveedor_compra: pedido?.Proveedor || '',
+        estado_operativo: 'En pedido',
+        observaciones: 'Creado desde pedido ' + pedidoId,
+        coste: v('linea-precio') || '',
+      };
     } else {
       materialNombre = v('linea-servicio-desc');
       if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
@@ -231,11 +230,11 @@ async function guardarLineaPedido() {
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
   const precio = v('linea-precio') || '';
 
-  if (eqRowToCreate) {
+  if (nuevoEquipoDatos) {
     showLoading('Creando equipo en inventario...');
     try {
-      await sheetsAppend('Equipos', eqRowToCreate);
-      DATA.equipos.push(rowToObj(eqRowToCreate, 'equipos'));
+      const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'crear', ...nuevoEquipoDatos });
+      DATA.equipos.push(_equipoSbToObj(equipo));
     } catch(e) {
       hideLoading(); showToast('Error al crear el equipo en el inventario', 'error'); return;
     }
@@ -249,7 +248,7 @@ async function guardarLineaPedido() {
   DATA.lineasPedido.push(objLocal);
   closeModal('modal-nueva-linea');
   verDetallePedido(pedidoId);
-  showToast(eqRowToCreate ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
+  showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
   try { await sheetsAppend('Lineas_Pedido', row); }
   catch(e) {
     const idx = DATA.lineasPedido.indexOf(objLocal);

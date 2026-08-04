@@ -127,6 +127,34 @@ function _ubicacionSbToObj(u) {
   };
 }
 
+function _equipoSbToObj(e) {
+  return {
+    ID_Activo: e.id_activo || '',
+    Tipo_Equipo: e.tipo_equipo || '',
+    Marca: e.marca || '',
+    Modelo: e.modelo || '',
+    Numero_Serie: e.numero_serie || '',
+    Ubicacion: e.ubicacion || '',
+    Responsable: e.responsable || '',
+    Fecha_Adquisicion: e.fecha_adquisicion || '',
+    Origen_Financiacion: e.origen_financiacion || '',
+    Proveedor_Compra: e.proveedor_compra || '',
+    Proveedor_Servicio_Tecnico: e.proveedor_servicio_tecnico || '',
+    Estado_Operativo: e.estado_operativo || '',
+    Periodicidad_Mantenimiento: '',
+    Periodicidad_Custom: '',
+    Fecha_Ultimo_Preventivo: '',
+    Fecha_Proximo_Preventivo: '',
+    Manual_Ficha_Tecnica: e.manual_ficha_tecnica || '',
+    Observaciones: e.observaciones || '',
+    Coste: e.coste != null ? String(e.coste) : '',
+    Protocolo_Uso: e.protocolo_uso || '',
+    Tipo_Mantenimiento: e.tipo_mantenimiento || '',
+    Mes_Inicio_Temporada: e.mes_inicio_temporada != null ? String(e.mes_inicio_temporada) : '',
+    Mes_Fin_Temporada: e.mes_fin_temporada != null ? String(e.mes_fin_temporada) : '',
+  };
+}
+
 // ============================================================
 // HELPERS MATERIAL_UBICACIONES
 // ============================================================
@@ -179,7 +207,7 @@ async function loadAllData() {
            revisionesInventario, consultasResiduo,
            configReservas, reservas, registrosCabina, registrosAutoclave,
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
-           sbProveedoresRes, sbUbicacionesRes] = await Promise.all([
+           sbProveedoresRes, sbUbicacionesRes, sbEquiposRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -214,12 +242,17 @@ async function loadAllData() {
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
       _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
 
     DATA.equipos             = toObj(equipos,             'equipos');
+    const sbEquipos = sbEquiposRes?.data || [];
+    if (sbEquipos.length) {
+      DATA.equipos = sbEquipos.map(_equipoSbToObj);
+    }
     DATA.intervenciones      = toObj(intervenciones,      'intervenciones');
     DATA.incidencias         = toObj(incidencias,         'incidencias');
     DATA.tareasIntervencion  = toObj(tareasIntervencion || [], 'tareasIntervencion');
