@@ -692,7 +692,7 @@ function openFichaIntervencion(intIdx) {
   if (pendienteFactura && puedeHacer('crearIntervenciones'))
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
   if (puedeNuevaVisita)
-    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');programarOtraVisita(${intIdx})">📅 Programar otra visita</button>`;
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');programarOtraVisita(${intIdx})">📅 Programar otra actuación</button>`;
   if (incVinculada)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
   acciones.innerHTML = btns;
