@@ -385,7 +385,7 @@ create table solicitudes (
   motivo                  text,
   proveedor_requerido     text,
   estado                  text not null default 'Pendiente',
-  lista_pedido            text references pedidos(id_pedido),
+  lista_pedido            text references pedidos(id_pedido) on delete set null,   -- eliminarPedido no toca solicitudes (igual que en Sheets, sin FK)
   observaciones           text,
   snooze_hasta            date
 );
@@ -393,7 +393,7 @@ create table solicitudes (
 create table historico_precio (
   id_historico       text primary key,
   nombre_material    text,
-  id_pedido          text references pedidos(id_pedido),
+  id_pedido          text references pedidos(id_pedido) on delete set null,   -- eliminarPedido no toca el histórico (es un log de auditoría)
   proveedor          text,   -- nombre libre, no FK
   fecha              date,
   precio_unitario    numeric
