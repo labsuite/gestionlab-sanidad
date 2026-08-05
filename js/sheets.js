@@ -371,6 +371,33 @@ function _revisionInventarioSbToObj(r) {
   };
 }
 
+function _configReservaSbToObj(c) {
+  return {
+    ID_Equipo: c.id_equipo || '',
+    Politica: c.politica || 'BLOCK',
+    Params_Template: JSON.stringify(c.params_template || []),
+    Max_Horas: c.max_horas != null ? String(c.max_horas) : '',
+    Antelacion_Min_Horas: c.antelacion_min_horas != null ? String(c.antelacion_min_horas) : '',
+  };
+}
+
+function _reservaSbToObj(r) {
+  return {
+    ID_Reserva: r.id_reserva || '',
+    ID_Equipo: r.id_equipo || '',
+    Usuario: r.usuario || '',
+    Fecha_Inicio: r.fecha_inicio || '',
+    Fecha_Fin: r.fecha_fin || '',
+    Condiciones: JSON.stringify(r.condiciones || {}),
+    Proposito: r.proposito || '',
+    Estado: r.estado || 'Confirmada',
+    Aprobado_Por: r.aprobado_por || '',
+    Observaciones_Admin: r.observaciones_admin || '',
+    Inicio_Real: r.inicio_real || '',
+    Fin_Real: r.fin_real || '',
+  };
+}
+
 // ============================================================
 // CARGAR TODOS LOS DATOS
 // ============================================================
@@ -389,7 +416,8 @@ async function loadAllData() {
            sbIntervencionesRes, sbIncidenciasRes, sbTareasRes,
            sbPlanesRes, sbRegistroMantRes,
            sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
-           sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes] = await Promise.all([
+           sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
+           sbConfigReservasRes, sbReservasRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -438,7 +466,9 @@ async function loadAllData() {
       _sbMigracion.from('solicitudes').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('historico_precio').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('movimientos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('revisiones_inventario').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('revisiones_inventario').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('config_reservas').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -518,7 +548,11 @@ async function loadAllData() {
     if (sbRevisiones.length) DATA.revisionesInventario = sbRevisiones.map(_revisionInventarioSbToObj);
     DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
     DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
+    const sbConfigReservas = sbConfigReservasRes?.data || [];
+    if (sbConfigReservas.length) DATA.configReservas = sbConfigReservas.map(_configReservaSbToObj);
     DATA.reservas               = toObj(reservas               || [], 'reservas');
+    const sbReservas = sbReservasRes?.data || [];
+    if (sbReservas.length) DATA.reservas = sbReservas.map(_reservaSbToObj);
     DATA.registrosCabina        = toObj(registrosCabina        || [], 'registrosCabina');
     DATA.registrosAutoclave     = toObj(registrosAutoclave     || [], 'registrosAutoclave');
 

@@ -506,3 +506,5 @@ create policy "solicitudes_select_anon" on solicitudes for select to anon using 
 create policy "historico_precio_select_anon" on historico_precio for select to anon using (true);
 create policy "movimientos_select_anon" on movimientos for select to anon using (true);
 create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to anon using (true);
+create policy "config_reservas_select_anon" on config_reservas for select to anon using (true);
+create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon using (true);

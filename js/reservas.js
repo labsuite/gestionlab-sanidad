@@ -574,24 +574,21 @@ async function guardarReserva() {
   }
 
   const condiciones = _leerCondicionesModal();
-  const conflicto = _verificarConflicto(idEquipo, inicio, fin, condiciones, _reservaEditandoId);
-  const estado = conflicto.ok ? 'Confirmada' : 'Pendiente';
-
-  const email = (currentUser?.email||'').toLowerCase().trim();
-  const id    = _nextIdReserva();
-  const fila  = [id, idEquipo, email, inicio, fin, JSON.stringify(condiciones), proposito, estado, '', '', '', ''];
 
   showLoading('Guardando reserva…');
   try {
-    await sheetsAppend('Reservas_Equipos', fila);
-    DATA.reservas.push(rowToObj(fila, 'reservas'));
+    const { reserva, conflicto } = await callEdgeFunction('gestionar-reserva', {
+      accion: 'crear', id_equipo: idEquipo, fecha_inicio: inicio, fecha_fin: fin,
+      condiciones, proposito,
+    });
+    DATA.reservas.push(_reservaSbToObj(reserva));
     closeModal('modal-nueva-reserva');
     renderReservas();
     _updateBadgeReservas();
-    if (conflicto.ok) {
+    if (!conflicto) {
       showToast('Reserva confirmada', 'success');
     } else {
-      showToast(`Reserva registrada — pendiente de revisión por conflicto: ${conflicto.mensaje}`, 'warning');
+      showToast(`Reserva registrada — pendiente de revisión por conflicto: ${conflicto}`, 'warning');
     }
   } catch(e) {
     showToast('Error al guardar la reserva', 'error'); console.error(e);
@@ -602,15 +599,15 @@ async function guardarReserva() {
 
 async function cancelarReserva(idReserva) {
   if (!confirm('¿Cancelar esta reserva?')) return;
-  await _cambiarEstadoReserva(idReserva, 'Cancelada');
+  await _cambiarEstadoReserva('cancelar', idReserva, 'Reserva cancelada');
 }
 
 async function iniciarUso(idReserva) {
-  await _cambiarEstadoReserva(idReserva, 'Activa', null, null, new Date().toISOString(), null);
+  await _cambiarEstadoReserva('iniciar_uso', idReserva, 'Uso iniciado');
 }
 
 async function finalizarUso(idReserva) {
-  await _cambiarEstadoReserva(idReserva, 'Completada', null, null, null, new Date().toISOString());
+  await _cambiarEstadoReserva('finalizar_uso', idReserva, 'Uso finalizado');
 }
 
 // ── Modal: Gestión ────────────────────────────────────────────
@@ -638,39 +635,30 @@ async function _accionGestion(accion) {
   if (!_gestionReservaId) return;
   const obs = v('gestion-obs');
   if (accion === 'rechazar' && !obs) { showToast('Indica el motivo del rechazo', 'error'); return; }
-  const email = (currentUser?.email||'').toLowerCase().trim();
-  const estadoMap = { aprobar:'Confirmada', rechazar:'Rechazada', conflicto:'En conflicto' };
-  await _cambiarEstadoReserva(_gestionReservaId, estadoMap[accion], obs, email);
-  closeModal('modal-gestion-reserva');
-}
-
-// ── Actualizar estado en Sheets ───────────────────────────────
-
-async function _cambiarEstadoReserva(idReserva, nuevoEstado, obs = null, aprobadoPor = null, inicioReal = null, finReal = null) {
-  const idx = DATA.reservas.findIndex(r => r.ID_Reserva === idReserva);
-  if (idx === -1) { showToast('Reserva no encontrada', 'error'); return; }
-  const r = DATA.reservas[idx];
-  const filaNum = idx + 2;  // datos empiezan en fila 2
-
-  const rowH_L = [
-    nuevoEstado,
-    aprobadoPor  ?? r.Aprobado_Por        ?? '',
-    obs !== null ? obs : (r.Observaciones_Admin ?? ''),
-    inicioReal   ?? r.Inicio_Real          ?? '',
-    finReal      ?? r.Fin_Real             ?? ''
-  ];
-
+  const msgs = { aprobar:'Reserva aprobada', rechazar:'Reserva rechazada', conflicto:'Marcada en conflicto' };
   showLoading('Actualizando…');
   try {
-    await sheetsUpdate(`Reservas_Equipos!H${filaNum}:L${filaNum}`, rowH_L);
-    DATA.reservas[idx].Estado = nuevoEstado;
-    if (aprobadoPor)  DATA.reservas[idx].Aprobado_Por        = aprobadoPor;
-    if (obs !== null) DATA.reservas[idx].Observaciones_Admin = obs;
-    if (inicioReal)   DATA.reservas[idx].Inicio_Real         = inicioReal;
-    if (finReal)      DATA.reservas[idx].Fin_Real            = finReal;
+    const { reserva } = await callEdgeFunction('gestionar-reserva', { accion: 'gestionar', id_reserva: _gestionReservaId, resultado: accion, observaciones: obs });
+    const idx = DATA.reservas.findIndex(r => r.ID_Reserva === _gestionReservaId);
+    if (idx !== -1) DATA.reservas[idx] = _reservaSbToObj(reserva);
+    showToast(msgs[accion] || 'Estado actualizado', 'success');
+    closeModal('modal-gestion-reserva');
+    renderReservas();
+    _updateBadgeReservas();
+  } catch(e) {
+    showToast('Error al actualizar la reserva', 'error'); console.error(e);
+  } finally { hideLoading(); }
+}
 
-    const msgs = { Confirmada:'Reserva aprobada', Rechazada:'Reserva rechazada', 'En conflicto':'Marcada en conflicto', Cancelada:'Reserva cancelada', Activa:'Uso iniciado', Completada:'Uso finalizado' };
-    showToast(msgs[nuevoEstado]||'Estado actualizado', 'success');
+// ── Cancelar / iniciar / finalizar (dueño de la reserva) ───────
+
+async function _cambiarEstadoReserva(accionApi, idReserva, mensajeOk) {
+  showLoading('Actualizando…');
+  try {
+    const { reserva } = await callEdgeFunction('gestionar-reserva', { accion: accionApi, id_reserva: idReserva });
+    const idx = DATA.reservas.findIndex(r => r.ID_Reserva === idReserva);
+    if (idx !== -1) DATA.reservas[idx] = _reservaSbToObj(reserva);
+    showToast(mensajeOk, 'success');
     renderReservas();
     _updateBadgeReservas();
   } catch(e) {
@@ -755,25 +743,15 @@ async function guardarConfigEquipo() {
   if (!idEquipo) { showToast('Selecciona un equipo', 'error'); return; }
   _cfgParamsTemp.forEach((_,i) => { if (!_cfgParamsTemp[i].key) _cfgAutoKey(i); });
 
-  const fila = [
-    idEquipo,
-    v('cfg-politica') || 'BLOCK',
-    JSON.stringify(_cfgParamsTemp),
-    v('cfg-max-horas') || '',
-    v('cfg-antelacion') || ''
-  ];
-
-  const existeIdx = DATA.configReservas.findIndex(c => c.ID_Equipo === idEquipo);
   showLoading('Guardando…');
   try {
-    if (existeIdx >= 0) {
-      const filaNum = existeIdx + 2;
-      await sheetsUpdate(`Config_Reservas!A${filaNum}:E${filaNum}`, fila);
-      DATA.configReservas[existeIdx] = rowToObj(fila, 'configReservas');
-    } else {
-      await sheetsAppend('Config_Reservas', fila);
-      DATA.configReservas.push(rowToObj(fila, 'configReservas'));
-    }
+    const { config } = await callEdgeFunction('gestionar-reserva', {
+      accion: 'config_equipo', id_equipo: idEquipo, politica: v('cfg-politica') || 'BLOCK',
+      params_template: _cfgParamsTemp, max_horas: v('cfg-max-horas') || '', antelacion_min_horas: v('cfg-antelacion') || '',
+    });
+    const existeIdx = DATA.configReservas.findIndex(c => c.ID_Equipo === idEquipo);
+    if (existeIdx >= 0) DATA.configReservas[existeIdx] = _configReservaSbToObj(config);
+    else DATA.configReservas.push(_configReservaSbToObj(config));
     closeModal('modal-config-equipo-reserva');
     renderReservas();
     showToast('Configuración guardada', 'success');
