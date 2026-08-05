@@ -54,12 +54,6 @@ function _nombreEquipoReg(idEquipo) {
   return eq ? `${idEquipo} — ${[eq.Marca, eq.Modelo].filter(Boolean).join(' ')}`.trim() : idEquipo;
 }
 
-function _nextIdReg(tipo) {
-  const cfg = _regConfig[tipo];
-  const nums = DATA[cfg.key].map(r => parseInt((r.ID_Registro || '').replace(cfg.prefix, '')) || 0);
-  return cfg.prefix + String(Math.max(0, ...nums) + 1).padStart(4, '0');
-}
-
 function _fmtFechaReg(f) {
   if (!f) return '—';
   try { return new Date(f + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
@@ -411,23 +405,23 @@ async function guardarSesionRegistro() {
     return;
   }
   const incidencias = v('reg-sesion-incidencias');
-  const email = idx != null ? DATA[cfg.key][idx].Usuario : (currentUser?.email || '').toLowerCase().trim();
-  const id    = idx != null ? DATA[cfg.key][idx].ID_Registro : _nextIdReg(tipo);
-
-  const fila = tipo === 'cabina'
-    ? [id, idEquipo, email, fecha, horaIni, horaFin, campos.Practica_Tecnica, campos.Nivel_Riesgo, campos.Verificacion_Previa, campos.Descontaminacion_Posterior, incidencias, 'Cerrada']
-    : [id, idEquipo, email, fecha, horaIni, horaFin, campos.Programa_Ciclo, campos.Tipo_Carga, campos.Resultado_Control, incidencias, 'Cerrada'];
+  const idRegistro = idx != null ? DATA[cfg.key][idx].ID_Registro : null;
+  const camposApi = tipo === 'cabina'
+    ? { practica_tecnica: campos.Practica_Tecnica, nivel_riesgo: campos.Nivel_Riesgo, verificacion_previa: campos.Verificacion_Previa, descontaminacion_posterior: campos.Descontaminacion_Posterior }
+    : { programa_ciclo: campos.Programa_Ciclo, tipo_carga: campos.Tipo_Carga, resultado_control: campos.Resultado_Control };
 
   showLoading('Guardando…');
   try {
+    const { registro } = await callEdgeFunction('gestionar-registro-uso', {
+      accion: 'guardar_sesion', tipo, id_registro: idRegistro, id_equipo: idEquipo,
+      fecha, hora_inicio: horaIni, hora_fin: horaFin, incidencias, campos: camposApi,
+    });
+    const objLocal = tipo === 'cabina' ? _registroCabinaSbToObj(registro) : _registroAutoclaveSbToObj(registro);
     if (idx != null) {
-      const filaNum = idx + 2;
-      await sheetsUpdate(`${cfg.sheet}!A${filaNum}:${cfg.lastCol}${filaNum}`, fila);
-      DATA[cfg.key][idx] = rowToObj(fila, cfg.key);
+      DATA[cfg.key][idx] = objLocal;
       showToast('Sesión cerrada ✓', 'success');
     } else {
-      await sheetsAppend(cfg.sheet, fila);
-      DATA[cfg.key].push(rowToObj(fila, cfg.key));
+      DATA[cfg.key].push(objLocal);
       showToast(cfg.permiteSesionAbierta ? 'Sesión registrada ✓' : 'Ciclo registrado ✓', 'success');
     }
     closeModal('modal-reg-sesion');
@@ -440,10 +434,12 @@ async function guardarSesionRegistro() {
 
 async function descartarSesionAbierta(tipo, idx) {
   const cfg = _regConfig[tipo];
+  const idRegistro = DATA[cfg.key][idx]?.ID_Registro;
+  if (!idRegistro) return;
   if (!confirm('¿Descartar esta sesión abierta? No se puede deshacer.')) return;
   showLoading('Eliminando…');
   try {
-    await sheetsDeleteRow(cfg.sheet, idx);
+    await callEdgeFunction('gestionar-registro-uso', { accion: 'descartar_sesion', tipo, id_registro: idRegistro });
     DATA[cfg.key].splice(idx, 1);
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
@@ -476,22 +472,14 @@ function _abrirRegistroPorNfc(tipo, idEquipo) {
 
 async function _iniciarSesionRapida(tipo, idEquipo) {
   const cfg = _regConfig[tipo];
-  const email = (currentUser?.email || '').toLowerCase().trim();
-  const ahora = new Date();
-  const fecha = ahora.toISOString().split('T')[0];
-  const hora  = ahora.toTimeString().slice(0, 5);
-  const id    = _nextIdReg(tipo);
-  const fila  = tipo === 'cabina'
-    ? [id, idEquipo, email, fecha, hora, '', '', '', '', '', '', 'Abierta']
-    : [id, idEquipo, email, fecha, hora, '', '', '', '', '', 'Abierta'];
-
   showLoading('Iniciando sesión…');
   try {
-    await sheetsAppend(cfg.sheet, fila);
-    DATA[cfg.key].push(rowToObj(fila, cfg.key));
+    const { registro } = await callEdgeFunction('gestionar-registro-uso', { accion: 'iniciar_rapido', tipo, id_equipo: idEquipo });
+    const objLocal = _registroCabinaSbToObj(registro);
+    DATA[cfg.key].push(objLocal);
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
-    mostrarToastConAccion(`Sesión iniciada a las ${hora} ✓ — vuelve aquí (o escanea de nuevo) para terminarla`, 'Deshacer', () => _deshacerInicioSesionReg(tipo, id), 6000);
+    mostrarToastConAccion(`Sesión iniciada a las ${objLocal.Hora_Inicio} ✓ — vuelve aquí (o escanea de nuevo) para terminarla`, 'Deshacer', () => _deshacerInicioSesionReg(tipo, objLocal.ID_Registro), 6000);
   } catch (e) {
     showToast('Error al iniciar la sesión', 'error'); console.error(e);
   } finally { hideLoading(); }
@@ -503,7 +491,7 @@ async function _deshacerInicioSesionReg(tipo, id) {
   if (idx === -1) return;
   showLoading('Deshaciendo…');
   try {
-    await sheetsDeleteRow(cfg.sheet, idx);
+    await callEdgeFunction('gestionar-registro-uso', { accion: 'deshacer_inicio', tipo, id_registro: id });
     DATA[cfg.key].splice(idx, 1);
     renderRegistrosUso();
     _updateBadgeRegistrosUso();

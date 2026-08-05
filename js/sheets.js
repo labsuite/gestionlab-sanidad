@@ -398,6 +398,39 @@ function _reservaSbToObj(r) {
   };
 }
 
+function _registroCabinaSbToObj(r) {
+  return {
+    ID_Registro: r.id_registro || '',
+    ID_Equipo: r.id_equipo || '',
+    Usuario: r.usuario || '',
+    Fecha: r.fecha || '',
+    Hora_Inicio: (r.hora_inicio || '').slice(0, 5),
+    Hora_Fin: (r.hora_fin || '').slice(0, 5),
+    Practica_Tecnica: r.practica_tecnica || '',
+    Nivel_Riesgo: r.nivel_riesgo || '',
+    Verificacion_Previa: r.verificacion_previa || '',
+    Descontaminacion_Posterior: r.descontaminacion_posterior || '',
+    Incidencias: r.incidencias || '',
+    Estado: r.estado || 'Abierta',
+  };
+}
+
+function _registroAutoclaveSbToObj(r) {
+  return {
+    ID_Registro: r.id_registro || '',
+    ID_Equipo: r.id_equipo || '',
+    Usuario: r.usuario || '',
+    Fecha: r.fecha || '',
+    Hora_Inicio: (r.hora_inicio || '').slice(0, 5),
+    Hora_Fin: (r.hora_fin || '').slice(0, 5),
+    Programa_Ciclo: r.programa_ciclo || '',
+    Tipo_Carga: r.tipo_carga || '',
+    Resultado_Control: r.resultado_control || '',
+    Incidencias: r.incidencias || '',
+    Estado: r.estado || 'Cerrada',
+  };
+}
+
 // ============================================================
 // CARGAR TODOS LOS DATOS
 // ============================================================
@@ -417,7 +450,8 @@ async function loadAllData() {
            sbPlanesRes, sbRegistroMantRes,
            sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
            sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
-           sbConfigReservasRes, sbReservasRes] = await Promise.all([
+           sbConfigReservasRes, sbReservasRes,
+           sbRegistrosCabinaRes, sbRegistrosAutoclaveRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -468,7 +502,9 @@ async function loadAllData() {
       _sbMigracion.from('movimientos').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('revisiones_inventario').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('config_reservas').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('registros_cabina').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('registros_autoclave').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -554,7 +590,11 @@ async function loadAllData() {
     const sbReservas = sbReservasRes?.data || [];
     if (sbReservas.length) DATA.reservas = sbReservas.map(_reservaSbToObj);
     DATA.registrosCabina        = toObj(registrosCabina        || [], 'registrosCabina');
+    const sbRegistrosCabina = sbRegistrosCabinaRes?.data || [];
+    if (sbRegistrosCabina.length) DATA.registrosCabina = sbRegistrosCabina.map(_registroCabinaSbToObj);
     DATA.registrosAutoclave     = toObj(registrosAutoclave     || [], 'registrosAutoclave');
+    const sbRegistrosAutoclave = sbRegistrosAutoclaveRes?.data || [];
+    if (sbRegistrosAutoclave.length) DATA.registrosAutoclave = sbRegistrosAutoclave.map(_registroAutoclaveSbToObj);
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];
