@@ -367,7 +367,7 @@ create table pedidos (
 create table lineas_pedido (
   id_linea             text primary key,
   pedido               text not null references pedidos(id_pedido) on delete cascade,
-  material             text references material(id_material),
+  material             text,   -- nombre libre, no FK: la app guarda el Nombre, no el ID (permite "material no catalogado")
   cantidad_pedida      numeric,
   cantidad_recibida    numeric not null default 0,
   estado_linea         text,
@@ -378,7 +378,7 @@ create table lineas_pedido (
 
 create table solicitudes (
   id_solicitud            text primary key,
-  material                text references material(id_material),
+  material                text,   -- nombre libre, no FK: igual que lineas_pedido.material
   cantidad_solicitada     numeric,
   solicitante             text,
   fecha                   timestamptz not null default now(),
@@ -401,7 +401,7 @@ create table historico_precio (
 
 create table movimientos (
   id_movimiento    text primary key,
-  material         text references material(id_material),
+  material         text,   -- nombre libre, no FK: igual que lineas_pedido.material
   tipo             text,
   cantidad         numeric,
   usuario          text,
@@ -498,3 +498,11 @@ create policy "incidencias_select_anon" on incidencias for select to anon using 
 create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to anon using (true);
 create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to anon using (true);
 create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to anon using (true);
+create policy "material_select_anon" on material for select to anon using (true);
+create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to anon using (true);
+create policy "pedidos_select_anon" on pedidos for select to anon using (true);
+create policy "lineas_pedido_select_anon" on lineas_pedido for select to anon using (true);
+create policy "solicitudes_select_anon" on solicitudes for select to anon using (true);
+create policy "historico_precio_select_anon" on historico_precio for select to anon using (true);
+create policy "movimientos_select_anon" on movimientos for select to anon using (true);
+create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to anon using (true);

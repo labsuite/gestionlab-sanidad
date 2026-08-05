@@ -82,26 +82,20 @@ async function guardarPrecios() {
   const inputs = Array.from(document.querySelectorAll('.precio-input'));
   if (!p || !lineas.length) return;
 
-  const fecha = new Date().toISOString().split('T')[0];
   showLoading('Guardando precios...');
   try {
+    const lineasBody = [];
     for (let i = 0; i < inputs.length; i++) {
       const precioStr = inputs[i].value.trim();
       if (!precioStr) continue;
       const linea = lineas[i];
       if (!linea) continue;
-      const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === linea.ID_Linea);
-      if (idx === -1) continue;
-
-      // Guardar Precio_Unitario en col H de Lineas_Pedido
-      await sheetsUpdate(`Lineas_Pedido!H${idx + 2}`, [precioStr]);
-      DATA.lineasPedido[idx].Precio_Unitario = precioStr;
-
-      // Añadir entrada al histórico
-      const histRow = [genId('HP-'), linea.Material, pedidoId, p.Proveedor || '', fecha, precioStr];
-      await sheetsAppend('Historico_Precios', histRow);
-      DATA.historicoPrecio.push(rowToObj(histRow, 'historicoPrecio'));
+      lineasBody.push({ id_linea: linea.ID_Linea, precio_unitario: precioStr });
     }
+    await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'actualizar_precio', pedido: pedidoId, proveedor: p.Proveedor || '', lineas: lineasBody,
+    });
+    await loadAllData(); // refresca DATA.lineasPedido y DATA.historicoPrecio
     showToast('Precios guardados', 'success');
     closeModal('modal-precios');
     renderPedidos();
@@ -339,7 +333,7 @@ async function guardarReasignacion() {
   if (pedIdx === -1) return;
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Pedidos!Q${pedIdx+2}:R${pedIdx+2}`, [ciclo, modulo]);
+    await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { ciclo, modulo } });
     DATA.pedidos[pedIdx].Ciclo = ciclo;
     DATA.pedidos[pedIdx].Modulo = modulo;
     showToast('Reasignado correctamente', 'success');

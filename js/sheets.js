@@ -247,42 +247,128 @@ function _tareaSbToObj(t) {
   };
 }
 
-// ============================================================
-// HELPERS MATERIAL_UBICACIONES
-// ============================================================
-
-/**
- * Actualiza el Stock_Local de un lote existente.
- * loteIndex: posición en DATA.materialUbicaciones (0-based → fila = loteIndex + 2)
- */
-async function actualizarStockLocal(loteIndex, nuevoStock) {
-  const fila = loteIndex + 2;
-  await sheetsUpdate(`Material_Ubicaciones!D${fila}`, [String(nuevoStock)]);
-  DATA.materialUbicaciones[loteIndex].Stock_Local = String(nuevoStock);
+function _materialSbToObj(m) {
+  return {
+    ID_Material: m.id_material || '',
+    Nombre: m.nombre || '',
+    Categoria: m.categoria || '',
+    Referencia_Proveedor: m.referencia_proveedor || '',
+    Proveedor: m.proveedor || '',
+    Unidad: m.unidad || '',
+    Ubicacion: m.ubicacion || '',
+    Stock_Actual: m.stock_actual != null ? String(m.stock_actual) : '0',
+    Stock_Minimo: m.stock_minimo != null ? String(m.stock_minimo) : '0',
+    Stock_Optimo: m.stock_optimo != null ? String(m.stock_optimo) : '0',
+    Observaciones: m.observaciones || '',
+    Gestion_Automatica: m.gestion_automatica ? 'TRUE' : 'FALSE',
+  };
 }
 
-/**
- * Añade un nuevo lote a Material_Ubicaciones y lo registra en DATA.
- * Devuelve el objeto lote creado.
- */
-async function añadirLote(idMaterial, idUbicacion, stockLocal, stockMin, stockOpt, idLotePadre = '', unidadLote = '') {
-  const id = genId('LU');
-  const row = [id, idMaterial, idUbicacion, String(stockLocal), String(stockMin || 0), String(stockOpt || 0), idLotePadre || '', unidadLote || ''];
-  await sheetsAppend('Material_Ubicaciones', row);
-  const lote = rowToObj(row, 'materialUbicaciones');
-  DATA.materialUbicaciones.push(lote);
-  return lote;
+function _materialUbicacionSbToObj(l) {
+  return {
+    ID: l.id || '',
+    ID_Material: l.id_material || '',
+    ID_Ubicacion: l.id_ubicacion || '',
+    Stock_Local: l.stock_local != null ? String(l.stock_local) : '0',
+    Stock_Minimo_Local: l.stock_minimo_local != null ? String(l.stock_minimo_local) : '',
+    Stock_Optimo_Local: l.stock_optimo_local != null ? String(l.stock_optimo_local) : '',
+    ID_Lote_Padre: l.id_lote_padre || '',
+    Unidad_Lote: l.unidad_lote || '',
+  };
 }
 
-/**
- * Elimina un lote de Material_Ubicaciones (pone fila en blanco).
- * En Sheets no hay borrado real de filas via API REST sin Batchupdate,
- * así que vaciamos los valores. La fila vacía se ignora en loadAllData (filtro r[0]).
- */
-async function eliminarLote(loteIndex) {
-  const fila = loteIndex + 2;
-  await sheetsUpdate(`Material_Ubicaciones!A${fila}:H${fila}`, ['', '', '', '', '', '', '', '']);
-  DATA.materialUbicaciones.splice(loteIndex, 1);
+function _pedidoSbToObj(p) {
+  return {
+    ID_Pedido: p.id_pedido || '',
+    Nombre_Lista: p.nombre_lista || '',
+    Proveedor: p.proveedor || '',
+    Fecha_Creacion: p.fecha_creacion || '',
+    Fecha_Presupuesto: p.fecha_presupuesto || '',
+    Fecha_Aprobacion: p.fecha_aprobacion || '',
+    Fecha_Pedido_Enviado: p.fecha_pedido_enviado || '',
+    Fecha_Recepcion_Completa: p.fecha_recepcion_completa || '',
+    Fecha_Factura: p.fecha_factura || '',
+    Estado: p.estado || 'Abierto',
+    Numero_Presupuesto: p.numero_presupuesto || '',
+    Numero_Factura: p.numero_factura || '',
+    Observaciones: p.observaciones || '',
+    Doc_Hoja_Generada: p.doc_hoja_generada ? 'TRUE' : '',
+    Doc_Hoja_Completada: '',
+    Doc_Enviada_Jefatura: p.doc_enviada_jefatura ? 'TRUE' : '',
+    Ciclo: p.ciclo || '',
+    Modulo: p.modulo || '',
+    Tipo: p.tipo || 'Material',
+    Gasto_Extra_Concepto: p.gasto_extra_concepto || '',
+    Gasto_Extra_Importe: p.gasto_extra_importe != null ? String(p.gasto_extra_importe) : '',
+  };
+}
+
+function _lineaPedidoSbToObj(l) {
+  return {
+    ID_Linea: l.id_linea || '',
+    Pedido: l.pedido || '',
+    Material: l.material || '',
+    Cantidad_Pedida: l.cantidad_pedida != null ? String(l.cantidad_pedida) : '',
+    Cantidad_Recibida: l.cantidad_recibida != null ? String(l.cantidad_recibida) : '0',
+    Estado_Linea: l.estado_linea || '',
+    Observaciones: l.observaciones || '',
+    Precio_Unitario: l.precio_unitario != null ? String(l.precio_unitario) : '',
+    ID_Equipo: l.id_equipo || '',
+  };
+}
+
+function _solicitudSbToObj(s) {
+  return {
+    ID_Solicitud: s.id_solicitud || '',
+    Material: s.material || '',
+    Cantidad_Solicitada: s.cantidad_solicitada != null ? String(s.cantidad_solicitada) : '',
+    Solicitante: s.solicitante || '',
+    Fecha: (s.fecha || '').slice(0, 10),
+    Motivo: s.motivo || '',
+    Proveedor_Requerido: s.proveedor_requerido || '',
+    Estado: s.estado || 'Pendiente',
+    Lista_Pedido: s.lista_pedido || '',
+    Observaciones: s.observaciones || '',
+    Snooze_Hasta: s.snooze_hasta || '',
+  };
+}
+
+function _historicoPrecioSbToObj(h) {
+  return {
+    ID_Historico: h.id_historico || '',
+    Nombre_Material: h.nombre_material || '',
+    ID_Pedido: h.id_pedido || '',
+    Proveedor: h.proveedor || '',
+    Fecha: h.fecha || '',
+    Precio_Unitario: h.precio_unitario != null ? String(h.precio_unitario) : '',
+  };
+}
+
+function _movimientoSbToObj(m) {
+  return {
+    ID_Movimiento: m.id_movimiento || '',
+    Material: m.material || '',
+    Tipo: m.tipo || '',
+    Cantidad: m.cantidad != null ? String(m.cantidad) : '',
+    Usuario: m.usuario || '',
+    Fecha: (m.fecha || '').slice(0, 10),
+    Motivo: m.motivo || '',
+    Observaciones: m.observaciones || '',
+  };
+}
+
+function _revisionInventarioSbToObj(r) {
+  return {
+    ID_Revision: r.id_revision || '',
+    Fecha: (r.fecha || '').slice(0, 10),
+    ID_Material: r.id_material || '',
+    Nombre_Material: r.nombre_material || '',
+    Stock_App: r.stock_app != null ? String(r.stock_app) : '',
+    Stock_Real: r.stock_real != null ? String(r.stock_real) : '',
+    Diferencia: r.diferencia != null ? String(r.diferencia) : '',
+    Usuario: r.usuario || '',
+    Observaciones: r.observaciones || '',
+  };
 }
 
 // ============================================================
@@ -301,7 +387,9 @@ async function loadAllData() {
            sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
            sbProveedoresRes, sbUbicacionesRes, sbEquiposRes,
            sbIntervencionesRes, sbIncidenciasRes, sbTareasRes,
-           sbPlanesRes, sbRegistroMantRes] = await Promise.all([
+           sbPlanesRes, sbRegistroMantRes,
+           sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
+           sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -342,7 +430,15 @@ async function loadAllData() {
       _sbMigracion.from('incidencias').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('tareas_intervencion').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('planes_mantenimiento').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registro_mantenimientos').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('registro_mantenimientos').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('material').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('material_ubicaciones').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('pedidos').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('lineas_pedido').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('solicitudes').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('historico_precio').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('movimientos').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('revisiones_inventario').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -379,10 +475,20 @@ async function loadAllData() {
     }
     DATA.usuarios            = toObj(usuarios,            'usuarios');
     DATA.material            = toObj(material,            'material');
+    const sbMaterial = sbMaterialRes?.data || [];
+    if (sbMaterial.length) DATA.material = sbMaterial.map(_materialSbToObj);
     DATA.movimientos         = toObj(movimientos,         'movimientos');
+    const sbMovimientos = sbMovimientosRes?.data || [];
+    if (sbMovimientos.length) DATA.movimientos = sbMovimientos.map(_movimientoSbToObj);
     DATA.solicitudes         = toObj(solicitudes,         'solicitudes');
+    const sbSolicitudes = sbSolicitudesRes?.data || [];
+    if (sbSolicitudes.length) DATA.solicitudes = sbSolicitudes.map(_solicitudSbToObj);
     DATA.pedidos             = toObj(pedidos,             'pedidos');
+    const sbPedidos = sbPedidosRes?.data || [];
+    if (sbPedidos.length) DATA.pedidos = sbPedidos.map(_pedidoSbToObj);
     DATA.lineasPedido        = toObj(lineasPedido,        'lineasPedido');
+    const sbLineasPedido = sbLineasPedidoRes?.data || [];
+    if (sbLineasPedido.length) DATA.lineasPedido = sbLineasPedido.map(_lineaPedidoSbToObj);
     DATA.ciclosModulos = ciclosModulos
       .filter(r => r.length && r.some(Boolean))  // mantener filas con col A vacía (módulos sin ciclo repetido)
       .map(r => rowToObj(r, 'ciclosModulos'));
@@ -392,7 +498,11 @@ async function loadAllData() {
       if (cm.Ciclo) { ultimoCiclo = cm.Ciclo; } else { cm.Ciclo = ultimoCiclo; }
     });
     DATA.materialUbicaciones = toObj(materialUbicaciones, 'materialUbicaciones');
+    const sbMaterialUbicaciones = sbMaterialUbicacionesRes?.data || [];
+    if (sbMaterialUbicaciones.length) DATA.materialUbicaciones = sbMaterialUbicaciones.map(_materialUbicacionSbToObj);
     DATA.historicoPrecio        = toObj(historicoPrecio        || [], 'historicoPrecio');
+    const sbHistoricoPrecio = sbHistoricoPrecioRes?.data || [];
+    if (sbHistoricoPrecio.length) DATA.historicoPrecio = sbHistoricoPrecio.map(_historicoPrecioSbToObj);
     DATA.tareas                 = toObj(tareas                 || [], 'tareas');
     DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
     const sbPlanes = sbPlanesRes?.data || [];
@@ -404,6 +514,8 @@ async function loadAllData() {
     DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
     DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
     DATA.revisionesInventario   = toObj(revisionesInventario   || [], 'revisionesInventario');
+    const sbRevisiones = sbRevisionesRes?.data || [];
+    if (sbRevisiones.length) DATA.revisionesInventario = sbRevisiones.map(_revisionInventarioSbToObj);
     DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
     DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
     DATA.reservas               = toObj(reservas               || [], 'reservas');

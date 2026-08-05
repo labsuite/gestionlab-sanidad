@@ -77,6 +77,12 @@ export async function requireAdminOrGestor(req: Request) {
   return requireRoles(req, ROLES_PERMITIDOS, "Admin/Gestor");
 }
 
+// Eliminar ítems (material, equipos...) es solo para Administrador — ver
+// `eliminarItems` en PERMISOS (js/ui.js), que Gestor no tiene.
+export async function requireAdmin(req: Request) {
+  return requireRoles(req, ["Administrador"], "Administrador");
+}
+
 // Intervenciones/Incidencias: el Profesor también puede gestionar las de sus
 // propios equipos (ver crearIntervenciones/crearIncidencias en js/ui.js).
 export async function requireStaff(req: Request) {

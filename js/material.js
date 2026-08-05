@@ -102,17 +102,14 @@ async function guardarConteo() {
   }
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
-  const stockApp = getStockTotal(mat);
   const stockReal = parseFloat(realStr);
-  const diferencia = stockReal - stockApp;
-  const fecha = new Date().toISOString().split('T')[0];
-  const id = genId('REV-');
   const obs = document.getElementById('contar-obs').value;
-  const row = [id, fecha, matId, mat.Nombre, String(stockApp), String(stockReal), String(diferencia), currentUser?.name || '', obs];
   showLoading('Enviando revisión...');
   try {
-    await sheetsAppend('Revisiones_Inventario', row);
-    DATA.revisionesInventario.push(rowToObj(row, 'revisionesInventario'));
+    const { revision } = await callEdgeFunction('gestionar-material', {
+      accion: 'revision_crear', id_material: matId, stock_real: stockReal, observaciones: obs, usuario: currentUser?.name || '',
+    });
+    DATA.revisionesInventario.push(_revisionInventarioSbToObj(revision));
     showToast('Revisión enviada. El profesor la revisará pronto.', 'success');
     closeModal('modal-contar-stock');
   } catch(e) { showToast('Error al enviar la revisión', 'error'); console.error(e); }
@@ -122,38 +119,10 @@ async function guardarConteo() {
 async function aplicarRevisionInventario(revId) {
   const revIdx = DATA.revisionesInventario.findIndex(r => r.ID_Revision === revId);
   if (revIdx === -1) return;
-  const rev = DATA.revisionesInventario[revIdx];
-  const mat = DATA.material.find(m => m.ID_Material === rev.ID_Material);
-  if (!mat) { showToast('Material no encontrado', 'error'); return; }
-  const stockReal = parseFloat(rev.Stock_Real);
-  const matIdx = DATA.material.indexOf(mat);
-  const lotes = getMatUbics(mat.ID_Material);
   showLoading('Aplicando ajuste...');
   try {
-    if (lotes.length > 0) {
-      // Material con ubicaciones: ajustar stock total repartiendo la diferencia en el primer lote
-      const diferencia = stockReal - getStockTotal(mat);
-      const primerLoteIdx = DATA.materialUbicaciones.findIndex(l => l.ID_Material === mat.ID_Material);
-      if (primerLoteIdx !== -1) {
-        const nuevoLocal = Math.max(0, (parseFloat(DATA.materialUbicaciones[primerLoteIdx].Stock_Local) || 0) + diferencia);
-        await actualizarStockLocal(primerLoteIdx, nuevoLocal);
-      }
-      const nuevoTotal = getStockTotal(mat);
-      mat.Stock_Actual = String(nuevoTotal);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoTotal]);
-    } else {
-      mat.Stock_Actual = String(stockReal);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [stockReal]);
-    }
-    // Movimiento de ajuste
-    const fecha = new Date().toISOString().split('T')[0];
-    const movRow = [genId('MOV-'), mat.Nombre, 'Ajuste', Math.abs(parseFloat(rev.Diferencia)||0),
-      currentUser?.name || '', fecha, `Ajuste por revisión de inventario (alumno: ${rev.Usuario})`, ''];
-    await sheetsAppend('Movimientos', movRow);
-    DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-    // Eliminar revisión del sheet
-    await sheetsDeleteRow('Revisiones_Inventario', revIdx);
-    DATA.revisionesInventario.splice(revIdx, 1);
+    await callEdgeFunction('gestionar-material', { accion: 'revision_aplicar', id_revision: revId, usuario: currentUser?.name || '' });
+    await loadAllData(); // refresca material, lotes, movimientos y revisiones
     showToast('Ajuste aplicado correctamente', 'success');
     renderPanelRevisiones(); renderMaterial();
   } catch(e) { showToast('Error aplicando el ajuste', 'error'); console.error(e); }
@@ -165,7 +134,7 @@ async function descartarRevisionInventario(revId) {
   if (revIdx === -1) return;
   showLoading('Descartando...');
   try {
-    await sheetsDeleteRow('Revisiones_Inventario', revIdx);
+    await callEdgeFunction('gestionar-material', { accion: 'revision_descartar', id_revision: revId });
     DATA.revisionesInventario.splice(revIdx, 1);
     showToast('Revisión descartada', 'success');
     renderPanelRevisiones();
@@ -692,14 +661,9 @@ async function eliminarMaterial() {
   if (!confirm(`¿Eliminar "${m.Nombre}" del inventario? Esta acción no se puede deshacer.`)) return;
   showLoading('Eliminando...');
   try {
-    // Vaciar lotes de Material_Ubicaciones de mayor a menor índice (splice no desplaza los anteriores)
-    const loteIndices = getMatUbics(m.ID_Material)
-      .map(l => DATA.materialUbicaciones.indexOf(l))
-      .filter(i => i !== -1)
-      .sort((a, b) => b - a);
-    for (const idx of loteIndices) await eliminarLote(idx);
-    // Eliminar fila física de Material
-    await sheetsDeleteRow('Material', editingRow.rowIndex);
+    // Los lotes de Material_Ubicaciones caen en cascada (FK on delete cascade).
+    await callEdgeFunction('gestionar-material', { accion: 'eliminar', id_material: m.ID_Material });
+    DATA.materialUbicaciones = DATA.materialUbicaciones.filter(l => l.ID_Material !== m.ID_Material);
     DATA.material.splice(editingRow.rowIndex, 1);
     closeModal('modal-material');
     editingRow = null;
@@ -941,37 +905,34 @@ async function guardarMaterial() {
     : (gestionAuto ? (v('mat-optimo') || '0') : '0');
 
   const ubicPrincipal = _lotesTemp.length ? _lotesTemp[0].ID_Ubicacion : v('mat-ubicacion');
-  const row = [id, nombre, cat, v('mat-referencia'), v('mat-proveedor'), unidad, ubicPrincipal, stockGlobal, minStock, optStock, v('mat-observaciones'), gestionAuto ? 'TRUE' : 'FALSE'];
+
+  const lotesBody = _lotesTemp
+    .filter(l => !(l._esPrepoblado && !_lotesTemp.some(x => x._nuevo && !x._esPrepoblado)))
+    .map(l => ({
+      id: l._nuevo ? undefined : l._loteId,
+      id_ubicacion: l.ID_Ubicacion, stock_local: l.Stock_Local,
+      stock_minimo_local: l.Stock_Minimo_Local, stock_optimo_local: l.Stock_Optimo_Local,
+      unidad_lote: (l.Unidad_Lote || '').trim(),
+    }));
 
   showLoading('Guardando...');
   try {
-    if (editingRow && editingRow.sheet === 'Material') {
-      await sheetsUpdate(`Material!A${editingRow.rowIndex + 2}:L${editingRow.rowIndex + 2}`, row);
-      DATA.material[editingRow.rowIndex] = rowToObj(row, 'material');
-    } else {
-      if (DATA.material.find(m => m.ID_Material === id)) { showToast('Ese ID ya existe', 'error'); hideLoading(); return; }
-      await sheetsAppend('Material', row);
-      DATA.material.push(rowToObj(row, 'material'));
-    }
+    const esEdicion = editingRow && editingRow.sheet === 'Material';
+    if (!esEdicion && DATA.material.find(m => m.ID_Material === id)) { showToast('Ese ID ya existe', 'error'); hideLoading(); return; }
 
-    for (const lote of _lotesTemp) {
-      if (lote._nuevo) {
-        // No convertir ubicación legacy a lote si no se añadió una segunda ubicación real
-        if (lote._esPrepoblado && !_lotesTemp.some(l => l._nuevo && !l._esPrepoblado)) continue;
-        await añadirLote(id, lote.ID_Ubicacion, lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local, '', (lote.Unidad_Lote || '').trim());
-      } else if (lote._loteIdx !== undefined) {
-        const l = DATA.materialUbicaciones[lote._loteIdx];
-        const unidadLoteNueva = (lote.Unidad_Lote || '').trim();
-        if (l && (l.Stock_Local !== lote.Stock_Local || l.Stock_Minimo_Local !== lote.Stock_Minimo_Local || l.Stock_Optimo_Local !== lote.Stock_Optimo_Local || (l.Unidad_Lote || '') !== unidadLoteNueva)) {
-          const fila = lote._loteIdx + 2;
-          // D:F son Stock_Local/Mín/Óptimo; G es ID_Lote_Padre (se reescribe tal cual, no es editable aquí); H es Unidad_Lote
-          await sheetsUpdate(`Material_Ubicaciones!D${fila}:H${fila}`, [lote.Stock_Local, lote.Stock_Minimo_Local, lote.Stock_Optimo_Local, l.ID_Lote_Padre || '', unidadLoteNueva]);
-          DATA.materialUbicaciones[lote._loteIdx].Stock_Local         = lote.Stock_Local;
-          DATA.materialUbicaciones[lote._loteIdx].Stock_Minimo_Local  = lote.Stock_Minimo_Local;
-          DATA.materialUbicaciones[lote._loteIdx].Stock_Optimo_Local  = lote.Stock_Optimo_Local;
-          DATA.materialUbicaciones[lote._loteIdx].Unidad_Lote         = unidadLoteNueva;
-        }
-      }
+    const { material, lotes } = await callEdgeFunction('gestionar-material', {
+      accion: esEdicion ? 'actualizar' : 'crear', id_material: id, nombre, categoria: cat,
+      referencia_proveedor: v('mat-referencia'), proveedor: v('mat-proveedor'), unidad, ubicacion: ubicPrincipal,
+      stock_actual: stockGlobal, stock_minimo: minStock, stock_optimo: optStock,
+      observaciones: v('mat-observaciones'), gestion_automatica: gestionAuto, lotes: lotesBody,
+    });
+
+    if (esEdicion) DATA.material[editingRow.rowIndex] = _materialSbToObj(material);
+    else DATA.material.push(_materialSbToObj(material));
+    for (const l of lotes) {
+      const idx = DATA.materialUbicaciones.findIndex(x => x.ID === l.id);
+      if (idx !== -1) DATA.materialUbicaciones[idx] = _materialUbicacionSbToObj(l);
+      else DATA.materialUbicaciones.push(_materialUbicacionSbToObj(l));
     }
 
     showToast(editingRow ? 'Material actualizado' : 'Material guardado', 'success');
@@ -982,13 +943,9 @@ async function guardarMaterial() {
     if (_pendingRecepcion) {
       const { lineaId, pedidoId, cantRec, obs } = _pendingRecepcion;
       _pendingRecepcion = null;
-      const idx = DATA.lineasPedido.findIndex(l => l.ID_Linea === lineaId);
-      if (idx !== -1) {
-        const l = DATA.lineasPedido[idx];
-        const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-        const cantPed = parseFloat(l.Cantidad_Pedida) || 0;
-        if (mat) { showToast('Material catalogado. Registrando recepción...', 'success'); await _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, obs); verDetallePedido(pedidoId); }
-      }
+      const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+      const mat = l && DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+      if (mat) { showToast('Material catalogado. Registrando recepción...', 'success'); await _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs); }
     } else {
       renderAll();
     }
@@ -1026,29 +983,13 @@ async function guardarConsumo() {
 
   showLoading('Registrando...');
   try {
-    const fecha  = new Date().toISOString().split('T')[0];
-    const idMov  = genId('MOV-');
-    const rowMov = [idMov, mat.Nombre, 'Salida', cantidad, currentUser?.name || 'Usuario', fecha, v('consumo-motivo') || 'Consumo', v('consumo-obs')];
-    await sheetsAppend('Movimientos', rowMov);
-    DATA.movimientos.push(rowToObj(rowMov, 'movimientos'));
-
-    if (lotes.length > 0 && loteElegido) {
-      const loteIdx = DATA.materialUbicaciones.indexOf(loteElegido);
-      if (loteIdx !== -1) {
-        const nuevoLocal = Math.max(0, (parseFloat(DATA.materialUbicaciones[loteIdx].Stock_Local) || 0) - cantidad);
-        await actualizarStockLocal(loteIdx, nuevoLocal);
-      }
-      const nuevoTotal = getStockTotal(mat);
-      const matIdx = DATA.material.indexOf(mat);
-      mat.Stock_Actual = String(nuevoTotal);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoTotal]);
-    } else {
-      const nuevoStock = Math.max(0, (parseFloat(mat.Stock_Actual) || 0) - cantidad);
-      const matIdx = DATA.material.indexOf(mat);
-      mat.Stock_Actual = String(nuevoStock);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoStock]);
-    }
-    showToast(`Consumo registrado. Stock: ${getStockTotal(mat)} ${mat.Unidad}`, 'success');
+    await callEdgeFunction('gestionar-material', {
+      accion: 'consumo', id_material: matId, cantidad, lote_id: loteElegido?.ID || undefined,
+      motivo: v('consumo-motivo') || 'Consumo', observaciones: v('consumo-obs'), usuario: currentUser?.name || 'Usuario',
+    });
+    await loadAllData();
+    const matFinal = DATA.material.find(m => m.ID_Material === matId);
+    showToast(`Consumo registrado. Stock: ${getStockTotal(matFinal)} ${matFinal?.Unidad || ''}`, 'success');
     closeModal('modal-consumo'); renderAll();
   } catch(e) { showToast('Error registrando consumo', 'error'); console.error(e); }
   hideLoading();
@@ -1062,36 +1003,19 @@ async function guardarEntrada() {
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) { showToast('Material no encontrado', 'error'); return; }
   const cantidad = parseFloat(cantStr);
-  const lotes    = getMatUbics(matId);
   // Bote fijo (viene de openModalEntradaLote). Si no, el del selector. Ambos son ID de lote, no de ubicación.
   const loteFijo = document.getElementById('entrada-lote-fixed')?.value || '';
   const loteSel  = loteFijo || document.getElementById('entrada-ubicacion-sel')?.value || '';
 
   showLoading('Registrando...');
   try {
-    const fecha  = new Date().toISOString().split('T')[0];
-    const idMov  = genId('MOV-');
-    const rowMov = [idMov, mat.Nombre, 'Entrada', cantidad, currentUser?.name || 'Usuario', fecha, v('entrada-motivo'), v('entrada-obs')];
-    await sheetsAppend('Movimientos', rowMov);
-    DATA.movimientos.push(rowToObj(rowMov, 'movimientos'));
-
-    if (lotes.length > 0 && loteSel) {
-      const loteIdx = DATA.materialUbicaciones.findIndex(l => l.ID === loteSel);
-      if (loteIdx !== -1) {
-        const nuevoLocal = (parseFloat(DATA.materialUbicaciones[loteIdx].Stock_Local) || 0) + cantidad;
-        await actualizarStockLocal(loteIdx, nuevoLocal);
-      }
-      const nuevoTotal = getStockTotal(mat);
-      const matIdx = DATA.material.indexOf(mat);
-      mat.Stock_Actual = String(nuevoTotal);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoTotal]);
-    } else {
-      const nuevoStock = (parseFloat(mat.Stock_Actual) || 0) + cantidad;
-      const matIdx = DATA.material.indexOf(mat);
-      mat.Stock_Actual = String(nuevoStock);
-      await sheetsUpdate(`Material!H${matIdx + 2}`, [nuevoStock]);
-    }
-    showToast(`Entrada registrada. Stock: ${getStockTotal(mat)} ${mat.Unidad}`, 'success');
+    await callEdgeFunction('gestionar-material', {
+      accion: 'entrada', id_material: matId, cantidad, lote_id: loteSel || undefined,
+      motivo: v('entrada-motivo'), observaciones: v('entrada-obs'), usuario: currentUser?.name || 'Usuario',
+    });
+    await loadAllData();
+    const matFinal = DATA.material.find(m => m.ID_Material === matId);
+    showToast(`Entrada registrada. Stock: ${getStockTotal(matFinal)} ${matFinal?.Unidad || ''}`, 'success');
     closeModal('modal-entrada'); renderAll();
   } catch(e) { showToast('Error registrando entrada', 'error'); console.error(e); }
   hideLoading();
@@ -1177,46 +1101,13 @@ async function confirmarTransferenciaArmario() {
   if (!items.length) { showToast('Introduce la cantidad de al menos un material', 'error'); return; }
   showLoading('Trasladando...');
   try {
-    const fecha = new Date().toISOString().split('T')[0];
-    for (const item of items) {
-      const mat = DATA.material.find(m => m.ID_Material === item.matId);
-      if (!mat) continue;
-      if (item.isLote) {
-        const loteOrigenIdx = DATA.materialUbicaciones.findIndex(
-          l => l.ID_Material === item.matId && l.ID_Ubicacion === origen);
-        if (loteOrigenIdx === -1) continue;
-        await actualizarStockLocal(loteOrigenIdx, item.stockOrigen - item.cant);
-        const loteDestinoIdx = DATA.materialUbicaciones.findIndex(
-          l => l.ID_Material === item.matId && l.ID_Ubicacion === destino);
-        if (loteDestinoIdx !== -1) {
-          const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
-          await actualizarStockLocal(loteDestinoIdx, stockDest + item.cant);
-        } else {
-          await añadirLote(item.matId, destino, item.cant, 0, 0);
-        }
-      } else {
-        const matIdx = DATA.material.indexOf(mat);
-        const nuevoStockOrig = item.stockOrigen - item.cant;
-        mat.Stock_Actual = '0';
-        await sheetsUpdate(`Material!H${matIdx + 2}`, [0]);
-        if (nuevoStockOrig > 0) await añadirLote(item.matId, origen, nuevoStockOrig, 0, 0);
-        const loteDestinoIdx = DATA.materialUbicaciones.findIndex(
-          l => l.ID_Material === item.matId && l.ID_Ubicacion === destino);
-        if (loteDestinoIdx !== -1) {
-          const stockDest = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
-          await actualizarStockLocal(loteDestinoIdx, stockDest + item.cant);
-        } else {
-          await añadirLote(item.matId, destino, item.cant, 0, 0);
-        }
-      }
-      const movRow = [genId('MOV-'), mat.Nombre, 'Traslado', item.cant,
-        currentUser?.name || 'Usuario', fecha,
-        `NFC · De: ${getNombreUbicacion(origen)} → ${getNombreUbicacion(destino)}`, ''];
-      await sheetsAppend('Movimientos', movRow);
-      DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-    }
-    const n = items.length;
-    showToast(`${n} ítem${n>1?'s':''} trasladado${n>1?'s':''} → ${getNombreUbicacion(destino)}`, 'success');
+    const { procesados } = await callEdgeFunction('gestionar-material', {
+      accion: 'transferencia_masiva', id_origen_ubicacion: origen, id_destino_ubicacion: destino,
+      usuario: currentUser?.name || 'Usuario',
+      items: items.map(item => ({ id_material: item.matId, cantidad: item.cant, es_lote: item.isLote })),
+    });
+    await loadAllData();
+    showToast(`${procesados} ítem${procesados>1?'s':''} trasladado${procesados>1?'s':''} → ${getNombreUbicacion(destino)}`, 'success');
     closeModal('modal-nfc-transfer');
     renderMaterial(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error en el traslado. Revisa la consola.', 'error'); console.error(e); }
@@ -1287,25 +1178,15 @@ async function guardarTraslado() {
   if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
   showLoading('Trasladando...');
   try {
-    await actualizarStockLocal(loteOrigenIdx, stockOrigen - cant);
     // Si el destino es un bote concreto (vuelta a la madre), se apunta por ID — sin ambigüedad
-    // aunque comparta ubicación con el origen. Si no, se busca/crea por ubicación como antes.
+    // aunque comparta ubicación con el origen. Si no, se busca/crea por ubicación server-side.
     const destinoLoteId = v('traslado-destino-lote-id');
-    const loteDestinoIdx = destinoLoteId
-      ? DATA.materialUbicaciones.findIndex(l => l.ID === destinoLoteId)
-      : DATA.materialUbicaciones.findIndex(l => l.ID_Material === matId && l.ID_Ubicacion === idDestino);
-    if (loteDestinoIdx === -1) {
-      await añadirLote(matId, idDestino, cant, 0, 0);
-    } else {
-      const stockDestino = parseFloat(DATA.materialUbicaciones[loteDestinoIdx].Stock_Local) || 0;
-      await actualizarStockLocal(loteDestinoIdx, stockDestino + cant);
-    }
-    // Registrar movimiento de traslado
-    const fecha = new Date().toISOString().split('T')[0];
-    const movRow = [genId('MOV-'), mat.Nombre, 'Traslado',cant, currentUser?.name||'Usuario', fecha,
-      `De: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(idDestino)}`, ''];
-    await sheetsAppend('Movimientos', movRow);
-    DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
+    await callEdgeFunction('gestionar-material', {
+      accion: 'traslado', id_material: matId, lote_origen_id: loteOrigenId, cantidad: cant,
+      lote_destino_id: destinoLoteId || undefined, id_destino_ubicacion: destinoLoteId ? undefined : idDestino,
+      motivo: `De: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(idDestino)}`, usuario: currentUser?.name || 'Usuario',
+    });
+    await loadAllData();
     showToast(`Traslado registrado: ${cant} ${unidadOrigen} → ${getNombreUbicacion(idDestino)}`, 'success');
     closeModal('modal-traslado'); renderMaterial();
     renderDashboard();
@@ -1324,13 +1205,13 @@ async function guardarTraslado() {
 async function _asegurarLoteLegacy(matId) {
   const lotesExistentes = getMatUbics(matId);
   if (lotesExistentes.length > 0) return lotesExistentes[0].ID;
-  const m = DATA.material.find(x => x.ID_Material === matId);
-  if (!m || !m.Ubicacion) { showToast('Este ítem no tiene ubicación asignada todavía — edítalo primero', 'error'); return null; }
   showLoading('Preparando...');
   let lote;
   try {
-    lote = await añadirLote(matId, m.Ubicacion, m.Stock_Actual || 0, m.Stock_Minimo || 0, m.Stock_Optimo || 0);
-  } catch(e) { hideLoading(); showToast('Error al preparar el ítem', 'error'); console.error(e); return null; }
+    const { lote: loteCreado } = await callEdgeFunction('gestionar-material', { accion: 'asegurar_lote_legacy', id_material: matId });
+    lote = _materialUbicacionSbToObj(loteCreado);
+    if (!DATA.materialUbicaciones.some(l => l.ID === lote.ID)) DATA.materialUbicaciones.push(lote);
+  } catch(e) { hideLoading(); showToast(e.message || 'Error al preparar el ítem', 'error'); console.error(e); return null; }
   hideLoading();
   return lote.ID;
 }
@@ -1455,18 +1336,13 @@ async function guardarSubdivision() {
   if (totalRepartido > stockOrigen) { showToast(`Stock insuficiente en el bote madre (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
   showLoading('Subdividiendo...');
   try {
-    await actualizarStockLocal(loteOrigenIdx, stockOrigen - totalRepartido);
-    const fecha = new Date().toISOString().split('T')[0];
-    for (const f of filas) {
-      const cant = parseFloat(f.cantidad) || 0;
-      // Siempre se crea un bote nuevo (nunca se fusiona con uno existente): evita elegir
-      // a ciegas entre varios botes que pudiera haber ya en esa misma ubicación.
-      await añadirLote(matId, f.idUbicacion, cant, parseFloat(f.stockMin) || 0, parseFloat(f.stockOpt) || 0, loteOrigenId, f.unidad.trim());
-      const movRow = [genId('MOV-'), mat.Nombre, 'Subdivisión', cant, currentUser?.name || 'Usuario', fecha,
-        `Subdividido de: ${getNombreUbicacion(idOrigen)} → ${getNombreUbicacion(f.idUbicacion)}`, ''];
-      await sheetsAppend('Movimientos', movRow);
-      DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-    }
+    // Siempre se crea un bote nuevo por destino (nunca se fusiona con uno existente): evita
+    // elegir a ciegas entre varios botes que pudiera haber ya en esa misma ubicación.
+    await callEdgeFunction('gestionar-material', {
+      accion: 'subdivision', id_material: matId, lote_origen_id: loteOrigenId, usuario: currentUser?.name || 'Usuario',
+      destinos: filas.map(f => ({ id_ubicacion: f.idUbicacion, cantidad: f.cantidad, unidad: f.unidad.trim(), stock_min: f.stockMin, stock_opt: f.stockOpt })),
+    });
+    await loadAllData();
     showToast(`Repartido en ${filas.length} ubicación${filas.length > 1 ? 'es' : ''}`, 'success');
     closeModal('modal-subdividir-lote');
     renderMaterial(); renderDashboard(); updateBadges();
@@ -1487,10 +1363,11 @@ async function eliminarLoteDirecto(loteId) {
   if (stock > 0) msg += ` Tiene ${stock} ${unidad} registrado — se perderá del stock total.`;
   if (esMadre) msg += ' Tiene botes de uso subdivididos a partir de él; seguirán existiendo pero perderán la referencia a este bote madre.';
   if (!confirm(msg)) return;
-  const idx = DATA.materialUbicaciones.indexOf(lote);
   showLoading('Eliminando...');
   try {
-    await eliminarLote(idx);
+    await callEdgeFunction('gestionar-material', { accion: 'eliminar_lote', lote_id: loteId });
+    const idx = DATA.materialUbicaciones.indexOf(lote);
+    if (idx !== -1) DATA.materialUbicaciones.splice(idx, 1);
     showToast('Bote eliminado', 'success');
     renderMaterial(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error al eliminar', 'error'); console.error(e); }

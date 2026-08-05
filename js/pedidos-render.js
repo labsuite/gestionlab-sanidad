@@ -16,12 +16,11 @@ async function aplicarSnooze(solId) {
   if (!fecha) { showToast('Indica una fecha', 'error'); return; }
   const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
   if (!sol) return;
-  const idx = DATA.solicitudes.indexOf(sol);
   const anterior = sol.Snooze_Hasta;
   sol.Snooze_Hasta = fecha;
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Solicitudes!K${idx + 2}`, [fecha]);
+    await callEdgeFunction('gestionar-solicitud', { accion: 'snooze', id_solicitud: solId, fecha });
     renderSolicitudes();
   } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
@@ -29,12 +28,11 @@ async function aplicarSnooze(solId) {
 async function cancelarSnooze(solId) {
   const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
   if (!sol) return;
-  const idx = DATA.solicitudes.indexOf(sol);
   const anterior = sol.Snooze_Hasta;
   sol.Snooze_Hasta = '';
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Solicitudes!K${idx + 2}`, ['']);
+    await callEdgeFunction('gestionar-solicitud', { accion: 'unsnooze', id_solicitud: solId });
     renderSolicitudes();
   } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();

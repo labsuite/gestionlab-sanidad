@@ -6,8 +6,6 @@ async function guardarSolicitud() {
   // Declarar variables comunes ANTES del if/else para evitar problemas de scope
   const cant = v('sol-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
-  const id             = genId('SOL-');
-  const fecha          = new Date().toISOString().split('T')[0];
   const usuario        = currentUser?.name || 'Usuario';
   const urgencia       = v('sol-urgencia');
   const fechaNecesidad = v('sol-fecha-necesidad');
@@ -28,17 +26,15 @@ async function guardarSolicitud() {
   }
   if (!materialNombre) { showToast('Indica el material', 'error'); return; }
 
-  const rowSheet = [id, materialNombre, cant, usuario, fecha,
-    v('sol-motivo') + (fechaNecesidad ? ' · Necesario: ' + fechaNecesidad : ''),
-    v('sol-proveedor'), 'Pendiente', '', unidadObs + obsBase];
-
   showLoading('Guardando...');
   try {
-    await sheetsAppend('Solicitudes', rowSheet);
-    const objLocal = { ID_Solicitud: id, Material: materialNombre, Cantidad_Solicitada: cant,
-      Solicitante: usuario, Fecha: fecha, Motivo: v('sol-motivo'),
-      Proveedor_Requerido: v('sol-proveedor'), Estado: 'Pendiente', Lista_Pedido: '',
-      Observaciones: rowSheet[9], Urgencia: urgencia };
+    const { solicitud } = await callEdgeFunction('gestionar-solicitud', {
+      accion: 'crear', material: materialNombre, cantidad_solicitada: cant, solicitante: usuario,
+      motivo: v('sol-motivo') + (fechaNecesidad ? ' · Necesario: ' + fechaNecesidad : ''),
+      proveedor_requerido: v('sol-proveedor'), observaciones: unidadObs + obsBase,
+    });
+    const objLocal = _solicitudSbToObj(solicitud);
+    objLocal.Urgencia = urgencia;
     DATA.solicitudes.push(objLocal);
     showToast('Solicitud enviada', 'success');
     closeModal('modal-solicitud'); renderSolicitudes(); updateBadges();
@@ -50,14 +46,10 @@ async function rechazarSolicitud(solId) {
   if (!confirm('¿Rechazar esta solicitud?')) return;
   const idx = DATA.solicitudes.findIndex(s => s.ID_Solicitud === solId);
   if (idx === -1) return;
-  DATA.solicitudes[idx].Estado = 'Rechazado';
   showLoading('Actualizando...');
   try {
-    const sol = DATA.solicitudes[idx];
-    const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada,
-      sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido,
-      'Rechazado', sol.Lista_Pedido, sol.Observaciones];
-    await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+    const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'rechazar', id_solicitud: solId });
+    DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
     showToast('Solicitud rechazada', 'success'); renderSolicitudes();
   } catch(e) { showToast('Error', 'error'); }
   hideLoading();
@@ -69,13 +61,10 @@ async function cancelarSolicitud(solId) {
   if (idx === -1) return;
   const sol = DATA.solicitudes[idx];
   if (sol.Estado !== 'Pendiente') { showToast('Solo se pueden cancelar solicitudes Pendientes', 'error'); return; }
-  DATA.solicitudes[idx].Estado = 'Cancelado';
   showLoading('Actualizando...');
   try {
-    const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada,
-      sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido,
-      'Cancelado', sol.Lista_Pedido, sol.Observaciones];
-    await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+    const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'cancelar', id_solicitud: solId });
+    DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
     showToast('Solicitud cancelada', 'success'); renderSolicitudes();
   } catch(e) { showToast('Error', 'error'); }
   hideLoading();
@@ -103,16 +92,11 @@ async function confirmarSolicitudAPedido(pedidoId) {
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
   const sol    = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
   if (!pedido || !sol) { showToast('Error al añadir al pedido', 'error'); return; }
-  const idLinea  = genId('LIN-');
-  const rowLinea = [idLinea, pedidoId, sol.Material, sol.Cantidad_Solicitada, '0', 'Pendiente', 'Desde solicitud ' + solId];
   showLoading('Añadiendo al pedido...');
   try {
-    await sheetsAppend('Lineas_Pedido', rowLinea);
-    DATA.lineasPedido.push(rowToObj(rowLinea, 'lineasPedido'));
-    const solIdx = DATA.solicitudes.indexOf(sol);
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'crear', pedido: pedidoId, id_solicitud: solId });
+    DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
     sol.Estado = 'Añadida a pedido'; sol.Lista_Pedido = pedidoId;
-    const rowSol = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, 'Añadida a pedido', pedidoId, sol.Observaciones];
-    await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
     showToast(`Añadido a "${pedido.Nombre_Lista}"`, 'success');
     renderAll();
     // Ofrecer navegación directa al pedido
@@ -145,10 +129,12 @@ function solicitudStockAPedido(matId, cantidadPreset) {
 
 async function confirmarStockAPedido(pedidoId, matNombre, cantidad) {
   closeModal('modal-seleccionar-pedido');
-  const idLinea = genId('LIN-');
-  const row = [idLinea, pedidoId, matNombre, cantidad, '0', 'Pendiente', 'Stock bajo mínimo'];
   showLoading('Añadiendo...');
-  try { await sheetsAppend('Lineas_Pedido', row); DATA.lineasPedido.push(rowToObj(row, 'lineasPedido')); showToast(`"${matNombre}" añadido al pedido`, 'success'); renderAll(); }
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'crear', pedido: pedidoId, material: matNombre, cantidad_pedida: cantidad, observaciones: 'Stock bajo mínimo' });
+    DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
+    showToast(`"${matNombre}" añadido al pedido`, 'success'); renderAll();
+  }
   catch(e) { showToast('Error', 'error'); }
   hideLoading();
 }
@@ -159,35 +145,31 @@ async function confirmarStockAPedido(pedidoId, matNombre, cantidad) {
 async function guardarNuevoPedido() {
   const nombre = v('ped-nombre');
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
-  const id = genId('PED-');
-  const fecha = new Date().toISOString().split('T')[0];
   const tipo = v('ped-tipo') || 'Material';
-  const row = [id, nombre, v('ped-proveedor'), fecha, '', '', '', '', '', 'Abierto', '', '', v('ped-obs'), '', '', '', '', '', tipo];
   showLoading('Creando lista...');
   try {
-    await sheetsAppend('Pedidos', row);
-    DATA.pedidos.push(rowToObj(row, 'pedidos'));
+    const { pedido: pedidoCreado } = await callEdgeFunction('gestionar-pedido', {
+      accion: 'crear', nombre_lista: nombre, proveedor: v('ped-proveedor'), observaciones: v('ped-obs'), tipo,
+    });
+    DATA.pedidos.push(_pedidoSbToObj(pedidoCreado));
+    const id = pedidoCreado.id_pedido;
     closeModal('modal-nuevo-pedido');
     if (_pendingSolicitudParaPedido) {
-      const { tipo, solId, matNombre, cantidad } = _pendingSolicitudParaPedido;
+      const { tipo: tipoPend, solId, matNombre, cantidad } = _pendingSolicitudParaPedido;
       _pendingSolicitudParaPedido = null;
-      const idLinea  = genId('LIN-');
-      const rowLinea = [idLinea, id, matNombre, cantidad, '0', 'Pendiente', tipo === 'sol' ? 'Desde solicitud ' + solId : 'Stock bajo mínimo'];
-      await sheetsAppend('Lineas_Pedido', rowLinea);
-      DATA.lineasPedido.push(rowToObj(rowLinea, 'lineasPedido'));
-      if (tipo === 'sol') {
+      const bodyLinea = tipoPend === 'sol'
+        ? { accion: 'crear', pedido: id, id_solicitud: solId }
+        : { accion: 'crear', pedido: id, material: matNombre, cantidad_pedida: cantidad, observaciones: 'Stock bajo mínimo' };
+      const { linea } = await callEdgeFunction('gestionar-linea-pedido', bodyLinea);
+      DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
+      if (tipoPend === 'sol') {
         const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
-        if (sol) {
-          const solIdx = DATA.solicitudes.indexOf(sol);
-          sol.Estado = 'Añadida a pedido'; sol.Lista_Pedido = id;
-          const rowSol = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, 'Añadida a pedido', id, sol.Observaciones];
-          await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
-        }
+        if (sol) { sol.Estado = 'Añadida a pedido'; sol.Lista_Pedido = id; }
       }
       showToast(`Lista creada y "${matNombre}" añadido`, 'success');
     } else { showToast('Lista creada', 'success'); }
     renderPedidos(); renderSolicitudes(); renderDashboard(); updateBadges();
-  } catch(e) { showToast('Error', 'error'); }
+  } catch(e) { showToast('Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -241,21 +223,22 @@ async function guardarLineaPedido() {
     hideLoading();
   }
 
-  const id = genId('LIN-');
   const obs = v('linea-obs');
-  const row = [id, pedidoId, materialNombre, cant, '0', 'Pendiente', obs, precio, equipoId];
-  const objLocal = rowToObj(row, 'lineasPedido');
-  DATA.lineasPedido.push(objLocal);
-  closeModal('modal-nueva-linea');
-  verDetallePedido(pedidoId);
-  showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
-  try { await sheetsAppend('Lineas_Pedido', row); }
-  catch(e) {
-    const idx = DATA.lineasPedido.indexOf(objLocal);
-    if (idx !== -1) DATA.lineasPedido.splice(idx, 1);
-    showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
+  showLoading('Guardando línea...');
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'crear', pedido: pedidoId, material: materialNombre, cantidad_pedida: cant,
+      observaciones: obs, precio_unitario: precio, id_equipo: equipoId,
+    });
+    DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
+    closeModal('modal-nueva-linea');
     verDetallePedido(pedidoId);
+    showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
+  } catch(e) {
+    showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
+    console.error(e);
   }
+  hideLoading();
 }
 
 async function guardarEstadoPedido() {
@@ -267,48 +250,20 @@ async function guardarEstadoPedido() {
   }
   const idx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
   if (idx === -1) return;
-  const p = DATA.pedidos[idx];
-  const hoy = new Date().toISOString().split('T')[0];
-  p.Estado = nuevoEstado;
-  if (nuevoEstado === 'Presupuesto solicitado') p.Fecha_Presupuesto = hoy;
-  if (nuevoEstado === 'Presupuesto aprobado')   p.Fecha_Aprobacion = hoy;
-  if (nuevoEstado === 'Recepción completa')     p.Fecha_Recepcion_Completa = hoy;
-  // Nota: Fecha_Factura se gestiona desde el generador de hoja, no desde este modal
-  const numPres = v('estado-num-presupuesto'); if (numPres) p.Numero_Presupuesto = numPres;
-  const numFact = v('estado-num-factura');     if (numFact) p.Numero_Factura = numFact;
-  const provNew = v('estado-proveedor');       if (provNew) p.Proveedor = provNew;
-  const row = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, p.Estado, p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones];
+  const numPres = v('estado-num-presupuesto');
+  const numFact = v('estado-num-factura');
+  const provNew = v('estado-proveedor');
   showLoading('Actualizando...');
   try {
-    await sheetsUpdate(`Pedidos!A${idx+2}:M${idx+2}`, row);
-
-    // ── Sincronizar estado de las solicitudes vinculadas ────────────────
-    // Mapa pedido → solicitud. Los estados finales (Recibido, Rechazado,
-    // Archivado) los gestiona guardarRecepcionLinea; aquí no los tocamos.
-    const MAPA_SOL = {
-      'Presupuesto aprobado': 'En espera de recepción',
-    }
-    const ESTADOS_FINALES_SOL = ['Recibido', 'Rechazado', 'Cancelado'];
-    const nuevoEstadoSol = MAPA_SOL[nuevoEstado];
-    if (nuevoEstadoSol) {
-      const solsVinculadas = DATA.solicitudes.filter(s =>
-        s.Lista_Pedido === pedidoId && !ESTADOS_FINALES_SOL.includes(s.Estado)
-      );
-      for (const sol of solsVinculadas) {
-        const solIdx = DATA.solicitudes.indexOf(sol);
-        sol.Estado = nuevoEstadoSol;
-        const rowSol = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada,
-          sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido,
-          nuevoEstadoSol, sol.Lista_Pedido, sol.Observaciones];
-        try {
-          await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
-        } catch(e) { console.warn('No se pudo actualizar solicitud', sol.ID_Solicitud, e); }
-      }
-    }
+    await callEdgeFunction('gestionar-pedido', {
+      accion: 'actualizar_estado', id_pedido: pedidoId, estado: nuevoEstado,
+      numero_presupuesto: numPres || undefined, numero_factura: numFact || undefined, proveedor: provNew || undefined,
+    });
+    await loadAllData();
     showToast('Estado actualizado', 'success');
     closeModal('modal-estado-pedido'); renderPedidos(); renderSolicitudes();
     if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error', 'error'); }
+  } catch(e) { showToast('Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -317,53 +272,26 @@ async function guardarRecepcionMasiva() {
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
   const aRecibir = lineas
     .map(l => ({
-      linea: l,
-      cantRec: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
-      obs: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || ''
+      id_linea: l.ID_Linea,
+      cantidad: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
+      observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || ''
     }))
-    .filter(x => x.cantRec > 0);
+    .filter(x => x.cantidad > 0);
   if (!aRecibir.length) { showToast('Introduce al menos una cantidad', 'error'); return; }
   closeModal('modal-recepcion-masiva');
   showLoading('Registrando albarán...');
-  let procesadas = 0, errores = 0;
-  for (const { linea, cantRec, obs } of aRecibir) {
-    const idx = DATA.lineasPedido.indexOf(linea);
-    const cantPed = parseFloat(linea.Cantidad_Pedida) || 0;
-    const cantRecTotal = (parseFloat(linea.Cantidad_Recibida) || 0) + cantRec;
-    const cantRecAntes = linea.Cantidad_Recibida;
-    const estadoAntes  = linea.Estado_Linea;
-    linea.Cantidad_Recibida = String(cantRecTotal);
-    linea.Estado_Linea = cantRecTotal >= cantPed ? 'Recibido' : (cantRecTotal > 0 ? 'Recibido parcialmente' : 'Pendiente');
-    if (obs) linea.Observaciones = obs;
-    try {
-      await _persistirLinea(idx, linea);
-      procesadas++;
-      const mat = DATA.material.find(m => m.Nombre === linea.Material || linea.Material.startsWith(m.Nombre));
-      if (mat && cantRec > 0) {
-        try { await _actualizarStockMaterial(mat, cantRec, pedidoId, null); }
-        catch(e) { console.warn('[albarán] stock no actualizado para', linea.Material, e); }
-      }
-      if (linea.Estado_Linea === 'Recibido') {
-        try { await _actualizarSolicitudOrigen(linea, pedidoId); }
-        catch(e) { console.warn('[albarán] solicitud no actualizada para', linea.ID_Linea, e); }
-      }
-    } catch(e) {
-      linea.Cantidad_Recibida = cantRecAntes;
-      linea.Estado_Linea = estadoAntes;
-      errores++;
-      console.error('[albarán] error persistiendo línea', linea.ID_Linea, e);
+  try {
+    const { procesadas, errores } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion_masiva', pedido: pedidoId, lineas: aRecibir });
+    await loadAllData();
+    if (errores > 0) {
+      showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
+    } else {
+      showToast(`Albarán registrado: ${procesadas} línea(s)`, 'success');
     }
-  }
-  try { await _actualizarEstadoPedidoPostRecepcion(pedidoId); }
-  catch(e) { console.warn('[albarán] estado del pedido no actualizado', e); }
+    renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast('Error registrando el albarán', 'error'); console.error(e); }
   hideLoading();
-  if (errores > 0) {
-    showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
-  } else {
-    showToast(`Albarán registrado: ${procesadas} línea(s)`, 'success');
-  }
-  renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
-  verDetallePedido(pedidoId);
 }
 
 async function guardarRecepcionLinea() {
@@ -376,7 +304,7 @@ async function guardarRecepcionLinea() {
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
   if (pedido?.Tipo === 'Servicio') {
     const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
-    await _completarRecepcionLinea(idx, l, cantPed - yaRec, cantPed, pedidoId, null, v('rec-obs'));
+    await _completarRecepcionLinea(lineaId, pedidoId, cantPed - yaRec, v('rec-obs'));
     return;
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
@@ -398,190 +326,41 @@ async function guardarRecepcionLinea() {
     showToast('Este material no está catalogado. Completa su ficha para continuar.', 'error');
     return;
   }
-  await _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, v('rec-obs'));
-}
-
-// ── Subfunciones de recepción ─────────────────────────────────
-
-async function _persistirLinea(idx, l) {
-  const row = [l.ID_Linea, l.Pedido, l.Material, l.Cantidad_Pedida, l.Cantidad_Recibida, l.Estado_Linea, l.Observaciones];
-  await sheetsUpdate(`Lineas_Pedido!A${idx+2}:G${idx+2}`, row);
-}
-
-async function _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion) {
-  const lotesDelMat = DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material);
-  if (lotesDelMat.length > 0) {
-    const loteTarget = idUbicacion
-      ? DATA.materialUbicaciones.find(lu => lu.ID_Material === mat.ID_Material && lu.ID_Ubicacion === idUbicacion)
-      : lotesDelMat[0];
-    if (loteTarget) {
-      const loteIdx = DATA.materialUbicaciones.indexOf(loteTarget);
-      const nuevoLocal = (parseFloat(loteTarget.Stock_Local) || 0) + cantRec;
-      loteTarget.Stock_Local = String(nuevoLocal);
-      await sheetsUpdate(`Material_Ubicaciones!D${loteIdx+2}`, [nuevoLocal]);
-    }
-  }
-  const nuevoStock = lotesDelMat.length > 0
-    ? DATA.materialUbicaciones.filter(lu => lu.ID_Material === mat.ID_Material).reduce((s, lu) => s + (parseFloat(lu.Stock_Local)||0), 0)
-    : (parseFloat(mat.Stock_Actual)||0) + cantRec;
-  const idxMat = DATA.material.indexOf(mat);
-  mat.Stock_Actual = String(nuevoStock);
-  await sheetsUpdate(`Material!H${idxMat+2}`, [nuevoStock]);
-  const movRow = [genId('MOV-'), mat.Nombre, 'Entrada', cantRec, currentUser?.name||'Usuario', new Date().toISOString().split('T')[0], 'Recepción pedido ' + pedidoId, ''];
-  await sheetsAppend('Movimientos', movRow);
-  DATA.movimientos.push(rowToObj(movRow, 'movimientos'));
-}
-
-async function _actualizarEstadoPedidoPostRecepcion(pedidoId) {
-  const pedIdx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
-  if (pedIdx === -1) return;
-  const p = DATA.pedidos[pedIdx];
-  const todasLineas    = DATA.lineasPedido.filter(x => x.Pedido === pedidoId);
-  const todasRecibidas = todasLineas.every(x => x.Estado_Linea === 'Recibido');
-  if (todasRecibidas && p.Estado !== 'Recepción completa' && p.Estado !== 'Factura recibida') {
-    p.Estado = 'Recepción completa';
-    p.Fecha_Recepcion_Completa = new Date().toISOString().split('T')[0];
-    const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, p.Estado, p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones, p.Doc_Hoja_Generada||'', p.Doc_Hoja_Completada||'', p.Doc_Enviada_Jefatura||''];
-    await sheetsUpdate(`Pedidos!A${pedIdx+2}:P${pedIdx+2}`, rowP);
-    showToast('¡Pedido completo! Estado actualizado automáticamente', 'success');
-  } else if (!todasRecibidas && p.Estado === 'Presupuesto aprobado') {
-    p.Estado = 'Recepción parcial';
-    const rowP = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, 'Recepción parcial', p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones];
-    await sheetsUpdate(`Pedidos!A${pedIdx+2}:M${pedIdx+2}`, rowP);
-  }
-}
-
-async function _actualizarSolicitudOrigen(l, pedidoId) {
-  const normNombre = n => (n || '').normalize('NFC').replace(/\s*\[.*?\]/g, '').trim().toLowerCase();
-  // Intento 1 — match por ID embebido en Observaciones ("Desde solicitud SOL-xxx")
-  const solIdMatch = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
-  let solOrigen = solIdMatch
-    ? DATA.solicitudes.find(s => s.ID_Solicitud === solIdMatch[1] && s.Estado !== 'Recibido')
-    : null;
-  // Intento 2 — match por pedidoId + nombre normalizado (cubre líneas añadidas sin solicitud previa)
-  if (!solOrigen) {
-    solOrigen = DATA.solicitudes.find(s =>
-      s.Lista_Pedido === pedidoId &&
-      normNombre(s.Material) === normNombre(l.Material) &&
-      s.Estado !== 'Recibido'
-    );
-  }
-  if (!solOrigen) {
-    console.warn('[pedidos] No se encontró solicitud origen para línea', l.ID_Linea, '— estado de solicitud no actualizado');
-    return;
-  }
-  const solIdx = DATA.solicitudes.indexOf(solOrigen);
-  if (!solOrigen.Lista_Pedido) solOrigen.Lista_Pedido = pedidoId;
-  const fechaHoy = new Date().toISOString().split('T')[0];
-  const obsSinFecha = (solOrigen.Observaciones || '').replace(/\[Recibido:\d{4}-\d{2}-\d{2}\]\s*/g, '').trim();
-  solOrigen.Observaciones = (obsSinFecha ? obsSinFecha + ' ' : '') + `[Recibido:${fechaHoy}]`;
-  solOrigen.Estado = 'Recibido';
-  const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Recibido', solOrigen.Lista_Pedido, solOrigen.Observaciones];
-  try {
-    await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
-  } catch(e) {
-    console.warn('[pedidos] No se pudo actualizar solicitud a Recibido', solOrigen.ID_Solicitud, e);
-  }
+  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'));
 }
 
 // ── Orquestador principal de recepción ───────────────────────
-
-async function _completarRecepcionLinea(idx, l, cantRec, cantPed, pedidoId, mat, obs, idUbicacion = null) {
-  // Guardar estado previo para revertir si el primer paso falla
-  const cantRecAntes  = l.Cantidad_Recibida;
-  const estadoAntes   = l.Estado_Linea;
-  const obsAntes      = l.Observaciones;
-
-  // Acumular sobre lo ya recibido
-  const cantRecTotal = (parseFloat(l.Cantidad_Recibida) || 0) + cantRec;
-  l.Cantidad_Recibida = String(cantRecTotal);
-  l.Estado_Linea = cantRecTotal >= cantPed ? 'Recibido' : (cantRecTotal > 0 ? 'Recibido parcialmente' : 'Pendiente');
-  if (obs) l.Observaciones = obs;
-
+// Toda la lógica (stock, lote, movimiento, estado del pedido, solicitud
+// origen) vive ahora server-side en gestionar-linea-pedido (accion:
+// 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
+// que es la fuente de verdad tras una operación que toca varias tablas.
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs) {
   showLoading('Registrando recepción...');
-
-  // Paso 1 — crítico: si falla, revertir memoria y abortar sin haber cambiado nada
   try {
-    await _persistirLinea(idx, l);
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs });
+    await loadAllData();
+    showToast('Recepción registrada', 'success');
+    closeModal('modal-recepcion-linea');
+    renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+    verDetallePedido(pedidoId);
   } catch(e) {
-    l.Cantidad_Recibida = cantRecAntes;
-    l.Estado_Linea      = estadoAntes;
-    l.Observaciones     = obsAntes;
     showToast('Error al guardar la recepción. No se modificó nada.', 'error');
-    console.error('[recepción] fallo en _persistirLinea', e);
-    hideLoading(); return;
+    console.error('[recepción]', e);
   }
-
-  // Pasos siguientes — si fallan, la línea ya está guardada correctamente;
-  // avisamos con precisión para que el gestor pueda corregir lo que falta.
-  if (mat && cantRec > 0) {
-    try {
-      await _actualizarStockMaterial(mat, cantRec, pedidoId, idUbicacion);
-    } catch(e) {
-      showToast('⚠️ Recepción guardada, pero el stock no se actualizó. Corrígelo manualmente en el inventario.', 'error');
-      console.error('[recepción] fallo en _actualizarStockMaterial', e);
-    }
-  }
-
-  try {
-    await _actualizarEstadoPedidoPostRecepcion(pedidoId);
-  } catch(e) {
-    showToast('⚠️ Recepción guardada, pero el estado del pedido no se actualizó. Cámbialo manualmente.', 'error');
-    console.error('[recepción] fallo en _actualizarEstadoPedidoPostRecepcion', e);
-  }
-
-  if (l.Estado_Linea === 'Recibido') await _actualizarSolicitudOrigen(l, pedidoId);
-
-  showToast('Recepción registrada', 'success');
-  closeModal('modal-recepcion-linea');
-  renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
-  verDetallePedido(pedidoId);
   hideLoading();
 }
 
 async function eliminarLineaPedido(lineaId, pedidoId) {
   if (!confirm('¿Eliminar esta línea del pedido?')) return;
-  const idx = DATA.lineasPedido.findIndex(l => l.ID_Linea === lineaId);
-  if (idx === -1) return;
-  const l = DATA.lineasPedido[idx];
   showLoading('Eliminando...');
   try {
-    await sheetsClear(`Lineas_Pedido!A${idx+2}:I${idx+2}`);
-    DATA.lineasPedido.splice(idx, 1);
-    DATA.lineasPedido = DATA.lineasPedido.filter(x => x.ID_Linea);
-
-    // Revertir solicitud vinculada si procede
-    const normNombre = n => (n || '').normalize('NFC').replace(/\s*\[.*?\]/g, '').trim().toLowerCase();
-    const estadosRevertibles = ['Añadida a pedido', 'En espera de recepción'];
-    const solIdMatch = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
-    let solOrigen = solIdMatch
-      ? DATA.solicitudes.find(s => s.ID_Solicitud === solIdMatch[1] && estadosRevertibles.includes(s.Estado))
-      : null;
-    if (!solOrigen) {
-      solOrigen = DATA.solicitudes.find(s =>
-        s.Lista_Pedido === pedidoId &&
-        normNombre(s.Material) === normNombre(l.Material) &&
-        estadosRevertibles.includes(s.Estado)
-      );
-    }
-
-    if (solOrigen) {
-      const solIdx = DATA.solicitudes.indexOf(solOrigen);
-      const idSol = solOrigen.ID_Solicitud;
-      solOrigen.Estado = 'Pendiente';
-      solOrigen.Lista_Pedido = '';
-      const rowSol = [solOrigen.ID_Solicitud, solOrigen.Material, solOrigen.Cantidad_Solicitada, solOrigen.Solicitante, solOrigen.Fecha, solOrigen.Motivo, solOrigen.Proveedor_Requerido, 'Pendiente', '', solOrigen.Observaciones];
-      try {
-        await sheetsUpdate(`Solicitudes!A${solIdx+2}:J${solIdx+2}`, rowSol);
-        showToast(`Línea eliminada. La solicitud ${idSol} volvió a Pendiente.`, 'success');
-      } catch(e) {
-        console.error('[pedidos] No se pudo revertir solicitud', solOrigen.ID_Solicitud, e);
-        showToast('Línea eliminada, pero no se pudo revertir la solicitud. Cámbiala manualmente.', 'error');
-      }
+    const { solicitud_revertida } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'eliminar', id_linea: lineaId });
+    await loadAllData();
+    if (solicitud_revertida) {
+      showToast(`Línea eliminada. La solicitud ${solicitud_revertida.id_solicitud} volvió a Pendiente.`, 'success');
     } else {
       showToast('Línea eliminada', 'success');
     }
-
     verDetallePedido(pedidoId);
     renderSolicitudes();
   }
@@ -601,15 +380,10 @@ async function avanceEstadoPedido(pedidoId) {
     showToast('El pedido ya está en el estado final', 'info'); return;
   }
   const nuevoEstado = SECUENCIA_ESTADOS[posActual + 1];
-  const hoy = new Date().toISOString().split('T')[0];
-  p.Estado = nuevoEstado;
-  if (nuevoEstado === 'Presupuesto solicitado') p.Fecha_Presupuesto = hoy;
-  if (nuevoEstado === 'Presupuesto aprobado')   p.Fecha_Aprobacion = hoy;
-  if (nuevoEstado === 'Recepción completa')      p.Fecha_Recepcion_Completa = hoy;
-  const row = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, p.Estado, p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones, p.Doc_Hoja_Generada||'', p.Doc_Hoja_Completada||'', p.Doc_Enviada_Jefatura||''];
   showLoading('Actualizando estado...');
   try {
-    await sheetsUpdate(`Pedidos!A${idx+2}:P${idx+2}`, row);
+    await callEdgeFunction('gestionar-pedido', { accion: 'avanzar_estado', id_pedido: pedidoId });
+    await loadAllData();
     showToast(`Estado: ${nuevoEstado}`, 'success');
     renderPedidos();
     if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
@@ -626,18 +400,10 @@ async function eliminarPedido(pedidoId) {
   if (!confirm(`¿Eliminar el pedido "${p.Nombre_Lista}" (${p.ID_Pedido})?${aviso}\n\nEsta acción no se puede deshacer.`)) return;
   showLoading('Eliminando...');
   try {
-    // Eliminar líneas de mayor a menor índice para no desplazar filas
-    const indicesLineas = lineas
-      .map(l => DATA.lineasPedido.indexOf(l))
-      .filter(i => i !== -1)
-      .sort((a, b) => b - a);
-    for (const idx of indicesLineas) {
-      await sheetsDeleteRow('Lineas_Pedido', idx);
-      DATA.lineasPedido.splice(idx, 1);
-    }
-    const pedIdx = DATA.pedidos.indexOf(p);
-    await sheetsDeleteRow('Pedidos', pedIdx);
-    DATA.pedidos.splice(pedIdx, 1);
+    // Las líneas de Lineas_Pedido caen en cascada al eliminar el pedido.
+    await callEdgeFunction('gestionar-pedido', { accion: 'eliminar', id_pedido: pedidoId });
+    DATA.lineasPedido = DATA.lineasPedido.filter(l => l.Pedido !== pedidoId);
+    DATA.pedidos = DATA.pedidos.filter(x => x.ID_Pedido !== pedidoId);
     showToast('Pedido eliminado', 'success');
     showPage('pedidos');
     renderPedidos();
@@ -652,15 +418,14 @@ async function toggleDocPedido(pedidoId, campo, valor) {
   const idx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
   if (idx === -1) return;
   const p = DATA.pedidos[idx];
-  p[campo] = valor ? 'TRUE' : '';
-  const colMap = { Doc_Hoja_Generada: 'N', Doc_Hoja_Completada: 'O', Doc_Enviada_Jefatura: 'P' };
-  const col = colMap[campo];
+  const campoApi = { Doc_Hoja_Generada: 'doc_hoja_generada', Doc_Enviada_Jefatura: 'doc_enviada_jefatura' }[campo];
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Pedidos!${col}${idx+2}`, [p[campo]]);
+    await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { [campoApi]: valor } });
+    p[campo] = valor ? 'TRUE' : '';
     showToast('Documentación actualizada', 'success');
     verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error guardando', 'error'); p[campo] = valor ? '' : 'TRUE'; }
+  } catch(e) { showToast('Error guardando', 'error'); }
   hideLoading();
 }
 
@@ -669,15 +434,14 @@ async function archivarPedido(pedidoId) {
   const idx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
   if (idx === -1) return;
   const p = DATA.pedidos[idx];
-  p.Estado = 'Archivado';
-  const row = [p.ID_Pedido, p.Nombre_Lista, p.Proveedor, p.Fecha_Creacion, p.Fecha_Presupuesto, p.Fecha_Aprobacion, p.Fecha_Pedido_Enviado, p.Fecha_Recepcion_Completa, p.Fecha_Factura, 'Archivado', p.Numero_Presupuesto, p.Numero_Factura, p.Observaciones, p.Doc_Hoja_Generada, p.Doc_Hoja_Completada, p.Doc_Enviada_Jefatura];
   showLoading('Archivando...');
   try {
-    await sheetsUpdate(`Pedidos!A${idx+2}:P${idx+2}`, row);
+    await callEdgeFunction('gestionar-pedido', { accion: 'archivar', id_pedido: pedidoId });
+    p.Estado = 'Archivado';
     showToast('Pedido archivado', 'success');
     showPage('pedidos');
     renderPedidos();
-  } catch(e) { showToast('Error archivando', 'error'); p.Estado = 'Recepción completa'; }
+  } catch(e) { showToast('Error archivando', 'error'); }
   hideLoading();
 }
 
@@ -702,7 +466,7 @@ async function guardarProveedorPedido() {
   if (idx === -1) return;
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Pedidos!C${idx + 2}`, [nuevo]);
+    await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { proveedor: nuevo } });
     DATA.pedidos[idx].Proveedor = nuevo;
     showToast('Proveedor actualizado', 'success');
     closeModal('modal-editar-proveedor');
@@ -731,7 +495,10 @@ async function guardarGastoExtraPedido() {
   const concepto = importe > 0 ? (v('gasto-extra-concepto').trim() || 'Gasto extra') : '';
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Pedidos!T${idx + 2}:U${idx + 2}`, [concepto, importe > 0 ? importe : '']);
+    await callEdgeFunction('gestionar-pedido', {
+      accion: 'actualizar_campos', id_pedido: pedidoId,
+      campos: { gasto_extra_concepto: concepto, gasto_extra_importe: importe > 0 ? importe : '' },
+    });
     DATA.pedidos[idx].Gasto_Extra_Concepto = concepto;
     DATA.pedidos[idx].Gasto_Extra_Importe = importe > 0 ? String(importe) : '';
     showToast('Gasto extra actualizado', 'success');
@@ -789,16 +556,18 @@ async function guardarEdicionSolicitud() {
     if (!nombreNuevo) { showToast('Indica el nombre del material', 'error'); return; }
     sol.Material = nombreNuevo;
   }
-  sol.Cantidad_Solicitada = cant;
-  sol.Urgencia = urgencia;
-  sol.Motivo = motivo;
-  sol.Proveedor_Requerido = proveedor;
-  sol.Observaciones = obsFinal;
-  const idx = DATA.solicitudes.indexOf(sol);
-  const row = [sol.ID_Solicitud, sol.Material, sol.Cantidad_Solicitada, sol.Solicitante, sol.Fecha, sol.Motivo, sol.Proveedor_Requerido, sol.Estado, sol.Lista_Pedido, sol.Observaciones];
   showLoading('Guardando...');
   try {
-    await sheetsUpdate(`Solicitudes!A${idx+2}:J${idx+2}`, row);
+    await callEdgeFunction('gestionar-solicitud', {
+      accion: 'editar', id_solicitud: sol.ID_Solicitud, cantidad_solicitada: cant,
+      motivo, proveedor_requerido: proveedor, observaciones: obsFinal,
+      material: (matInput && matInput.style.display !== 'none') ? sol.Material : undefined,
+    });
+    sol.Cantidad_Solicitada = cant;
+    sol.Urgencia = urgencia;
+    sol.Motivo = motivo;
+    sol.Proveedor_Requerido = proveedor;
+    sol.Observaciones = obsFinal;
     showToast('Solicitud actualizada', 'success');
     closeModal('modal-editar-solicitud');
     renderSolicitudes();

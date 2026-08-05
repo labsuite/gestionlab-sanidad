@@ -90,10 +90,10 @@ async function generarHojaPedido() {
     const cambiado = numFacturaNuevo !== (p.Numero_Factura || '') || fechaFacturaNuevo !== (p.Fecha_Factura || '');
     if (cambiado) {
       try {
-        // Num_Factura → col L (índice 11, fila pedIdx+2), Fecha_Factura → col I (índice 8)
-        // Actualizamos las dos columnas individualmente para no tocar el resto
-        await sheetsUpdate(`Pedidos!I${pedIdx + 2}`, [fechaFacturaNuevo]);
-        await sheetsUpdate(`Pedidos!L${pedIdx + 2}`, [numFacturaNuevo]);
+        await callEdgeFunction('gestionar-pedido', {
+          accion: 'actualizar_campos', id_pedido: pedidoId,
+          campos: { numero_factura: numFacturaNuevo, fecha_factura: fechaFacturaNuevo },
+        });
         DATA.pedidos[pedIdx].Numero_Factura = numFacturaNuevo;
         DATA.pedidos[pedIdx].Fecha_Factura  = fechaFacturaNuevo;
       } catch(e) {
@@ -111,7 +111,7 @@ async function generarHojaPedido() {
       const moduloActual = DATA.pedidos[pedIdx].Modulo || '';
       if (cicloNuevo !== cicloActual || moduloNuevo !== moduloActual) {
         try {
-          await sheetsUpdate(`Pedidos!Q${pedIdx+2}:R${pedIdx+2}`, [cicloNuevo, moduloNuevo]);
+          await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { ciclo: cicloNuevo, modulo: moduloNuevo } });
           DATA.pedidos[pedIdx].Ciclo  = cicloNuevo;
           DATA.pedidos[pedIdx].Modulo = moduloNuevo;
           // Refrescar contabilidad en caliente sin esperar recarga
@@ -212,7 +212,7 @@ async function generarHojaPedido() {
         // Marcar Doc_Hoja_Generada
         if (pedIdx !== -1 && DATA.pedidos[pedIdx].Doc_Hoja_Generada !== 'TRUE') {
           DATA.pedidos[pedIdx].Doc_Hoja_Generada = 'TRUE';
-          try { await sheetsUpdate('Pedidos!N' + (pedIdx+2), ['TRUE']); } catch(e) { console.warn('No se pudo marcar Doc_Hoja_Generada', e); }
+          try { await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { doc_hoja_generada: true } }); } catch(e) { console.warn('No se pudo marcar Doc_Hoja_Generada', e); }
           if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
         }
       } catch(err) { setGenEstado('Error subiendo a Drive: ' + err.message, 'error'); }
