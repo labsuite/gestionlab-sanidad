@@ -431,6 +431,20 @@ function _registroAutoclaveSbToObj(r) {
   };
 }
 
+function _usuarioSbToObj(u) {
+  return {
+    ID_Usuario: u.id_usuario || '',
+    Nombre: u.nombre || '',
+    Email: u.email || '',
+    Rol: u.rol || 'Alumno',
+    Activo: u.activo ? 'TRUE' : 'FALSE',
+    Ubicaciones_Asignadas: u.ubicaciones_asignadas || '',
+    Modulo: u.modulo || '',
+    Ciclo_Principal: u.ciclo_principal || '',
+    Puede_Revisar_Inventario: u.puede_revisar_inventario ? 'TRUE' : '',
+  };
+}
+
 // ============================================================
 // CARGAR TODOS LOS DATOS
 // ============================================================
@@ -451,7 +465,7 @@ async function loadAllData() {
            sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
            sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
            sbConfigReservasRes, sbReservasRes,
-           sbRegistrosCabinaRes, sbRegistrosAutoclaveRes] = await Promise.all([
+           sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -504,7 +518,8 @@ async function loadAllData() {
       _sbMigracion.from('config_reservas').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('registros_cabina').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registros_autoclave').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('registros_autoclave').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('usuarios').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -540,6 +555,8 @@ async function loadAllData() {
       DATA.ubicaciones = sbUbicaciones.map(_ubicacionSbToObj);
     }
     DATA.usuarios            = toObj(usuarios,            'usuarios');
+    const sbUsuariosCatalogo = sbUsuariosCatalogoRes?.data || [];
+    if (sbUsuariosCatalogo.length) DATA.usuarios = sbUsuariosCatalogo.map(_usuarioSbToObj);
     DATA.material            = toObj(material,            'material');
     const sbMaterial = sbMaterialRes?.data || [];
     if (sbMaterial.length) DATA.material = sbMaterial.map(_materialSbToObj);

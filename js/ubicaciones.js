@@ -707,30 +707,31 @@ async function guardarUsuario() {
   }
 
   const existingU = editingRow ? DATA.usuarios[editingRow.rowIndex] : null;
-  const id = existingU ? existingU.ID_Usuario : genId('USR-');
-  const activo = existingU ? existingU.Activo : 'TRUE';
   const rol = v('usr-rol') || 'Alumno';
-  let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = '';
+  let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = false;
   if (rol === 'Alumno') {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');  // plain module names
     cicloPrincipal = (document.getElementById('usr-ciclo-principal')?.value || '').trim();
-    if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); hideLoading(); return; }
-    puedeRevisarInventario = document.getElementById('usr-puede-revisar')?.checked ? 'TRUE' : '';
+    if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); return; }
+    puedeRevisarInventario = !!document.getElementById('usr-puede-revisar')?.checked;
   }
-  const row = [id, nombre, email, rol, activo, ubicAsignadas, modulo, cicloPrincipal, puedeRevisarInventario];
+  const datos = {
+    nombre, email, rol, ubicaciones_asignadas: ubicAsignadas, modulo,
+    ciclo_principal: cicloPrincipal, puede_revisar_inventario: puedeRevisarInventario,
+  };
   showLoading('Guardando...');
   try {
-    if (editingRow && editingRow.sheet === 'Usuarios') {
-      await sheetsUpdate(`Usuarios!A${editingRow.rowIndex+2}:I${editingRow.rowIndex+2}`, row);
-      DATA.usuarios[editingRow.rowIndex] = rowToObj(row, 'usuarios');
+    if (existingU) {
+      const { usuario } = await callEdgeFunction('gestionar-usuario', { accion: 'actualizar', id_usuario: existingU.ID_Usuario, ...datos });
+      DATA.usuarios[editingRow.rowIndex] = _usuarioSbToObj(usuario);
       showToast('Usuario actualizado', 'success');
     } else {
-      await sheetsAppend('Usuarios', row);
-      DATA.usuarios.push(rowToObj(row, 'usuarios'));
+      const { usuario } = await callEdgeFunction('gestionar-usuario', { accion: 'crear', ...datos });
+      DATA.usuarios.push(_usuarioSbToObj(usuario));
       showToast('Usuario guardado', 'success');
     }
     closeModal('modal-usuario'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); }
+  } catch(e) { showToast('Error guardando: ' + e.message, 'error'); console.error(e); }
   hideLoading(); editingRow = null;
 }

@@ -78,6 +78,28 @@ create table user_modulos (
   unique (user_id, modulo_id, curso_academico)
 );
 
+-- Catálogo de personas gestionado hoy desde la app (hoja Usuarios de
+-- Sheets) — Admins/Gestores siempre, Profesores a veces (se pueden dar de
+-- alta a mano o promover desde un Profesor _sbOnly), Alumnos si se añaden
+-- manualmente. DISTINTA de `users` de arriba: esa es solo el puñado de
+-- cuentas con login real de Supabase Auth para verificar rol server-side
+-- en las Edge Functions; esta es el catálogo completo que ve/edita la
+-- página "Usuarios" de la app. Se fusiona en el cliente con los
+-- Profesores/Alumnos de solo lectura del proyecto Supabase compartido
+-- (`_sb`, ver docs/modulo-usuarios.md "Usuarios _sbOnly") — esa fusión no
+-- cambia con esta migración.
+create table usuarios (
+  id_usuario                  text primary key,
+  nombre                      text not null,
+  email                       text not null,
+  rol                         text not null default 'Alumno',
+  activo                      boolean not null default true,
+  ubicaciones_asignadas       text,   -- números de lab separados por coma, no IDs de zona
+  modulo                      text,   -- nombres de módulo separados por coma, sin prefijo de ciclo
+  ciclo_principal             text,
+  puede_revisar_inventario    boolean not null default false
+);
+
 create table ubicaciones (
   id_ubicacion            text primary key,
   laboratorio_aula        text,
@@ -510,3 +532,4 @@ create policy "config_reservas_select_anon" on config_reservas for select to ano
 create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon using (true);
 create policy "registros_cabina_select_anon" on registros_cabina for select to anon using (true);
 create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon using (true);
+create policy "usuarios_select_anon" on usuarios for select to anon using (true);
