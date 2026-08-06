@@ -192,39 +192,35 @@ async function guardarTipoResiduo() {
   const existing = editingRow ? DATA.tiposResiduo[editingRow.rowIndex] : null;
   const riesgo = [...document.querySelectorAll('#tr-riesgo-checks input[type=checkbox]:checked')]
     .map(cb => cb.value).join(', ');
-  const row = [
-    existing?.ID_Residuo || genId('RES'),
-    nombre, v('tr-descripcion'), riesgo, v('tr-contenedor'),
-    existing?.Lab || '', existing?.Zona || ''
-  ];
+  const body = {
+    nombre, descripcion: v('tr-descripcion'), riesgo, contenedor_tipo: v('tr-contenedor'),
+  };
   showLoading('Guardando...');
   try {
     if (editingRow) {
-      await sheetsUpdate(`Tipos_Residuo!A${editingRow.rowIndex+2}:G${editingRow.rowIndex+2}`, row);
-      DATA.tiposResiduo[editingRow.rowIndex] = rowToObj(row, 'tiposResiduo');
+      const { tipo } = await callEdgeFunction('gestionar-residuo', { accion: 'actualizar_tipo', id_residuo: existing.ID_Residuo, ...body });
+      DATA.tiposResiduo[editingRow.rowIndex] = _tipoResiduoSbToObj(tipo);
       showToast('Tipo de residuo actualizado', 'success');
     } else {
-      await sheetsAppend('Tipos_Residuo', row);
-      DATA.tiposResiduo.push(rowToObj(row, 'tiposResiduo'));
+      const { tipo } = await callEdgeFunction('gestionar-residuo', { accion: 'crear_tipo', ...body });
+      DATA.tiposResiduo.push(_tipoResiduoSbToObj(tipo));
       showToast('Tipo de residuo guardado', 'success');
     }
     closeModal('modal-tipo-residuo');
     renderResiduosGuia();
-  } catch(e) { showToast('Error al guardar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al guardar', 'error'); }
   hideLoading(); editingRow = null;
 }
 
 async function eliminarTipoResiduo(idx) {
   const t = DATA.tiposResiduo[idx];
-  const enUso = DATA.contenedoresResiduo.some(c => c.ID_Residuo === t.ID_Residuo);
-  if (enUso) { showToast('No se puede eliminar: hay contenedores asociados a este tipo', 'error'); return; }
   if (!confirm(`¿Eliminar el tipo de residuo "${t.Nombre}"?`)) return;
   try {
-    await sheetsDeleteRow('Tipos_Residuo', idx);
+    await callEdgeFunction('gestionar-residuo', { accion: 'eliminar_tipo', id_residuo: t.ID_Residuo });
     DATA.tiposResiduo.splice(idx, 1);
     renderResiduosGuia();
     showToast('Tipo de residuo eliminado', 'success');
-  } catch(e) { showToast('Error al eliminar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al eliminar', 'error'); }
 }
 
 // ── Página: Contenedores ─────────────────────────────────────
@@ -410,30 +406,22 @@ async function guardarAdicion() {
   if (!idResiduo) { showToast('Selecciona el tipo de residuo', 'error'); return; }
 
   const c = DATA.contenedoresResiduo[idx];
-  const fecha = new Date().toISOString().split('T')[0];
   const usuario = currentUser?.name || currentUser?.email || '';
-  const idAdicion = genId('AD');
 
   showLoading('Guardando...');
   try {
-    // Guardar adición
-    const rowAdicion = [idAdicion, c.ID_Contenedor, idResiduo, fecha, usuario, obs];
-    await sheetsAppend('Adiciones_Residuo', rowAdicion);
-    DATA.adicionesResiduo.push(rowToObj(rowAdicion, 'adicionesResiduo'));
-
-    // Actualizar nivel del contenedor (cols E=Nivel, I=Fecha_Actualizacion, J=Actualizado_Por)
-    const fila = idx + 2;
-    await sheetsUpdate(`Contenedores_Residuo!E${fila}`, [nuevoNivel]);
-    await sheetsUpdate(`Contenedores_Residuo!I${fila}:J${fila}`, [fecha, usuario]);
-    c.Nivel = nuevoNivel;
-    c.Fecha_Actualizacion = fecha;
-    c.Actualizado_Por = usuario;
+    const { adicion, contenedor } = await callEdgeFunction('gestionar-residuo', {
+      accion: 'añadir_adicion', id_contenedor: c.ID_Contenedor, id_residuo: idResiduo,
+      nivel: nuevoNivel, usuario, observaciones: obs,
+    });
+    DATA.adicionesResiduo.push(_adicionResiduoSbToObj(adicion));
+    Object.assign(c, _contenedorResiduoSbToObj(contenedor));
 
     closeModal('modal-adicion-res');
     renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Residuo registrado', 'success');
-  } catch(e) { showToast('Error al guardar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al guardar', 'error'); }
   hideLoading();
 }
 
@@ -442,28 +430,20 @@ async function cerrarContenedor(idx) {
   const c = DATA.contenedoresResiduo[idx];
   if (!confirm(`¿Cerrar el contenedor "${c.Categoria}" de Lab ${c.Lab}?\nSe creará uno nuevo vacío en la misma ubicación.`)) return;
 
-  const fecha = new Date().toISOString().split('T')[0];
   const usuario = currentUser?.name || currentUser?.email || '';
-  const fila = idx + 2;
 
   showLoading('Cerrando contenedor...');
   try {
-    // Marcar como cerrado: cols F=Estado, H=Fecha_Cierre, I=Fecha_Actualizacion, J=Actualizado_Por
-    await sheetsUpdate(`Contenedores_Residuo!F${fila}`, ['cerrado']);
-    await sheetsUpdate(`Contenedores_Residuo!H${fila}:J${fila}`, [fecha, fecha, usuario]);
-    Object.assign(c, { Estado: 'cerrado', Fecha_Cierre: fecha, Fecha_Actualizacion: fecha, Actualizado_Por: usuario });
-
-    // Crear nuevo contenedor vacío del mismo tipo
-    const idNuevo = genId('RC');
-    const fechaApertura = fecha;
-    const rowNuevo = [idNuevo, c.Categoria, c.Lab, c.Zona, 'vacío', 'activo', fechaApertura, '', fecha, usuario];
-    await sheetsAppend('Contenedores_Residuo', rowNuevo);
-    DATA.contenedoresResiduo.push(rowToObj(rowNuevo, 'contenedoresResiduo'));
+    const { cerrado, nuevo } = await callEdgeFunction('gestionar-residuo', {
+      accion: 'cerrar_contenedor', id_contenedor: c.ID_Contenedor, usuario,
+    });
+    Object.assign(c, _contenedorResiduoSbToObj(cerrado));
+    DATA.contenedoresResiduo.push(_contenedorResiduoSbToObj(nuevo));
 
     renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Contenedor cerrado. Nuevo contenedor vacío creado.', 'success');
-  } catch(e) { showToast('Error al cerrar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al cerrar', 'error'); }
   hideLoading();
 }
 
@@ -472,22 +452,18 @@ async function registrarRecogida(idx) {
   const c = DATA.contenedoresResiduo[idx];
   if (!confirm(`¿Confirmar recogida del contenedor "${c.Categoria}" de Lab ${c.Lab}?`)) return;
 
-  const fecha = new Date().toISOString().split('T')[0];
   const usuario = currentUser?.name || currentUser?.email || '';
-  const fila = idx + 2;
 
   showLoading('Registrando recogida...');
   try {
-    await sheetsUpdate(`Contenedores_Residuo!F${fila}`, ['recogido']);
-    await sheetsUpdate(`Contenedores_Residuo!I${fila}:J${fila}`, [fecha, usuario]);
-    // Eliminar físicamente para no acumular historial indefinido
-    await sheetsDeleteRow('Contenedores_Residuo', idx);
+    // Se elimina físicamente para no acumular historial indefinido (mismo comportamiento que antes)
+    await callEdgeFunction('gestionar-residuo', { accion: 'registrar_recogida', id_contenedor: c.ID_Contenedor, usuario });
     DATA.contenedoresResiduo.splice(idx, 1);
 
     renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Recogida registrada. Contenedor archivado.', 'success');
-  } catch(e) { showToast('Error al registrar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al registrar', 'error'); }
   hideLoading();
 }
 
@@ -517,42 +493,45 @@ async function guardarContenedor() {
   const lab = v('cont-lab');
   if (!categoria || !lab) { showToast('Categoría y laboratorio son obligatorios', 'error'); return; }
 
-  const fecha = new Date().toISOString().split('T')[0];
   const usuario = currentUser?.name || currentUser?.email || '';
 
   showLoading('Guardando...');
   try {
     const formato = v('cont-formato');
+    const zona = v('cont-zona');
     if (editingRow !== null) {
       const c = DATA.contenedoresResiduo[editingRow];
-      const fila = editingRow + 2;
-      const row = [c.ID_Contenedor, categoria, lab, v('cont-zona'), c.Nivel || v('cont-nivel-ini'), c.Estado || 'activo', c.Fecha_Apertura || fecha, c.Fecha_Cierre || '', fecha, usuario, formato];
-      await sheetsUpdate(`Contenedores_Residuo!A${fila}:K${fila}`, row);
-      Object.assign(c, rowToObj(row, 'contenedoresResiduo'));
+      const { contenedor } = await callEdgeFunction('gestionar-residuo', {
+        accion: 'actualizar_contenedor', id_contenedor: c.ID_Contenedor,
+        categoria, lab, zona, formato, usuario,
+      });
+      Object.assign(c, _contenedorResiduoSbToObj(contenedor));
     } else {
-      const id = genId('RC');
-      const row = [id, categoria, lab, v('cont-zona'), v('cont-nivel-ini') || 'vacío', 'activo', fecha, '', fecha, usuario, formato];
-      await sheetsAppend('Contenedores_Residuo', row);
-      DATA.contenedoresResiduo.push(rowToObj(row, 'contenedoresResiduo'));
+      const { contenedor } = await callEdgeFunction('gestionar-residuo', {
+        accion: 'crear_contenedor', categoria, lab, zona, formato,
+        nivel: v('cont-nivel-ini') || 'vacío', usuario,
+      });
+      DATA.contenedoresResiduo.push(_contenedorResiduoSbToObj(contenedor));
     }
     closeModal('modal-contenedor-res');
     renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Contenedor guardado', 'success');
-  } catch(e) { showToast('Error al guardar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al guardar', 'error'); }
   hideLoading(); editingRow = null;
 }
 
 async function eliminarContenedor(idx) {
   if (!confirm('¿Eliminar este contenedor del registro?')) return;
+  const c = DATA.contenedoresResiduo[idx];
   showLoading('Eliminando...');
   try {
-    await sheetsDeleteRow('Contenedores_Residuo', idx);
+    await callEdgeFunction('gestionar-residuo', { accion: 'eliminar_contenedor', id_contenedor: c.ID_Contenedor });
     DATA.contenedoresResiduo.splice(idx, 1);
     renderResiduosContenedores();
     _updateBadgeResiduos();
     showToast('Contenedor eliminado', 'success');
-  } catch(e) { showToast('Error al eliminar', 'error'); }
+  } catch(e) { showToast(e.message || 'Error al eliminar', 'error'); }
   hideLoading();
 }
 
@@ -569,19 +548,18 @@ async function guardarConsultaResiduo() {
   const ubi  = v('consulta-ubicacion');
   if (!desc) { showToast('Describe el residuo antes de enviar', 'error'); return; }
   if (!ubi)  { showToast('Indica dónde lo has dejado', 'error'); return; }
-  const id   = genId('CR-');
-  const fecha = new Date().toISOString().split('T')[0];
-  const row  = [id, fecha, currentUser?.name || '', desc, ubi, 'Pendiente'];
   showLoading('Enviando aviso...');
   try {
-    await sheetsAppend('Consultas_Residuo', row);
-    DATA.consultasResiduo.push(rowToObj(row, 'consultasResiduo'));
+    const { consulta } = await callEdgeFunction('gestionar-residuo', {
+      accion: 'crear_consulta', descripcion: desc, ubicacion_dejado: ubi, usuario: currentUser?.name || '',
+    });
+    DATA.consultasResiduo.push(_consultaResiduoSbToObj(consulta));
     _updateBadgeResiduos();
     renderPanelConsultasResiduo();
     renderDashboard();
     showToast('Aviso enviado. La gestora lo revisará pronto.', 'success');
     closeModal('modal-consulta-residuo');
-  } catch(e) { showToast('Error al enviar el aviso', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error al enviar el aviso', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -633,14 +611,13 @@ async function resolverConsultaResiduo(idx) {
   if (!c) return;
   showLoading('Marcando como resuelta...');
   try {
-    const fila = idx + 2;
-    await sheetsUpdate(`Consultas_Residuo!F${fila}`, ['Resuelta']);
+    await callEdgeFunction('gestionar-residuo', { accion: 'resolver_consulta', id_consulta: c.ID_Consulta });
     DATA.consultasResiduo[idx].Estado = 'Resuelta';
     _updateBadgeResiduos();
     renderPanelConsultasResiduo();
     renderDashboard();
     showToast('Consulta marcada como resuelta', 'success');
-  } catch(e) { showToast('Error al actualizar', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error al actualizar', 'error'); console.error(e); }
   hideLoading();
 }
 

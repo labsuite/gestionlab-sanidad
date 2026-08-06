@@ -533,3 +533,7 @@ create policy "reservas_equipos_select_anon" on reservas_equipos for select to a
 create policy "registros_cabina_select_anon" on registros_cabina for select to anon using (true);
 create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon using (true);
 create policy "usuarios_select_anon" on usuarios for select to anon using (true);
+create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon using (true);
+create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon using (true);
+create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon using (true);
+create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon using (true);

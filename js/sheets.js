@@ -371,6 +371,56 @@ function _revisionInventarioSbToObj(r) {
   };
 }
 
+function _tipoResiduoSbToObj(t) {
+  return {
+    ID_Residuo: t.id_residuo || '',
+    Nombre: t.nombre || '',
+    Descripcion: t.descripcion || '',
+    Riesgo: t.riesgo || '',
+    Contenedor_Tipo: t.contenedor_tipo || '',
+    Lab: t.lab || '',
+    Zona: t.zona || '',
+  };
+}
+
+function _contenedorResiduoSbToObj(c) {
+  return {
+    ID_Contenedor: c.id_contenedor || '',
+    Categoria: c.categoria || '',
+    Lab: c.lab || '',
+    Zona: c.zona || '',
+    Nivel: c.nivel || '',
+    Estado: c.estado || 'activo',
+    Fecha_Apertura: c.fecha_apertura || '',
+    Fecha_Cierre: c.fecha_cierre || '',
+    Fecha_Actualizacion: (c.fecha_actualizacion || '').slice(0, 10),
+    Actualizado_Por: c.actualizado_por || '',
+    Formato: c.formato || '',
+  };
+}
+
+function _adicionResiduoSbToObj(a) {
+  return {
+    ID_Adicion: a.id_adicion || '',
+    ID_Contenedor: a.id_contenedor || '',
+    ID_Residuo: a.id_residuo || '',
+    Fecha: (a.fecha || '').slice(0, 10),
+    Usuario: a.usuario || '',
+    Observaciones: a.observaciones || '',
+  };
+}
+
+function _consultaResiduoSbToObj(c) {
+  return {
+    ID_Consulta: c.id_consulta || '',
+    Fecha: (c.fecha || '').slice(0, 10),
+    Usuario: c.usuario || '',
+    Descripcion: c.descripcion || '',
+    Ubicacion_Dejado: c.ubicacion_dejado || '',
+    Estado: c.estado || 'Pendiente',
+  };
+}
+
 function _configReservaSbToObj(c) {
   return {
     ID_Equipo: c.id_equipo || '',
@@ -465,7 +515,8 @@ async function loadAllData() {
            sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
            sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
            sbConfigReservasRes, sbReservasRes,
-           sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes] = await Promise.all([
+           sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
+           sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -519,7 +570,11 @@ async function loadAllData() {
       _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('registros_cabina').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('registros_autoclave').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('usuarios').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('usuarios').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('tipos_residuo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('contenedores_residuo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('adiciones_residuo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -594,12 +649,20 @@ async function loadAllData() {
     const sbRegistroMant = sbRegistroMantRes?.data || [];
     if (sbRegistroMant.length) DATA.registroMantenimientos = sbRegistroMant.map(_registroMantSbToObj);
     DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
+    const sbTiposResiduo = sbTiposResiduoRes?.data || [];
+    if (sbTiposResiduo.length) DATA.tiposResiduo = sbTiposResiduo.map(_tipoResiduoSbToObj);
     DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
+    const sbContenedoresResiduo = sbContenedoresResiduoRes?.data || [];
+    if (sbContenedoresResiduo.length) DATA.contenedoresResiduo = sbContenedoresResiduo.map(_contenedorResiduoSbToObj);
     DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
+    const sbAdicionesResiduo = sbAdicionesResiduoRes?.data || [];
+    if (sbAdicionesResiduo.length) DATA.adicionesResiduo = sbAdicionesResiduo.map(_adicionResiduoSbToObj);
     DATA.revisionesInventario   = toObj(revisionesInventario   || [], 'revisionesInventario');
     const sbRevisiones = sbRevisionesRes?.data || [];
     if (sbRevisiones.length) DATA.revisionesInventario = sbRevisiones.map(_revisionInventarioSbToObj);
     DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
+    const sbConsultasResiduo = sbConsultasResiduoRes?.data || [];
+    if (sbConsultasResiduo.length) DATA.consultasResiduo = sbConsultasResiduo.map(_consultaResiduoSbToObj);
     DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
     const sbConfigReservas = sbConfigReservasRes?.data || [];
     if (sbConfigReservas.length) DATA.configReservas = sbConfigReservas.map(_configReservaSbToObj);
