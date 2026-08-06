@@ -1,79 +1,6 @@
 // ============================================================
-// SHEETS API
+// SUPABASE — carga de datos y llamadas a Edge Functions
 // ============================================================
-
-// ----------------------------------------------------------------
-// authFetch — wrapper central para todas las llamadas a la API.
-// Inyecta el Bearer token, y si recibe un 401 intenta renovar el
-// token una vez antes de rendirse y redirigir al login.
-// ----------------------------------------------------------------
-// ----------------------------------------------------------------
-// authFetch — wrapper central para todas las llamadas a la API.
-// Google Sheets devuelve 401 o 403 cuando el token ha expirado.
-// Con el flujo GIS no hay renovación silenciosa posible:
-// limpiamos sesión, mostramos UN toast y enviamos al login.
-// El flag _sessionExpired evita la tormenta de mensajes cuando
-// Promise.all lanza varias peticiones en paralelo.
-// ----------------------------------------------------------------
-let _sessionExpired = false;
-
-async function authFetch(url, options = {}) {
-  options.headers = { ...options.headers, Authorization: `Bearer ${accessToken}` };
-  const r = await fetch(url, options);
-
-  if (r.status === 401 || r.status === 403) {
-    if (!_sessionExpired) {
-      _sessionExpired = true;
-      clearSession();
-      accessToken = null;
-      showToast('Sesión expirada. Vuelve a iniciar sesión.', 'error');
-      setTimeout(() => {
-        _sessionExpired = false;
-        document.getElementById('app').style.display  = 'none';
-        document.getElementById('auth-screen').style.display = 'flex';
-      }, 1500);
-    }
-    throw new Error('Sesión expirada');
-  }
-  return r;
-}
-
-async function sheetsGet(range) {
-  const r = await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`
-  );
-  const d = await r.json();
-  return d.values || [];
-}
-
-async function sheetsAppend(sheet, row) {
-  await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(sheet + '!A1')}:append?valueInputOption=USER_ENTERED`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [row] })
-    }
-  );
-}
-
-async function sheetsUpdate(range, row) {
-  await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
-    {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values: [row] })
-    }
-  );
-}
-
-async function sheetsClear(range) {
-  await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}:clear`,
-    { method: 'POST' }
-  );
-}
 
 // ----------------------------------------------------------------
 // callEdgeFunction — wrapper para las Edge Functions de Supabase que hacen
@@ -512,14 +439,7 @@ function _usuarioSbToObj(u) {
 async function loadAllData() {
   showLoading('Cargando datos...');
   try {
-    const [equipos, intervenciones, incidencias, tareasIntervencion, proveedores, ubicaciones, usuarios,
-           material, movimientos, solicitudes, pedidos, lineasPedido, ciclosModulos,
-           materialUbicaciones, historicoPrecio, tareas,
-           planesMantenimiento, registroMantenimientos,
-           tiposResiduo, contenedoresResiduo, adicionesResiduo,
-           revisionesInventario, consultasResiduo,
-           configReservas, reservas, registrosCabina, registrosAutoclave,
-           sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
+    const [sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,
            sbProveedoresRes, sbUbicacionesRes, sbEquiposRes,
            sbIntervencionesRes, sbIncidenciasRes, sbTareasRes,
            sbPlanesRes, sbRegistroMantRes,
@@ -529,34 +449,7 @@ async function loadAllData() {
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbTareasPersonalesRes] = await Promise.all([
-      sheetsGet('Equipos!A2:W'),
-      sheetsGet('Intervenciones!A2:T'),
-      sheetsGet('Incidencias!A2:J'),
-      sheetsGet('Tareas_Intervencion!A2:F').catch(() => []),
-      sheetsGet('Proveedores!A2:I'),
-      sheetsGet('Ubicaciones!A2:F'),
-      sheetsGet('Usuarios!A2:I'),
-      sheetsGet('Material!A2:L'),
-      sheetsGet('Movimientos!A2:H'),
-      sheetsGet('Solicitudes!A2:K'),
-      sheetsGet('Pedidos!A2:U'),
-      sheetsGet('Lineas_Pedido!A2:I'),
-      sheetsGet('Ciclos_Modulos!A2:B'),
-      sheetsGet('Material_Ubicaciones!A2:H'),
-      sheetsGet('Historico_Precios!A2:F').catch(() => []),
-      sheetsGet('Tareas_Usuario!A2:F').catch(() => []),
-      sheetsGet('Planes_Mantenimiento!A2:H').catch(e => { console.warn('Planes_Mantenimiento no cargó:', e); return []; }),
-      sheetsGet('Registro_Mantenimientos!A2:I').catch(e => { console.warn('Registro_Mantenimientos no cargó:', e); return []; }),
-      sheetsGet('Tipos_Residuo!A2:G').catch(() => []),
-      sheetsGet('Contenedores_Residuo!A2:K').catch(() => []),
-      sheetsGet('Adiciones_Residuo!A2:F').catch(() => []),
-      sheetsGet('Revisiones_Inventario!A2:I').catch(() => []),
-      sheetsGet('Consultas_Residuo!A2:F').catch(() => []),
-      sheetsGet('Config_Reservas!A2:E').catch(() => []),
-      sheetsGet('Reservas_Equipos!A2:L').catch(() => []),
-      sheetsGet('Registros_Cabina!A2:L').catch(() => []),
-      sheetsGet('Registros_Autoclave!A2:K').catch(() => []),
-      // Supabase — en paralelo con Sheets (usar .then(r=>r, fallback) porque el builder no tiene .catch())
+      // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
       _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
@@ -590,106 +483,33 @@ async function loadAllData() {
       _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
-    const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
-
-    DATA.equipos             = toObj(equipos,             'equipos');
-    const sbEquipos = sbEquiposRes?.data || [];
-    if (sbEquipos.length) {
-      DATA.equipos = sbEquipos.map(_equipoSbToObj);
-    }
-    DATA.intervenciones      = toObj(intervenciones,      'intervenciones');
-    const sbIntervenciones = sbIntervencionesRes?.data || [];
-    if (sbIntervenciones.length) {
-      DATA.intervenciones = sbIntervenciones.map(_intervencionSbToObj);
-    }
-    DATA.incidencias         = toObj(incidencias,         'incidencias');
-    const sbIncidencias = sbIncidenciasRes?.data || [];
-    if (sbIncidencias.length) {
-      DATA.incidencias = sbIncidencias.map(_incidenciaSbToObj);
-    }
-    DATA.tareasIntervencion  = toObj(tareasIntervencion || [], 'tareasIntervencion');
-    const sbTareas = sbTareasRes?.data || [];
-    if (sbTareas.length) {
-      DATA.tareasIntervencion = sbTareas.map(_tareaSbToObj);
-    }
-    DATA.proveedores         = toObj(proveedores,         'proveedores');
-    const sbProveedores = sbProveedoresRes?.data || [];
-    if (sbProveedores.length) {
-      DATA.proveedores = sbProveedores.map(_proveedorSbToObj);
-    }
-    DATA.ubicaciones         = toObj(ubicaciones,         'ubicaciones');
-    const sbUbicaciones = sbUbicacionesRes?.data || [];
-    if (sbUbicaciones.length) {
-      DATA.ubicaciones = sbUbicaciones.map(_ubicacionSbToObj);
-    }
-    DATA.usuarios            = toObj(usuarios,            'usuarios');
-    const sbUsuariosCatalogo = sbUsuariosCatalogoRes?.data || [];
-    if (sbUsuariosCatalogo.length) DATA.usuarios = sbUsuariosCatalogo.map(_usuarioSbToObj);
-    DATA.material            = toObj(material,            'material');
-    const sbMaterial = sbMaterialRes?.data || [];
-    if (sbMaterial.length) DATA.material = sbMaterial.map(_materialSbToObj);
-    DATA.movimientos         = toObj(movimientos,         'movimientos');
-    const sbMovimientos = sbMovimientosRes?.data || [];
-    if (sbMovimientos.length) DATA.movimientos = sbMovimientos.map(_movimientoSbToObj);
-    DATA.solicitudes         = toObj(solicitudes,         'solicitudes');
-    const sbSolicitudes = sbSolicitudesRes?.data || [];
-    if (sbSolicitudes.length) DATA.solicitudes = sbSolicitudes.map(_solicitudSbToObj);
-    DATA.pedidos             = toObj(pedidos,             'pedidos');
-    const sbPedidos = sbPedidosRes?.data || [];
-    if (sbPedidos.length) DATA.pedidos = sbPedidos.map(_pedidoSbToObj);
-    DATA.lineasPedido        = toObj(lineasPedido,        'lineasPedido');
-    const sbLineasPedido = sbLineasPedidoRes?.data || [];
-    if (sbLineasPedido.length) DATA.lineasPedido = sbLineasPedido.map(_lineaPedidoSbToObj);
-    DATA.ciclosModulos = ciclosModulos
-      .filter(r => r.length && r.some(Boolean))  // mantener filas con col A vacía (módulos sin ciclo repetido)
-      .map(r => rowToObj(r, 'ciclosModulos'));
-    // Propagar Ciclo hacia abajo: celdas vacías heredan el ciclo de la fila anterior
-    let ultimoCiclo = '';
-    DATA.ciclosModulos.forEach(cm => {
-      if (cm.Ciclo) { ultimoCiclo = cm.Ciclo; } else { cm.Ciclo = ultimoCiclo; }
-    });
-    DATA.materialUbicaciones = toObj(materialUbicaciones, 'materialUbicaciones');
-    const sbMaterialUbicaciones = sbMaterialUbicacionesRes?.data || [];
-    if (sbMaterialUbicaciones.length) DATA.materialUbicaciones = sbMaterialUbicaciones.map(_materialUbicacionSbToObj);
-    DATA.historicoPrecio        = toObj(historicoPrecio        || [], 'historicoPrecio');
-    const sbHistoricoPrecio = sbHistoricoPrecioRes?.data || [];
-    if (sbHistoricoPrecio.length) DATA.historicoPrecio = sbHistoricoPrecio.map(_historicoPrecioSbToObj);
-    DATA.tareas                 = toObj(tareas                 || [], 'tareas');
-    const sbTareasPersonales = sbTareasPersonalesRes?.data || [];
-    if (sbTareasPersonales.length) DATA.tareas = sbTareasPersonales.map(_tareaPersonalSbToObj);
-    DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
-    const sbPlanes = sbPlanesRes?.data || [];
-    if (sbPlanes.length) DATA.planesMantenimiento = sbPlanes.map(_planMantenimientoSbToObj);
-    DATA.registroMantenimientos = toObj(registroMantenimientos || [], 'registroMantenimientos');
-    const sbRegistroMant = sbRegistroMantRes?.data || [];
-    if (sbRegistroMant.length) DATA.registroMantenimientos = sbRegistroMant.map(_registroMantSbToObj);
-    DATA.tiposResiduo           = toObj(tiposResiduo           || [], 'tiposResiduo');
-    const sbTiposResiduo = sbTiposResiduoRes?.data || [];
-    if (sbTiposResiduo.length) DATA.tiposResiduo = sbTiposResiduo.map(_tipoResiduoSbToObj);
-    DATA.contenedoresResiduo    = toObj(contenedoresResiduo    || [], 'contenedoresResiduo');
-    const sbContenedoresResiduo = sbContenedoresResiduoRes?.data || [];
-    if (sbContenedoresResiduo.length) DATA.contenedoresResiduo = sbContenedoresResiduo.map(_contenedorResiduoSbToObj);
-    DATA.adicionesResiduo       = toObj(adicionesResiduo       || [], 'adicionesResiduo');
-    const sbAdicionesResiduo = sbAdicionesResiduoRes?.data || [];
-    if (sbAdicionesResiduo.length) DATA.adicionesResiduo = sbAdicionesResiduo.map(_adicionResiduoSbToObj);
-    DATA.revisionesInventario   = toObj(revisionesInventario   || [], 'revisionesInventario');
-    const sbRevisiones = sbRevisionesRes?.data || [];
-    if (sbRevisiones.length) DATA.revisionesInventario = sbRevisiones.map(_revisionInventarioSbToObj);
-    DATA.consultasResiduo       = toObj(consultasResiduo       || [], 'consultasResiduo');
-    const sbConsultasResiduo = sbConsultasResiduoRes?.data || [];
-    if (sbConsultasResiduo.length) DATA.consultasResiduo = sbConsultasResiduo.map(_consultaResiduoSbToObj);
-    DATA.configReservas         = toObj(configReservas         || [], 'configReservas');
-    const sbConfigReservas = sbConfigReservasRes?.data || [];
-    if (sbConfigReservas.length) DATA.configReservas = sbConfigReservas.map(_configReservaSbToObj);
-    DATA.reservas               = toObj(reservas               || [], 'reservas');
-    const sbReservas = sbReservasRes?.data || [];
-    if (sbReservas.length) DATA.reservas = sbReservas.map(_reservaSbToObj);
-    DATA.registrosCabina        = toObj(registrosCabina        || [], 'registrosCabina');
-    const sbRegistrosCabina = sbRegistrosCabinaRes?.data || [];
-    if (sbRegistrosCabina.length) DATA.registrosCabina = sbRegistrosCabina.map(_registroCabinaSbToObj);
-    DATA.registrosAutoclave     = toObj(registrosAutoclave     || [], 'registrosAutoclave');
-    const sbRegistrosAutoclave = sbRegistrosAutoclaveRes?.data || [];
-    if (sbRegistrosAutoclave.length) DATA.registrosAutoclave = sbRegistrosAutoclave.map(_registroAutoclaveSbToObj);
+    DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
+    DATA.intervenciones          = (sbIntervencionesRes?.data || []).map(_intervencionSbToObj);
+    DATA.incidencias             = (sbIncidenciasRes?.data || []).map(_incidenciaSbToObj);
+    DATA.tareasIntervencion      = (sbTareasRes?.data || []).map(_tareaSbToObj);
+    DATA.proveedores             = (sbProveedoresRes?.data || []).map(_proveedorSbToObj);
+    DATA.ubicaciones             = (sbUbicacionesRes?.data || []).map(_ubicacionSbToObj);
+    DATA.usuarios                = (sbUsuariosCatalogoRes?.data || []).map(_usuarioSbToObj);
+    DATA.material                = (sbMaterialRes?.data || []).map(_materialSbToObj);
+    DATA.movimientos             = (sbMovimientosRes?.data || []).map(_movimientoSbToObj);
+    DATA.solicitudes             = (sbSolicitudesRes?.data || []).map(_solicitudSbToObj);
+    DATA.pedidos                 = (sbPedidosRes?.data || []).map(_pedidoSbToObj);
+    DATA.lineasPedido            = (sbLineasPedidoRes?.data || []).map(_lineaPedidoSbToObj);
+    DATA.ciclosModulos           = []; // se construye más abajo desde la tabla pivot modulo_ciclo
+    DATA.materialUbicaciones     = (sbMaterialUbicacionesRes?.data || []).map(_materialUbicacionSbToObj);
+    DATA.historicoPrecio         = (sbHistoricoPrecioRes?.data || []).map(_historicoPrecioSbToObj);
+    DATA.tareas                  = (sbTareasPersonalesRes?.data || []).map(_tareaPersonalSbToObj);
+    DATA.planesMantenimiento     = (sbPlanesRes?.data || []).map(_planMantenimientoSbToObj);
+    DATA.registroMantenimientos  = (sbRegistroMantRes?.data || []).map(_registroMantSbToObj);
+    DATA.tiposResiduo            = (sbTiposResiduoRes?.data || []).map(_tipoResiduoSbToObj);
+    DATA.contenedoresResiduo     = (sbContenedoresResiduoRes?.data || []).map(_contenedorResiduoSbToObj);
+    DATA.adicionesResiduo        = (sbAdicionesResiduoRes?.data || []).map(_adicionResiduoSbToObj);
+    DATA.revisionesInventario    = (sbRevisionesRes?.data || []).map(_revisionInventarioSbToObj);
+    DATA.consultasResiduo        = (sbConsultasResiduoRes?.data || []).map(_consultaResiduoSbToObj);
+    DATA.configReservas          = (sbConfigReservasRes?.data || []).map(_configReservaSbToObj);
+    DATA.reservas                = (sbReservasRes?.data || []).map(_reservaSbToObj);
+    DATA.registrosCabina         = (sbRegistrosCabinaRes?.data || []).map(_registroCabinaSbToObj);
+    DATA.registrosAutoclave      = (sbRegistrosAutoclaveRes?.data || []).map(_registroAutoclaveSbToObj);
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];
@@ -761,38 +581,8 @@ async function loadAllData() {
 
     renderAll();
   } catch(e) {
-    showToast('Error cargando datos. Comprueba los permisos del Sheet.', 'error');
+    showToast('Error cargando datos. Comprueba tu conexión.', 'error');
     console.error(e);
   }
   hideLoading();
-}
-
-// ── sheetsDeleteRow ──────────────────────────────────────────
-// Elimina físicamente una fila de una hoja (rowIndex: 0-based en DATA, sin contar cabecera).
-// Obtiene el sheetId numérico dinámicamente para no depender de IDs hardcodeados.
-async function sheetsDeleteRow(sheetName, rowIndex) {
-  const meta = await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}?fields=sheets.properties`
-  );
-  const data = await meta.json();
-  const sheet = data.sheets.find(s => s.properties.title === sheetName);
-  if (!sheet) throw new Error(`Hoja "${sheetName}" no encontrada`);
-  const sheetId = sheet.properties.sheetId;
-  await authFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}:batchUpdate`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{
-          deleteDimension: {
-            range: { sheetId, dimension: 'ROWS',
-              startIndex: rowIndex + 1,  // +1 por la fila de cabecera
-              endIndex:   rowIndex + 2
-            }
-          }
-        }]
-      })
-    }
-  );
 }
