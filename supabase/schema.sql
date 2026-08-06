@@ -537,3 +537,4 @@ create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon us
 create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon using (true);
 create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon using (true);
 create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon using (true);
+create policy "tareas_personales_select_anon" on tareas_personales for select to anon using (true);

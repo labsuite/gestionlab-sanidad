@@ -410,6 +410,17 @@ function _adicionResiduoSbToObj(a) {
   };
 }
 
+function _tareaPersonalSbToObj(t) {
+  return {
+    ID_Tarea: t.id_tarea || '',
+    Email: t.email || '',
+    Texto: t.texto || '',
+    Fecha_Limite: t.fecha_limite || '',
+    Completada: t.completada ? 'true' : 'false',
+    Fecha_Creacion: (t.fecha_creacion || '').slice(0, 10),
+  };
+}
+
 function _consultaResiduoSbToObj(c) {
   return {
     ID_Consulta: c.id_consulta || '',
@@ -516,7 +527,8 @@ async function loadAllData() {
            sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
            sbConfigReservasRes, sbReservasRes,
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
-           sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes] = await Promise.all([
+           sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
+           sbTareasPersonalesRes] = await Promise.all([
       sheetsGet('Equipos!A2:W'),
       sheetsGet('Intervenciones!A2:T'),
       sheetsGet('Incidencias!A2:J'),
@@ -574,7 +586,8 @@ async function loadAllData() {
       _sbMigracion.from('tipos_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('contenedores_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('adiciones_residuo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     const toObj = (rows, type) => rows.filter(r => r.length && r[0]).map(r => rowToObj(r, type));
@@ -642,6 +655,8 @@ async function loadAllData() {
     const sbHistoricoPrecio = sbHistoricoPrecioRes?.data || [];
     if (sbHistoricoPrecio.length) DATA.historicoPrecio = sbHistoricoPrecio.map(_historicoPrecioSbToObj);
     DATA.tareas                 = toObj(tareas                 || [], 'tareas');
+    const sbTareasPersonales = sbTareasPersonalesRes?.data || [];
+    if (sbTareasPersonales.length) DATA.tareas = sbTareasPersonales.map(_tareaPersonalSbToObj);
     DATA.planesMantenimiento    = toObj(planesMantenimiento    || [], 'planesMantenimiento');
     const sbPlanes = sbPlanesRes?.data || [];
     if (sbPlanes.length) DATA.planesMantenimiento = sbPlanes.map(_planMantenimientoSbToObj);

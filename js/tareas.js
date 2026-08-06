@@ -140,32 +140,27 @@ function _toggleCompletadas() {
 async function _guardarTarea() {
   const texto = (document.getElementById('tarea-texto')?.value || '').trim();
   if (!texto) { document.getElementById('tarea-texto')?.focus(); return; }
-  const fecha   = document.getElementById('tarea-fecha')?.value || '';
-  const email   = (currentUser?.email || '').toLowerCase();
-  const id      = genId('TAR-');
-  const hoy     = new Date().toISOString().split('T')[0];
-  const row     = [id, email, texto, fecha, 'false', hoy];
+  const fecha = document.getElementById('tarea-fecha')?.value || '';
 
   showLoading('Guardando tarea...');
   try {
-    await sheetsAppend('Tareas_Usuario', row);
-    DATA.tareas.push(rowToObj(row, 'tareas'));
+    const { tarea } = await callEdgeFunction('gestionar-tarea-personal', { accion: 'crear', texto, fecha_limite: fecha || null });
+    DATA.tareas.push(_tareaPersonalSbToObj(tarea));
     _ocultarFormTarea();
     renderTareas();
-  } catch(e) { showToast('Error guardando tarea', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando tarea', 'error'); console.error(e); }
   hideLoading();
 }
 
 async function _toggleTarea(id, completada) {
   const idx = DATA.tareas.findIndex(t => t.ID_Tarea === id);
   if (idx === -1) return;
-  const fila = idx + 2;
   try {
-    await sheetsUpdate(`Tareas_Usuario!E${fila}`, [String(completada)]);
+    await callEdgeFunction('gestionar-tarea-personal', { accion: 'toggle', id_tarea: id, completada });
     DATA.tareas[idx].Completada = String(completada);
     renderTareas();
   } catch(e) {
-    showToast('Error actualizando tarea', 'error');
+    showToast(e.message || 'Error actualizando tarea', 'error');
     // Revertir checkbox visualmente
     const cb = document.querySelector(`#tarea-row-${id} input[type=checkbox]`);
     if (cb) cb.checked = !completada;
@@ -176,12 +171,11 @@ async function _toggleTarea(id, completada) {
 async function _eliminarTarea(id) {
   const idx = DATA.tareas.findIndex(t => t.ID_Tarea === id);
   if (idx === -1) return;
-  const fila = idx + 2;
   showLoading('Eliminando...');
   try {
-    await sheetsUpdate(`Tareas_Usuario!A${fila}:F${fila}`, ['','','','','','']);
+    await callEdgeFunction('gestionar-tarea-personal', { accion: 'eliminar', id_tarea: id });
     DATA.tareas.splice(idx, 1);
     renderTareas();
-  } catch(e) { showToast('Error eliminando tarea', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error eliminando tarea', 'error'); console.error(e); }
   hideLoading();
 }
