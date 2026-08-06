@@ -1,9 +1,8 @@
-// Tarea #4 — Importación masiva de alumnado desde Sanidad CMA.
-// Solo Admin/Gestor (ver _shared/auth.ts). Dos acciones:
-//   GET  ?action=preview        -> lista de alumnos de Sanidad CMA + si ya existen
-//   POST ?action=import         -> body { emails: string[] } crea cuenta+perfil+módulo
-// Replica el patrón de BioDesk (lib/sanidadCma.ts + importar-action.ts), pero
-// contra el proyecto Supabase propio de GestionLab.
+// Importación masiva de alumnado desde la app "Sanidad CMA". Solo Admin/Gestor.
+// POST { accion: 'preview' }                -> lista de alumnos de Sanidad CMA + si ya existen en `usuarios`
+// POST { accion: 'importar', emails: [...] } -> por cada email: fila en `usuarios` (catálogo) +
+//   cuenta real de Supabase Auth con contraseña temporal + fila en `public.users` (login/rol server-side).
+// Mismo patrón que scripts/importar_alumnos.py — sin esto el alumno no podría iniciar sesión.
 import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal, handleCorsPreflight } from "../_shared/auth.ts";
 
 interface AlumnoCMA {
@@ -27,23 +26,28 @@ async function fetchAlumnosCMA(): Promise<AlumnoCMA[]> {
   return Array.isArray(data) ? data : (data.alumnos ?? []);
 }
 
-function cursoAcademicoActual(): string {
-  const hoy = new Date();
-  const anioInicio = hoy.getMonth() >= 8 ? hoy.getFullYear() : hoy.getFullYear() - 1; // curso empieza en sept
-  return `${anioInicio}-${anioInicio + 1}`;
+function genId(prefix: string): string {
+  return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
 }
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
+  if (req.method !== "POST") return jsonError("Método no permitido", 405);
+
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
   if (authError) return authError;
 
-  const url = new URL(req.url);
-  const action = url.searchParams.get("action") || "preview";
+  let body: { accion?: string; emails?: string[] };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonError("Cuerpo inválido (se esperaba JSON)", 400);
+  }
+  const accion = body.accion || "preview";
 
-  // ── Preview: lista de alumnos de Sanidad + si ya existen en GestionLab ──
-  if (req.method === "GET" && action === "preview") {
+  // ── Preview: lista de alumnos de Sanidad CMA + si ya existen en el catálogo `usuarios` ──
+  if (accion === "preview") {
     let alumnos: AlumnoCMA[];
     try {
       alumnos = await fetchAlumnosCMA();
@@ -52,21 +56,15 @@ Deno.serve(async (req) => {
     }
 
     const emails = alumnos.map((a) => a.email.toLowerCase().trim());
-    const { data: existentes } = await supabaseAdmin.from("users").select("email").in("email", emails);
-    const yaExisten = new Set((existentes ?? []).map((u: { email: string }) => u.email.toLowerCase()));
+    const { data: existentes } = await supabaseAdmin.from("usuarios").select("email").in("email", emails);
+    const yaExisten = new Set((existentes ?? []).map((u: { email: string }) => (u.email || "").toLowerCase().trim()));
 
     const conEstado = alumnos.map((a) => ({ ...a, existe: yaExisten.has(a.email.toLowerCase().trim()) }));
     return jsonOk({ alumnos: conEstado });
   }
 
-  // ── Import: crea cuenta + perfil + módulo para los seleccionados ──
-  if (req.method === "POST" && action === "import") {
-    let body: { emails?: string[] };
-    try {
-      body = await req.json();
-    } catch {
-      return jsonError("Cuerpo inválido, se esperaba { emails: [...] }", 400);
-    }
+  // ── Importar: crea fila en `usuarios` + cuenta Auth + fila en `public.users` para los seleccionados ──
+  if (accion === "importar") {
     const seleccionados = new Set((body.emails ?? []).map((e) => e.toLowerCase().trim()));
     if (!seleccionados.size) return jsonError("No se seleccionó ningún alumno", 400);
 
@@ -78,7 +76,6 @@ Deno.serve(async (req) => {
     }
 
     const aImportar = alumnos.filter((a) => seleccionados.has(a.email.toLowerCase().trim()));
-    const cursoAcademico = cursoAcademicoActual();
     const resultados: Array<
       { email: string; ok: boolean; motivo?: string; password_temporal?: string }
     > = [];
@@ -86,12 +83,32 @@ Deno.serve(async (req) => {
     for (const a of aImportar) {
       const email = a.email.toLowerCase().trim();
 
-      const { data: yaExiste } = await supabaseAdmin.from("users").select("id").eq("email", email).maybeSingle();
+      const { data: yaExiste } = await supabaseAdmin.from("usuarios").select("id_usuario").eq("email", email)
+        .maybeSingle();
       if (yaExiste) {
         resultados.push({ email, ok: false, motivo: "Ya existía, omitido" });
         continue;
       }
 
+      // 1. Fila en el catálogo `usuarios` (lo que ve/edita la página Usuarios)
+      const idUsuario = genId("USR-");
+      const { error: catalogoErr } = await supabaseAdmin.from("usuarios").insert({
+        id_usuario: idUsuario,
+        nombre: a.nombre,
+        email,
+        rol: "Alumno",
+        activo: true,
+        ubicaciones_asignadas: a.laboratorio || "",
+        modulo: a.modulo || "",
+        ciclo_principal: a.ciclo || "",
+        puede_revisar_inventario: false,
+      });
+      if (catalogoErr) {
+        resultados.push({ email, ok: false, motivo: catalogoErr.message });
+        continue;
+      }
+
+      // 2. Cuenta real de Supabase Auth (sin esto el alumno no puede acceder a la app)
       const password = generarPasswordTemporal();
       const { data: authUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
@@ -99,11 +116,16 @@ Deno.serve(async (req) => {
         email_confirm: true,
       });
       if (createErr || !authUser?.user) {
-        resultados.push({ email, ok: false, motivo: createErr?.message ?? "error creando cuenta" });
+        resultados.push({
+          email,
+          ok: false,
+          motivo: `Catálogo creado pero falló la cuenta de acceso: ${createErr?.message ?? "error desconocido"}`,
+        });
         continue;
       }
       const userId = authUser.user.id;
 
+      // 3. Resolver/crear ciclo y dar de alta en public.users (verificación de rol server-side)
       let cicloId: string | null = null;
       if (a.ciclo) {
         let { data: ciclo } = await supabaseAdmin.from("ciclos").select("id").eq("nombre", a.ciclo).maybeSingle();
@@ -117,6 +139,7 @@ Deno.serve(async (req) => {
 
       const { error: profileErr } = await supabaseAdmin.from("users").insert({
         id: userId,
+        gestionlab_id: idUsuario,
         nombre: a.nombre,
         email,
         rol: "Alumno",
@@ -126,26 +149,12 @@ Deno.serve(async (req) => {
       });
       if (profileErr) {
         await supabaseAdmin.auth.admin.deleteUser(userId);
-        resultados.push({ email, ok: false, motivo: profileErr.message });
+        resultados.push({
+          email,
+          ok: false,
+          motivo: `Catálogo creado pero falló el alta de acceso: ${profileErr.message}`,
+        });
         continue;
-      }
-
-      if (a.modulo) {
-        let { data: modulo } = await supabaseAdmin.from("modulos").select("id").eq("nombre", a.modulo)
-          .maybeSingle();
-        if (!modulo) {
-          const { data: nuevoModulo } = await supabaseAdmin.from("modulos")
-            .insert({ nombre: a.modulo, lab_teoria: a.laboratorio, lab_practicas: a.laboratorio })
-            .select("id").single();
-          modulo = nuevoModulo;
-        }
-        if (modulo) {
-          await supabaseAdmin.from("user_modulos").insert({
-            user_id: userId,
-            modulo_id: modulo.id,
-            curso_academico: cursoAcademico,
-          });
-        }
       }
 
       resultados.push({ email, ok: true, password_temporal: password });
@@ -154,5 +163,5 @@ Deno.serve(async (req) => {
     return jsonOk({ resultados });
   }
 
-  return jsonError("Acción no reconocida (usa ?action=preview o ?action=import)", 400);
+  return jsonError("accion debe ser 'preview' o 'importar'", 400);
 });

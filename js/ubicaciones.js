@@ -240,7 +240,8 @@ function renderUsuarios() {
       <input id="search-usuarios" type="search" placeholder="Buscar por nombre o email..."
         oninput="buscarUsuario(this.value)"
         style="flex:1;min-width:200px;max-width:360px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
-      <div style="margin-left:auto">
+      <div style="margin-left:auto;display:flex;gap:8px">
+        ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarAlumnos()">📥 Importar desde Sanidad CMA</button>` : ''}
         ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
       </div>
     </div>
@@ -734,4 +735,128 @@ async function guardarUsuario() {
     closeModal('modal-usuario'); renderAll();
   } catch(e) { showToast('Error guardando: ' + e.message, 'error'); console.error(e); }
   hideLoading(); editingRow = null;
+}
+
+// ============================================================
+// IMPORTAR ALUMNOS DESDE SANIDAD CMA
+// ============================================================
+let _previewAlumnosCMA = [];
+
+function abrirModalImportarAlumnos() {
+  _previewAlumnosCMA = [];
+  document.getElementById('importar-alumnos-contenido').innerHTML = `
+    <div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">⏳</div>
+      <div class="empty-state-title">Consultando Sanidad CMA...</div>
+    </div>`;
+  document.getElementById('btn-confirmar-importar-alumnos').style.display = 'none';
+  openModal('modal-importar-alumnos');
+  _cargarPreviewImportarAlumnos();
+}
+
+async function _cargarPreviewImportarAlumnos() {
+  const cont = document.getElementById('importar-alumnos-contenido');
+  try {
+    const { alumnos } = await callEdgeFunction('importar-alumnos', { accion: 'preview' });
+    _previewAlumnosCMA = alumnos || [];
+    _renderPreviewImportarAlumnos();
+  } catch (e) {
+    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">⚠️</div>
+      <div class="empty-state-title">No se pudo consultar Sanidad CMA</div>
+      <div style="color:var(--text-muted);font-size:13px;margin-top:6px">${e.message}</div>
+    </div>`;
+  }
+}
+
+function _renderPreviewImportarAlumnos() {
+  const cont = document.getElementById('importar-alumnos-contenido');
+  const btnImportar = document.getElementById('btn-confirmar-importar-alumnos');
+  const nuevos = _previewAlumnosCMA.filter(a => !a.existe);
+
+  if (!_previewAlumnosCMA.length) {
+    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">🎓</div>
+      <div class="empty-state-title">Sanidad CMA no tiene alumnado disponible ahora mismo</div>
+    </div>`;
+    btnImportar.style.display = 'none';
+    return;
+  }
+
+  const filas = _previewAlumnosCMA.map((a, i) => `
+    <tr style="${a.existe ? 'opacity:0.5' : ''}">
+      <td><input type="checkbox" class="importar-alumno-check" value="${i}" ${a.existe ? 'disabled' : 'checked'}></td>
+      <td><strong>${a.nombre || '—'}</strong></td>
+      <td>${a.email || '—'}</td>
+      <td>${a.ciclo || '—'}</td>
+      <td>${a.modulo || '—'}</td>
+      <td>${a.laboratorio || '—'}</td>
+      <td>${a.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
+    </tr>`).join('');
+
+  cont.innerHTML = `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
+      ${nuevos.length} alumno(s) nuevo(s) de ${_previewAlumnosCMA.length} en Sanidad CMA.
+      ${nuevos.length ? 'Se creará su acceso a GestionLab con contraseña temporal.' : ''}
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr>
+          <th><input type="checkbox" ${nuevos.length ? 'checked' : ''} ${nuevos.length ? '' : 'disabled'} onchange="_toggleSeleccionarTodosImportar(this.checked)"></th>
+          <th>Nombre</th><th>Email</th><th>Ciclo</th><th>Módulo</th><th>Lab</th><th></th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+  btnImportar.style.display = nuevos.length ? '' : 'none';
+}
+
+function _toggleSeleccionarTodosImportar(checked) {
+  document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => { cb.checked = checked; });
+}
+
+async function confirmarImportarAlumnos() {
+  const emails = Array.from(document.querySelectorAll('.importar-alumno-check:checked'))
+    .map(cb => _previewAlumnosCMA[Number(cb.value)].email);
+  if (!emails.length) { showToast('Selecciona al menos un alumno', 'error'); return; }
+
+  showLoading('Importando alumnado...');
+  try {
+    const { resultados } = await callEdgeFunction('importar-alumnos', { accion: 'importar', emails });
+    _renderResultadosImportarAlumnos(resultados);
+    await loadAllData();
+  } catch (e) {
+    showToast('Error importando: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function _renderResultadosImportarAlumnos(resultados) {
+  const cont = document.getElementById('importar-alumnos-contenido');
+  document.getElementById('btn-confirmar-importar-alumnos').style.display = 'none';
+  const ok = resultados.filter(r => r.ok);
+  const fallidos = resultados.filter(r => !r.ok);
+
+  const filasOk = ok.map(r => `
+    <tr>
+      <td>${r.email}</td>
+      <td><code style="font-size:12px">${r.password_temporal}</code></td>
+    </tr>`).join('');
+
+  const filasError = fallidos.map(r => `<li>${r.email}: ${r.motivo || 'error desconocido'}</li>`).join('');
+
+  cont.innerHTML = `
+    ${ok.length ? `
+      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">✅ ${ok.length} alumno(s) importado(s)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Contraseñas temporales — reparte y no guardes este listado.</div>
+      <div class="card" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Email</th><th>Contraseña temporal</th></tr></thead>
+          <tbody>${filasOk}</tbody>
+        </table>
+      </div>` : ''}
+    ${fallidos.length ? `
+      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">⚠️ ${fallidos.length} omitido(s)</div>
+      <ul style="font-size:13px;color:var(--text-muted)">${filasError}</ul>` : ''}
+  `;
 }

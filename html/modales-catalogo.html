@@ -163,3 +163,25 @@
   </div>
 </div>
 
+<!-- Modal Importar alumnos desde Sanidad CMA -->
+<div class="modal-overlay" id="modal-importar-alumnos">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Importar alumnado desde Sanidad CMA</div>
+      <button class="modal-close" onclick="closeModal('modal-importar-alumnos')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="importar-alumnos-contenido">
+        <div class="empty-state" style="padding:40px 0">
+          <div class="empty-state-icon">⏳</div>
+          <div class="empty-state-title">Consultando Sanidad CMA...</div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-importar-alumnos')">Cerrar</button>
+        <button class="btn btn-primary" id="btn-confirmar-importar-alumnos" style="display:none" onclick="confirmarImportarAlumnos()">Importar seleccionados</button>
+      </div>
+    </div>
+  </div>
+</div>
+
