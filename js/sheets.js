@@ -484,7 +484,12 @@ async function loadAllData() {
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
       _sb.from('modulo_ciclo').select('modulo_id,ciclo_id').then(r => r, () => ({ data: [] })),
       _sb.from('user_modulos').select('user_id,modulo_id,curso_academico').then(r => r, () => ({ data: [] })),
-      _sb.from('users').select('id,email,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
+      // 'email' se quitó del select: esa columna ya no existe en public.users del proyecto
+      // compartido (probablemente movida a auth.users por la otra app) — el select fallaba
+      // con 400 (42703). Sin poder leer el email no se puede casar por email de todas formas,
+      // así que este bloque queda inerte hasta averiguar el nombre real de la columna con quien
+      // mantenga ese proyecto (Sanidad CMA / app de Vercel). La tabla devuelve 0 filas hoy.
+      _sb.from('users').select('id,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] })),
