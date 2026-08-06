@@ -769,6 +769,9 @@ async function _cargarPreviewImportarAlumnos() {
   }
 }
 
+// Cada fila de Sanidad CMA es una matrícula (alumno × módulo), no un alumno único —
+// un mismo alumno puede aparecer varias veces con módulo/lab distintos. Se agrupa por
+// Ciclo → Módulo para poder seleccionar en bloque, y al importar se fusionan por email.
 function _renderPreviewImportarAlumnos() {
   const cont = document.getElementById('importar-alumnos-contenido');
   const btnImportar = document.getElementById('btn-confirmar-importar-alumnos');
@@ -783,46 +786,101 @@ function _renderPreviewImportarAlumnos() {
     return;
   }
 
-  const filas = _previewAlumnosCMA.map((a, i) => `
-    <tr style="${a.existe ? 'opacity:0.5' : ''}">
-      <td><input type="checkbox" class="importar-alumno-check" value="${i}" ${a.existe ? 'disabled' : 'checked'}></td>
-      <td><strong>${a.nombre || '—'}</strong></td>
-      <td>${a.email || '—'}</td>
-      <td>${a.ciclo || '—'}</td>
-      <td>${a.modulo || '—'}</td>
-      <td>${a.laboratorio || '—'}</td>
-      <td>${a.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
-    </tr>`).join('');
+  const grupos = {};
+  _previewAlumnosCMA.forEach((a, i) => {
+    const ciclo = a.ciclo || 'Sin ciclo';
+    const modulo = a.modulo || 'Sin módulo';
+    (grupos[ciclo] ??= {});
+    (grupos[ciclo][modulo] ??= []).push(i);
+  });
+
+  const ciclosHtml = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es')).map(ciclo => {
+    const modulos = grupos[ciclo];
+    const idsCiclo = Object.values(modulos).flat();
+    const habilesCiclo = idsCiclo.some(i => !_previewAlumnosCMA[i].existe);
+
+    const modulosHtml = Object.keys(modulos).sort((a, b) => a.localeCompare(b, 'es')).map(modulo => {
+      const ids = modulos[modulo];
+      const habilesModulo = ids.some(i => !_previewAlumnosCMA[i].existe);
+      const filas = ids.map(i => {
+        const a = _previewAlumnosCMA[i];
+        return `<tr style="${a.existe ? 'opacity:0.5' : ''}">
+          <td><input type="checkbox" class="importar-alumno-check" data-ciclo="${_escAttr(ciclo)}" data-modulo="${_escAttr(modulo)}" value="${i}" ${a.existe ? 'disabled' : 'checked'}></td>
+          <td>${a.nombre || '—'}</td>
+          <td>${a.email || '—'}</td>
+          <td>${a.laboratorio || '—'}</td>
+          <td>${a.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin:10px 0">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:${habilesModulo ? 'pointer' : 'default'}">
+          <input type="checkbox" ${habilesModulo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportar('modulo','${_escAttr(ciclo)}','${_escAttr(modulo)}',this.checked)">
+          ${modulo} <span style="font-weight:400;color:var(--text-muted)">(${ids.length})</span>
+        </label>
+        <table style="margin-top:4px"><tbody>${filas}</tbody></table>
+      </div>`;
+    }).join('');
+
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <label style="display:flex;align-items:center;gap:8px;cursor:${habilesCiclo ? 'pointer' : 'default'}">
+          <input type="checkbox" ${habilesCiclo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportar('ciclo','${_escAttr(ciclo)}',null,this.checked)">
+          <span class="card-title" style="margin:0">${ciclo} <span style="font-weight:400;color:var(--text-muted)">(${idsCiclo.length})</span></span>
+        </label>
+      </div>
+      <div style="padding:4px 16px 12px">${modulosHtml}</div>
+    </div>`;
+  }).join('');
 
   cont.innerHTML = `
-    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
-      ${nuevos.length} alumno(s) nuevo(s) de ${_previewAlumnosCMA.length} en Sanidad CMA.
-      ${nuevos.length ? 'Se creará su acceso a GestionLab con contraseña temporal.' : ''}
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <span>${nuevos.length} matrícula(s) nueva(s) de ${_previewAlumnosCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
+      <span style="white-space:nowrap">
+        <button type="button" onclick="_toggleSeleccionarTodosImportar(true)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
+        <button type="button" onclick="_toggleSeleccionarTodosImportar(false)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Nada</button>
+      </span>
     </div>
-    <div class="card">
-      <table>
-        <thead><tr>
-          <th><input type="checkbox" ${nuevos.length ? 'checked' : ''} ${nuevos.length ? '' : 'disabled'} onchange="_toggleSeleccionarTodosImportar(this.checked)"></th>
-          <th>Nombre</th><th>Email</th><th>Ciclo</th><th>Módulo</th><th>Lab</th><th></th>
-        </tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>`;
+    ${ciclosHtml}`;
   btnImportar.style.display = nuevos.length ? '' : 'none';
+}
+
+function _escAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+
+function _toggleGrupoImportar(nivel, ciclo, modulo, checked) {
+  document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => {
+    const coincideCiclo = cb.dataset.ciclo === ciclo;
+    const coincide = nivel === 'ciclo' ? coincideCiclo : (coincideCiclo && cb.dataset.modulo === modulo);
+    if (coincide) cb.checked = checked;
+  });
 }
 
 function _toggleSeleccionarTodosImportar(checked) {
   document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => { cb.checked = checked; });
+  document.querySelectorAll('#importar-alumnos-contenido input[type=checkbox]:not(.importar-alumno-check):not(:disabled)').forEach(cb => { cb.checked = checked; });
 }
 
 async function confirmarImportarAlumnos() {
-  const emails = Array.from(document.querySelectorAll('.importar-alumno-check:checked'))
-    .map(cb => _previewAlumnosCMA[Number(cb.value)].email);
-  if (!emails.length) { showToast('Selecciona al menos un alumno', 'error'); return; }
+  const seleccionadas = Array.from(document.querySelectorAll('.importar-alumno-check:checked'))
+    .map(cb => _previewAlumnosCMA[Number(cb.value)]);
+  if (!seleccionadas.length) { showToast('Selecciona al menos un alumno', 'error'); return; }
+
+  // Un alumno puede tener varias matrículas seleccionadas (módulo+lab distintos) — se fusionan por email
+  const porEmail = {};
+  seleccionadas.forEach(a => {
+    const email = (a.email || '').toLowerCase().trim();
+    if (!email) return;
+    (porEmail[email] ??= { nombre: a.nombre, email, ciclo: a.ciclo, modulos: new Set(), labs: new Set() });
+    if (a.modulo) porEmail[email].modulos.add(a.modulo);
+    if (a.laboratorio) porEmail[email].labs.add(a.laboratorio);
+  });
+  const alumnos = Object.values(porEmail).map(a => ({
+    nombre: a.nombre, email: a.email, ciclo: a.ciclo,
+    modulo: [...a.modulos].join(','), laboratorio: [...a.labs].join(','),
+  }));
 
   showLoading('Importando alumnado...');
   try {
-    const { resultados } = await callEdgeFunction('importar-alumnos', { accion: 'importar', emails });
+    const { resultados } = await callEdgeFunction('importar-alumnos', { accion: 'importar', alumnos });
     _renderResultadosImportarAlumnos(resultados);
     await loadAllData();
   } catch (e) {

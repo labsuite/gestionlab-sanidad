@@ -1,7 +1,11 @@
 // Importación masiva de alumnado desde la app "Sanidad CMA". Solo Admin/Gestor.
-// POST { accion: 'preview' }                -> lista de alumnos de Sanidad CMA + si ya existen en `usuarios`
-// POST { accion: 'importar', emails: [...] } -> por cada email: fila en `usuarios` (catálogo) +
-//   cuenta real de Supabase Auth con contraseña temporal + fila en `public.users` (login/rol server-side).
+// POST { accion: 'preview' } -> lista de MATRÍCULAS de Sanidad CMA (una fila por alumno×módulo,
+//   cada módulo trae su propio lab) + si ya existen en `usuarios`.
+// POST { accion: 'importar', alumnos: [{nombre,email,ciclo,modulo,laboratorio}, ...] } -> por
+//   cada alumno ya fusionado por el cliente (agrupa las matrículas seleccionadas de un mismo
+//   email en modulo/laboratorio con varios valores separados por coma, según lo que la usuaria
+//   haya marcado en el checklist por ciclo/módulo): fila en `usuarios` (catálogo) + cuenta real
+//   de Supabase Auth con contraseña temporal + fila en `public.users` (login/rol server-side).
 // Mismo patrón que scripts/importar_alumnos.py — sin esto el alumno no podría iniciar sesión.
 import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal, handleCorsPreflight } from "../_shared/auth.ts";
 
@@ -11,6 +15,14 @@ interface AlumnoCMA {
   ciclo: string;
   modulo: string;
   laboratorio: string;
+}
+
+interface AlumnoImportar {
+  nombre?: string;
+  email?: string;
+  ciclo?: string;
+  modulo?: string;
+  laboratorio?: string;
 }
 
 async function fetchAlumnosCMA(): Promise<AlumnoCMA[]> {
@@ -38,7 +50,7 @@ Deno.serve(async (req) => {
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
   if (authError) return authError;
 
-  let body: { accion?: string; emails?: string[] };
+  let body: { accion?: string; alumnos?: AlumnoImportar[] };
   try {
     body = await req.json();
   } catch {
@@ -64,24 +76,25 @@ Deno.serve(async (req) => {
   }
 
   // ── Importar: crea fila en `usuarios` + cuenta Auth + fila en `public.users` para los seleccionados ──
+  // Recibe los alumnos ya fusionados por email desde el cliente (una matrícula de Sanidad CMA es
+  // alumno×módulo; si la usuaria seleccionó varios módulos del mismo alumno, modulo/laboratorio
+  // ya vienen aquí como listas separadas por coma) — no se vuelve a consultar Sanidad CMA aquí,
+  // para no perder qué módulos concretos se marcaron en el checklist.
   if (accion === "importar") {
-    const seleccionados = new Set((body.emails ?? []).map((e) => e.toLowerCase().trim()));
-    if (!seleccionados.size) return jsonError("No se seleccionó ningún alumno", 400);
+    const aImportar = Array.isArray(body.alumnos) ? body.alumnos : [];
+    if (!aImportar.length) return jsonError("No se seleccionó ningún alumno", 400);
 
-    let alumnos: AlumnoCMA[];
-    try {
-      alumnos = await fetchAlumnosCMA();
-    } catch (e) {
-      return jsonError(`No se pudo consultar Sanidad CMA: ${(e as Error).message}`, 502);
-    }
-
-    const aImportar = alumnos.filter((a) => seleccionados.has(a.email.toLowerCase().trim()));
     const resultados: Array<
       { email: string; ok: boolean; motivo?: string; password_temporal?: string }
     > = [];
 
     for (const a of aImportar) {
-      const email = a.email.toLowerCase().trim();
+      const email = (a.email || "").toLowerCase().trim();
+      const nombre = (a.nombre || "").trim();
+      if (!email || !nombre) {
+        resultados.push({ email: email || "(sin email)", ok: false, motivo: "Faltan nombre o email" });
+        continue;
+      }
 
       const { data: yaExiste } = await supabaseAdmin.from("usuarios").select("id_usuario").eq("email", email)
         .maybeSingle();
@@ -94,7 +107,7 @@ Deno.serve(async (req) => {
       const idUsuario = genId("USR-");
       const { error: catalogoErr } = await supabaseAdmin.from("usuarios").insert({
         id_usuario: idUsuario,
-        nombre: a.nombre,
+        nombre,
         email,
         rol: "Alumno",
         activo: true,
@@ -140,7 +153,7 @@ Deno.serve(async (req) => {
       const { error: profileErr } = await supabaseAdmin.from("users").insert({
         id: userId,
         gestionlab_id: idUsuario,
-        nombre: a.nombre,
+        nombre,
         email,
         rol: "Alumno",
         activo: true,
