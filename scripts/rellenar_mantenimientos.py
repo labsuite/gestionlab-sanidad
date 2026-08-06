@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 rellenar_mantenimientos.py
-Inserta en Registro_Mantenimientos todos los periodos del curso 2025-2026
+Inserta en registro_mantenimientos todos los periodos del curso indicado
 para los planes activos, como si se hubieran realizado.
 Omite automáticamente los que ya tienen registro existente.
 
@@ -10,18 +10,15 @@ Con DRY_RUN=True solo muestra qué se insertaría.
 
 import sys
 import os
-import random
-import string
 import calendar
-from datetime import date
 
 sys.path.insert(0, os.path.dirname(__file__))
-from base import conectar, leer, insertar_varios
+from base import conectar, leer, insertar_varios, generar_id
 
 # ─────────────── CONFIGURACIÓN ───────────────
 CURSO          = '2025-2026'
-REALIZADO_POR  = 'Paloma'    # Nombre que aparece en "Realizado_Por"
-DRY_RUN        = True        # Cambiar a False para escribir en Sheets
+REALIZADO_POR  = 'Paloma'    # Nombre que aparece en "realizado_por"
+DRY_RUN        = True        # Cambiar a False para escribir en Supabase
 # ──────────────────────────────────────────────
 
 # Los 10 meses del curso (Sep–Jun) como tuplas (año, mes)
@@ -47,8 +44,7 @@ def es_momento_fin(operacion):
 
 
 def es_con_alumnado(plan):
-    v = str(plan.get('Con_Alumnado', '')).strip()
-    return v in ('Sí', '1', '1.0', 'TRUE', 'Yes')
+    return bool(plan.get('con_alumnado'))
 
 
 def get_periodos_curso(plan, equipo):
@@ -57,8 +53,8 @@ def get_periodos_curso(plan, equipo):
     if es_con_alumnado(plan):
         meses = [(y, m) for y, m in meses if m != 9]
 
-    p      = plan.get('Periodicidad', '')
-    es_fin = es_momento_fin(plan.get('Operacion', ''))
+    p      = plan.get('periodicidad', '')
+    es_fin = es_momento_fin(plan.get('operacion', ''))
 
     if p == 'Mensual':
         return [mes_str(y, m) for y, m in meses]
@@ -96,83 +92,79 @@ def fecha_para_periodo(periodo):
     return f'{año}-{str(mes).zfill(2)}-{ultimo}'
 
 
-def nuevo_id():
-    chars = string.ascii_uppercase + string.digits
-    return 'RM' + ''.join(random.choices(chars, k=6))
-
-
 def main():
-    sh = conectar()
-    _, _, planes_list  = leer(sh, 'Planes_Mantenimiento')
-    _, _, equipos_list = leer(sh, 'Equipos')
-    ws_reg, headers_reg, registros = leer(sh, 'Registro_Mantenimientos')
+    conn = conectar()
+    _, _, planes_list  = leer(conn, 'planes_mantenimiento')
+    _, _, equipos_list = leer(conn, 'equipos')
+    t_reg, _, registros = leer(conn, 'registro_mantenimientos')
 
-    equipos = {e['ID_Activo']: e for e in equipos_list}
+    equipos = {e['id_activo']: e for e in equipos_list}
 
     # Índice de registros existentes para este curso
     existentes = {
-        (r.get('ID_Plan', ''), r.get('Periodo', ''))
+        (r.get('id_plan', ''), r.get('periodo', ''))
         for r in registros
-        if r.get('Curso_Academico') == CURSO
+        if r.get('curso_academico') == CURSO
     }
     print(f'Registros existentes en {CURSO}: {len(existentes)}')
 
     # Construir los registros nuevos
     nuevos = []
-    ids_usados = {r.get('ID_Registro', '') for r in registros}
+    ids_usados = {r.get('id_registro', '') for r in registros}
 
     for plan in planes_list:
-        activo = str(plan.get('Activo', '')).strip().upper()
-        if activo not in ('TRUE', 'SÍ', 'SI'):
+        if not plan.get('activo'):
             continue
-        if plan.get('Tipo_Intervencion', '').strip() == 'Externo':
+        if (plan.get('tipo_intervencion') or '').strip() == 'Externo':
             continue
-        equipo = equipos.get(plan.get('ID_Equipo', ''))
+        equipo = equipos.get(plan.get('id_equipo', ''))
         if not equipo:
             continue
 
         for periodo in get_periodos_curso(plan, equipo):
-            key = (plan['ID_Plan'], periodo)
+            key = (plan['id_plan'], periodo)
             if key in existentes:
                 continue  # ya existe, no duplicar
 
             # Evitar colisión de IDs
-            rid = nuevo_id()
+            rid = generar_id('RM')
             while rid in ids_usados:
-                rid = nuevo_id()
+                rid = generar_id('RM')
             ids_usados.add(rid)
 
             nuevos.append({
-                'ID_Registro'    : rid,
-                'ID_Plan'        : plan['ID_Plan'],
-                'ID_Equipo'      : plan['ID_Equipo'],
-                'Curso_Academico': CURSO,
-                'Periodo'        : periodo,
-                'Fecha_Realizacion': fecha_para_periodo(periodo),
-                'Realizado_Por'  : REALIZADO_POR,
-                ' Supervisado_Por': '',    # cabecera lleva espacio en Sheets
-                'Observaciones'  : '',
+                'id_registro'      : rid,
+                'id_plan'          : plan['id_plan'],
+                'id_equipo'        : plan['id_equipo'],
+                'curso_academico'  : CURSO,
+                'periodo'          : periodo,
+                'fecha_realizacion': fecha_para_periodo(periodo),
+                'realizado_por'    : REALIZADO_POR,
+                'supervisado_por'  : None,
+                'observaciones'    : None,
             })
 
     print(f'Registros a insertar: {len(nuevos)}')
     if nuevos:
-        # Muestra muestra de lo que se insertará
         for r in nuevos[:5]:
-            print(f'  {r["ID_Plan"]} | {r["ID_Equipo"]} | {r["Periodo"]} | {r["Fecha_Realizacion"]}')
+            print(f'  {r["id_plan"]} | {r["id_equipo"]} | {r["periodo"]} | {r["fecha_realizacion"]}')
         if len(nuevos) > 5:
             print(f'  … y {len(nuevos) - 5} más')
 
-    if dry_run := DRY_RUN:
+    if DRY_RUN:
         print('\n[DRY_RUN=True] No se ha escrito nada. Cambia DRY_RUN=False para insertar.')
+        conn.close()
         return
 
     if not nuevos:
         print('Nada que insertar.')
+        conn.close()
         return
 
     print(f'\nInsertando {len(nuevos)} registros…')
-    insertar_varios(ws_reg, nuevos, headers=headers_reg)
+    insertar_varios(t_reg, nuevos)
     print('✓ Hecho.')
+    conn.close()
 
 
 if __name__ == '__main__':

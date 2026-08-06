@@ -1,15 +1,15 @@
 """
 actualizar_riesgos_ghs.py – asigna pictogramas GHS a los tipos de residuo
 Clasifica por fragmentos de nombre (insensible a mayúsculas/tildes).
-Overrides por ID_Residuo cuando el matching de nombre produce falsos positivos.
+Overrides por id_residuo cuando el matching de nombre produce falsos positivos.
 DRY_RUN = True  → solo muestra los cambios propuestos
-DRY_RUN = False → escribe en Sheets
+DRY_RUN = False → escribe en Supabase
 """
 import sys, unicodedata
 sys.path.insert(0, '.')
 from scripts.base import conectar, leer, actualizar_fila_por_fila
 
-DRY_RUN = False  # ← cambiar a False para aplicar
+DRY_RUN = True  # ← cambiar a False para aplicar
 
 # ── Valores GHS canónicos (deben coincidir con los checkboxes de la UI) ────────
 T   = 'Tóxico'
@@ -371,8 +371,8 @@ REGLAS = [
 ]
 
 # ── EJECUCIÓN ──────────────────────────────────────────────────────────────────
-sh = conectar()
-ws, headers, datos = leer(sh, 'Tipos_Residuo')
+conn = conectar()
+t, columnas, datos = leer(conn, 'tipos_residuo')
 
 print(f'\n{"ID":6s}  {"Nombre":55s}  {"Actual":25s}  {"Propuesto":40s}')
 print('-' * 140)
@@ -380,10 +380,10 @@ print('-' * 140)
 actualizaciones = []
 sin_regla = []
 
-for fila_idx, d in enumerate(datos, start=2):
-    id_res  = d.get('ID_Residuo', '')
-    nombre  = d.get('Nombre', '')
-    actual  = d.get('Riesgo', '')
+for d in datos:
+    id_res  = d.get('id_residuo', '')
+    nombre  = d.get('nombre', '') or ''
+    actual  = d.get('riesgo', '') or ''
     nombre_n = norm(nombre)
 
     # Overrides por ID tienen prioridad
@@ -408,7 +408,7 @@ for fila_idx, d in enumerate(datos, start=2):
     print(f'{id_res:6s}  {nombre[:55]:55s}  {actual[:25]:25s}  {marca} {propuesto}')
 
     if cambio:
-        actualizaciones.append((fila_idx, propuesto))
+        actualizaciones.append((id_res, propuesto))
 
 print()
 if sin_regla:
@@ -420,9 +420,11 @@ if sin_regla:
 print(f'Cambios a aplicar: {len(actualizaciones)} / {len(datos)} residuos')
 
 if not DRY_RUN and actualizaciones:
-    print('\nActualizando Sheets...')
-    cambios = [(fila_idx, {'Riesgo': ghs_val}) for fila_idx, ghs_val in actualizaciones]
-    actualizar_fila_por_fila(ws, cambios)
+    print('\nActualizando Supabase...')
+    cambios = [(id_res, {'riesgo': ghs_val}) for id_res, ghs_val in actualizaciones]
+    actualizar_fila_por_fila(t, cambios)
     print(f'✅ {len(actualizaciones)} residuos actualizados.')
 elif DRY_RUN:
-    print('\n[DRY RUN] Pon DRY_RUN = False y vuelve a ejecutar para escribir en Sheets.')
+    print('\n[DRY RUN] Pon DRY_RUN = False y vuelve a ejecutar para escribir en Supabase.')
+
+conn.close()

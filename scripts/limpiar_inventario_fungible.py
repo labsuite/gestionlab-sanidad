@@ -1,7 +1,6 @@
 """
 limpiar_inventario_fungible.py
 Borra todos los datos de prueba del módulo de material fungible.
-Conserva las cabeceras de todas las hojas.
 DRY_RUN = True  →  solo muestra lo que se borraría (sin tocar nada)
 DRY_RUN = False →  borra de verdad
 """
@@ -10,33 +9,33 @@ sys.path.insert(0, '.')
 from scripts.base import conectar, leer, eliminar_todas
 
 # ── CONFIGURACIÓN ────────────────────────────────────────────────
-DRY_RUN = False  # cambiar a False para ejecutar de verdad
+DRY_RUN = True  # cambiar a False para ejecutar de verdad
 
-HOJAS = [
-    'Material',
-    'Movimientos',
-    'Material_Ubicaciones',
-    'Historico_Precios',
-    'Solicitudes',
-    'Lineas_Pedido',
-    'Pedidos',
-    'Revisiones_Inventario',
+TABLAS = [
+    'material',
+    'movimientos',
+    'material_ubicaciones',
+    'historico_precio',
+    'solicitudes',
+    'lineas_pedido',
+    'pedidos',
+    'revisiones_inventario',
 ]
 # ────────────────────────────────────────────────────────────────
 
-sh = conectar()
+conn = conectar()
 
 total = 0
-for nombre in HOJAS:
+for nombre in TABLAS:
     try:
-        ws, headers, datos = leer(sh, nombre)
+        t, columnas, datos = leer(conn, nombre)
         n = len(datos)
         total += n
         if DRY_RUN:
             print(f'  [DRY] {nombre:30s} {n:4d} filas se borrarían')
         else:
             if n > 0:
-                eliminar_todas(ws)
+                eliminar_todas(t)
                 print(f'  ✓ {nombre:30s} {n:4d} filas eliminadas')
             else:
                 print(f'  — {nombre:30s} ya estaba vacía')
@@ -45,7 +44,9 @@ for nombre in HOJAS:
 
 print()
 if DRY_RUN:
-    print(f'[DRY RUN] Se borrarían {total} filas en total. Cabeceras conservadas.')
+    print(f'[DRY RUN] Se borrarían {total} filas en total.')
     print('Pon DRY_RUN = False y vuelve a ejecutar para borrar de verdad.')
 else:
-    print(f'✅ Limpieza completada — {total} filas eliminadas. Cabeceras conservadas.')
+    print(f'✅ Limpieza completada — {total} filas eliminadas.')
+
+conn.close()

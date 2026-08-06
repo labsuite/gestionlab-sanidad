@@ -1,7 +1,7 @@
 # GestionLab – Estado del proyecto
 
 App web de gestión de laboratorio para el CIFP Manuel Antonio (Vigo).
-Stack: JS vanilla + HTML/CSS, Google Sheets como base de datos vía REST API, Google OAuth client-side.
+Stack: JS vanilla + HTML/CSS, Supabase (Postgres + Auth + Storage + Edge Functions) como backend.
 URL de la app: `https://palomafedez.github.io/gestionlab-sanidad/`
 
 ---
@@ -29,57 +29,67 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 
 ## Scripts de mantenimiento de base de datos (carpeta `scripts/`)
 
-Permiten modificar Google Sheets directamente desde Claude Code.
-Autenticación vía cuenta de servicio (`scripts/credentials.json`, excluido de git).
+Permiten modificar Supabase (proyecto de migración `vnoecaqldymonkgrmvlj`) directamente
+desde Claude Code, por conexión Postgres directa (pooler) con la contraseña de servicio —
+bypassa RLS igual que las Edge Functions con la service_role key.
+Credenciales en `scripts/supabase_credentials.json` (excluido de git).
+
+**Google Sheets ya no es la base de datos de GestionLab** (retirado 2026-08-06 junto con el
+cambio de login a Supabase Auth) — estos scripts operan sobre las tablas reales de Postgres,
+no sobre ninguna hoja de cálculo. `scripts/credentials.json` (cuenta de servicio de Google)
+ya no lo usa nada; se puede revocar si se quiere.
 
 ### Estructura
 - `base.py` — conexión y funciones comunes (importar desde aquí)
 - `test_conexion.py` — verifica que la conexión funciona
-- `nuevo_residuo.py` — INSERT en Tipos_Residuo
-- `actualizar_riesgos_ghs.py` — UPDATE masivo del campo Riesgo en Tipos_Residuo con pictogramas GHS; `DRY_RUN = True` por defecto
-- `actualizar_planes.py` — UPDATE en Planes_Mantenimiento (operación, periodicidad, tipo...)
-- `actualizar_equipos.py` — UPDATE en Equipos (protocolos, temporadas, ubicaciones...)
-- `limpiar_hoja.py` — DELETE en cualquier hoja con filtro; `DRY_RUN = True` por defecto
-- `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 hojas del módulo de fungibles
-- `importar_alumnos.py` — INSERT masivo en Usuarios desde Excel (inicio de curso)
-- `rellenar_mantenimientos.py` — INSERT en Registro_Mantenimientos de todos los periodos de un curso como realizados (solo Internos); `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
-- `quitar_externos_excel.py` — elimina filas de Tipo_Intervencion=Externo de un XLSX ya exportado; busca automáticamente el más reciente en Descargas o acepta ruta como argumento. Genera `*_sin_externos.xlsx` sin tocar el original.
+- `nuevo_residuo.py` — INSERT/UPDATE puntual en `tipos_residuo`
+- `actualizar_riesgos_ghs.py` — UPDATE masivo del campo `riesgo` en `tipos_residuo` con pictogramas GHS; `DRY_RUN = True` por defecto
+- `actualizar_planes.py` — UPDATE en `planes_mantenimiento` (operación, periodicidad, tipo...)
+- `actualizar_equipos.py` — UPDATE en `equipos` (protocolos, temporadas, ubicaciones...)
+- `limpiar_hoja.py` — DELETE en cualquier tabla con filtro; `DRY_RUN = True` por defecto
+- `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 tablas del módulo de fungibles; `DRY_RUN = True` por defecto
+- `importar_alumnos.py` — INSERT masivo en `usuarios` desde Excel (inicio de curso) — además da de alta una cuenta real de Supabase Auth con contraseña temporal para cada alumno nuevo (sin email no puede acceder, así que el email es obligatorio); las contraseñas se imprimen al final para repartirlas, nunca se guardan en fichero
+- `onboardear_auth_supabase.py` — alta en bloque de cuentas reales de Supabase Auth para todo el profesorado/alumnado activo del catálogo `usuarios` que aún no la tenga (mismo patrón que la Edge Function `crear-usuario`, en bloque)
+- `rellenar_mantenimientos.py` — INSERT en `registro_mantenimientos` de todos los periodos de un curso como realizados (solo Internos); `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
+- `quitar_externos_excel.py` — elimina filas de Tipo_Intervencion=Externo de un XLSX ya exportado; busca automáticamente el más reciente en Descargas o acepta ruta como argumento. Genera `*_sin_externos.xlsx` sin tocar el original. (No toca Supabase — manipula el XLSX directamente.)
 - `generar_modelo_calidad.py` — genera los dos Excel del modelo de calidad (inventario + plan de mantenimiento) desde Python; alternativa al botón de la app cuando se necesita uso puntual offline.
+- `migrar_*.py` — scripts puntuales ya ejecutados que copiaron los datos de cada módulo desde Sheets a Supabase durante la migración; se conservan como registro histórico de cómo se pobló cada tabla, no hace falta volver a ejecutarlos.
 
 ### Flujo de trabajo
 1. Usuario describe el cambio a Claude
 2. Claude rellena la sección `CONFIGURACIÓN` del script correspondiente
 3. Usuario ejecuta `! python scripts/<nombre>.py`
-4. Los cambios aparecen directamente en Sheets
+4. Los cambios aparecen directamente en Supabase (y por tanto en la app)
 
 ### Funciones de base.py
+`ws`/`t` es un objeto `Tabla` (nombre de tabla + su PK + conexión) que devuelve `leer()` —
+sustituye al `worksheet` de gspread. Las funciones de búsqueda devuelven valores de **clave
+primaria**, no índices de fila (Postgres no tiene "fila 5").
+
 | Función | Uso |
 |---|---|
-| `conectar()` | Devuelve el spreadsheet autenticado |
-| `leer(sh, hoja)` | Devuelve `(ws, headers, datos)` |
-| `buscar(ws, campo, valor)` | Filas con coincidencia exacta |
-| `buscar_multi(ws, {campo: valor})` | Filas que cumplen todos los filtros |
-| `buscar_contiene(ws, campo, texto)` | Búsqueda parcial sin distinción de mayúsculas |
-| `todas_las_filas(ws)` | Índices de todas las filas de datos |
-| `actualizar(ws, filas, campo, valor)` | Actualiza un campo (batch) |
-| `actualizar_varios(ws, filas, {campo: valor})` | Actualiza varios campos (batch) |
-| `actualizar_fila_por_fila(ws, [(fila, {campo: valor})])` | Cambios distintos por equipo |
-| `eliminar(ws, filas)` | Borra filas de abajo arriba |
-| `eliminar_todas(ws)` | Limpieza total manteniendo cabecera |
-| `insertar(ws, dict)` | Añade una fila |
-| `insertar_varios(ws, [dicts])` | Añade múltiples filas (batch) |
-| `siguiente_id(ws, campo_id, prefijo)` | Genera el siguiente ID correlativo |
-| `preview_filas(ws, filas, campos)` | Muestra preview antes de actuar |
+| `conectar()` | Devuelve la conexión a Postgres autenticada |
+| `leer(conn, tabla)` | Devuelve `(t, columnas, datos)` |
+| `buscar(t, campo, valor)` | PKs con coincidencia exacta |
+| `buscar_multi(t, {campo: valor})` | PKs que cumplen todos los filtros |
+| `buscar_contiene(t, campo, texto)` | Búsqueda parcial sin distinción de mayúsculas (`ilike`) |
+| `todas_las_filas(t)` | PKs de todas las filas |
+| `actualizar(t, pks, campo, valor)` | Actualiza un campo (batch) |
+| `actualizar_varios(t, pks, {campo: valor})` | Actualiza varios campos (batch) |
+| `actualizar_fila_por_fila(t, [(pk, {campo: valor})])` | Cambios distintos por fila |
+| `eliminar(t, pks)` | Borra filas por PK |
+| `eliminar_todas(t)` | Limpieza total de la tabla |
+| `insertar(t, dict)` | Añade una fila |
+| `insertar_varios(t, [dicts])` | Añade múltiples filas (batch) |
+| `generar_id(prefijo)` | Genera un ID `PREFIJO` + 6 caracteres alfanuméricos al azar — mismo formato que `genId()` en `js/config.js` |
+| `preview_filas(t, pks, campos)` | Muestra preview antes de actuar |
 
-### Formatos de ID por hoja
-| Hoja | Formato | Ejemplo |
-|---|---|---|
-| Tipos_Residuo | `R` + 3 dígitos sin guión | `R001`, `R112` |
-| Usuarios | `USR-` + 3 dígitos | `USR-001` |
-| Planes_Mantenimiento | `PM` + 4 dígitos | `PM0046` |
-| Equipos | prefijo tipo + guión + número | `CEN-02`, `PIP-035` |
-
-⚠ Usar `siguiente_id()` solo si el formato es `PREF-NNN`. Para formatos sin guión (como Tipos_Residuo), calcular el ID manualmente.
+### Formatos de ID
+Todas las tablas migradas usan IDs tipo `PREFIJO` + 6 caracteres alfanuméricos al azar
+(p.ej. `RESHA8SA3`, `RM4F9K2X`), generados server-side en las Edge Functions o con
+`generar_id()` en los scripts — ya no hay IDs secuenciales tipo `PREF-NNN` ni formatos
+especiales por tabla que recordar (el antiguo `R` + 3 dígitos de `tipos_residuo` era propio
+de Sheets; los residuos nuevos ya usan el formato `RES` + hash).
 
 ### Formato Excel para importar alumnos
 Cabecera: `Nombre | Apellidos | Email | Ciclo | Modulos | Labs`
@@ -143,23 +153,17 @@ Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `
 
 ---
 
-## Rangos de carga en sheets.js
+## Añadir una columna nueva a una tabla
 
-⚠ Al añadir una columna nueva a una hoja de Sheets, **actualizar el rango** en `loadAllData()` (`js/sheets.js`) y las columnas en `COLS` (`js/config.js`). Si no, el campo llega siempre `undefined` en el navegador.
+⚠ Al añadir una columna a una tabla de Supabase, actualizar: la migración SQL (`supabase/schema.sql`),
+la Edge Function `gestionar-*` correspondiente (leer/escribir el campo nuevo), la función
+`_xSbToObj()` en `js/sheets.js` (mapea la fila de Supabase al objeto que usa el resto de la
+app) y `COLS` en `js/config.js` si el módulo también tiene columnas legacy de Sheets. Si se
+olvida el mapeo en `_xSbToObj()`, el campo llega siempre `undefined` en el navegador aunque
+la columna exista en la base de datos.
 
-Rangos actuales relevantes:
-| Hoja | Rango | Última col |
-|------|-------|-----------|
-| Planes_Mantenimiento | `A2:H` | H = Con_Alumnado |
-| Registro_Mantenimientos | `A2:I` | I = Observaciones |
-| Equipos | `A2:W` | W = Mes_Fin_Temporada |
-| Pedidos | `A2:U` | U = Gasto_Extra_Importe |
-| Material_Ubicaciones | `A2:H` | H = Unidad_Lote |
-| Solicitudes | `A2:K` | K = Snooze_Hasta |
-| Incidencias | `A2:J` | J = Relacionada_Con |
-| Tareas_Intervencion | `A2:F` | F = Observaciones |
-| Registros_Cabina | `A2:L` | L = Estado |
-| Registros_Autoclave | `A2:K` | K = Estado |
+(Ya no aplica el antiguo sistema de "rango A2:X" de Sheets — `loadAllData()` en `js/sheets.js`
+lee todas las tablas directo de Supabase con `select('*')`.)
 
 ---
 
@@ -174,9 +178,9 @@ El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:h
 ## Arquitectura general
 
 - `index.html` — página principal, carga todos los scripts y modales
-- `js/config.js` — constantes globales: DATA, COLS, ROLES, SHEETS_ID
-- `js/auth.js` — OAuth Google (token management)
-- `js/sheets.js` — helpers sheetsGet/sheetsAppend/sheetsUpdate/sheetsDeleteRow + loadAllData()
+- `js/config.js` — constantes globales: DATA, COLS, ROLES, clientes Supabase (`_sb`, `_sbMigracion`)
+- `js/auth.js` — Supabase Auth (email + contraseña), sesión gestionada por supabase-js
+- `js/sheets.js` — `loadAllData()` (lee todas las tablas de Supabase), `callEdgeFunction()`, `subirDocumento()`/`abrirDocumento()` (Storage), y los `_xSbToObj()` de mapeo por tabla
 - `js/ui.js` — navegación, renderAll(), badges, carga de modales
 - `js/mantenimiento.js` — sistema completo de mantenimiento preventivo
 - `js/residuos.js` — módulo de gestión de residuos
@@ -196,35 +200,17 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 
 ---
 
-## Hoja de Equipos – columnas (A–W)
+## Tabla `equipos` — columnas
 
-| Col | Campo |
-|-----|-------|
-| A | ID_Activo |
-| B | Tipo_Equipo |
-| C | Marca |
-| D | Modelo |
-| E | Numero_Serie |
-| F | Ubicacion |
-| G | Responsable |
-| H | Fecha_Adquisicion |
-| I | Origen_Financiacion |
-| J | Proveedor_Compra |
-| K | Proveedor_Servicio_Tecnico |
-| L | Estado_Operativo |
-| M | Periodicidad_Mantenimiento *(legado, no usar)* |
-| N | Periodicidad_Custom *(legado, no usar)* |
-| O | Fecha_Ultimo_Preventivo *(legado, no usar)* |
-| P | Fecha_Proximo_Preventivo *(legado, no usar)* |
-| Q | Manual_Ficha_Tecnica |
-| R | Observaciones |
-| S | Coste |
-| T | Protocolo_Uso |
-| U | Tipo_Mantenimiento |
-| V | Mes_Inicio_Temporada |
-| W | Mes_Fin_Temporada |
+id_activo, tipo_equipo, marca, modelo, numero_serie, ubicacion, responsable,
+fecha_adquisicion, origen_financiacion, proveedor_compra, proveedor_servicio_tecnico,
+estado_operativo, manual_ficha_tecnica, observaciones, coste, protocolo_uso,
+tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada.
 
-**Columnas M-P:** existen en Sheets pero la app las deja vacías. NO eliminar (desplazaría el resto).
+Las columnas legado de Sheets (Periodicidad_Mantenimiento, Periodicidad_Custom,
+Fecha_Ultimo_Preventivo, Fecha_Proximo_Preventivo — sustituidas hace tiempo por
+Planes_Mantenimiento + Registro_Mantenimientos) no se migraron a la tabla Postgres, no
+existen aquí.
 
 ---
 

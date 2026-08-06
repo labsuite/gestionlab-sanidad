@@ -1,7 +1,7 @@
 """
-limpiar_hoja.py — Eliminar registros de cualquier hoja de la base de datos.
-Sirve para: Incidencias, Solicitudes, Movimientos, Intervenciones, Tareas_Usuario,
-            Consultas_Residuo, Adiciones_Residuo, Registro_Mantenimientos, etc.
+limpiar_hoja.py — Eliminar registros de cualquier tabla de Supabase.
+Sirve para: incidencias, solicitudes, movimientos, intervenciones, tareas_personales,
+            consultas_residuo, adiciones_residuo, registro_mantenimientos, etc.
 Uso: ! python scripts/limpiar_hoja.py
 """
 import sys
@@ -12,25 +12,25 @@ from base import conectar, leer, buscar, buscar_multi, buscar_contiene, todas_la
 # CONFIGURACIÓN — Claude rellena esta sección cada vez
 # ===========================================================================
 
-# Hoja a limpiar
-HOJA = 'Consultas_Residuo'
+# Tabla a limpiar
+TABLA = 'consultas_residuo'
 
 # Modo de selección de filas a eliminar:
-#   'todas'      → elimina todas las filas de datos (limpieza total)
+#   'todas'      → elimina todas las filas (limpieza total)
 #   'filtro'     → elimina las filas que coincidan con FILTRO
 #   'contiene'   → elimina las filas donde CAMPO_TEXTO contiene TEXTO
 
 MODO = 'filtro'
 
 # Para MODO 'filtro': dict con uno o varios campos exactos
-FILTRO = {'Estado': 'Resuelta'}
+FILTRO = {'estado': 'Resuelta'}
 
 # Para MODO 'contiene': campo y texto a buscar
-CAMPO_TEXTO = 'Observaciones'
+CAMPO_TEXTO = 'observaciones'
 TEXTO = 'curso 2023-2024'
 
 # Columnas que se mostrarán en el preview antes de borrar
-PREVIEW_CAMPOS = ['ID_Consulta', 'Fecha', 'Estado', 'Descripcion']
+PREVIEW_CAMPOS = ['id_consulta', 'fecha', 'estado', 'descripcion']
 
 # Poner en False para ejecutar de verdad; True solo muestra qué se borraría
 DRY_RUN = True
@@ -39,24 +39,24 @@ DRY_RUN = True
 # EJECUCIÓN — no tocar
 # ===========================================================================
 
-sh = conectar()
-ws, headers, _ = leer(sh, HOJA)
+conn = conectar()
+t, columnas, _ = leer(conn, TABLA)
 
 if MODO == 'todas':
-    filas = todas_las_filas(ws)
+    pks = todas_las_filas(t)
 elif MODO == 'filtro':
-    filas = buscar_multi(ws, FILTRO, headers)
+    pks = buscar_multi(t, FILTRO)
 elif MODO == 'contiene':
-    filas = buscar_contiene(ws, CAMPO_TEXTO, TEXTO, headers)
+    pks = buscar_contiene(t, CAMPO_TEXTO, TEXTO)
 else:
     print(f"⚠ MODO '{MODO}' no reconocido. Usa 'todas', 'filtro' o 'contiene'.")
     sys.exit(1)
 
-print(f"Filas seleccionadas en '{HOJA}': {len(filas)}")
-campos_preview = [c for c in PREVIEW_CAMPOS if c in headers]
-preview_filas(ws, filas, campos_preview, headers)
+print(f"Filas seleccionadas en '{TABLA}': {len(pks)}")
+campos_preview = [c for c in PREVIEW_CAMPOS if c in columnas]
+preview_filas(t, pks, campos_preview)
 
-if not filas:
+if not pks:
     print("Nada que eliminar.")
     sys.exit(0)
 
@@ -65,7 +65,9 @@ if DRY_RUN:
     print(f"   Cambia DRY_RUN = False para ejecutar el borrado real.")
 else:
     if MODO == 'todas':
-        n = eliminar_todas(ws)
+        n = eliminar_todas(t)
     else:
-        n = eliminar(ws, filas)
-    print(f"\n✅ {n} fila(s) eliminada(s) de '{HOJA}'.")
+        n = eliminar(t, pks)
+    print(f"\n✅ {n} fila(s) eliminada(s) de '{TABLA}'.")
+
+conn.close()
