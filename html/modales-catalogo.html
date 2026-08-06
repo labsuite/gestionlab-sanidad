@@ -185,3 +185,27 @@
   </div>
 </div>
 
+<!-- Modal Importar profesorado desde Sanidad CMA -->
+<div class="modal-overlay" id="modal-importar-profesores">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Importar profesorado desde Sanidad CMA</div>
+      <button class="modal-close" onclick="closeModal('modal-importar-profesores')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="importar-profesores-contenido">
+        <div class="empty-state" style="padding:40px 0">
+          <div class="empty-state-icon">⏳</div>
+          <div class="empty-state-title">Consultando Sanidad CMA...</div>
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-importar-profesores')">Cerrar</button>
+        <button class="btn btn-secondary" id="btn-atras-importar-profesores" style="display:none" onclick="_pasoUnoImportarProfesores()">← Atrás</button>
+        <button class="btn btn-primary" id="btn-siguiente-importar-profesores" style="display:none" onclick="_pasoDosImportarProfesores()">Siguiente: equipos →</button>
+        <button class="btn btn-primary" id="btn-confirmar-importar-profesores" style="display:none" onclick="confirmarImportarProfesores()">Importar profesorado</button>
+      </div>
+    </div>
+  </div>
+</div>
+

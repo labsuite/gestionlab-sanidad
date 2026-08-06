@@ -240,8 +240,9 @@ function renderUsuarios() {
       <input id="search-usuarios" type="search" placeholder="Buscar por nombre o email..."
         oninput="buscarUsuario(this.value)"
         style="flex:1;min-width:200px;max-width:360px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
-      <div style="margin-left:auto;display:flex;gap:8px">
-        ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarAlumnos()">📥 Importar desde Sanidad CMA</button>` : ''}
+      <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+        ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarAlumnos()">📥 Importar alumnado</button>` : ''}
+        ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarProfesores()">📥 Importar profesorado</button>` : ''}
         ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
       </div>
     </div>
@@ -910,6 +911,249 @@ function _renderResultadosImportarAlumnos(resultados) {
       <div class="card" style="margin-bottom:16px">
         <table>
           <thead><tr><th>Email</th><th>Contraseña temporal</th></tr></thead>
+          <tbody>${filasOk}</tbody>
+        </table>
+      </div>` : ''}
+    ${fallidos.length ? `
+      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">⚠️ ${fallidos.length} omitido(s)</div>
+      <ul style="font-size:13px;color:var(--text-muted)">${filasError}</ul>` : ''}
+  `;
+}
+
+// ============================================================
+// IMPORTAR PROFESORADO DESDE SANIDAD CMA (2 pasos: módulos → equipos)
+// ============================================================
+let _previewProfesoresCMA = [];
+let _profesoresAImportar = [];
+
+function abrirModalImportarProfesores() {
+  _previewProfesoresCMA = [];
+  _profesoresAImportar = [];
+  document.getElementById('importar-profesores-contenido').innerHTML = `
+    <div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">⏳</div>
+      <div class="empty-state-title">Consultando Sanidad CMA...</div>
+    </div>`;
+  ['btn-atras-importar-profesores', 'btn-siguiente-importar-profesores', 'btn-confirmar-importar-profesores']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  openModal('modal-importar-profesores');
+  _cargarPreviewImportarProfesores();
+}
+
+async function _cargarPreviewImportarProfesores() {
+  const cont = document.getElementById('importar-profesores-contenido');
+  try {
+    const { profesores } = await callEdgeFunction('importar-profesores', { accion: 'preview' });
+    _previewProfesoresCMA = profesores || [];
+    _pasoUnoImportarProfesores();
+  } catch (e) {
+    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">⚠️</div>
+      <div class="empty-state-title">No se pudo consultar Sanidad CMA</div>
+      <div style="color:var(--text-muted);font-size:13px;margin-top:6px">${e.message}</div>
+    </div>`;
+  }
+}
+
+// Paso 1: checklist agrupado Ciclo → Módulo (mismo patrón que alumnos) para elegir qué
+// asignaciones profesor×módulo se van a importar.
+function _pasoUnoImportarProfesores() {
+  const cont = document.getElementById('importar-profesores-contenido');
+  const nuevos = _previewProfesoresCMA.filter(p => !p.existe);
+
+  document.getElementById('btn-atras-importar-profesores').style.display = 'none';
+  document.getElementById('btn-confirmar-importar-profesores').style.display = 'none';
+  const btnSiguiente = document.getElementById('btn-siguiente-importar-profesores');
+
+  if (!_previewProfesoresCMA.length) {
+    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
+      <div class="empty-state-icon">🧑‍🏫</div>
+      <div class="empty-state-title">Sanidad CMA no tiene profesorado disponible ahora mismo</div>
+    </div>`;
+    btnSiguiente.style.display = 'none';
+    return;
+  }
+
+  const grupos = {};
+  _previewProfesoresCMA.forEach((p, i) => {
+    const ciclo = p.ciclo || 'Sin ciclo';
+    const modulo = p.modulo || 'Sin módulo';
+    (grupos[ciclo] ??= {});
+    (grupos[ciclo][modulo] ??= []).push(i);
+  });
+
+  const ciclosHtml = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es')).map(ciclo => {
+    const modulos = grupos[ciclo];
+    const idsCiclo = Object.values(modulos).flat();
+    const habilesCiclo = idsCiclo.some(i => !_previewProfesoresCMA[i].existe);
+
+    const modulosHtml = Object.keys(modulos).sort((a, b) => a.localeCompare(b, 'es')).map(modulo => {
+      const ids = modulos[modulo];
+      const habilesModulo = ids.some(i => !_previewProfesoresCMA[i].existe);
+      const filas = ids.map(i => {
+        const p = _previewProfesoresCMA[i];
+        return `<tr style="${p.existe ? 'opacity:0.5' : ''}">
+          <td><input type="checkbox" class="importar-profesor-check" data-ciclo="${_escAttr(ciclo)}" data-modulo="${_escAttr(modulo)}" value="${i}" ${p.existe ? 'disabled' : 'checked'}></td>
+          <td>${p.nombre || '—'}</td>
+          <td>${p.email || '—'}</td>
+          <td>${p.laboratorio || '<span style="color:var(--text-muted)">sin lab</span>'}</td>
+          <td>${p.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
+        </tr>`;
+      }).join('');
+      return `<div style="margin:10px 0">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:${habilesModulo ? 'pointer' : 'default'}">
+          <input type="checkbox" ${habilesModulo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportarProfesores('modulo','${_escAttr(ciclo)}','${_escAttr(modulo)}',this.checked)">
+          ${modulo} <span style="font-weight:400;color:var(--text-muted)">(${ids.length})</span>
+        </label>
+        <table style="margin-top:4px"><tbody>${filas}</tbody></table>
+      </div>`;
+    }).join('');
+
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <label style="display:flex;align-items:center;gap:8px;cursor:${habilesCiclo ? 'pointer' : 'default'}">
+          <input type="checkbox" ${habilesCiclo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportarProfesores('ciclo','${_escAttr(ciclo)}',null,this.checked)">
+          <span class="card-title" style="margin:0">${ciclo} <span style="font-weight:400;color:var(--text-muted)">(${idsCiclo.length})</span></span>
+        </label>
+      </div>
+      <div style="padding:4px 16px 12px">${modulosHtml}</div>
+    </div>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <span>${nuevos.length} asignación(es) nueva(s) de ${_previewProfesoresCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
+      <span style="white-space:nowrap">
+        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(true)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
+        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(false)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Nada</button>
+      </span>
+    </div>
+    ${ciclosHtml}`;
+  btnSiguiente.style.display = nuevos.length ? '' : 'none';
+}
+
+function _toggleGrupoImportarProfesores(nivel, ciclo, modulo, checked) {
+  document.querySelectorAll('.importar-profesor-check:not(:disabled)').forEach(cb => {
+    const coincideCiclo = cb.dataset.ciclo === ciclo;
+    const coincide = nivel === 'ciclo' ? coincideCiclo : (coincideCiclo && cb.dataset.modulo === modulo);
+    if (coincide) cb.checked = checked;
+  });
+}
+
+function _toggleSeleccionarTodosImportarProfesores(checked) {
+  document.querySelectorAll('.importar-profesor-check:not(:disabled)').forEach(cb => { cb.checked = checked; });
+  document.querySelectorAll('#importar-profesores-contenido input[type=checkbox]:not(.importar-profesor-check):not(:disabled)').forEach(cb => { cb.checked = checked; });
+}
+
+function _extraerLabDeUbicacion(ubicacion) {
+  const m = (ubicacion || '').match(/\b(\d{3})\b/);
+  return m ? m[1] : null;
+}
+
+// Paso 2: a partir de los labs de los módulos marcados, sugiere los equipos de esos labs
+// (checklist revisable) que pasarán a tener a este profesor como responsable.
+function _pasoDosImportarProfesores() {
+  const seleccionadas = Array.from(document.querySelectorAll('.importar-profesor-check:checked'))
+    .map(cb => _previewProfesoresCMA[Number(cb.value)]);
+  if (!seleccionadas.length) { showToast('Selecciona al menos un profesor', 'error'); return; }
+
+  const porEmail = {};
+  seleccionadas.forEach(p => {
+    const email = (p.email || '').toLowerCase().trim();
+    if (!email) return;
+    (porEmail[email] ??= { nombre: p.nombre, email, ciclo: p.ciclo, modulos: new Set(), labs: new Set() });
+    if (p.modulo) porEmail[email].modulos.add(p.modulo);
+    if (p.laboratorio) porEmail[email].labs.add(p.laboratorio);
+  });
+  _profesoresAImportar = Object.values(porEmail).map(p => ({
+    nombre: p.nombre, email: p.email, ciclo: p.ciclo,
+    modulo: [...p.modulos].join(','), laboratorio: [...p.labs].join(','), labs: [...p.labs],
+  }));
+
+  const cont = document.getElementById('importar-profesores-contenido');
+  const tarjetasHtml = _profesoresAImportar.map(p => {
+    const equiposDeSusLabs = p.labs.length
+      ? DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)))
+      : [];
+
+    const filasEquipos = equiposDeSusLabs.map(e => `
+      <tr>
+        <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" value="${_escAttr(e.ID_Activo)}" checked></td>
+        <td>${e.Tipo_Equipo || '—'} ${e.Marca || ''} ${e.Modelo || ''} <span style="color:var(--text-muted)">(${e.ID_Activo})</span></td>
+        <td>${e.Ubicacion || '—'}</td>
+        <td style="color:var(--text-muted);font-size:12px">${e.Responsable || '—'}</td>
+      </tr>`).join('');
+
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="card-header">
+        <div class="card-title">${p.nombre} <span style="font-weight:400;color:var(--text-muted)">(${p.email})</span></div>
+      </div>
+      <div style="padding:8px 16px 14px">
+        ${!p.labs.length
+          ? `<div style="font-size:12px;color:var(--text-muted)">Sus módulos seleccionados no tienen lab asignado en Sanidad CMA — no se puede sugerir equipos automáticamente. Se importará igualmente, sin marcarlo responsable de ningún equipo.</div>`
+          : !equiposDeSusLabs.length
+            ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
+            : `<table>
+                <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Responsable(s) actual(es)</th></tr></thead>
+                <tbody>${filasEquipos}</tbody>
+              </table>`}
+      </div>
+    </div>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
+      Equipos sugeridos según el lab de sus módulos. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
+    </div>
+    ${tarjetasHtml}`;
+
+  document.getElementById('btn-siguiente-importar-profesores').style.display = 'none';
+  document.getElementById('btn-atras-importar-profesores').style.display = '';
+  document.getElementById('btn-confirmar-importar-profesores').style.display = '';
+}
+
+async function confirmarImportarProfesores() {
+  const profesores = _profesoresAImportar.map(p => ({
+    nombre: p.nombre, email: p.email, ciclo: p.ciclo, modulo: p.modulo, laboratorio: p.laboratorio,
+    equipos_responsable: Array.from(document.querySelectorAll(`.importar-equipo-check[data-email="${CSS.escape(p.email)}"]:checked`))
+      .map(cb => cb.value),
+  }));
+  if (!profesores.length) { showToast('No hay profesorado seleccionado', 'error'); return; }
+
+  showLoading('Importando profesorado...');
+  try {
+    const { resultados } = await callEdgeFunction('importar-profesores', { accion: 'importar', profesores });
+    _renderResultadosImportarProfesores(resultados);
+    await loadAllData();
+  } catch (e) {
+    showToast('Error importando: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function _renderResultadosImportarProfesores(resultados) {
+  const cont = document.getElementById('importar-profesores-contenido');
+  ['btn-atras-importar-profesores', 'btn-siguiente-importar-profesores', 'btn-confirmar-importar-profesores']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  const ok = resultados.filter(r => r.ok);
+  const fallidos = resultados.filter(r => !r.ok);
+
+  const filasOk = ok.map(r => `
+    <tr>
+      <td>${r.email}</td>
+      <td><code style="font-size:12px">${r.password_temporal}</code></td>
+      <td>${r.equipos_actualizados || 0}</td>
+    </tr>`).join('');
+
+  const filasError = fallidos.map(r => `<li>${r.email}: ${r.motivo || 'error desconocido'}</li>`).join('');
+
+  cont.innerHTML = `
+    ${ok.length ? `
+      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">✅ ${ok.length} profesor(es) importado(s)</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Contraseñas temporales — reparte y no guardes este listado.</div>
+      <div class="card" style="margin-bottom:16px">
+        <table>
+          <thead><tr><th>Email</th><th>Contraseña temporal</th><th>Equipos asignados</th></tr></thead>
           <tbody>${filasOk}</tbody>
         </table>
       </div>` : ''}
