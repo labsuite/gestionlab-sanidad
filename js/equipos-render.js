@@ -202,7 +202,7 @@ function renderEquipos(filtro, filtroEstado) {
       return `<span class="badge badge-orange">${pendientes} pendiente${pendientes > 1 ? 's' : ''}</span>`;
     })();
     const expandId = 'eq-expand-' + e.ID_Activo.replace(/[^a-zA-Z0-9]/g,'_');
-    const manualLink = e.Manual_Ficha_Tecnica ? `<a href="${e.Manual_Ficha_Tecnica}" target="_blank" class="icon-btn" title="Ver manual">📄</a>` : '';
+    const manualLink = e.Manual_Ficha_Tecnica ? `<a href="#" onclick="abrirDocumento('${e.Manual_Ficha_Tecnica}'); return false;" class="icon-btn" title="Ver manual">📄</a>` : '';
     // Profesor puede editar e intervenir solo en equipos donde es responsable
     const puedeEditarEste   = puedeHacer('editarEquipos') ||
       (getUserRole() === 'Profesor' && esResponsableDeEquipo(e));
@@ -253,7 +253,7 @@ function buildIntervencionesEquipo(equipoId) {
     ? parseFloat(equipo.Coste).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })
     : '—';
   const manualBtn = equipo.Manual_Ficha_Tecnica
-    ? `<a href="${equipo.Manual_Ficha_Tecnica}" target="_blank" style="color:var(--accent);font-size:12px;text-decoration:none">📄 Ver manual</a>`
+    ? `<a href="#" onclick="abrirDocumento('${equipo.Manual_Ficha_Tecnica}'); return false;" style="color:var(--accent);font-size:12px;text-decoration:none">📄 Ver manual</a>`
     : '<span style="color:var(--text-muted)">—</span>';
   const detalle = (label, valor) =>
     `<div><div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">${label}</div><div style="font-size:12px">${valor||'—'}</div></div>`;
@@ -413,7 +413,7 @@ function renderIntervenciones(filtroTipo = '') {
   const tipoBadge  = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   tbody.innerHTML = items.map(i => {
-    const pdfLink = i.URL_Adjunto ? `<a href="${i.URL_Adjunto}" target="_blank" title="${i.Nombre_Adjunto||'Ver documento'}" class="icon-btn">📄</a>` : '';
+    const pdfLink = i.URL_Adjunto ? `<a href="#" onclick="abrirDocumento('${i.URL_Adjunto}'); return false;" title="${i.Nombre_Adjunto||'Ver documento'}" class="icon-btn">📄</a>` : '';
     const intIdx  = DATA.intervenciones.indexOf(i);
     const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
@@ -672,7 +672,7 @@ function openFichaIntervencion(intIdx) {
     : '—';
   document.getElementById('ficha-int-observaciones').textContent = i.Observaciones || '—';
   document.getElementById('ficha-int-doc').innerHTML = i.URL_Adjunto
-    ? `<a href="${i.URL_Adjunto}" target="_blank" class="btn btn-secondary" style="font-size:12px">📄 ${i.Nombre_Adjunto || 'Ver documento'}</a>`
+    ? `<a href="#" onclick="abrirDocumento('${i.URL_Adjunto}'); return false;" class="btn btn-secondary" style="font-size:12px">📄 ${i.Nombre_Adjunto || 'Ver documento'}</a>`
     : '<span style="color:var(--text-muted);font-size:12px">Sin documento adjunto</span>';
 
   // Botones de acción

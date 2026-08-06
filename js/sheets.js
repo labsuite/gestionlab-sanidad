@@ -5,23 +5,53 @@
 // ----------------------------------------------------------------
 // callEdgeFunction — wrapper para las Edge Functions de Supabase que hacen
 // de "servidor" de GestionLab (crear-usuario, gestionar-proveedor...).
-// Reenvía el access_token de Google actual para que la función verifique
-// el rol server-side — el navegador nunca habla con Supabase Auth directo
-// hasta la migración del login (tarea #8).
+// Reenvía el access_token de la sesión de Supabase Auth actual: el gateway
+// de Edge Functions lo usa para verificar la firma, y la propia función
+// vuelve a comprobarlo (auth.getUser) para identificar el rol server-side.
 // ----------------------------------------------------------------
 async function callEdgeFunction(nombre, body) {
+  const { data: { session } } = await _sbMigracion.auth.getSession();
   const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${SUPABASE_MIGRACION_ANON}`,
+      'Authorization': `Bearer ${session?.access_token || SUPABASE_MIGRACION_ANON}`,
       'Content-Type': 'application/json',
-      'x-google-token': accessToken,
     },
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
   return data;
+}
+
+// ----------------------------------------------------------------
+// subirDocumento / abrirDocumento — Storage privado de Supabase (bucket
+// "documentos"), sustituye a la subida directa a Google Drive de antes de
+// la migración de login. subirDocumento devuelve una ruta interna (no una
+// URL pública, el bucket es privado); abrirDocumento pide un enlace firmado
+// de 1h justo antes de abrirlo. Los valores ya guardados con el sistema
+// antiguo son URLs de Drive completas (http…) — abrirDocumento las abre
+// directamente sin pasar por el bucket.
+// ----------------------------------------------------------------
+async function subirDocumento(tipo, id, fileData, fileName, fileType) {
+  const { path } = await callEdgeFunction('subir-documento', {
+    tipo, id, nombre_archivo: fileName, tipo_mime: fileType, contenido_base64: fileData,
+  });
+  return path;
+}
+
+async function abrirDocumento(path) {
+  if (!path) return;
+  if (/^https?:\/\//i.test(path)) { window.open(path, '_blank'); return; }
+  try {
+    const { data: { session } } = await _sbMigracion.auth.getSession();
+    const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/obtener-documento?path=${encodeURIComponent(path)}`, {
+      headers: { 'Authorization': `Bearer ${session?.access_token || SUPABASE_MIGRACION_ANON}` },
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
+    window.open(data.url, '_blank');
+  } catch(e) { showToast(e.message || 'No se pudo abrir el documento', 'error'); }
 }
 
 // ----------------------------------------------------------------

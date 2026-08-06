@@ -638,24 +638,34 @@ async function guardarActuacion(finalizar) {
     const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
     const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
     const tipoInt = v('act-tipo-int') || 'Correctivo';
-    let urlAdjunto = '', nombreAdjunto = '';
+    showLoading('Guardando intervención...');
+    let intervencion;
+    try {
+      ({ intervencion } = await callEdgeFunction('gestionar-intervencion', {
+        accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
+        fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
+        coste_intervencion: coste, estado: 'Planificada',
+      }));
+      DATA.intervenciones.push(_intervencionSbToObj(intervencion));
+    } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
+
+    // El adjunto se sube DESPUÉS de crear la intervención: la ruta de Storage
+    // se organiza por ID_Intervencion, que hasta aquí no existía todavía.
     if (_pendingActFileBase64) {
       showLoading('Subiendo documento...');
       try {
-        urlAdjunto    = await uploadFileToDrive(_pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
-        nombreAdjunto = _pendingActFileBase64.name;
-      } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
+        const path = await subirDocumento('actuacion', intervencion.id_intervencion, _pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
+        const { intervencion: actualizada } = await callEdgeFunction('gestionar-intervencion', {
+          accion: 'actualizar', id_intervencion: intervencion.id_intervencion,
+          url_adjunto: path, nombre_adjunto: _pendingActFileBase64.name,
+        });
+        DATA.intervenciones[DATA.intervenciones.length - 1] = _intervencionSbToObj(actualizada);
+      } catch(e) { showToast('Intervención guardada, pero el documento no se pudo subir', 'error'); }
       _pendingActFileBase64 = null;
     }
-    showLoading('Guardando intervención...');
+
+    showLoading('Guardando...');
     try {
-      const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
-        accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
-        fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
-        coste_intervencion: coste, url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto,
-        estado: 'Planificada',
-      });
-      DATA.intervenciones.push(_intervencionSbToObj(intervencion));
       await _guardarTareaIntervencion(intervencion.id_intervencion, desc, 'Pendiente', '', v('act-observaciones'));
       closeModal('modal-registrar-actuacion');
       showToast(`Intervención ${intervencion.id_intervencion} registrada. Tarea → Pendiente`, 'success');
@@ -684,7 +694,7 @@ async function guardarActuacion(finalizar) {
   if (_pendingActFileBase64) {
     showLoading('Subiendo documento...');
     try {
-      urlAdjunto    = await uploadFileToDrive(_pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
+      urlAdjunto    = await subirDocumento('actuacion', i.ID_Intervencion, _pendingActFileBase64.data, _pendingActFileBase64.name, _pendingActFileBase64.type);
       nombreAdjunto = _pendingActFileBase64.name;
     } catch(e) { showToast('Error subiendo el PDF', 'error'); hideLoading(); return; }
     _pendingActFileBase64 = null;
@@ -855,7 +865,7 @@ async function guardarEquipo() {
   let manualUrl = v('eq-pdf-url') || '';
   if (pendingEqFileBase64) {
     showLoading('Subiendo manual...');
-    try { manualUrl = await uploadFileToDrive(pendingEqFileBase64.data, pendingEqFileBase64.name, pendingEqFileBase64.type); }
+    try { manualUrl = await subirDocumento('manual', id, pendingEqFileBase64.data, pendingEqFileBase64.name, pendingEqFileBase64.type); }
     catch(e) { showToast('Error subiendo el PDF. Guardando sin él.', 'error'); }
     pendingEqFileBase64 = null;
   }
@@ -1031,7 +1041,7 @@ async function guardarFactura() {
   if (_pendingFacturaBase64) {
     showLoading('Subiendo factura...');
     try {
-      urlAdjunto    = await uploadFileToDrive(_pendingFacturaBase64.data, _pendingFacturaBase64.name, _pendingFacturaBase64.type);
+      urlAdjunto    = await subirDocumento('actuacion', i.ID_Intervencion, _pendingFacturaBase64.data, _pendingFacturaBase64.name, _pendingFacturaBase64.type);
       nombreAdjunto = _pendingFacturaBase64.name;
     } catch(e) { showToast('Error subiendo la factura', 'error'); hideLoading(); return; }
     _pendingFacturaBase64 = null;

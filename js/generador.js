@@ -201,21 +201,21 @@ async function generarHojaPedido() {
 
     const docxBlob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
 
-    setGenEstado('☁️ Subiendo a Drive...', 'info');
+    setGenEstado('☁️ Subiendo documento...', 'info');
     const fileName = `Folla_Pedido_${p.Nombre_Lista.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.docx`;
     const reader = new FileReader();
     reader.onload = async e => {
       try {
         const base64data = e.target.result.split(',')[1];
-        const url = await uploadFileToDrive(base64data, fileName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-        setGenEstado(`✅ Listo. <a href="${url}" target="_blank" style="color:var(--accent);font-weight:600;text-decoration:underline">📥 Abrir documento en Drive</a>`, 'ok');
+        const path = await subirDocumento('documento', pedidoId, base64data, fileName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        setGenEstado(`✅ Listo. <a href="#" onclick="abrirDocumento('${path}'); return false;" style="color:var(--accent);font-weight:600;text-decoration:underline">📥 Abrir documento</a>`, 'ok');
         // Marcar Doc_Hoja_Generada
         if (pedIdx !== -1 && DATA.pedidos[pedIdx].Doc_Hoja_Generada !== 'TRUE') {
           DATA.pedidos[pedIdx].Doc_Hoja_Generada = 'TRUE';
           try { await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { doc_hoja_generada: true } }); } catch(e) { console.warn('No se pudo marcar Doc_Hoja_Generada', e); }
           if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
         }
-      } catch(err) { setGenEstado('Error subiendo a Drive: ' + err.message, 'error'); }
+      } catch(err) { setGenEstado('Error subiendo el documento: ' + err.message, 'error'); }
       btn.disabled = false; btn.textContent = 'Generar Word';
     };
     reader.readAsDataURL(docxBlob);

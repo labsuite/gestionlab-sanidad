@@ -7,3 +7,4 @@ supabase/.temp/
 scripts/__pycache__/
 *.pyc
 exports/
+.playwright-mcp/

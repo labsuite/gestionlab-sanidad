@@ -251,7 +251,9 @@ function showApp() {
   const p = PERMISOS[rol] || PERMISOS.Alumno;
   document.getElementById('user-name').textContent = currentUser?.name || currentUser?.email || 'Usuario';
   document.getElementById('user-role').textContent = rol;
-  document.getElementById('user-avatar').src = currentUser?.picture || '';
+  const avatarEl = document.getElementById('user-avatar');
+  avatarEl.style.display = currentUser?.picture ? '' : 'none';
+  avatarEl.src = currentUser?.picture || '';
 
   document.querySelectorAll('.nav-item').forEach(el => {
     const onclick = el.getAttribute('onclick') || '';
@@ -269,7 +271,6 @@ function showApp() {
   if (navPedidos) navPedidos.style.display = p.verPedidos ? '' : 'none';
 
   showPage(p.dashboard ? 'dashboard' : (p.nav[0] || 'equipos'));
-  scheduleTokenRenewal();
   _checkPendingNfcAction();
 }
 
@@ -388,30 +389,3 @@ function _checkPendingNfcAction() {
   }
 }
 
-// ============================================================
-// ADJUNTOS PDF — upload a Google Drive
-// ============================================================
-async function uploadFileToDrive(fileData, fileName, fileType) {
-  const boundary = '-------GestionLabBoundary';
-  const metadata = JSON.stringify({ name: fileName, mimeType: fileType });
-  const body =
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n` +
-    `--${boundary}\r\nContent-Type: ${fileType}\r\nContent-Transfer-Encoding: base64\r\n\r\n${fileData}\r\n` +
-    `--${boundary}--`;
-
-  const r = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary="${boundary}"` },
-    body
-  });
-  const result = await r.json();
-  if (!result.id) throw new Error('Error subiendo archivo a Drive');
-
-  await fetch(`https://www.googleapis.com/drive/v3/files/${result.id}/permissions`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role: 'reader', type: 'anyone' })
-  });
-
-  return `https://drive.google.com/file/d/${result.id}/view`;
-}

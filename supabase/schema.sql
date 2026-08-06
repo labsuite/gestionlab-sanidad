@@ -505,36 +505,38 @@ alter default privileges in schema public grant select on tables to anon;
 -- ============================================================
 -- 11. POLÍTICAS RLS — catálogos no sensibles, lectura pública
 -- ============================================================
--- Mismo criterio que ciclos/modulos en el proyecto compartido: catálogos sin
--- datos personales, de lectura libre para cualquiera con la anon key (igual
--- que ya pasa hoy). Las escrituras siguen exigiendo Admin/Gestor vía Edge
--- Function (gestionar-proveedor) porque el navegador no tiene sesión real de
--- Supabase Auth todavía (tarea #8) — sin eso, una policy de escritura para
--- "authenticated" no protegería nada real.
+-- Lectura libre para "anon" (mientras el login siga siendo Google OAuth
+-- directo, todas las lecturas usan la anon key) y también "authenticated"
+-- (una vez el login pase a Supabase Auth real, el cliente adjunta el JWT de
+-- sesión en vez de la anon key — sin "authenticated" aquí, cualquier persona
+-- que iniciase sesión de verdad se quedaría sin poder leer nada, porque las
+-- políticas "to anon" no aplican a sesiones autenticadas). Las escrituras
+-- siguen exigiendo Admin/Gestor vía Edge Function, nunca directo desde el
+-- cliente con RLS de escritura.
 
-create policy "proveedores_select_anon" on proveedores for select to anon using (true);
-create policy "ubicaciones_select_anon" on ubicaciones for select to anon using (true);
-create policy "equipos_select_anon" on equipos for select to anon using (true);
-create policy "intervenciones_select_anon" on intervenciones for select to anon using (true);
-create policy "incidencias_select_anon" on incidencias for select to anon using (true);
-create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to anon using (true);
-create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to anon using (true);
-create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to anon using (true);
-create policy "material_select_anon" on material for select to anon using (true);
-create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to anon using (true);
-create policy "pedidos_select_anon" on pedidos for select to anon using (true);
-create policy "lineas_pedido_select_anon" on lineas_pedido for select to anon using (true);
-create policy "solicitudes_select_anon" on solicitudes for select to anon using (true);
-create policy "historico_precio_select_anon" on historico_precio for select to anon using (true);
-create policy "movimientos_select_anon" on movimientos for select to anon using (true);
-create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to anon using (true);
-create policy "config_reservas_select_anon" on config_reservas for select to anon using (true);
-create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon using (true);
-create policy "registros_cabina_select_anon" on registros_cabina for select to anon using (true);
-create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon using (true);
-create policy "usuarios_select_anon" on usuarios for select to anon using (true);
-create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon using (true);
-create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon using (true);
-create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon using (true);
-create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon using (true);
-create policy "tareas_personales_select_anon" on tareas_personales for select to anon using (true);
+create policy "proveedores_select_anon" on proveedores for select to anon, authenticated using (true);
+create policy "ubicaciones_select_anon" on ubicaciones for select to anon, authenticated using (true);
+create policy "equipos_select_anon" on equipos for select to anon, authenticated using (true);
+create policy "intervenciones_select_anon" on intervenciones for select to anon, authenticated using (true);
+create policy "incidencias_select_anon" on incidencias for select to anon, authenticated using (true);
+create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to anon, authenticated using (true);
+create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to anon, authenticated using (true);
+create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to anon, authenticated using (true);
+create policy "material_select_anon" on material for select to anon, authenticated using (true);
+create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to anon, authenticated using (true);
+create policy "pedidos_select_anon" on pedidos for select to anon, authenticated using (true);
+create policy "lineas_pedido_select_anon" on lineas_pedido for select to anon, authenticated using (true);
+create policy "solicitudes_select_anon" on solicitudes for select to anon, authenticated using (true);
+create policy "historico_precio_select_anon" on historico_precio for select to anon, authenticated using (true);
+create policy "movimientos_select_anon" on movimientos for select to anon, authenticated using (true);
+create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to anon, authenticated using (true);
+create policy "config_reservas_select_anon" on config_reservas for select to anon, authenticated using (true);
+create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon, authenticated using (true);
+create policy "registros_cabina_select_anon" on registros_cabina for select to anon, authenticated using (true);
+create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon, authenticated using (true);
+create policy "usuarios_select_anon" on usuarios for select to anon, authenticated using (true);
+create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon, authenticated using (true);
+create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon, authenticated using (true);
+create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon, authenticated using (true);
+create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon, authenticated using (true);
+create policy "tareas_personales_select_anon" on tareas_personales for select to anon, authenticated using (true);
