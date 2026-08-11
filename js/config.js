@@ -156,10 +156,10 @@ function esZonaComun(idUbicacion) {
  * El campo Responsable admite varios nombres separados por comas.
  */
 function esResponsableDeEquipo(equipo) {
-  if (!currentUser?.email) return false;
+  if (!getEffectiveUser().email) return false;
   // Usar el Nombre de la tabla Usuarios (no currentUser.name de Google),
   // porque el campo Responsable almacena exactamente ese valor.
-  const emailNorm = currentUser.email.toLowerCase().trim();
+  const emailNorm = getEffectiveUser().email;
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   if (!u) return false;
   const miNombre = (u.Nombre || '').toLowerCase().trim();
@@ -175,7 +175,7 @@ function esResponsableDeEquipo(equipo) {
  * La zona común se incluye siempre automáticamente.
  */
 function getUbicacionesAlumno() {
-  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const emailNorm = getEffectiveUser().email;
   const zonasComun = DATA.ubicaciones
     .filter(ub => (ub.Laboratorio_Aula || '').trim() === '205 - Zona común')
     .map(ub => ub.ID_Ubicacion);

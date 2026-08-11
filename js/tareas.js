@@ -10,7 +10,7 @@ function renderTareas() {
   const cont = document.getElementById('tareas-container');
   if (!cont || !puedeHacer('verTareas')) { if (cont) cont.innerHTML = ''; return; }
 
-  const email   = (currentUser?.email || '').toLowerCase();
+  const email   = getEffectiveUser().email;
   const misTareas = DATA.tareas.filter(t => (t.Email || '').toLowerCase() === email);
   const pending   = misTareas.filter(t => (t.Completada || '').toLowerCase() !== 'true').sort(_sortTareas);
   const done      = misTareas.filter(t => (t.Completada || '').toLowerCase() === 'true').sort(_sortTareas);

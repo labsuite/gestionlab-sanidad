@@ -233,12 +233,51 @@
     }
     .btn-signout:hover { color: var(--danger); }
 
+    .btn-vista-previa {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 8px;
+      margin-bottom: 8px;
+      background: var(--warning-light);
+      color: var(--warning);
+      border: 1px solid var(--warning-light);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .btn-vista-previa:hover { filter: brightness(0.96); }
+
     /* MAIN CONTENT */
     .main {
       margin-left: 240px;
       min-height: 100vh;
       display: flex;
       flex-direction: column;
+    }
+
+    .banner-vista-previa {
+      background: var(--warning);
+      color: #fff;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      font-weight: 500;
+      position: sticky;
+      top: 0;
+      z-index: 51;
+    }
+    .banner-vista-previa-nota { font-size: 11px; opacity: 0.85; font-weight: 400; }
+    .banner-vista-previa .btn-secondary {
+      background: rgba(255,255,255,0.9);
+      border-color: transparent;
     }
 
     .topbar {

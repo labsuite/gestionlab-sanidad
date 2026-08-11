@@ -456,7 +456,7 @@ function renderIncidencias(filtroEstado = '') {
   const rol = getUserRole();
   let items = DATA.incidencias;
   if (rol === 'Profesor') {
-    const miNombre = (currentUser?.name || '').toLowerCase().trim();
+    const miNombre = (getEffectiveUser().name || '').toLowerCase().trim();
     items = items.filter(i => {
       if ((i.Reportado_Por || '').toLowerCase().trim() === miNombre) return true;
       const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));

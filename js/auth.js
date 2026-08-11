@@ -60,6 +60,8 @@ async function signIn() {
 async function signOut() {
   await _sbMigracion.auth.signOut();
   currentUser = null;
+  previewRole = null;
+  previewUser = null;
   _mostrarPantallaLogin();
 }
 

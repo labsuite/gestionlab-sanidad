@@ -281,7 +281,7 @@ function _renderTimeline(idEquipo) {
 // ── Tab: Mis reservas ─────────────────────────────────────────
 
 function _renderTabMisReservas() {
-  const email    = (currentUser?.email||'').toLowerCase().trim();
+  const email    = getEffectiveUser().email;
   const esGestor = puedeHacer('gestionarReservas');
   const ahora    = new Date();
 

@@ -121,6 +121,9 @@
       </div>
     </div>
     <div class="sidebar-footer">
+      <button class="btn-vista-previa" id="btn-vista-previa" onclick="abrirVistaPrevia()" style="display:none">
+        👁 Vista previa de rol
+      </button>
       <div class="user-chip">
         <img class="user-avatar" id="user-avatar" src="" alt="">
         <div class="user-info">
@@ -134,6 +137,12 @@
 
   <!-- MAIN -->
   <div class="main">
+    <div class="banner-vista-previa" id="banner-vista-previa" style="display:none">
+      <span id="banner-vista-previa-texto"></span>
+      <span style="flex:1"></span>
+      <span class="banner-vista-previa-nota">Modo de solo lectura — no se guardan cambios</span>
+      <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px" onclick="salirVistaPrevia()">Salir de vista previa</button>
+    </div>
     <div class="topbar">
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <div class="topbar-title" id="page-title">Panel principal</div>

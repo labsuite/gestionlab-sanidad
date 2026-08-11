@@ -22,7 +22,7 @@ function _precioMedioLabel(m) {
 
 function _puedeRevisarInventario() {
   if (getUserRole() !== 'Alumno') return false;
-  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const emailNorm = getEffectiveUser().email;
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   return u?.Puede_Revisar_Inventario === 'TRUE';
 }

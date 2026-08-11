@@ -163,7 +163,7 @@ function renderSolicitudes(filtroEstado = '') {
   const esProfesor = rol === 'Profesor' || rol === 'Alumno';
   let items = DATA.solicitudes;
   if (esProfesor) {
-    const miNombre = currentUser?.name || '';
+    const miNombre = getEffectiveUser().name || '';
     items = items.filter(s => s.Solicitante === miNombre);
   }
   // Filtrar: solo año actual y anterior
@@ -226,11 +226,11 @@ function renderSolicitudes(filtroEstado = '') {
 function filtrarSolicitudesEstado(val) { renderSolicitudes(val || ''); }
 
 function _nCambiosSolicitudProfesor() {
-  const usuario = currentUser?.email || currentUser?.name || '';
+  const usuario = getEffectiveUser().email || getEffectiveUser().name || '';
   if (!usuario) return 0;
   const guardados = JSON.parse(localStorage.getItem('glab_sol_estados_' + usuario) || 'null');
   if (!guardados) return 0;
-  const miNombre = currentUser?.name || '';
+  const miNombre = getEffectiveUser().name || '';
   return DATA.solicitudes.filter(s =>
     s.Solicitante === miNombre &&
     guardados[s.ID_Solicitud] !== undefined &&
@@ -258,11 +258,11 @@ function _actualizarBadgeSolicitudes() {
 function _notificarCambiosSolicitudes() {
   const rol = getUserRole();
   if (rol !== 'Profesor' && rol !== 'Alumno') return;
-  const usuario = currentUser?.email || currentUser?.name || '';
+  const usuario = getEffectiveUser().email || getEffectiveUser().name || '';
   if (!usuario) return;
   const storageKey = 'glab_sol_estados_' + usuario;
   const guardados = JSON.parse(localStorage.getItem(storageKey) || 'null');
-  const miNombre = currentUser?.name || '';
+  const miNombre = getEffectiveUser().name || '';
   const misSols = DATA.solicitudes.filter(s => s.Solicitante === miNombre);
   if (!guardados) {
     const estado = {};
@@ -289,9 +289,9 @@ function _notificarCambiosSolicitudes() {
 }
 
 function _marcarCambiosSolicitudesVisto() {
-  const usuario = currentUser?.email || currentUser?.name || '';
+  const usuario = getEffectiveUser().email || getEffectiveUser().name || '';
   if (!usuario) return;
-  const miNombre = currentUser?.name || '';
+  const miNombre = getEffectiveUser().name || '';
   const estado = {};
   DATA.solicitudes.filter(s => s.Solicitante === miNombre).forEach(s => { estado[s.ID_Solicitud] = s.Estado; });
   localStorage.setItem('glab_sol_estados_' + usuario, JSON.stringify(estado));

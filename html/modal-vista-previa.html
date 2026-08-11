@@ -1,0 +1,37 @@
+<!-- ============================================================
+     VISTA PREVIA DE ROL (solo Administrador)
+     ============================================================ -->
+<div class="modal-overlay" id="modal-vista-previa">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">👁 Vista previa de rol</div>
+      <button class="modal-close" onclick="closeModal('modal-vista-previa')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">
+        Elige un rol y un usuario para ver la app tal como la vería esa persona
+        (páginas, botones y "mis datos" propios). Mientras dure la vista previa
+        no se pueden guardar cambios reales.
+      </p>
+      <div class="form-group">
+        <label>Rol *</label>
+        <select id="vp-rol" onchange="_poblarUsuariosVistaPrevia()">
+          <option value="">Elige un rol…</option>
+          <option value="Alumno">Alumno</option>
+          <option value="Profesor">Profesor</option>
+          <option value="Gestor">Gestor</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Usuario *</label>
+        <select id="vp-usuario" disabled>
+          <option value="">Elige un rol primero</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-vista-previa')">Cancelar</button>
+      <button class="btn btn-primary" onclick="activarVistaPrevia()">Activar vista previa</button>
+    </div>
+  </div>
+</div>

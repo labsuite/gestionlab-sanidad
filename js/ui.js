@@ -26,7 +26,8 @@ async function loadModales() {
     'html/modales-mantenimiento.html',
     'html/modales-residuos.html',
     'html/modales-reservas.html',
-    'html/modales-registros.html'
+    'html/modales-registros.html',
+    'html/modal-vista-previa.html'
   ];
   try {
     const htmls = await Promise.all(archivos.map(f => _fetchConReintentos(f)));
@@ -189,13 +190,95 @@ const PERMISOS = {
 function getPermisos() { return PERMISOS[getUserRole()] || PERMISOS.Alumno; }
 function puedeHacer(accion) { return getPermisos()[accion] === true; }
 
-function getUserRole() {
+// ============================================================
+// VISTA PREVIA DE ROL (solo Administrador)
+// ============================================================
+// Simula la app tal como la vería otro rol/usuario sin necesidad de otra
+// cuenta. La sesión real de Supabase sigue siendo la del Administrador, así
+// que las escrituras se bloquean mientras dure la vista previa (ver
+// callEdgeFunction en sheets.js) — es un modo de solo lectura. No persiste
+// entre recargas (variables en memoria, no sessionStorage): un F5 siempre
+// vuelve a la vista real.
+let previewRole = null;   // 'Alumno' | 'Profesor' | 'Gestor' | null
+let previewUser = null;   // fila de DATA.usuarios simulada, o null
+
+function getRealUserRole() {
   if (!currentUser?.email) return 'Alumno';
   const emailNorm = currentUser.email.toLowerCase().trim();
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   if (u) return u?.Rol || 'Alumno';
   const sbU = DATA.sbUsuarios?.find(u => (u.email || '').toLowerCase().trim() === emailNorm);
   return sbU?.role || 'Alumno';
+}
+
+function getUserRole() {
+  if (previewRole) return previewRole;
+  return getRealUserRole();
+}
+
+/** Identidad usada para filtrar "mis" datos (incidencias, reservas, tareas...): la
+ *  simulada durante la vista previa, o la real en caso contrario. */
+function getEffectiveUser() {
+  if (previewUser) return { email: (previewUser.Email || '').toLowerCase().trim(), name: previewUser.Nombre || '' };
+  return { email: currentUser?.email || '', name: currentUser?.name || '' };
+}
+
+function abrirVistaPrevia() {
+  if (getRealUserRole() !== 'Administrador') return;
+  const selRol = document.getElementById('vp-rol');
+  if (selRol) selRol.value = '';
+  _poblarUsuariosVistaPrevia();
+  openModal('modal-vista-previa');
+}
+
+function _poblarUsuariosVistaPrevia() {
+  const rol = v('vp-rol');
+  const selU = document.getElementById('vp-usuario');
+  if (!selU) return;
+  if (!rol) { selU.innerHTML = '<option value="">Elige un rol primero</option>'; selU.disabled = true; return; }
+  const candidatos = DATA.usuarios
+    .filter(u => u.Rol === rol && u.Activo !== 'FALSE')
+    .sort((a, b) => (a.Nombre || '').localeCompare(b.Nombre || ''));
+  selU.disabled = false;
+  selU.innerHTML = candidatos.length
+    ? candidatos.map(u => `<option value="${u.ID_Usuario}">${u.Nombre}</option>`).join('')
+    : '<option value="">No hay usuarios activos con ese rol</option>';
+}
+
+function activarVistaPrevia() {
+  const rol = v('vp-rol');
+  const idUsuario = v('vp-usuario');
+  if (!rol || !idUsuario) { showToast('Elige un rol y un usuario', 'error'); return; }
+  const usuario = DATA.usuarios.find(u => u.ID_Usuario === idUsuario);
+  if (!usuario) { showToast('Usuario no encontrado', 'error'); return; }
+  previewRole = rol;
+  previewUser = usuario;
+  closeModal('modal-vista-previa');
+  showApp();
+  renderAll();
+  showToast(`Viendo la app como ${usuario.Nombre} (${rol})`, '');
+}
+
+function salirVistaPrevia() {
+  previewRole = null;
+  previewUser = null;
+  showApp();
+  renderAll();
+  showToast('Vista previa desactivada', '');
+}
+
+function _actualizarBannerVistaPrevia() {
+  const banner = document.getElementById('banner-vista-previa');
+  const btnAbrir = document.getElementById('btn-vista-previa');
+  if (btnAbrir) btnAbrir.style.display = getRealUserRole() === 'Administrador' ? '' : 'none';
+  if (!banner) return;
+  if (previewRole && previewUser) {
+    banner.style.display = 'flex';
+    banner.querySelector('#banner-vista-previa-texto').textContent =
+      `👁 Vista previa: viendo la app como ${previewUser.Nombre} (${previewRole})`;
+  } else {
+    banner.style.display = 'none';
+  }
 }
 
 function showPage(page) {
@@ -250,10 +333,13 @@ function showApp() {
   const rol = getUserRole();
   const p = PERMISOS[rol] || PERMISOS.Alumno;
   document.getElementById('user-name').textContent = currentUser?.name || currentUser?.email || 'Usuario';
-  document.getElementById('user-role').textContent = rol;
+  // Ojo: el chip de usuario siempre muestra el rol REAL (no el simulado en vista
+  // previa) — quien está viendo la app sigue siendo el Administrador real.
+  document.getElementById('user-role').textContent = getRealUserRole();
   const avatarEl = document.getElementById('user-avatar');
   avatarEl.style.display = currentUser?.picture ? '' : 'none';
   avatarEl.src = currentUser?.picture || '';
+  _actualizarBannerVistaPrevia();
 
   document.querySelectorAll('.nav-item').forEach(el => {
     const onclick = el.getAttribute('onclick') || '';

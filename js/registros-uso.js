@@ -84,7 +84,7 @@ function _horasAcumuladasReg(tipo, idEquipo) {
 function _updateBadgeRegistrosUso() {
   const el = document.getElementById('badge-registros-uso');
   if (!el) return;
-  const email = (currentUser?.email || '').toLowerCase().trim();
+  const email = getEffectiveUser().email;
   const n = ['cabina', 'autoclave'].reduce((sum, tipo) =>
     sum + DATA[_regConfig[tipo].key].filter(r => r.Estado === 'Abierta' && (r.Usuario || '').toLowerCase().trim() === email).length, 0);
   el.textContent = n;
@@ -94,7 +94,7 @@ function _updateBadgeRegistrosUso() {
 function _avisarSesionesAbiertasAntiguas() {
   if (_regAvisoMostrado) return;
   _regAvisoMostrado = true;
-  const email = (currentUser?.email || '').toLowerCase().trim();
+  const email = getEffectiveUser().email;
   const hoy = new Date().toISOString().split('T')[0];
   const antiguas = ['cabina', 'autoclave'].flatMap(tipo =>
     DATA[_regConfig[tipo].key].filter(r => r.Estado === 'Abierta' && r.Fecha < hoy && (r.Usuario || '').toLowerCase().trim() === email)
@@ -161,7 +161,7 @@ function _renderRegTab(tipo) {
   let botonPrincipal = `<button class="btn btn-primary" onclick="openModalSesionRegistro('${tipo}')">+ Registrar ciclo</button>`;
   let notaManual = '';
   if (cfg.permiteSesionAbierta) {
-    const email = (currentUser?.email || '').toLowerCase().trim();
+    const email = getEffectiveUser().email;
     const idxAbierta = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipoSel && (r.Usuario || '').toLowerCase().trim() === email);
     botonPrincipal = idxAbierta >= 0
       ? `<button class="btn btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idxAbierta})">■ Terminar mi sesión</button>`
@@ -196,7 +196,7 @@ function _onRegEquipoCambio(tipo, idEquipo) {
 function _renderSesionesAbiertasReg(tipo) {
   const cfg = _regConfig[tipo];
   if (!cfg.permiteSesionAbierta) return '';
-  const email = (currentUser?.email || '').toLowerCase().trim();
+  const email = getEffectiveUser().email;
   const esGestor = _puedeGestionarRegistros();
   const abiertas = DATA[cfg.key]
     .map((r, idx) => ({ r, idx }))
@@ -464,7 +464,7 @@ function _abrirRegistroPorNfc(tipo, idEquipo) {
     return;
   }
 
-  const email = (currentUser?.email || '').toLowerCase().trim();
+  const email = getEffectiveUser().email;
   const idx = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipo && (r.Usuario || '').toLowerCase().trim() === email);
   if (idx >= 0) openModalCerrarSesion(tipo, idx);
   else _iniciarSesionRapida(tipo, idEquipo);

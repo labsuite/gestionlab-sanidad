@@ -10,6 +10,7 @@
 // vuelve a comprobarlo (auth.getUser) para identificar el rol server-side.
 // ----------------------------------------------------------------
 async function callEdgeFunction(nombre, body) {
+  if (previewRole) throw new Error('Estás en vista previa — sal de ese modo para guardar cambios reales');
   const { data: { session } } = await _sbMigracion.auth.getSession();
   const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
     method: 'POST',
