@@ -1238,7 +1238,6 @@ function openModalSubdividirLote(loteId) {
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
   sv('subdiv-mat-id', matId);
-  sv('subdiv-origen-ubicacion', loteOrigen.ID_Ubicacion);
   sv('subdiv-lote-origen-id', loteOrigen.ID);
   document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
   document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
@@ -1325,7 +1324,12 @@ async function guardarSubdivision() {
   const loteOrigenId = v('subdiv-lote-origen-id');
   const mat = DATA.material.find(m => m.ID_Material === matId);
   const loteOrigenIdx = DATA.materialUbicaciones.findIndex(l => l.ID === loteOrigenId);
-  if (!mat || loteOrigenIdx === -1) return;
+  if (!mat || loteOrigenIdx === -1) { showToast('No se encontró el bote de origen', 'error'); return; }
+  // Filas a medio rellenar (ubicación sin cantidad, o cantidad sin ubicación) se bloquean en
+  // vez de descartarse en silencio — si no, la usuaria ve "repartido en 2" sin saber que una
+  // tercera fila que sí había rellenado a medias se ignoró.
+  const incompletas = _subdivTemp.filter(f => Boolean(f.idUbicacion) !== (parseFloat(f.cantidad) > 0));
+  if (incompletas.length) { showToast('Completa o quita los destinos con ubicación pero sin cantidad (o viceversa)', 'error'); return; }
   const filas = _subdivTemp.filter(f => f.idUbicacion && parseFloat(f.cantidad) > 0);
   if (!filas.length) { showToast('Añade al menos un destino con cantidad', 'error'); return; }
   const loteOrigen = DATA.materialUbicaciones[loteOrigenIdx];
@@ -1346,7 +1350,7 @@ async function guardarSubdivision() {
     showToast(`Repartido en ${filas.length} ubicación${filas.length > 1 ? 'es' : ''}`, 'success');
     closeModal('modal-subdividir-lote');
     renderMaterial(); renderDashboard(); updateBadges();
-  } catch(e) { showToast('Error al subdividir', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error al subdividir', 'error'); console.error(e); }
   hideLoading();
 }
 

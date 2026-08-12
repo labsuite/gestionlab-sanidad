@@ -262,7 +262,20 @@ Deno.serve(async (req) => {
       const totalRepartido = validos.reduce((s, f) => s + Number(f.cantidad), 0);
       if (totalRepartido > stockOrigen) return jsonError(`Stock insuficiente en el bote madre (${stockOrigen})`, 400);
 
-      await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stockOrigen - totalRepartido }).eq("id", loteOrigenId);
+      // Bloqueo optimista: la condición eq("stock_local", stockOrigen) hace que la escritura
+      // solo tenga efecto si nadie más ha tocado el bote madre desde que lo leímos arriba. Sin
+      // esto, dos subdivisiones simultáneas del mismo bote podrían leer el mismo stock, pasar
+      // ambas la validación, y la segunda escritura pisaría a la primera (double-spend).
+      const { data: loteActualizado, error: updateError } = await supabaseAdmin
+        .from("material_ubicaciones")
+        .update({ stock_local: stockOrigen - totalRepartido })
+        .eq("id", loteOrigenId)
+        .eq("stock_local", loteOrigen.stock_local)
+        .select()
+        .maybeSingle();
+      if (updateError) return jsonError(`No se pudo actualizar el bote madre: ${updateError.message}`, 400);
+      if (!loteActualizado) return jsonError("El stock del bote madre cambió mientras se procesaba la subdivisión — vuelve a intentarlo", 409);
+
       const creados = [];
       for (const f of validos) {
         const cant = Number(f.cantidad);
