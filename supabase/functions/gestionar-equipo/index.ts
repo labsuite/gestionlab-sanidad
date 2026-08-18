@@ -1,6 +1,10 @@
 // Módulo Equipos — mismo patrón que gestionar-proveedor/gestionar-ubicacion.
-// Solo Admin/Gestor. id_activo es la clave primaria y no cambia al editar
-// (a diferencia de Ubicaciones, el formulario bloquea el campo ID al editar).
+// Solo Admin/Gestor. id_activo es la clave primaria; cambiarla es la acción
+// "cambiar_id" (por separado de "actualizar", que ya no toca el ID) — todas
+// las FK hacia equipos(id_activo) tienen ON UPDATE CASCADE (ver
+// scripts/migrar_esquema_equipos_y_pedidos_publico.py), así que un UPDATE
+// del id_activo propaga solo a incidencias/intervenciones/mantenimiento/
+// reservas/líneas de pedido sin tocarlas una a una.
 //
 // accion "actualizar_estado" es un atajo ligero: solo cambia estado_operativo,
 // usado por actualizarEstadoEquipo() cuando se reporta una incidencia o se
@@ -87,11 +91,26 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (accion === "cambiar_id") {
+    const nuevoIdActivo = String(body.nuevo_id_activo || "").trim();
+    if (!nuevoIdActivo) return jsonError("nuevo_id_activo es obligatorio", 400);
+    if (nuevoIdActivo === idActivo) return jsonError("El nuevo ID es igual al actual", 400);
+
+    const { data: existente } = await supabaseAdmin.from("equipos").select("id_activo").eq("id_activo", nuevoIdActivo).maybeSingle();
+    if (existente) return jsonError(`Ya existe un equipo con el ID "${nuevoIdActivo}"`, 409);
+
+    const { data, error } = await supabaseAdmin.from("equipos")
+      .update({ id_activo: nuevoIdActivo }).eq("id_activo", idActivo).select().single();
+    if (error) return jsonError(`No se pudo cambiar el ID: ${error.message}`, 400);
+    if (!data) return jsonError(`No se encontró el equipo "${idActivo}"`, 404);
+    return jsonOk({ equipo: data });
+  }
+
   if (accion === "eliminar") {
     const { error } = await supabaseAdmin.from("equipos").delete().eq("id_activo", idActivo);
     if (error) return jsonError(`No se pudo eliminar: ${error.message}`, 400);
     return jsonOk({ eliminado: idActivo });
   }
 
-  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado' o 'eliminar'", 400);
+  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado', 'cambiar_id' o 'eliminar'", 400);
 });

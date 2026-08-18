@@ -9,7 +9,10 @@
       <div class="form-grid form-grid-2">
         <div class="form-group">
           <label>ID Activo *</label>
-          <input id="eq-id" placeholder="EQ-001">
+          <div style="display:flex;gap:6px;align-items:center">
+            <input id="eq-id" placeholder="EQ-001" style="flex:1">
+            <button type="button" class="icon-btn" id="btn-desbloquear-eq-id" title="Cambiar ID del equipo" style="display:none" onclick="desbloquearEqId()">✏️</button>
+          </div>
         </div>
         <div class="form-group">
           <label>Tipo de equipo *</label>

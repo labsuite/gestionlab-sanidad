@@ -157,7 +157,7 @@ create table equipos (
 
 create table intervenciones (
   id_intervencion                        text primary key,
-  id_equipo                              text not null references equipos(id_activo) on delete cascade,
+  id_equipo                              text not null references equipos(id_activo) on delete cascade on update cascade,
   tipo                                   text,
   origen                                 text,
   fecha_planificada                      date,
@@ -180,7 +180,7 @@ create table intervenciones (
 
 create table incidencias (
   id_incidencia            text primary key,
-  id_equipo                text not null references equipos(id_activo) on delete cascade,
+  id_equipo                text not null references equipos(id_activo) on delete cascade on update cascade,
   reportado_por            text,
   fecha_hora               timestamptz not null default now(),
   descripcion_problema     text,
@@ -206,7 +206,7 @@ create table tareas_intervencion (
 
 create table planes_mantenimiento (
   id_plan             text primary key,
-  id_equipo           text not null references equipos(id_activo) on delete cascade,
+  id_equipo           text not null references equipos(id_activo) on delete cascade on update cascade,
   tipo_intervencion   text,
   periodicidad        text,
   activo              boolean not null default true,
@@ -218,7 +218,7 @@ create table planes_mantenimiento (
 create table registro_mantenimientos (
   id_registro         text primary key,
   id_plan             text not null references planes_mantenimiento(id_plan) on delete cascade,
-  id_equipo           text not null references equipos(id_activo) on delete cascade,
+  id_equipo           text not null references equipos(id_activo) on delete cascade on update cascade,
   curso_academico     text,
   periodo             text,
   fecha_realizacion   date,
@@ -278,7 +278,7 @@ create table consultas_residuo (
 -- ============================================================
 
 create table config_reservas (
-  id_equipo                text primary key references equipos(id_activo) on delete cascade,
+  id_equipo                text primary key references equipos(id_activo) on delete cascade on update cascade,
   politica                 text not null,
   params_template          jsonb,
   max_horas                numeric,
@@ -287,7 +287,7 @@ create table config_reservas (
 
 create table reservas_equipos (
   id_reserva               text primary key,
-  id_equipo                text not null references equipos(id_activo) on delete cascade,
+  id_equipo                text not null references equipos(id_activo) on delete cascade on update cascade,
   usuario                  text,
   fecha_inicio             timestamptz not null,
   fecha_fin                timestamptz not null,
@@ -306,7 +306,7 @@ create table reservas_equipos (
 
 create table registros_cabina (
   id_registro                     text primary key,
-  id_equipo                       text not null references equipos(id_activo) on delete cascade,
+  id_equipo                       text not null references equipos(id_activo) on delete cascade on update cascade,
   usuario                         text,
   fecha                           date not null,
   hora_inicio                     time,
@@ -321,7 +321,7 @@ create table registros_cabina (
 
 create table registros_autoclave (
   id_registro           text primary key,
-  id_equipo              text not null references equipos(id_activo) on delete cascade,
+  id_equipo              text not null references equipos(id_activo) on delete cascade on update cascade,
   usuario                 text,
   fecha                   date not null,
   hora_inicio              time,
@@ -383,7 +383,17 @@ create table pedidos (
   modulo                             text,
   tipo                                text not null default 'Material',
   gasto_extra_concepto                text,
-  gasto_extra_importe                 numeric
+  gasto_extra_importe                 numeric,
+  token_publico                       text unique  -- link sin login para que el proveedor suba factura/presupuesto
+);
+
+create table documentos_proveedor (
+  id_documento    text primary key,
+  pedido          text not null references pedidos(id_pedido) on delete cascade,
+  nombre_archivo  text not null,
+  path            text not null,
+  tamano_bytes    integer,
+  fecha_subida    timestamptz not null default now()
 );
 
 create table lineas_pedido (
@@ -395,7 +405,7 @@ create table lineas_pedido (
   estado_linea         text,
   observaciones        text,
   precio_unitario      numeric,
-  id_equipo            text references equipos(id_activo)
+  id_equipo            text references equipos(id_activo) on update cascade
 );
 
 create table solicitudes (

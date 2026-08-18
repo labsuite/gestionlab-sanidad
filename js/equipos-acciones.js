@@ -97,7 +97,9 @@ function openModalEquipo() {
   editingRow = null; pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Nuevo equipo';
   const idFieldN = document.getElementById('eq-id');
-  idFieldN.value = ''; idFieldN.readOnly = false; idFieldN.style.opacity = '';
+  idFieldN.value = ''; idFieldN.readOnly = false; idFieldN.style.opacity = ''; idFieldN.dataset.original = '';
+  const btnDesbloquearIdN = document.getElementById('btn-desbloquear-eq-id');
+  if (btnDesbloquearIdN) btnDesbloquearIdN.style.display = 'none';
   ['eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-observaciones'].forEach(id => sv(id,''));
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
@@ -121,8 +123,11 @@ function editEquipo(idx) {
   poblarSelects();
   const idField = document.getElementById('eq-id');
   idField.value = e.ID_Activo;
+  idField.dataset.original = e.ID_Activo;
   idField.readOnly = true;
   idField.style.opacity = '0.6';
+  const btnDesbloquearId = document.getElementById('btn-desbloquear-eq-id');
+  if (btnDesbloquearId) btnDesbloquearId.style.display = puedeHacer('editarEquipos') ? '' : 'none';
   sv('eq-tipo',e.Tipo_Equipo); sv('eq-marca',e.Marca);
   sv('eq-modelo',e.Modelo); sv('eq-serie',e.Numero_Serie); sv('eq-ubicacion',e.Ubicacion);
   _initResponsables(e.Responsable); sv('eq-fecha-adq',e.Fecha_Adquisicion);
@@ -152,6 +157,14 @@ function editEquipo(idx) {
   const btnElimEqEdit = document.getElementById('btn-eliminar-equipo');
   if (btnElimEqEdit) btnElimEqEdit.style.display = puedeHacer('eliminarItems') ? '' : 'none';
   openModal('modal-equipo');
+}
+
+function desbloquearEqId() {
+  if (!confirm('Cambiar el ID de este equipo también actualiza sus incidencias, intervenciones, planes de mantenimiento, reservas y líneas de pedido ya asociadas a él. ¿Continuar?')) return;
+  const idField = document.getElementById('eq-id');
+  idField.readOnly = false;
+  idField.style.opacity = '';
+  idField.focus();
 }
 
 async function eliminarEquipo() {
@@ -846,6 +859,7 @@ function _validarFormatoIdEquipo(id) {
 // ============================================================
 async function guardarEquipo() {
   let id = v('eq-id');
+  const idOriginal = document.getElementById('eq-id').dataset.original || '';
   const tipo  = v('eq-tipo');
   const marca = v('eq-marca');
   if (!tipo)  { showToast('El tipo de equipo es obligatorio', 'error'); return; }
@@ -884,10 +898,25 @@ async function guardarEquipo() {
     mes_inicio_temporada: v('eq-mes-inicio'), mes_fin_temporada: v('eq-mes-fin'),
   };
 
+  const cambioId = editingRow && editingRow.sheet === 'Equipos' && idOriginal && id !== idOriginal;
+
   showLoading('Guardando...');
   try {
+    if (cambioId) {
+      await callEdgeFunction('gestionar-equipo', { accion: 'cambiar_id', id_activo: idOriginal, nuevo_id_activo: id });
+    }
     if (editingRow && editingRow.sheet === 'Equipos') {
       const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'actualizar', ...datos });
+      if (cambioId) {
+        // El ID cambió en varias tablas relacionadas (incidencias, intervenciones,
+        // mantenimiento, reservas, líneas de pedido) — recargar todo en vez de
+        // parchear DATA.equipos a mano, para no dejar esos arrays con el ID viejo.
+        showToast('Equipo actualizado, ID cambiado', 'success');
+        closeModal('modal-equipo'); editingRow = null;
+        await loadAllData(); renderAll();
+        hideLoading();
+        return;
+      }
       DATA.equipos[editingRow.rowIndex] = _equipoSbToObj(equipo);
       showToast('Equipo actualizado', 'success');
     } else {
