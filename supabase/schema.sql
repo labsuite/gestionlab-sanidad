@@ -393,7 +393,9 @@ create table documentos_proveedor (
   nombre_archivo  text not null,
   path            text not null,
   tamano_bytes    integer,
-  fecha_subida    timestamptz not null default now()
+  fecha_subida    timestamptz not null default now(),
+  datos_extraidos jsonb,       -- resultado de leer-documento-proveedor (items + matching contra lineas_pedido)
+  extraido_en     timestamptz  -- null = todavía no se ha leído con IA
 );
 
 create table lineas_pedido (

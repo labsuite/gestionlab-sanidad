@@ -270,6 +270,8 @@ function _documentoProveedorSbToObj(d) {
     Path: d.path || '',
     Tamano_Bytes: d.tamano_bytes != null ? String(d.tamano_bytes) : '',
     Fecha_Subida: d.fecha_subida || '',
+    Datos_Extraidos: d.datos_extraidos || null,
+    Extraido_En: d.extraido_en || '',
   };
 }
 

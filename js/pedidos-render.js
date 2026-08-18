@@ -462,6 +462,59 @@ async function copiarLinkProveedor() {
   showToast('Link copiado al portapapeles', 'success');
 }
 
+// ── Revisión de lo leído por la IA en un documento del proveedor ──────
+// Solo lectura + botones que precargan los modales de siempre (recepción,
+// editar línea, gasto extra) — nunca escribe nada por sí misma. Nunca crea
+// líneas de pedido nuevas: lo que no encaja con ninguna línea existente se
+// muestra aparte, solo a título informativo.
+function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
+  const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
+  const r = doc?.Datos_Extraidos;
+  const cont = document.getElementById('revision-extraccion-contenido');
+  if (!r) { cont.innerHTML = `<div class="empty-state" style="padding:24px">Todavía no se ha leído este documento.</div>`; openModal('modal-revision-extraccion'); return; }
+
+  const filasMatch = (r.matches || []).map(m => {
+    const it = m.item_detectado || {};
+    const unidad = it.unidad ? ' ' + it.unidad : '';
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px">${m.material_linea}</td>
+      <td style="padding:6px 8px;text-align:center">${m.cantidad_pedida ?? '—'}</td>
+      <td style="padding:6px 8px;text-align:center">${m.cantidad_recibida || '0'}</td>
+      <td style="padding:6px 8px;text-align:center">${it.cantidad != null ? it.cantidad + unidad : '—'}</td>
+      <td style="padding:6px 8px;text-align:right">${it.precio_unitario != null ? Number(it.precio_unitario).toFixed(2) + ' €' : '—'}</td>
+      <td style="padding:6px 8px;white-space:nowrap">
+        ${it.cantidad != null ? `<button class="icon-btn" title="Precargar en Registrar recepción" onclick="closeModal('modal-revision-extraccion');openModalRecepcion('${m.id_linea}','${pedidoId}',${it.cantidad})">📥</button>` : ''}
+        ${it.precio_unitario != null ? `<button class="icon-btn" title="Precargar en Editar línea" onclick="closeModal('modal-revision-extraccion');openModalEditarLinea('${m.id_linea}','${pedidoId}',${it.precio_unitario})">✏️</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  const tabla = (r.matches || []).length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="border-bottom:2px solid var(--border)">
+      <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Línea del pedido</th>
+      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
+      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
+      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Detectado</th>
+      <th style="text-align:right;padding:6px 8px;color:var(--text-muted);font-weight:600">Precio detectado</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead>
+    <tbody>${filasMatch}</tbody>
+  </table></div>` : `<div class="empty-state" style="padding:16px">No se detectó ninguna línea que coincida con las líneas de este pedido.</div>`;
+
+  const sinMatch = (r.sin_match || []).length ? `<div style="margin-top:16px;padding:10px 14px;background:var(--danger-light,#fdf0f0);border-radius:var(--radius-sm);font-size:13px">
+    <div style="font-weight:600;margin-bottom:6px">⚠️ Detectado en el documento pero sin línea de pedido coincidente (no se ha tocado nada):</div>
+    <ul style="margin:0;padding-left:18px">${r.sin_match.map(i => `<li>${i.material}${i.cantidad != null ? ` — ${i.cantidad}${i.unidad ? ' ' + i.unidad : ''}` : ''}</li>`).join('')}</ul>
+  </div>` : '';
+
+  const cargoExtra = r.cargo_extra ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <div>🚚 Cargo extra detectado: <strong>${r.cargo_extra.concepto}</strong> — ${Number(r.cargo_extra.importe).toFixed(2)} €</div>
+    <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;white-space:nowrap" onclick="closeModal('modal-revision-extraccion');openModalGastoExtra('${pedidoId}','${(r.cargo_extra.concepto||'').replace(/'/g,"\\'")}',${r.cargo_extra.importe})">Precargar en Gasto extra</button>
+  </div>` : '';
+
+  cont.innerHTML = tabla + sinMatch + cargoExtra;
+  openModal('modal-revision-extraccion');
+}
+
 function verDetallePedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
@@ -552,7 +605,13 @@ function verDetallePedido(pedidoId) {
         <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
           ${docsProv.map(d => `<div class="linea-row">
             <div class="linea-nombre">${d.Nombre_Archivo}<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatDate(d.Fecha_Subida)||''}</div></div>
-            <div class="linea-actions"><button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button></div>
+            <div class="linea-actions">
+              ${d.Datos_Extraidos
+                ? `<button class="icon-btn" title="Ver datos leídos con IA" onclick="abrirModalRevisionExtraccion('${d.ID_Documento}','${pedidoId}')">📋</button>
+                   <button class="icon-btn" title="Releer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🔄</button>`
+                : `<button class="icon-btn" title="Leer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🤖</button>`}
+              <button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button>
+            </div>
           </div>`).join('')}
         </div>
       </div>`;
@@ -741,8 +800,9 @@ function openModalRecepcionMasiva(pedidoId) {
   openModal('modal-recepcion-masiva');
 }
 
-function openModalRecepcion(lineaId, pedidoId) {
-  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
+function openModalRecepcion(lineaId, pedidoId, cantidadSugerida) {
+  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', '');
+  sv('rec-cantidad', cantidadSugerida != null ? cantidadSugerida : '');
   const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const esServicio = pedido?.Tipo === 'Servicio';
   document.getElementById('rec-label-material').textContent = esServicio ? 'Servicio' : 'Material';

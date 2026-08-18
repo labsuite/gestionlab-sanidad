@@ -446,6 +446,26 @@ async function archivarPedido(pedidoId) {
 }
 
 // ============================================================
+// LECTURA CON IA DE DOCUMENTOS DEL PROVEEDOR
+// ============================================================
+// Dispara leer-documento-proveedor (Gemini) sobre un archivo ya subido por
+// el proveedor vía el link público. Solo extrae y guarda el resultado
+// (documentos_proveedor.datos_extraidos) — no toca cantidad_recibida ni
+// precio_unitario de ninguna línea; eso lo hace el Gestor a mano desde el
+// modal de revisión (abrirModalRevisionExtraccion en pedidos-render.js).
+async function leerDocumentoConIA(idDocumento, pedidoId) {
+  showLoading('Leyendo documento con IA...');
+  try {
+    const { resultado } = await callEdgeFunction('leer-documento-proveedor', { id_documento: idDocumento });
+    const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
+    if (doc) { doc.Datos_Extraidos = resultado; doc.Extraido_En = resultado.generado_en; }
+    verDetallePedido(pedidoId);
+    abrirModalRevisionExtraccion(idDocumento, pedidoId);
+  } catch (e) { showToast('Error leyendo el documento: ' + e.message, 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
 // EDITAR PROVEEDOR DEL PEDIDO
 // ============================================================
 function openModalEditarProveedor(pedidoId) {
@@ -479,11 +499,11 @@ async function guardarProveedorPedido() {
 // ============================================================
 // GASTO EXTRA DEL PEDIDO (transporte, tasas...)
 // ============================================================
-function openModalGastoExtra(pedidoId) {
+function openModalGastoExtra(pedidoId, conceptoSugerido, importeSugerido) {
   sv('gasto-extra-pedido-id', pedidoId);
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  sv('gasto-extra-concepto', p?.Gasto_Extra_Concepto || '');
-  sv('gasto-extra-importe', p?.Gasto_Extra_Importe || '');
+  sv('gasto-extra-concepto', p?.Gasto_Extra_Concepto || conceptoSugerido || '');
+  sv('gasto-extra-importe', p?.Gasto_Extra_Importe || (importeSugerido != null ? importeSugerido : ''));
   openModal('modal-gasto-extra');
 }
 
@@ -508,14 +528,14 @@ async function guardarGastoExtraPedido() {
   hideLoading();
 }
 
-function openModalEditarLinea(lineaId, pedidoId) {
+function openModalEditarLinea(lineaId, pedidoId, precioSugerido) {
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (!l) return;
   sv('edlinea-id', lineaId);
   sv('edlinea-pedido-id', pedidoId);
   document.getElementById('edlinea-material-nombre').textContent = l.Material;
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
-  sv('edlinea-precio', l.Precio_Unitario || '');
+  sv('edlinea-precio', l.Precio_Unitario || precioSugerido || '');
   sv('edlinea-obs', l.Observaciones || '');
   openModal('modal-editar-linea-pedido');
 }
