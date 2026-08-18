@@ -97,5 +97,27 @@ with conn.cursor() as cur:
         print("✓ tabla documentos_proveedor creada")
 conn.commit()
 
+# ── 4. RLS de documentos_proveedor ────────────────────────────────────────
+# Supabase activa RLS por defecto en toda tabla nueva de public (vía event
+# trigger) pero sin políticas — sin esto, la REST API (anon/authenticated)
+# devuelve [] aunque la fila exista (falló así la primera vez, detectado
+# probando el flujo real: el archivo se subía y se veía por SQL directo,
+# pero DATA.documentosProveedor se quedaba vacío en el navegador). Mismo
+# patrón que el resto de tablas (ver "POLÍTICAS RLS" en supabase/schema.sql):
+# RLS "true" para todos, el control de acceso real lo hacen las Edge
+# Functions, no RLS.
+with conn.cursor() as cur:
+    cur.execute("select 1 from pg_policies where tablename = 'documentos_proveedor'")
+    ya_existe = cur.fetchone() is not None
+    if ya_existe:
+        print("Política RLS de documentos_proveedor ya existía, no se toca")
+    else:
+        cur.execute(
+            "create policy documentos_proveedor_select_anon on documentos_proveedor "
+            "for select to anon, authenticated using (true)"
+        )
+        print("✓ Política RLS de documentos_proveedor creada")
+conn.commit()
+
 conn.close()
 print("\nMigración completada.")

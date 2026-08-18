@@ -536,6 +536,7 @@ create policy "material_select_anon" on material for select to anon, authenticat
 create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to anon, authenticated using (true);
 create policy "pedidos_select_anon" on pedidos for select to anon, authenticated using (true);
 create policy "lineas_pedido_select_anon" on lineas_pedido for select to anon, authenticated using (true);
+create policy "documentos_proveedor_select_anon" on documentos_proveedor for select to anon, authenticated using (true);
 create policy "solicitudes_select_anon" on solicitudes for select to anon, authenticated using (true);
 create policy "historico_precio_select_anon" on historico_precio for select to anon, authenticated using (true);
 create policy "movimientos_select_anon" on movimientos for select to anon, authenticated using (true);
