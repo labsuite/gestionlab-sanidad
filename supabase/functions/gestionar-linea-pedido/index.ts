@@ -177,6 +177,34 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminada: idLinea, solicitud_revertida: solRevertida });
   }
 
+  if (accion === "editar") {
+    const idLinea = String(body.id_linea || "").trim();
+    if (!idLinea) return jsonError("id_linea es obligatorio", 400);
+    const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
+    if (!linea) return jsonError("Línea no encontrada", 404);
+    const { data: pedido } = await supabaseAdmin.from("pedidos").select("estado").eq("id_pedido", linea.pedido).maybeSingle();
+    if (!pedido) return jsonError("Pedido no encontrado", 404);
+    if (!["Abierto", "Presupuesto solicitado"].includes(pedido.estado)) {
+      return jsonError("El pedido ya no admite cambios en las líneas", 400);
+    }
+
+    const datos: Record<string, unknown> = {};
+    if (body.cantidad_pedida !== undefined) {
+      const cant = Number(body.cantidad_pedida);
+      if (!cant || cant <= 0) return jsonError("Indica una cantidad válida", 400);
+      datos.cantidad_pedida = cant;
+    }
+    if (body.precio_unitario !== undefined) {
+      datos.precio_unitario = body.precio_unitario === "" || body.precio_unitario === null ? null : Number(body.precio_unitario);
+    }
+    if (body.observaciones !== undefined) datos.observaciones = strField(body.observaciones);
+    if (!Object.keys(datos).length) return jsonError("Nada que actualizar", 400);
+
+    const { data, error } = await supabaseAdmin.from("lineas_pedido").update(datos).eq("id_linea", idLinea).select().single();
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    return jsonOk({ linea: data });
+  }
+
   if (accion === "recepcion") {
     const idLinea = String(body.id_linea || "").trim();
     const cantRec = Number(body.cantidad);

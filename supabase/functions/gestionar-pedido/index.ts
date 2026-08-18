@@ -123,6 +123,20 @@ Deno.serve(async (req) => {
     return jsonOk({ pedido: data });
   }
 
+  if (accion === "generar_link_publico") {
+    const { data: p } = await supabaseAdmin.from("pedidos").select("token_publico").eq("id_pedido", idPedido).maybeSingle();
+    if (!p) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
+    if (p.token_publico) return jsonOk({ token: p.token_publico });
+
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    const token = btoa(String.fromCharCode(...bytes)).replace(/[^a-zA-Z0-9]/g, "");
+
+    const { error } = await supabaseAdmin.from("pedidos").update({ token_publico: token }).eq("id_pedido", idPedido);
+    if (error) return jsonError(`No se pudo generar el link: ${error.message}`, 400);
+    return jsonOk({ token });
+  }
+
   if (accion === "eliminar") {
     // Las líneas de Lineas_Pedido caen en cascada (FK on delete cascade).
     const { error } = await supabaseAdmin.from("pedidos").delete().eq("id_pedido", idPedido);

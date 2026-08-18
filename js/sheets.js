@@ -258,6 +258,18 @@ function _pedidoSbToObj(p) {
     Tipo: p.tipo || 'Material',
     Gasto_Extra_Concepto: p.gasto_extra_concepto || '',
     Gasto_Extra_Importe: p.gasto_extra_importe != null ? String(p.gasto_extra_importe) : '',
+    Token_Publico: p.token_publico || '',
+  };
+}
+
+function _documentoProveedorSbToObj(d) {
+  return {
+    ID_Documento: d.id_documento || '',
+    Pedido: d.pedido || '',
+    Nombre_Archivo: d.nombre_archivo || '',
+    Path: d.path || '',
+    Tamano_Bytes: d.tamano_bytes != null ? String(d.tamano_bytes) : '',
+    Fecha_Subida: d.fecha_subida || '',
   };
 }
 
@@ -474,7 +486,7 @@ async function loadAllData() {
            sbProveedoresRes, sbUbicacionesRes, sbEquiposRes,
            sbIntervencionesRes, sbIncidenciasRes, sbTareasRes,
            sbPlanesRes, sbRegistroMantRes,
-           sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes,
+           sbMaterialRes, sbMaterialUbicacionesRes, sbPedidosRes, sbLineasPedidoRes, sbDocumentosProveedorRes,
            sbSolicitudesRes, sbHistoricoPrecioRes, sbMovimientosRes, sbRevisionesRes,
            sbConfigReservasRes, sbReservasRes,
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
@@ -503,6 +515,7 @@ async function loadAllData() {
       _sbMigracion.from('material_ubicaciones').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('pedidos').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('lineas_pedido').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('documentos_proveedor').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('solicitudes').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('historico_precio').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('movimientos').select('*').then(r => r, () => ({ data: [] })),
@@ -531,6 +544,7 @@ async function loadAllData() {
     DATA.solicitudes             = (sbSolicitudesRes?.data || []).map(_solicitudSbToObj);
     DATA.pedidos                 = (sbPedidosRes?.data || []).map(_pedidoSbToObj);
     DATA.lineasPedido            = (sbLineasPedidoRes?.data || []).map(_lineaPedidoSbToObj);
+    DATA.documentosProveedor     = (sbDocumentosProveedorRes?.data || []).map(_documentoProveedorSbToObj);
     DATA.ciclosModulos           = []; // se construye más abajo desde la tabla pivot modulo_ciclo
     DATA.materialUbicaciones     = (sbMaterialUbicacionesRes?.data || []).map(_materialUbicacionSbToObj);
     DATA.historicoPrecio         = (sbHistoricoPrecioRes?.data || []).map(_historicoPrecioSbToObj);

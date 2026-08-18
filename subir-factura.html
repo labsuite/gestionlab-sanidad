@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subir factura — GestionLab</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --bg: #f4f1ec; --surface: #ffffff; --border: #e2ddd6; --text: #1a1714;
+    --text-soft: #6b6560; --text-muted: #a09a93; --accent: #2d5a3d;
+    --accent-light: #e8f0eb; --danger: #b94040; --danger-light: #fdf0f0;
+    --success: #2d5a3d; --success-light: #e8f0eb;
+    --radius: 10px; --radius-sm: 6px; --shadow: 0 2px 12px rgba(26,23,20,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif; background: var(--bg); color: var(--text);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); max-width: 440px; width: 100%; padding: 28px 24px;
+  }
+  .logo { font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  h1 { font-size: 18px; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: var(--text-soft); margin-bottom: 20px; }
+  .info-box {
+    background: var(--accent-light); color: var(--accent); border-radius: var(--radius-sm);
+    padding: 10px 14px; font-size: 13px; margin-bottom: 20px; font-weight: 500;
+  }
+  .file-drop {
+    border: 2px dashed var(--border); border-radius: var(--radius-sm); padding: 24px;
+    text-align: center; cursor: pointer; margin-bottom: 16px; font-size: 13px; color: var(--text-soft);
+  }
+  .file-drop.dragover { border-color: var(--accent); background: var(--accent-light); }
+  input[type=file] { display: none; }
+  .btn {
+    display: inline-block; width: 100%; padding: 11px 16px; border-radius: var(--radius-sm);
+    border: none; font-size: 14px; font-weight: 500; cursor: pointer; background: var(--accent);
+    color: #fff; font-family: inherit;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .msg { font-size: 13px; padding: 10px 14px; border-radius: var(--radius-sm); margin-top: 14px; display: none; }
+  .msg.ok { background: var(--success-light); color: var(--success); display: block; }
+  .msg.err { background: var(--danger-light); color: var(--danger); display: block; }
+  .file-name { font-size: 12px; color: var(--text-soft); margin-bottom: 12px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="card" id="card">
+  <div class="logo">🧪 GestionLab · CIFP Manuel Antonio</div>
+  <div id="contenido">Cargando...</div>
+</div>
+<script>
+const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
+const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
+
+const params = new URLSearchParams(location.search);
+const pedido = params.get('pedido') || '';
+const token = params.get('token') || '';
+const contenido = document.getElementById('contenido');
+
+async function llamar(accion, extra) {
+  const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/pedido-publico`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${SUPABASE_MIGRACION_ANON}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accion, pedido, token, ...extra }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
+  return data;
+}
+
+let archivoElegido = null;
+
+function renderFormulario(info) {
+  contenido.innerHTML = `
+    <h1>Subir factura o presupuesto</h1>
+    <div class="subtitle">${info.nombre_lista || pedido}${info.proveedor ? ' · ' + info.proveedor : ''}</div>
+    <div class="info-box">Sube aquí el PDF (o foto) de la factura o el presupuesto de este pedido. Solo lo verá el equipo del laboratorio.</div>
+    <div class="file-drop" id="drop">📎 Toca para elegir un archivo<br><span style="font-size:11px">PDF, JPG o PNG · máx. 10 MB</span></div>
+    <div class="file-name" id="file-name"></div>
+    <input type="file" id="file-input" accept="application/pdf,image/jpeg,image/png">
+    <button class="btn" id="btn-subir" disabled>Subir archivo</button>
+    <div class="msg" id="msg"></div>
+  `;
+  const fileInput = document.getElementById('file-input');
+  const drop = document.getElementById('drop');
+  const btnSubir = document.getElementById('btn-subir');
+  const fileName = document.getElementById('file-name');
+  const msg = document.getElementById('msg');
+
+  drop.onclick = () => fileInput.click();
+  drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('dragover'); };
+  drop.ondragleave = () => drop.classList.remove('dragover');
+  drop.ondrop = (e) => {
+    e.preventDefault(); drop.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) { fileInput.files = e.dataTransfer.files; onFileChange(); }
+  };
+  fileInput.onchange = onFileChange;
+
+  function onFileChange() {
+    const f = fileInput.files[0];
+    archivoElegido = f || null;
+    fileName.textContent = f ? `Elegido: ${f.name}` : '';
+    btnSubir.disabled = !f;
+    msg.className = 'msg';
+  }
+
+  btnSubir.onclick = async () => {
+    if (!archivoElegido) return;
+    btnSubir.disabled = true;
+    btnSubir.textContent = 'Subiendo...';
+    msg.className = 'msg';
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(archivoElegido);
+      });
+      await llamar('subir', {
+        nombre_archivo: archivoElegido.name,
+        tipo_mime: archivoElegido.type,
+        contenido_base64: base64,
+      });
+      msg.textContent = '✓ Archivo subido correctamente. Gracias.';
+      msg.className = 'msg ok';
+      fileInput.value = ''; archivoElegido = null;
+      fileName.textContent = '';
+      btnSubir.textContent = 'Subir archivo';
+      btnSubir.disabled = true;
+    } catch (e) {
+      msg.textContent = 'Error: ' + e.message;
+      msg.className = 'msg err';
+      btnSubir.textContent = 'Subir archivo';
+      btnSubir.disabled = false;
+    }
+  };
+}
+
+(async () => {
+  if (!pedido || !token) {
+    contenido.innerHTML = `<h1>Enlace no válido</h1><div class="subtitle">Falta información en el link. Pide a tu contacto en el laboratorio que te lo vuelva a enviar.</div>`;
+    return;
+  }
+  try {
+    const info = await llamar('info');
+    renderFormulario(info);
+  } catch (e) {
+    contenido.innerHTML = `<h1>Enlace no válido o caducado</h1><div class="subtitle">Pide a tu contacto en el laboratorio que te envíe un link nuevo.</div>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -437,6 +437,31 @@ async function copiarTextoEmailPedido() {
   showToast('Texto copiado al portapapeles', 'success');
 }
 
+async function abrirModalLinkProveedor(pedidoId) {
+  showLoading('Generando link...');
+  try {
+    const { token } = await callEdgeFunction('gestionar-pedido', { accion: 'generar_link_publico', id_pedido: pedidoId });
+    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+    if (p) p.Token_Publico = token;
+    const url = new URL('subir-factura.html', location.href);
+    url.search = `?pedido=${encodeURIComponent(pedidoId)}&token=${encodeURIComponent(token)}`;
+    document.getElementById('link-prov-url').value = url.href;
+    openModal('modal-link-proveedor');
+  } catch(e) { showToast('Error generando el link: ' + e.message, 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function copiarLinkProveedor() {
+  const input = document.getElementById('link-prov-url');
+  try {
+    await navigator.clipboard.writeText(input.value);
+  } catch (e) {
+    input.select();
+    document.execCommand('copy');
+  }
+  showToast('Link copiado al portapapeles', 'success');
+}
+
 function verDetallePedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
@@ -490,6 +515,7 @@ function verDetallePedido(pedidoId) {
         <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
         <div style="display:flex;gap:8px">
           ${puedeEditar && lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
+          ${puedeEditar ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>` : ''}
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
           ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
         </div>
@@ -510,13 +536,27 @@ function verDetallePedido(pedidoId) {
                 <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
               </div>
               <div class="linea-actions">
+                ${puedeEditar && ['Abierto','Presupuesto solicitado'].includes(p.Estado) ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
                 ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
                 ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
               </div>
             </div>`;
           }).join('')}
       </div>
-    </div>`;
+    </div>
+    ${(() => {
+      const docsProv = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId);
+      if (!docsProv.length) return '';
+      return `<div class="card">
+        <div class="card-header"><div class="card-title">📎 Documentos subidos por el proveedor (${docsProv.length})</div></div>
+        <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+          ${docsProv.map(d => `<div class="linea-row">
+            <div class="linea-nombre">${d.Nombre_Archivo}<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatDate(d.Fecha_Subida)||''}</div></div>
+            <div class="linea-actions"><button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button></div>
+          </div>`).join('')}
+        </div>
+      </div>`;
+    })()}`;
   showPage('pedido-detalle');
 }
 

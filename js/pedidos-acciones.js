@@ -508,6 +508,41 @@ async function guardarGastoExtraPedido() {
   hideLoading();
 }
 
+function openModalEditarLinea(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  sv('edlinea-id', lineaId);
+  sv('edlinea-pedido-id', pedidoId);
+  document.getElementById('edlinea-material-nombre').textContent = l.Material;
+  sv('edlinea-cantidad', l.Cantidad_Pedida || '');
+  sv('edlinea-precio', l.Precio_Unitario || '');
+  sv('edlinea-obs', l.Observaciones || '');
+  openModal('modal-editar-linea-pedido');
+}
+
+async function guardarEdicionLinea() {
+  const lineaId = v('edlinea-id');
+  const pedidoId = v('edlinea-pedido-id');
+  const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
+  if (idx === -1) return;
+  const cantidad = parseFloat(v('edlinea-cantidad'));
+  if (!cantidad || cantidad <= 0) { showToast('Indica una cantidad válida', 'error'); return; }
+  const precio = v('edlinea-precio');
+  const obs = v('edlinea-obs');
+  showLoading('Guardando...');
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'editar', id_linea: lineaId,
+      cantidad_pedida: cantidad, precio_unitario: precio, observaciones: obs,
+    });
+    DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+    showToast('Línea actualizada', 'success');
+    closeModal('modal-editar-linea-pedido');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast('Error: ' + e.message, 'error'); console.error(e); }
+  hideLoading();
+}
+
 // ============================================================
 // EDITAR SOLICITUD (solo Profesor, solo en estado Pendiente)
 // ============================================================

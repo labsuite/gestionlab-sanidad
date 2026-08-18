@@ -460,6 +460,39 @@
   </div>
 </div>
 
+<!-- Modal Editar línea de pedido -->
+<div class="modal-overlay" id="modal-editar-linea-pedido">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Editar línea</div>
+      <button class="modal-close" onclick="closeModal('modal-editar-linea-pedido')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edlinea-id">
+      <input type="hidden" id="edlinea-pedido-id">
+      <div id="edlinea-material-nombre" style="font-size:13px;color:var(--text-soft);margin-bottom:16px;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm)"></div>
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>Cantidad pedida</label>
+          <input id="edlinea-cantidad" type="number" min="0.01" step="0.01" placeholder="">
+        </div>
+        <div class="form-group">
+          <label>Precio unitario (€)</label>
+          <input id="edlinea-precio" type="number" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Observaciones</label>
+          <input id="edlinea-obs" placeholder="">
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-editar-linea-pedido')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarEdicionLinea()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Reasignar Ciclo/Módulo (desde Contabilidad) -->
 <div class="modal-overlay" id="modal-reasignar-ciclo">
   <div class="modal" style="max-width:420px">
@@ -512,6 +545,27 @@
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-email-pedido')">Cerrar</button>
         <button class="btn btn-primary" onclick="copiarTextoEmailPedido()">📋 Copiar texto</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Link para proveedor -->
+<div class="modal-overlay" id="modal-link-proveedor">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">🔗 Link para el proveedor</div>
+      <button class="modal-close" onclick="closeModal('modal-link-proveedor')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;color:var(--text-soft);margin-bottom:12px">Comparte este link con la casa comercial para que suba la factura o el presupuesto de este pedido, sin necesidad de iniciar sesión.</div>
+      <div class="form-group">
+        <label>Link</label>
+        <input id="link-prov-url" readonly style="font-family:inherit;font-size:13px" onclick="this.select()">
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-link-proveedor')">Cerrar</button>
+        <button class="btn btn-primary" onclick="copiarLinkProveedor()">📋 Copiar link</button>
       </div>
     </div>
   </div>
