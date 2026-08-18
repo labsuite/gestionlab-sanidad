@@ -1,85 +1,56 @@
-# Integración con Supabase
+# Integración con la base de datos de Sanidad CMA
 
-Segunda app (Vercel + Supabase) para gestión integral del departamento. GestionLab comparte ciclos/módulos, usuarios y (en el futuro) reservas de autoclaves.
+GestionLab comparte el catálogo de ciclos/módulos con "Sanidad CMA" (la otra app del
+departamento, Vercel + Supabase, `sanidade-cma-app.vercel.app`). Hay **dos canales
+distintos** hacia esa app — no confundirlos:
 
-## Credenciales
+## Canal 1 — lectura directa de `ciclos`/`modulos` (catálogo, en vivo)
+
+`DATA.ciclosModulos` (usado en el desplegable de módulo de Contabilidad, y en el
+selector de ciclo/módulo de Usuarios) se lee **en directo** del proyecto Supabase de
+Sanidad CMA, con la clave `anon` pública — no es una tabla propia de GestionLab.
+
 - **Project URL:** `https://clxcjsvkmaydpxvtqesv.supabase.co`
-- **Anon key:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA`
-- **Dashboard:** `https://supabase.com/dashboard/project/clxcjsvkmaydpxvtqesv`
+- **Cliente en el código:** `_sb` en `js/config.js` (constantes `SUPABASE_URL` /
+  `SUPABASE_ANON`) — distinto del cliente `_sbMigracion` que apunta a la base de datos
+  propia de GestionLab (`vnoecaqldymonkgrmvlj.supabase.co`).
+- `loadAllData()` en `js/sheets.js` consulta `ciclos`, `modulos` y `modulo_ciclo` (tabla
+  pivote muchos-a-muchos) de `_sb` y construye `DATA.ciclosModulos` combinando las tres
+  (ver función alrededor de `sbCiclosRes`/`sbModulosRes`/`sbModuloCicloRes`).
+- Confirmado en vivo (2026-08-18): la consulta devuelve datos reales y actualizados
+  (52 módulos, ciclos como "CS Laboratorio Clínico e Biomédico", "CS Anatomía
+  Patolóxica e Citodiagnóstico"...). Confirmado con la usuaria que este proyecto
+  **es** la base de datos de Sanidad CMA.
+- `DATA.sbUsuarios` / `DATA.userModulos` también se leen de aquí (`ciclos`, `modulos`,
+  `modulo_ciclo`, `user_modulos`, `users`) — se usan para `getUbicacionesAlumno()`
+  (labs del alumno a partir de sus módulos matriculados en Sanidad CMA).
+- Este canal es de **solo lectura** desde GestionLab (RLS: `SELECT TO anon`). No hay
+  forma de editar ciclos/módulos desde GestionLab — se gestionan en Sanidad CMA.
 
-La anon key es pública y segura en cliente. NO usar la service key en el cliente ni en git.
+## Canal 2 — API REST con `x-api-key` (importación de alumnado/profesorado)
 
-## Estado actual (2026-05-19) – PARCIALMENTE COMPLETADO
+Para dar de alta alumnado y profesorado como usuarios de GestionLab (con cuenta de
+Supabase Auth propia), se usa una API REST distinta y más reciente, documentada en
+`scripts/sanidad_cma_credentials.json` y en la memoria de la sesión que la implementó:
 
-| Ámbito | Estado | Fuente activa |
-|---|---|---|
-| Cliente Supabase (`_sb`) | ✓ integrado | `js/config.js` + CDN en `index.html` |
-| `ciclos` | ✓ migrado + datos cargados | Supabase |
-| `modulos` | ✓ migrado + datos cargados | Supabase |
-| `modulo_ciclo` | ✓ migrado + datos cargados | Supabase |
-| `user_modulos` | ✓ tabla creada, vacía | Supabase |
-| `puede_revisar_inventario` | ✓ columna añadida a `public.users` | Supabase |
-| `DATA.sbUsuarios` | ✓ cargado en paralelo | Supabase (solo para lookup de UUID) |
-| `DATA.usuarios` | ✓ parcial | Sheets + complementado con Supabase |
-| Reservas autoclaves | ✗ pendiente | Sheets |
+- **API URL:** `https://sanidade-cma-app.vercel.app`
+- **Endpoints:** `/api/bioDesk/alumnos`, `/api/bioDesk/profesores` (una fila por
+  matrícula alumno/profesor × módulo, con `ciclo`/`modulo`/`laboratorio` incluidos)
+- **Auth:** cabecera `x-api-key`, secreto guardado como variable de entorno de las
+  Edge Functions `importar-alumnos` / `importar-profesores`
+  (`SANIDAD_CMA_API_URL` / `SANIDAD_CMA_API_KEY`)
+- Esta API **no expone** un endpoint de catálogo de ciclos/módulos como tal (probado
+  2026-08-18: `/ciclos`, `/modulos`, `/ciclosModulos`, `/catalogo` devuelven 404) — solo
+  alumnado y profesorado ya matriculados. Para el catálogo de ciclos/módulos en sí,
+  usar el Canal 1.
+- Ver `docs/modulo-usuarios.md` para el flujo completo de importación.
 
-## Cómo funciona en GestionLab
-`loadAllData()` lanza en paralelo lecturas de Sheets y cuatro queries a Supabase: `ciclos`, `modulos`, `modulo_ciclo` y `users`. Si Supabase falla, cae al fallback de Sheets sin romperse.
+## Notas históricas
 
-- `DATA.ciclosModulos` desde Supabase (`modulo_ciclo` + `modulos` + `ciclos`), con `lab_teoria` y `lab_practicas`. Fallback a Sheets si vacío.
-- `DATA.sbUsuarios` carga `id, email, full_name, role, ciclo_principal, is_active, puede_revisar_inventario`. Solo para obtener UUID del usuario actual.
-- `getUbicacionesAlumno()` busca UUID en `DATA.sbUsuarios` → módulos en `DATA.userModulos` → labs. Fallback a `Ubicaciones_Asignadas` de Sheets si `user_modulos` vacía.
-
-## Estructura de tablas relevante
-- **`public.ciclos`**: `id (uuid), nombre (text), created_at, department_id (uuid, nullable)`
-- **`public.modulos`**: `id (uuid), nombre (text), created_at, lab_teoria (text), lab_practicas (text), horas_semanales (integer)`
-- **`public.modulo_ciclo`**: `ciclo_id (uuid), modulo_id (uuid)` — pivot pura
-- **`public.user_modulos`**: `id (uuid), user_id (uuid→users), modulo_id (uuid→modulos), curso_academico (text), created_at` — RLS: anon SELECT, authenticated ALL
-- **`public.users`**: `id, email, full_name, role (enum), ciclo_principal, is_active, xade_id, department_id, puede_revisar_inventario`
-
-RLS en `ciclos`, `modulos` y `modulo_ciclo`: `SELECT TO anon` añadido para GestionLab.
-
-## Complementación de DATA.usuarios desde Supabase (2026-05-20)
-Al final de `loadAllData()` se añaden usuarios de Supabase que cumplan:
-1. Rol `TEACHER` o `STUDENT`
-2. Tienen al menos un módulo en `user_modulos` con `lab_teoria` o `lab_practicas` asignado
-3. No están ya en Sheets (deduplicación por email)
-
-Marcados con `_sbOnly: true`. Mapeo: `TEACHER → Profesor`, `STUDENT → Alumno`.
-
-**Nota:** mientras `user_modulos` esté vacía, ningún usuario de Supabase aparece. Empezarán a aparecer cuando la otra app asigne módulos.
-
----
-
-## Pendiente — Fase 2: migración de usuarios a Supabase
-
-**Objetivo:** `DATA.usuarios` lea de Supabase en lugar de Sheets.
-
-**Bloqueante:** verificar que el enum `role` de Supabase (`Admin`, `Gestor`, `Profesor`, `Alumno`) coincide con GestionLab.
-
-**Nota sobre ID_Usuario:** GestionLab usa `USR-001`. Al migrar a UUID, añadir campo `gestionlab_id text` en `public.users`.
-
-**Cambios:**
-1. En `loadAllData()`: reemplazar `sheetsGet('Usuarios!A2:I')` por query a `_sb.from('users').select(...)`.
-2. En `js/ubicaciones.js`: reemplazar `sheetsAppend`/`sheetsUpdate` por `_sb.from('users').insert()` / `.update()`.
-3. Mantener hoja `Usuarios` como backup hasta verificar en producción.
-
-## Pendiente — Fase 3: migración a Supabase Auth
-
-**Objetivo:** GestionLab usa Supabase Auth con proveedor Google en lugar de Google GIS directo.
-
-**Alcance:** solo `js/auth.js` (~30-40 líneas). El token de Google para Sheets API se obtiene de `session.provider_token`.
-
-**Requisito previo:** añadir `https://clxcjsvkmaydpxvtqesv.supabase.co/auth/v1/callback` como URL autorizada en Google Cloud Console. La renovación silenciosa actual se sustituye por `_sb.auth.getSession()`.
-
-**Hacer en sesión dedicada** — si falla, el login deja de funcionar.
-
-## Pendiente — Fase 4: reservas de autoclaves compartidas
-
-**Objetivo:** reserva de autoclave visible desde GestionLab y la app de Vercel.
-
-**Cambios:**
-1. Crear tabla `reservas_autoclave` en Supabase (misma estructura que `Reservas_Equipos`, solo `AUTC-*`).
-2. En `loadAllData()`: cargar reservas de autoclaves desde Supabase; el resto sigue en Sheets.
-3. En `guardarReserva()`, `_cambiarEstadoReserva()`, `_actualizarVerificacion()`: detectar `idEquipo.startsWith('AUTC-')` y usar Supabase.
-4. Opcional: Supabase Realtime para actualizar el timeline sin recargar.
+Este documento describía antes (mayo 2026) una migración por fases de usuarios y login
+a Supabase que ya se completó — GestionLab usa Supabase Auth (email+contraseña) desde
+la migración completa documentada en `CLAUDE.md` y en la memoria de sesión
+`project_migracion_supabase_gestionlab`. Las fases 2 y 3 de aquella versión del
+documento ya no aplican. La fase de "reservas de autoclaves compartidas" sigue sin
+implementarse; si se retoma, revisar primero si sigue siendo necesaria dado que ahora
+Reservas vive enteramente en la base de datos propia de GestionLab (`_sbMigracion`).
