@@ -5,6 +5,18 @@
 // guarda el resultado; no toca cantidad_recibida/precio_unitario de ninguna
 // línea — eso lo hace el Gestor a mano en el modal de revisión, precargado
 // con lo detectado (gestionar-linea-pedido ya cubre esas escrituras).
+//
+// El emparejamiento lo hace el propio Gemini, no una comparación de texto
+// local: en pruebas reales, facturas de proveedor usan nombres comerciales
+// muy distintos al nombre genérico del catálogo interno (p.ej. "Aquatex
+// 50 mL" = "Medio de montaje para muestras hidratadas", "Calcofluor White
+// Stain" = "Tinción blanco de calcoflúor") — comparar palabras nunca
+// reconoce eso, pero el modelo sí (conoce marcas/sinónimos del sector). Por
+// eso se le pasa la lista de líneas del pedido en el propio prompt y es él
+// quien elige el id_linea de cada artículo. El servidor solo valida que el
+// id devuelto exista de verdad entre las líneas del pedido (nunca se fía a
+// ciegas de lo que diga el modelo) y resuelve duplicados si asigna el mismo
+// id_linea a dos artículos distintos.
 import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // gemini-1.5-flash y gemini-2.5-flash ya no están disponibles para claves
@@ -31,16 +43,27 @@ function arrayBufferABase64(buffer: ArrayBuffer): string {
   return btoa(binario);
 }
 
-const PROMPT = `Eres un asistente que extrae las líneas de artículo de una factura o presupuesto de un proveedor de material de laboratorio clínico/sanitario.
+function construirPrompt(lineas: { id_linea: string; material: string; cantidad_pedida: number | null }[]): string {
+  const listaLineas = lineas.length
+    ? lineas.map((l) => `- id_linea "${l.id_linea}": ${l.material} (cantidad pedida: ${l.cantidad_pedida ?? "?"})`).join("\n")
+    : "(este pedido no tiene ninguna línea todavía)";
 
-Devuelve SOLO un array JSON con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Reglas:
-- Ignora completamente cabeceras, totales, subtotales, portes/transporte y el IVA — nunca los devuelvas como si fueran un artículo.
-- "precio_unitario" es el precio POR UNIDAD SIN IVA (la base imponible de esa línea, no el total de la línea ni el precio con IVA incluido). Si el documento no lo indica, pon null.
-- "cantidad" es el número de unidades de esa línea. Si no aparece, pon null.
-- "unidad" es el texto breve de unidad si aparece (ej: "ud", "caja", "L", "kg"); si no aparece, cadena vacía.
-- "material" es el nombre del artículo tal como figura en el documento, sin inventar ni completar información que no esté.
-- Si además del listado de artículos el documento tiene un cargo aparte por transporte/portes/manipulación (no IVA, no descuento), inclúyelo en el campo "cargo_extra" del nivel superior como {"concepto": "...", "importe": número sin IVA}. Si no hay ninguno, "cargo_extra" debe ser null.
+  return `Eres un asistente que extrae las líneas de artículo de una factura o presupuesto de un proveedor de material de laboratorio clínico/sanitario, y las empareja con las líneas ya existentes de un pedido interno.
+
+Estas son las líneas del pedido interno con las que debes comparar cada artículo del documento:
+${listaLineas}
+
+Devuelve SOLO un objeto JSON. Reglas:
+- "items": un array con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Ignora completamente cabeceras, totales, subtotales y el IVA — nunca los devuelvas como si fueran un artículo.
+  - "material": el nombre del artículo tal como figura en el documento (incluye referencia/SKU si aparece), sin inventar ni completar información que no esté.
+  - "cantidad": número de unidades de esa línea, o null si no aparece.
+  - "precio_unitario": el precio POR UNIDAD SIN IVA (la base imponible de esa línea, no el total de la línea ni el precio con IVA incluido). Null si no se indica.
+  - "unidad": texto breve de unidad si aparece (ej: "ud", "caja", "L", "kg"); si no aparece, cadena vacía.
+  - "id_linea_sugerida": el "id_linea" de la lista de arriba que corresponde a este artículo, aunque el nombre comercial o la marca sean muy distintos del nombre genérico interno — usa tu conocimiento de productos de laboratorio (marcas, sinónimos, nombres técnicos equivalentes) para reconocerlo. Si no corresponde a ninguna línea de la lista, o tienes dudas razonables, pon null — mejor no emparejar que emparejar mal.
+  - "confianza_match": tu confianza en ese emparejamiento, de 0 a 1 (0 si id_linea_sugerida es null).
+- "cargo_extra": si el documento tiene, aparte del listado de artículos, algún cargo que NO es un artículo del inventario ni el IVA — transporte, portes, envasado especial, hielo, tasas de manipulación, etc. — inclúyelo aquí como {"concepto": "...", "importe": número sin IVA}. Si hay varios, súmalos en uno solo con un concepto conjunto. Si no hay ninguno, "cargo_extra" debe ser null. Nunca metas estos cargos dentro de "items".
 - No inventes artículos que no estén en el documento.`;
+}
 
 const ESQUEMA_RESPUESTA = {
   type: "OBJECT",
@@ -54,6 +77,8 @@ const ESQUEMA_RESPUESTA = {
           cantidad: { type: "NUMBER", nullable: true },
           precio_unitario: { type: "NUMBER", nullable: true },
           unidad: { type: "STRING" },
+          id_linea_sugerida: { type: "STRING", nullable: true },
+          confianza_match: { type: "NUMBER" },
         },
         required: ["material"],
       },
@@ -70,58 +95,36 @@ const ESQUEMA_RESPUESTA = {
   required: ["items"],
 };
 
-function normalizar(s: string): string {
-  return (s || "")
-    .toLowerCase()
-    .normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
-    .replace(/[^a-z0-9\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+// Nunca se fía a ciegas del id_linea_sugerida del modelo: descarta
+// cualquiera que no exista de verdad entre las líneas del pedido, y si dos
+// artículos apuntan a la misma línea se queda solo con el de mayor
+// confianza (el otro pasa a sin_match, no se descarta la información).
+function resolverMatches(items: any[], lineas: any[]) {
+  const porId = new Map(lineas.map((l) => [l.id_linea, l]));
+  const mejorPorLinea = new Map<string, any>();
 
-function similitud(a: string, b: string): number {
-  const na = normalizar(a), nb = normalizar(b);
-  if (!na || !nb) return 0;
-  if (na === nb) return 1;
-  if (na.includes(nb) || nb.includes(na)) return 0.85;
-  const wa = new Set(na.split(" "));
-  const wb = new Set(nb.split(" "));
-  let comunes = 0;
-  for (const w of wa) if (wb.has(w)) comunes++;
-  return comunes / Math.max(wa.size, wb.size);
-}
-
-const UMBRAL_MATCH = 0.4;
-
-// Empareja cada item detectado con, como mucho, una línea del pedido (y
-// viceversa) — greedy por similitud descendente, nunca crea líneas nuevas.
-function emparejar(items: any[], lineas: any[]) {
-  const pares: { item: any; linea: any; score: number }[] = [];
   for (const item of items) {
-    for (const linea of lineas) {
-      const score = similitud(item.material || "", linea.material || "");
-      if (score >= UMBRAL_MATCH) pares.push({ item, linea, score });
-    }
+    const idSugerido = item.id_linea_sugerida;
+    if (!idSugerido || !porId.has(idSugerido)) continue;
+    const actual = mejorPorLinea.get(idSugerido);
+    const confianza = typeof item.confianza_match === "number" ? item.confianza_match : 0;
+    if (!actual || confianza > actual.confianza) mejorPorLinea.set(idSugerido, { item, confianza });
   }
-  pares.sort((a, b) => b.score - a.score);
 
-  const itemsUsados = new Set<any>();
-  const lineasUsadas = new Set<string>();
-  const matches: any[] = [];
-  for (const par of pares) {
-    if (itemsUsados.has(par.item) || lineasUsadas.has(par.linea.id_linea)) continue;
-    itemsUsados.add(par.item);
-    lineasUsadas.add(par.linea.id_linea);
-    matches.push({
-      id_linea: par.linea.id_linea,
-      material_linea: par.linea.material,
-      cantidad_pedida: par.linea.cantidad_pedida,
-      cantidad_recibida: par.linea.cantidad_recibida,
-      item_detectado: par.item,
-      confianza: Math.round(par.score * 100) / 100,
-    });
-  }
-  const sinMatch = items.filter((i) => !itemsUsados.has(i));
+  const itemsEmparejados = new Set(Array.from(mejorPorLinea.values()).map((v) => v.item));
+  const matches = Array.from(mejorPorLinea.entries()).map(([idLinea, { item, confianza }]) => {
+    const linea = porId.get(idLinea);
+    return {
+      id_linea: idLinea,
+      material_linea: linea.material,
+      cantidad_pedida: linea.cantidad_pedida,
+      cantidad_recibida: linea.cantidad_recibida,
+      item_detectado: item,
+      confianza: Math.round(confianza * 100) / 100,
+    };
+  });
+
+  const sinMatch = items.filter((i) => !itemsEmparejados.has(i));
   return { matches, sinMatch };
 }
 
@@ -149,11 +152,14 @@ Deno.serve(async (req) => {
   const { data: doc } = await supabaseAdmin.from("documentos_proveedor").select("*").eq("id_documento", idDocumento).maybeSingle();
   if (!doc) return jsonError(`No se encontró el documento "${idDocumento}"`, 404);
 
+  const { data: lineas } = await supabaseAdmin.from("lineas_pedido").select("id_linea, material, cantidad_pedida, cantidad_recibida").eq("pedido", doc.pedido);
+
   const { data: archivo, error: descargaErr } = await supabaseAdmin.storage.from("documentos").download(doc.path);
   if (descargaErr || !archivo) return jsonError(`No se pudo leer el archivo: ${descargaErr?.message || "desconocido"}`, 400);
 
   const base64 = arrayBufferABase64(await archivo.arrayBuffer());
   const mimeType = mimeDesdeNombre(doc.nombre_archivo);
+  const prompt = construirPrompt(lineas || []);
 
   let respuestaGemini: Response;
   try {
@@ -163,10 +169,10 @@ Deno.serve(async (req) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
+          contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
           generationConfig: {
             responseMimeType: "application/json", responseSchema: ESQUEMA_RESPUESTA, temperature: 0.1,
-            thinkingConfig: { thinkingLevel: "low" }, // extracción de datos, no hace falta razonamiento largo — ahorra tokens/coste
+            thinkingConfig: { thinkingLevel: "low" }, // extracción + emparejamiento simple, no hace falta razonamiento largo — ahorra tokens/coste
           },
         }),
       },
@@ -192,8 +198,7 @@ Deno.serve(async (req) => {
   }
 
   const items = Array.isArray(extraido.items) ? extraido.items : [];
-  const { data: lineas } = await supabaseAdmin.from("lineas_pedido").select("id_linea, material, cantidad_pedida, cantidad_recibida").eq("pedido", doc.pedido);
-  const { matches, sinMatch } = emparejar(items, lineas || []);
+  const { matches, sinMatch } = resolverMatches(items, lineas || []);
 
   const resultado = {
     items,
