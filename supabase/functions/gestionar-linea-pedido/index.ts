@@ -20,17 +20,21 @@ async function buscarMaterialPorNombre(supabaseAdmin: any, nombreLinea: string) 
   return (todos || []).find((m: any) => nombreLinea.startsWith(m.nombre)) || null;
 }
 
-async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: number, pedidoId: string, usuario: string) {
+async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: number, pedidoId: string, usuario: string, unidadLinea: string | null) {
   const { data: lotes } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", mat.id_material);
   if ((lotes || []).length > 0) {
     const loteTarget = lotes[0];
     const nuevoLocal = (Number(loteTarget.stock_local) || 0) + cantRec;
-    await supabaseAdmin.from("material_ubicaciones").update({ stock_local: nuevoLocal }).eq("id", loteTarget.id);
+    const datosLote: Record<string, unknown> = { stock_local: nuevoLocal };
+    if (unidadLinea) datosLote.unidad_lote = unidadLinea;
+    await supabaseAdmin.from("material_ubicaciones").update(datosLote).eq("id", loteTarget.id);
     const nuevoTotal = lotes.reduce((s: number, l: any) => s + (l.id === loteTarget.id ? nuevoLocal : (Number(l.stock_local) || 0)), 0);
     await supabaseAdmin.from("material").update({ stock_actual: nuevoTotal }).eq("id_material", mat.id_material);
   } else {
     const nuevoStock = (Number(mat.stock_actual) || 0) + cantRec;
-    await supabaseAdmin.from("material").update({ stock_actual: nuevoStock }).eq("id_material", mat.id_material);
+    const datosMat: Record<string, unknown> = { stock_actual: nuevoStock };
+    if (unidadLinea) datosMat.unidad = unidadLinea;
+    await supabaseAdmin.from("material").update(datosMat).eq("id_material", mat.id_material);
   }
   await supabaseAdmin.from("movimientos").insert({
     id_movimiento: genId("MOV"), material: mat.nombre, tipo: "Entrada", cantidad: cantRec,
@@ -88,7 +92,7 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   // Servicios: no hay stock que tocar.
   if (pedido.tipo !== "Servicio" && cantRec > 0) {
     const mat = await buscarMaterialPorNombre(supabaseAdmin, linea.material);
-    if (mat) await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario);
+    if (mat) await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
   if (estadoLinea === "Recibido") await actualizarSolicitudOrigen(supabaseAdmin, lineaActualizada, linea.pedido);
@@ -138,6 +142,7 @@ Deno.serve(async (req) => {
       cantidad_recibida: 0, estado_linea: "Pendiente", observaciones,
       precio_unitario: body.precio_unitario ? Number(body.precio_unitario) : null,
       id_equipo: strField(body.id_equipo),
+      unidad: strField(body.unidad),
     };
     const { data, error } = await supabaseAdmin.from("lineas_pedido").insert(datos).select().single();
     if (error) return jsonError(`No se pudo añadir la línea: ${error.message}`, 400);

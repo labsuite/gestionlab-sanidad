@@ -213,6 +213,7 @@ function _materialSbToObj(m) {
     Referencia_Proveedor: m.referencia_proveedor || '',
     Proveedor: m.proveedor || '',
     Unidad: m.unidad || '',
+    Unidades_Extra: m.unidades_extra || '',
     Ubicacion: m.ubicacion || '',
     Stock_Actual: m.stock_actual != null ? String(m.stock_actual) : '0',
     Stock_Minimo: m.stock_minimo != null ? String(m.stock_minimo) : '0',
@@ -286,6 +287,7 @@ function _lineaPedidoSbToObj(l) {
     Observaciones: l.observaciones || '',
     Precio_Unitario: l.precio_unitario != null ? String(l.precio_unitario) : '',
     ID_Equipo: l.id_equipo || '',
+    Unidad: l.unidad || '',
   };
 }
 

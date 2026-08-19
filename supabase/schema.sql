@@ -344,6 +344,7 @@ create table material (
   referencia_proveedor   text,
   proveedor              text,   -- nombre libre, no FK
   unidad                 text,
+  unidades_extra         text,   -- unidades alternativas en las que también se puede pedir (coma-separadas), ver docs/modulo-pedidos.md
   ubicacion              text,   -- legacy: solo ubicación primaria, ver docs/modulo-pedidos.md
   stock_actual           numeric,
   stock_minimo           numeric,
@@ -407,7 +408,8 @@ create table lineas_pedido (
   estado_linea         text,
   observaciones        text,
   precio_unitario      numeric,
-  id_equipo            text references equipos(id_activo) on update cascade
+  id_equipo            text references equipos(id_activo) on update cascade,
+  unidad               text   -- unidad elegida al pedir esta línea (ej: "gotero" en vez de la "botella" por defecto del material); vacío = usa Material.Unidad
 );
 
 create table solicitudes (

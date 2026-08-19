@@ -168,6 +168,7 @@ Deno.serve(async (req) => {
 
       const datos = {
         nombre, categoria, unidad,
+        unidades_extra: strField(body.unidades_extra),
         referencia_proveedor: strField(body.referencia_proveedor),
         proveedor: strField(body.proveedor),
         ubicacion: strField(body.ubicacion),

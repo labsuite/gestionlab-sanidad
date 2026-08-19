@@ -438,6 +438,7 @@ function seleccionarMaterial(id, nombre, listId, hiddenId, selectedId) {
   if (unidadesField && mat) unidadesField.value = mat.Unidad || '';
   if (hiddenId === 'consumo-material-id') _mostrarSelectorUbicConsumo(id);
   if (hiddenId === 'entrada-material-id') _mostrarSelectorUbicEntrada(id);
+  if (hiddenId === 'linea-material-id') _mostrarSelectorUnidadLinea(mat);
 }
 
 function buscarMaterialSolicitud(val) { buscarMaterialGenerico(val, 'sol-autocomplete',    'sol-material-id',     'sol-material-selected'); }
@@ -578,7 +579,7 @@ function openModalMaterial() {
   editingRow = null; _lotesTemp = [];
   document.getElementById('modal-material-title').textContent = 'Nuevo material';
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = false;
-  ['mat-id','mat-nombre','mat-unidad','mat-ubicacion','mat-referencia','mat-observaciones','mat-ubicacion-search'].forEach(id => sv(id, ''));
+  ['mat-id','mat-nombre','mat-unidad','mat-unidades-extra','mat-ubicacion','mat-referencia','mat-observaciones','mat-ubicacion-search'].forEach(id => sv(id, ''));
   sv('mat-categoria', ''); sv('mat-stock', '0'); sv('mat-minimo', '0'); sv('mat-optimo', '0'); sv('mat-proveedor', '');
   clearUbicacionMat();
   const sel = document.getElementById('mat-proveedor');
@@ -630,7 +631,7 @@ function editMaterial(idx) {
   document.getElementById('modal-material-title').textContent = 'Editar material';
   sv('mat-id', m.ID_Material); sv('mat-nombre', m.Nombre); sv('mat-categoria', m.Categoria);
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = true;
-  sv('mat-referencia', m.Referencia_Proveedor); sv('mat-unidad', m.Unidad);
+  sv('mat-referencia', m.Referencia_Proveedor); sv('mat-unidad', m.Unidad); sv('mat-unidades-extra', m.Unidades_Extra);
   sv('mat-ubicacion', m.Ubicacion);
   sv('mat-stock', m.Stock_Actual); sv('mat-minimo', m.Stock_Minimo); sv('mat-optimo', m.Stock_Optimo);
   sv('mat-observaciones', m.Observaciones);
@@ -922,7 +923,7 @@ async function guardarMaterial() {
 
     const { material, lotes } = await callEdgeFunction('gestionar-material', {
       accion: esEdicion ? 'actualizar' : 'crear', id_material: id, nombre, categoria: cat,
-      referencia_proveedor: v('mat-referencia'), proveedor: v('mat-proveedor'), unidad, ubicacion: ubicPrincipal,
+      referencia_proveedor: v('mat-referencia'), proveedor: v('mat-proveedor'), unidad, unidades_extra: v('mat-unidades-extra'), ubicacion: ubicPrincipal,
       stock_actual: stockGlobal, stock_minimo: minStock, stock_optimo: optStock,
       observaciones: v('mat-observaciones'), gestion_automatica: gestionAuto, lotes: lotesBody,
     });

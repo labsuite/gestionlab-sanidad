@@ -391,8 +391,10 @@ function renderPedidos(filtroEstado = '') {
 }
 function filtrarPedidosEstado(v) { renderPedidos(v); }
 
-// Unidad de una línea: catálogo de material, o si no está catalogado, la solicitud vinculada
+// Unidad de una línea: la elegida al pedirla (si el material tenía varios
+// tipos), si no la del catálogo de material, si no la solicitud vinculada
 function _unidadLineaPedido(l) {
+  if (l.Unidad) return l.Unidad;
   const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
   if (mat?.Unidad) return mat.Unidad;
   const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
@@ -550,6 +552,7 @@ function anadirLineaDesdeSinMatch(idx) {
   openModalNuevaLinea(pedidoId);
   setSourceLinea('libre');
   sv('linea-material-libre', it.material);
+  sv('linea-material-unidades', it.unidad || '');
   sv('linea-cantidad', it.cantidad != null ? it.cantidad : '');
   sv('linea-precio', it.precio_unitario != null ? it.precio_unitario : '');
   sv('linea-obs', `No estaba en el pedido — detectada en ${doc?.Nombre_Archivo || 'el documento'} leído con IA`);
@@ -729,6 +732,22 @@ function setSourceLinea(source) {
   document.getElementById('linea-catalogo-group').style.display = esCatalogo ? '' : 'none';
   document.getElementById('linea-libre-group').style.display = esCatalogo ? 'none' : '';
   document.getElementById('linea-libre-unidad-group').style.display = esCatalogo ? 'none' : '';
+  if (!esCatalogo) document.getElementById('linea-catalogo-unidad-group').style.display = 'none';
+}
+
+// Selector de unidad al añadir una línea de pedido: solo se muestra si el
+// material tiene más de un tipo de unidad (Unidad + Unidades_Extra), como el
+// azul de lactofenol en botella o gotero. Con un único tipo no se muestra —
+// la línea usa la Unidad del material como hasta ahora.
+function _mostrarSelectorUnidadLinea(mat) {
+  const grupo = document.getElementById('linea-catalogo-unidad-group');
+  const sel = document.getElementById('linea-catalogo-unidad');
+  if (!grupo || !sel) return;
+  const extra = (mat?.Unidades_Extra || '').split(',').map(u => u.trim()).filter(Boolean);
+  const opciones = [mat?.Unidad || '', ...extra].filter(Boolean);
+  if (opciones.length <= 1) { grupo.style.display = 'none'; sel.innerHTML = ''; return; }
+  sel.innerHTML = opciones.map(u => `<option value="${u}">${u}</option>`).join('');
+  grupo.style.display = '';
 }
 
 function openModalSolicitud() {
@@ -771,7 +790,9 @@ function openModalNuevaLinea(pedidoId) {
     document.getElementById('linea-material-id').value = '';
     document.getElementById('linea-material-selected').style.display = 'none';
     document.getElementById('linea-search').value = '';
-    sv('linea-material-libre','');
+    sv('linea-material-libre',''); sv('linea-material-unidades','');
+    document.getElementById('linea-catalogo-unidad-group').style.display = 'none';
+    document.getElementById('linea-catalogo-unidad').innerHTML = '';
   }
   sv('linea-cantidad', esServicio ? '1' : '');
   sv('linea-precio', '');
@@ -813,6 +834,7 @@ function openModalRecepcionMasiva(pedidoId) {
     <thead>
       <tr style="border-bottom:2px solid var(--border)">
         <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Material</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Unidad</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">En este albarán *</th>
@@ -823,8 +845,10 @@ function openModalRecepcionMasiva(pedidoId) {
       ${lineas.map(l => {
         const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
         const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
+        const unidad = _unidadLineaPedido(l);
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:8px 6px;font-weight:500">${l.Material}</td>
+          <td style="padding:8px 6px;color:var(--text-soft)">${unidad || '—'}</td>
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${l.Cantidad_Pedida}</td>
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
           <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
@@ -848,12 +872,14 @@ function openModalRecepcion(lineaId, pedidoId) {
   document.getElementById('btn-confirmar-recepcion').textContent = esServicio ? 'Confirmar realizado' : 'Confirmar recepción';
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (l) {
-    document.getElementById('rec-material-nombre').textContent = l.Material;
+    const unidad = esServicio ? '' : _unidadLineaPedido(l);
+    document.getElementById('rec-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
     if (!esServicio) {
-      document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida;
+      document.getElementById('rec-cantidad-pedida').textContent = l.Cantidad_Pedida + (unidad ? ' ' + unidad : '');
+      document.getElementById('rec-cantidad').placeholder = unidad ? '0 ' + unidad : '0';
       const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
       if (yaRec > 0) {
-        document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec;
+        document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec + (unidad ? ' ' + unidad : '');
         document.getElementById('rec-ya-recibida-group').style.display = '';
       }
     }

@@ -177,7 +177,7 @@ async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
   const esServicio = pedido?.Tipo === 'Servicio';
-  let materialNombre = '', equipoId = '', nuevoEquipoDatos = null;
+  let materialNombre = '', equipoId = '', nuevoEquipoDatos = null, unidadLinea = '';
 
   if (esServicio) {
     const esNuevo = document.getElementById('btn-seq-nuevo').classList.contains('active');
@@ -206,6 +206,14 @@ async function guardarLineaPedido() {
     const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
     materialNombre = esLibre ? v('linea-material-libre') : (() => { const id = document.getElementById('linea-material-id').value; const mat = DATA.material.find(m => m.ID_Material === id); return mat ? mat.Nombre : ''; })();
     if (!materialNombre) { showToast('Indica el material', 'error'); return; }
+    // Unidad pedida: texto libre en material no catalogado, o el desplegable
+    // si el material catalogado tiene más de un tipo de unidad (ver _mostrarSelectorUnidadLinea)
+    if (esLibre) {
+      unidadLinea = v('linea-material-unidades');
+    } else {
+      const grupoUnidad = document.getElementById('linea-catalogo-unidad-group');
+      if (grupoUnidad && grupoUnidad.style.display !== 'none') unidadLinea = v('linea-catalogo-unidad');
+    }
   }
 
   const cant = v('linea-cantidad');
@@ -228,7 +236,7 @@ async function guardarLineaPedido() {
   try {
     const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
       accion: 'crear', pedido: pedidoId, material: materialNombre, cantidad_pedida: cant,
-      observaciones: obs, precio_unitario: precio, id_equipo: equipoId,
+      observaciones: obs, precio_unitario: precio, id_equipo: equipoId, unidad: unidadLinea,
     });
     DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
     closeModal('modal-nueva-linea');
@@ -565,7 +573,8 @@ function openModalEditarLinea(lineaId, pedidoId) {
   if (!l) return;
   sv('edlinea-id', lineaId);
   sv('edlinea-pedido-id', pedidoId);
-  document.getElementById('edlinea-material-nombre').textContent = l.Material;
+  const unidad = _unidadLineaPedido(l);
+  document.getElementById('edlinea-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');

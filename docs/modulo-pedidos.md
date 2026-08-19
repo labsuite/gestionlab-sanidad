@@ -147,6 +147,16 @@ El `<select>` de destino en el modal de subdividir (poco usable con muchas ubica
 
 **Requiere:** `python scripts/migrar_extraccion_documentos_proveedor.py` (añade `datos_extraidos`/`extraido_en` a `documentos_proveedor`), desplegar `leer-documento-proveedor`, y configurar el secreto `GEMINI_API_KEY` en el proyecto de Supabase (`supabase secrets set GEMINI_API_KEY=...`) — clave de Google AI Studio, distinta de la que en su día use el asistente de chat pendiente (esa es client-side con restricción de HTTP referrer; esta vive solo en la Edge Function).
 
+## Unidad pedida por línea, para materiales con varios formatos (2026-08-19)
+Caso: un material que se compra en más de un formato (ej. azul de lactofenol en botella o en gotero) necesitaba poder indicarse en cada pedido cuál se está pidiendo.
+- Col `unidades_extra` nueva en `material`: unidades alternativas del ítem, coma-separadas (la "de serie" sigue siendo `Material.Unidad`). Se edita en `modal-material` (`js/material.js`), campo opcional junto a "Unidad de medida".
+- Col `unidad` nueva en `lineas_pedido`: unidad elegida para esa línea concreta; vacío = se usa la `Unidad` del material como siempre.
+- En "Añadir línea al pedido" (`html/modales-pedidos.html`), al elegir un material del catálogo con más de un tipo de unidad, aparece un `<select id="linea-catalogo-unidad">` (`_mostrarSelectorUnidadLinea` en `js/pedidos-render.js`, llamada desde `seleccionarMaterial` en `js/material.js`). Si el material solo tiene un tipo, el selector no se muestra — se comporta igual que antes.
+- Para material no catalogado ("Material libre"), el campo de texto libre `linea-material-unidades` (ya existía en el HTML pero no se guardaba en ningún sitio) ahora sí se envía como `unidad` de la línea.
+- `_unidadLineaPedido(l)` (`js/pedidos-render.js`) prioriza `l.Unidad` (lo elegido al pedir) sobre `Material.Unidad`; se usa en detalle de pedido, recepción individual, recepción masiva (albarán, con columna "Unidad") y edición de línea.
+- **La recepción también fija la unidad del lote que recibe el stock**: `actualizarStockMaterial` en `gestionar-linea-pedido` (accion `recepcion`) escribe `unidad_lote` del lote afectado (o `Material.Unidad` si el ítem no tiene lotes) con la unidad de la línea, para no tener que corregirlo luego a mano en el catálogo.
+- Requiere `python scripts/migrar_unidad_pedido.py` (añade `material.unidades_extra` y `lineas_pedido.unidad`).
+
 ## Eliminar ítems del inventario (2026-05-22)
 - Permiso `eliminarItems: true` en **Administrador** únicamente (Gestor no lo tiene)
 - Botón "Eliminar" en footer izquierdo de los modales `modal-material` y `modal-equipo`, solo al editar
