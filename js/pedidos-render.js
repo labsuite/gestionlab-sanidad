@@ -519,6 +519,7 @@ function verDetallePedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  const docsProv = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId);
   const puedeEditar  = getUserRole() === 'Administrador' || getUserRole() === 'Gestor';
   const puedeAddLinea = ['Abierto','Presupuesto solicitado'].includes(p.Estado) && puedeEditar;
   const cont = document.getElementById('pedido-detalle-contenido');
@@ -543,11 +544,12 @@ function verDetallePedido(pedidoId) {
         <div class="detail-item"><div class="detail-label">Gasto extra</div><div class="detail-value" style="display:flex;align-items:center;gap:8px">${parseFloat(p.Gasto_Extra_Importe)>0 ? `${p.Gasto_Extra_Concepto||'Gasto extra'} · ${parseFloat(p.Gasto_Extra_Importe).toFixed(2)} €` : '—'}${puedeEditar ? `<button class="icon-btn" title="Añadir/editar gasto extra" onclick="openModalGastoExtra('${p.ID_Pedido}')" style="font-size:12px;padding:2px 6px">✏️</button>` : ''}</div></div>
       </div>
       ${puedeEditar ? `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;flex-wrap:wrap;gap:8px">
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación</div>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
-            ${puedeEditar ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>` : ''}
+            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
+            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -560,6 +562,21 @@ function verDetallePedido(pedidoId) {
             <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
           </label>
         </div>
+        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--text-soft);margin-bottom:8px">📎 Factura / presupuesto del proveedor${docsProv.length ? ` (${docsProv.length})` : ''}</div>
+          ${docsProv.length ? `<div style="display:flex;flex-direction:column;gap:8px">
+            ${docsProv.map(d => `<div class="linea-row">
+              <div class="linea-nombre">${d.Nombre_Archivo}<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatDate(d.Fecha_Subida)||''}</div></div>
+              <div class="linea-actions">
+                ${d.Datos_Extraidos
+                  ? `<button class="icon-btn" title="Ver datos leídos con IA" onclick="abrirModalRevisionExtraccion('${d.ID_Documento}','${pedidoId}')">📋</button>
+                     <button class="icon-btn" title="Releer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🔄</button>`
+                  : `<button class="icon-btn" title="Leer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🤖</button>`}
+                <button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button>
+              </div>
+            </div>`).join('')}
+          </div>` : `<div style="font-size:12px;color:var(--text-muted)">Aún no se ha subido ningún documento — pulsa "🔗 Link para proveedor" arriba y compártelo con la casa comercial.</div>`}
+        </div>
         ${p.Estado==='Recepción completa'&&p.Doc_Hoja_Generada==='TRUE'&&p.Doc_Enviada_Jefatura==='TRUE' ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
       </div>` : ''}
     </div>
@@ -568,7 +585,6 @@ function verDetallePedido(pedidoId) {
         <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
         <div style="display:flex;gap:8px">
           ${puedeEditar && lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
-          ${puedeEditar ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>` : ''}
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
           ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
         </div>
@@ -596,26 +612,7 @@ function verDetallePedido(pedidoId) {
             </div>`;
           }).join('')}
       </div>
-    </div>
-    ${(() => {
-      const docsProv = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId);
-      if (!docsProv.length) return '';
-      return `<div class="card">
-        <div class="card-header"><div class="card-title">📎 Documentos subidos por el proveedor (${docsProv.length})</div></div>
-        <div style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
-          ${docsProv.map(d => `<div class="linea-row">
-            <div class="linea-nombre">${d.Nombre_Archivo}<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatDate(d.Fecha_Subida)||''}</div></div>
-            <div class="linea-actions">
-              ${d.Datos_Extraidos
-                ? `<button class="icon-btn" title="Ver datos leídos con IA" onclick="abrirModalRevisionExtraccion('${d.ID_Documento}','${pedidoId}')">📋</button>
-                   <button class="icon-btn" title="Releer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🔄</button>`
-                : `<button class="icon-btn" title="Leer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🤖</button>`}
-              <button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button>
-            </div>
-          </div>`).join('')}
-        </div>
-      </div>`;
-    })()}`;
+    </div>`;
   showPage('pedido-detalle');
 }
 
