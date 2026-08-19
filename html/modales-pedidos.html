@@ -577,14 +577,16 @@
     <div class="modal-header">
       <div>
         <div class="modal-title">🤖 Datos leídos del documento</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Revisa cada línea antes de aplicarla — nada se guarda automáticamente</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Marca los precios que quieres aplicar — nada se guarda hasta que pulses Aplicar</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-revision-extraccion')">✕</button>
     </div>
     <div class="modal-body">
+      <input type="hidden" id="revext-pedido-id">
       <div id="revision-extraccion-contenido"></div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-revision-extraccion')">Cerrar</button>
+        <button class="btn btn-primary" onclick="aplicarPreciosExtraccion()">Aplicar precios seleccionados</button>
       </div>
     </div>
   </div>

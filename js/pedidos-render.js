@@ -463,40 +463,48 @@ async function copiarLinkProveedor() {
 }
 
 // ── Revisión de lo leído por la IA en un documento del proveedor ──────
-// Solo lectura + botones que precargan los modales de siempre (recepción,
-// editar línea, gasto extra) — nunca escribe nada por sí misma. Nunca crea
-// líneas de pedido nuevas: lo que no encaja con ninguna línea existente se
-// muestra aparte, solo a título informativo.
+// Lo único que esta pantalla puede escribir es precio_unitario, en lote, vía
+// la misma acción actualizar_precio que ya usa el botón 💶 Precios
+// (js/contabilidad.js) — nunca cantidad_recibida (eso exige comprobar
+// físicamente lo que ha llegado, no lo que diga una factura) ni
+// cantidad_pedida (eso es lo que se decidió pedir, no lo que facture el
+// proveedor). Cada línea tiene un checkbox (desmarcado y deshabilitado si
+// no se detectó precio) y el precio en un campo editable por si la lectura
+// viene casi bien pero hay que corregir un dígito — lo que no esté bien
+// simplemente se desmarca y no se aplica. Nunca crea líneas de pedido
+// nuevas: lo que no encaja con ninguna línea existente se muestra aparte,
+// solo a título informativo.
 function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
   const r = doc?.Datos_Extraidos;
+  sv('revext-pedido-id', pedidoId);
   const cont = document.getElementById('revision-extraccion-contenido');
   if (!r) { cont.innerHTML = `<div class="empty-state" style="padding:24px">Todavía no se ha leído este documento.</div>`; openModal('modal-revision-extraccion'); return; }
 
   const filasMatch = (r.matches || []).map(m => {
     const it = m.item_detectado || {};
     const unidad = it.unidad ? ' ' + it.unidad : '';
+    const tienePrecio = it.precio_unitario != null;
+    const cantidadDetectada = it.cantidad != null ? it.cantidad + unidad : '—';
+    const cantidadDistinta = it.cantidad != null && Number(it.cantidad) !== Number(m.cantidad_pedida);
     return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:6px 8px;text-align:center"><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
       <td style="padding:6px 8px">${m.material_linea}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_pedida ?? '—'}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_recibida || '0'}</td>
-      <td style="padding:6px 8px;text-align:center">${it.cantidad != null ? it.cantidad + unidad : '—'}</td>
-      <td style="padding:6px 8px;text-align:right">${it.precio_unitario != null ? Number(it.precio_unitario).toFixed(2) + ' €' : '—'}</td>
-      <td style="padding:6px 8px;white-space:nowrap">
-        ${it.cantidad != null ? `<button class="icon-btn" title="Precargar en Registrar recepción" onclick="closeModal('modal-revision-extraccion');openModalRecepcion('${m.id_linea}','${pedidoId}',${it.cantidad})">📥</button>` : ''}
-        ${it.precio_unitario != null ? `<button class="icon-btn" title="Precargar en Editar línea" onclick="closeModal('modal-revision-extraccion');openModalEditarLinea('${m.id_linea}','${pedidoId}',${it.precio_unitario})">✏️</button>` : ''}
-      </td>
+      <td style="padding:6px 8px;text-align:center${cantidadDistinta ? ';color:var(--danger,#dc2626)' : ''}" title="${cantidadDistinta ? 'Distinto de lo pedido — solo informativo, no se toca nada' : ''}">${cantidadDetectada}</td>
+      <td style="padding:6px 8px;text-align:right"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right"></td>
     </tr>`;
   }).join('');
 
   const tabla = (r.matches || []).length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:2px solid var(--border)">
+      <th style="padding:6px 8px"></th>
       <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Línea del pedido</th>
       <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
       <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
       <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Detectado</th>
-      <th style="text-align:right;padding:6px 8px;color:var(--text-muted);font-weight:600">Precio detectado</th>
-      <th style="padding:6px 8px"></th>
+      <th style="text-align:right;padding:6px 8px;color:var(--text-muted);font-weight:600">Precio (€)</th>
     </tr></thead>
     <tbody>${filasMatch}</tbody>
   </table></div>` : `<div class="empty-state" style="padding:16px">No se detectó ninguna línea que coincida con las líneas de este pedido.</div>`;
@@ -797,9 +805,8 @@ function openModalRecepcionMasiva(pedidoId) {
   openModal('modal-recepcion-masiva');
 }
 
-function openModalRecepcion(lineaId, pedidoId, cantidadSugerida) {
-  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', '');
-  sv('rec-cantidad', cantidadSugerida != null ? cantidadSugerida : '');
+function openModalRecepcion(lineaId, pedidoId) {
+  sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
   const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const esServicio = pedido?.Tipo === 'Servicio';
   document.getElementById('rec-label-material').textContent = esServicio ? 'Servicio' : 'Material';

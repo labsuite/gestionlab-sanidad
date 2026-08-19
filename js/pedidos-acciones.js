@@ -465,6 +465,38 @@ async function leerDocumentoConIA(idDocumento, pedidoId) {
   hideLoading();
 }
 
+// Aplica en lote los precios marcados en el modal de revisión — misma
+// acción actualizar_precio que ya usa 💶 Precios (js/contabilidad.js), así
+// que también queda registrado en historico_precio. Nunca toca
+// cantidad_recibida ni cantidad_pedida desde aquí (ver abrirModalRevisionExtraccion).
+async function aplicarPreciosExtraccion() {
+  const pedidoId = v('revext-pedido-id');
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  const checks = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-check'));
+  const lineasBody = [];
+  for (const chk of checks) {
+    if (!chk.checked) continue;
+    const idLinea = chk.dataset.idLinea;
+    const input = document.querySelector(`#revision-extraccion-contenido .revext-precio[data-id-linea="${idLinea}"]`);
+    const precio = input ? input.value.trim() : '';
+    if (!precio) continue;
+    lineasBody.push({ id_linea: idLinea, precio_unitario: precio });
+  }
+  if (!lineasBody.length) { showToast('No has seleccionado ningún precio para aplicar', 'info'); return; }
+
+  showLoading('Aplicando precios...');
+  try {
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'actualizar_precio', pedido: pedidoId, proveedor: p.Proveedor || '', lineas: lineasBody });
+    await loadAllData();
+    showToast(`${lineasBody.length} precio(s) actualizado(s)`, 'success');
+    closeModal('modal-revision-extraccion');
+    verDetallePedido(pedidoId);
+    renderContabilidad(); renderMaterial();
+  } catch (e) { showToast('Error aplicando precios: ' + e.message, 'error'); console.error(e); }
+  hideLoading();
+}
+
 // ============================================================
 // EDITAR PROVEEDOR DEL PEDIDO
 // ============================================================
@@ -528,14 +560,14 @@ async function guardarGastoExtraPedido() {
   hideLoading();
 }
 
-function openModalEditarLinea(lineaId, pedidoId, precioSugerido) {
+function openModalEditarLinea(lineaId, pedidoId) {
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (!l) return;
   sv('edlinea-id', lineaId);
   sv('edlinea-pedido-id', pedidoId);
   document.getElementById('edlinea-material-nombre').textContent = l.Material;
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
-  sv('edlinea-precio', l.Precio_Unitario || precioSugerido || '');
+  sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
   openModal('modal-editar-linea-pedido');
 }
