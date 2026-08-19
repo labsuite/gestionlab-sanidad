@@ -474,10 +474,13 @@ async function copiarLinkProveedor() {
 // simplemente se desmarca y no se aplica. Nunca crea líneas de pedido
 // nuevas: lo que no encaja con ninguna línea existente se muestra aparte,
 // solo a título informativo.
+let _revExtraccionActual = null;
+
 function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
   const r = doc?.Datos_Extraidos;
   sv('revext-pedido-id', pedidoId);
+  _revExtraccionActual = { idDocumento, pedidoId, r };
   const cont = document.getElementById('revision-extraccion-contenido');
   if (!r) { cont.innerHTML = `<div class="empty-state" style="padding:24px">Todavía no se ha leído este documento.</div>`; openModal('modal-revision-extraccion'); return; }
 
@@ -509,9 +512,17 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     <tbody>${filasMatch}</tbody>
   </table></div>` : `<div class="empty-state" style="padding:16px">No se detectó ninguna línea que coincida con las líneas de este pedido.</div>`;
 
+  const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const puedeAnadirDesdeFactura = pedido?.Tipo !== 'Servicio'; // el caso "reactivo sorpresa" es de material, no de servicio/equipo
   const sinMatch = (r.sin_match || []).length ? `<div style="margin-top:16px;padding:10px 14px;background:var(--danger-light,#fdf0f0);border-radius:var(--radius-sm);font-size:13px">
-    <div style="font-weight:600;margin-bottom:6px">⚠️ Detectado en el documento pero sin línea de pedido coincidente (no se ha tocado nada):</div>
-    <ul style="margin:0;padding-left:18px">${r.sin_match.map(i => `<li>${i.material}${i.cantidad != null ? ` — ${i.cantidad}${i.unidad ? ' ' + i.unidad : ''}` : ''}</li>`).join('')}</ul>
+    <div style="font-weight:600;margin-bottom:6px">⚠️ Detectado en el documento pero sin línea de pedido coincidente:</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${r.sin_match.map((i, idx) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span>${i.material}${i.cantidad != null ? ` — ${i.cantidad}${i.unidad ? ' ' + i.unidad : ''}` : ''}</span>
+        ${puedeAnadirDesdeFactura ? `<button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;white-space:nowrap" onclick="anadirLineaDesdeSinMatch(${idx})">+ Añadir línea nueva</button>` : ''}
+      </div>`).join('')}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Por defecto no se toca nada — usa "+ Añadir línea nueva" solo si de verdad llegó algo que no estaba en el pedido (p.ej. un reactivo no contemplado en el presupuesto). Esto funciona aunque el pedido ya no admita añadir líneas a mano.</div>
   </div>` : '';
 
   const cargoExtra = r.cargo_extra ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -521,6 +532,27 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
 
   cont.innerHTML = tabla + sinMatch + cargoExtra;
   openModal('modal-revision-extraccion');
+}
+
+// Excepción puntual y deliberada a "no se pueden añadir líneas tras
+// Presupuesto aprobado" (puedeAddLinea en verDetallePedido): a veces el
+// proveedor factura un reactivo que no estaba en el presupuesto original.
+// gestionar-linea-pedido/crear no tiene restricción de estado server-side
+// (solo la acción 'editar' la tiene) — aquí simplemente se abre el modal de
+// siempre, precargado, para que quede a criterio de quien lo confirma.
+function anadirLineaDesdeSinMatch(idx) {
+  if (!_revExtraccionActual) return;
+  const { idDocumento, pedidoId, r } = _revExtraccionActual;
+  const it = r.sin_match?.[idx];
+  if (!it) return;
+  const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
+  closeModal('modal-revision-extraccion');
+  openModalNuevaLinea(pedidoId);
+  setSourceLinea('libre');
+  sv('linea-material-libre', it.material);
+  sv('linea-cantidad', it.cantidad != null ? it.cantidad : '');
+  sv('linea-precio', it.precio_unitario != null ? it.precio_unitario : '');
+  sv('linea-obs', `No estaba en el pedido — detectada en ${doc?.Nombre_Archivo || 'el documento'} leído con IA`);
 }
 
 function verDetallePedido(pedidoId) {
