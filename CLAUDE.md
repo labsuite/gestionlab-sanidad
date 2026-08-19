@@ -298,7 +298,7 @@ Para "Uso de equipos", "Mantenimiento" y "Búsqueda de SAT": mostrar `<select>` 
 
 #### Llamada a la API de Gemini
 ```js
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
 const body = {
   contents: _chatHistory, // [{role:'user'|'model', parts:[{text:'...'}]}]
   generationConfig: { maxOutputTokens: 1024, temperature: 0.3 }
@@ -310,7 +310,7 @@ Respuesta en `response.candidates[0].content.parts[0].text`. Mostrar spinner mie
 #### Lo que NO hacer
 - No historial persistente (sin localStorage, sin Sheets).
 - No enviar el contenido completo de todas las hojas — solo los campos relevantes.
-- No usar `gemini-1.5-pro` ni `gemini-2.0` en el tier gratuito — solo `gemini-1.5-flash`.
+- Usar siempre el modelo "flash" más barato/ligero disponible, nunca uno "pro" — pero **antes de escribir el nombre del modelo en código, comprobar cuál es vigente** con `GET https://generativelanguage.googleapis.com/v1beta/models?key=...` (filtrando por `supportedGenerationMethods` que incluya `generateContent`). Google retira modelos con relativa frecuencia — `gemini-1.5-flash` y `gemini-2.5-flash` ya no existían en agosto de 2026 pese a estar documentados aquí; no dar por bueno un nombre de modelo solo porque aparece en este fichero o en conversaciones antiguas.
 - No enviar datos personales de usuarios a Gemini.
 
 `asistente.js` se carga después de `reservas.js` (al final de todo).

@@ -7,7 +7,12 @@
 // con lo detectado (gestionar-linea-pedido ya cubre esas escrituras).
 import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
-const GEMINI_MODELO = "gemini-1.5-flash"; // no usar pro/2.0 en tier gratuito (ver CLAUDE.md)
+// gemini-1.5-flash y gemini-2.5-flash ya no están disponibles para claves
+// nuevas (Google los retiró) — confirmado a mano contra la API el
+// 2026-08-19; gemini-3.6-flash es el que Google recomienda en su lugar. Si
+// esto vuelve a dar 404 "is not found for API version v1beta", comprobar
+// modelos vigentes con GET /v1beta/models?key=... antes de asumir otra causa.
+const GEMINI_MODELO = "gemini-3.6-flash";
 
 function mimeDesdeNombre(nombre: string): string {
   const ext = nombre.toLowerCase().split(".").pop() || "";
@@ -159,7 +164,10 @@ Deno.serve(async (req) => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: PROMPT }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-          generationConfig: { responseMimeType: "application/json", responseSchema: ESQUEMA_RESPUESTA, temperature: 0.1 },
+          generationConfig: {
+            responseMimeType: "application/json", responseSchema: ESQUEMA_RESPUESTA, temperature: 0.1,
+            thinkingConfig: { thinkingLevel: "low" }, // extracción de datos, no hace falta razonamiento largo — ahorra tokens/coste
+          },
         }),
       },
     );
