@@ -6,17 +6,23 @@
 // línea — eso lo hace el Gestor a mano en el modal de revisión, precargado
 // con lo detectado (gestionar-linea-pedido ya cubre esas escrituras).
 //
-// El emparejamiento lo hace el propio Gemini, no una comparación de texto
-// local: en pruebas reales, facturas de proveedor usan nombres comerciales
-// muy distintos al nombre genérico del catálogo interno (p.ej. "Aquatex
-// 50 mL" = "Medio de montaje para muestras hidratadas", "Calcofluor White
-// Stain" = "Tinción blanco de calcoflúor") — comparar palabras nunca
-// reconoce eso, pero el modelo sí (conoce marcas/sinónimos del sector). Por
-// eso se le pasa la lista de líneas del pedido en el propio prompt y es él
-// quien elige el id_linea de cada artículo. El servidor solo valida que el
-// id devuelto exista de verdad entre las líneas del pedido (nunca se fía a
-// ciegas de lo que diga el modelo) y resuelve duplicados si asigna el mismo
-// id_linea a dos artículos distintos.
+// DOS llamadas a Gemini, no una — probado a mano contra una factura real
+// (2026-08-19): pedirle en una sola llamada que extraiga del PDF Y empareje
+// contra las líneas del pedido a la vez hacía que el modelo "pensara en voz
+// alta" dentro de un campo string de la respuesta (p.ej. el campo "unidad"
+// del primer artículo se llenaba con un vuelco de razonamiento tipo
+// "Correct parse: 1. ... 2. ..." en vez del texto de unidad), rompiendo el
+// JSON y dejando solo 1 de 14 artículos. Separando en dos llamadas simples
+// —(1) extraer del PDF, sin matching; (2) emparejar los nombres ya
+// extraídos contra la lista de líneas, sin el PDF— cada llamada es un
+// problema de una sola cosa y Gemini responde limpio las dos veces. El
+// emparejamiento no es comparación de texto local: facturas reales usan
+// nombre comercial/marca muy distinto del nombre genérico interno (p.ej.
+// "Aquatex 50 mL" = "Medio de montaje para muestras hidratadas") — hace
+// falta el conocimiento de producto del modelo, no un umbral de similitud.
+// El servidor nunca se fía a ciegas: resolverMatches descarta cualquier
+// id_linea que no exista de verdad entre las líneas del pedido y resuelve
+// duplicados si el modelo asigna la misma línea a dos artículos.
 import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // gemini-1.5-flash y gemini-2.5-flash ya no están disponibles para claves
@@ -43,15 +49,33 @@ function arrayBufferABase64(buffer: ArrayBuffer): string {
   return btoa(binario);
 }
 
-function construirPrompt(lineas: { id_linea: string; material: string; cantidad_pedida: number | null }[]): string {
-  const listaLineas = lineas.length
-    ? lineas.map((l) => `- id_linea "${l.id_linea}": ${l.material} (cantidad pedida: ${l.cantidad_pedida ?? "?"})`).join("\n")
-    : "(este pedido no tiene ninguna línea todavía)";
+async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown) {
+  const respuesta = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts }],
+        generationConfig: {
+          responseMimeType: "application/json", responseSchema: schema, temperature: 0.1,
+          thinkingConfig: { thinkingLevel: "low" }, // tareas simples y ya separadas — no hace falta razonamiento largo, ahorra tokens/coste
+        },
+      }),
+    },
+  );
+  if (!respuesta.ok) {
+    const detalle = await respuesta.text().catch(() => "");
+    throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+  }
+  const data = await respuesta.json();
+  const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
+  return JSON.parse(texto);
+}
 
-  return `Eres un asistente que extrae las líneas de artículo de una factura o presupuesto de un proveedor de material de laboratorio clínico/sanitario, y las empareja con las líneas ya existentes de un pedido interno.
-
-Estas son las líneas del pedido interno con las que debes comparar cada artículo del documento:
-${listaLineas}
+// ── Paso 1: extracción pura del documento, sin matching ────────────────
+const PROMPT_EXTRACCION = `Eres un asistente que extrae las líneas de artículo de una factura o presupuesto de un proveedor de material de laboratorio clínico/sanitario.
 
 Devuelve SOLO un objeto JSON. Reglas:
 - "items": un array con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Ignora completamente cabeceras, totales, subtotales y el IVA — nunca los devuelvas como si fueran un artículo.
@@ -59,13 +83,10 @@ Devuelve SOLO un objeto JSON. Reglas:
   - "cantidad": número de unidades de esa línea, o null si no aparece.
   - "precio_unitario": el precio POR UNIDAD SIN IVA (la base imponible de esa línea, no el total de la línea ni el precio con IVA incluido). Null si no se indica.
   - "unidad": texto breve de unidad si aparece (ej: "ud", "caja", "L", "kg"); si no aparece, cadena vacía.
-  - "id_linea_sugerida": el "id_linea" de la lista de arriba que corresponde a este artículo, aunque el nombre comercial o la marca sean muy distintos del nombre genérico interno — usa tu conocimiento de productos de laboratorio (marcas, sinónimos, nombres técnicos equivalentes) para reconocerlo. Si no corresponde a ninguna línea de la lista, o tienes dudas razonables, pon null — mejor no emparejar que emparejar mal.
-  - "confianza_match": tu confianza en ese emparejamiento, de 0 a 1 (0 si id_linea_sugerida es null).
 - "cargo_extra": si el documento tiene, aparte del listado de artículos, algún cargo que NO es un artículo del inventario ni el IVA — transporte, portes, envasado especial, hielo, tasas de manipulación, etc. — inclúyelo aquí como {"concepto": "...", "importe": número sin IVA}. Si hay varios, súmalos en uno solo con un concepto conjunto. Si no hay ninguno, "cargo_extra" debe ser null. Nunca metas estos cargos dentro de "items".
 - No inventes artículos que no estén en el documento.`;
-}
 
-const ESQUEMA_RESPUESTA = {
+const ESQUEMA_EXTRACCION = {
   type: "OBJECT",
   properties: {
     items: {
@@ -77,8 +98,6 @@ const ESQUEMA_RESPUESTA = {
           cantidad: { type: "NUMBER", nullable: true },
           precio_unitario: { type: "NUMBER", nullable: true },
           unidad: { type: "STRING" },
-          id_linea_sugerida: { type: "STRING", nullable: true },
-          confianza_match: { type: "NUMBER" },
         },
         required: ["material"],
       },
@@ -95,36 +114,72 @@ const ESQUEMA_RESPUESTA = {
   required: ["items"],
 };
 
-// Nunca se fía a ciegas del id_linea_sugerida del modelo: descarta
-// cualquiera que no exista de verdad entre las líneas del pedido, y si dos
+// ── Paso 2: emparejar los nombres ya extraídos contra las líneas del pedido ──
+function construirPromptMatching(
+  items: { material: string }[],
+  lineas: { id_linea: string; material: string; cantidad_pedida: number | null }[],
+): string {
+  const listaLineas = lineas.map((l) => `- id_linea "${l.id_linea}": ${l.material} (cantidad pedida: ${l.cantidad_pedida ?? "?"})`).join("\n");
+  const listaItems = items.map((it, idx) => `${idx}. ${it.material}`).join("\n");
+
+  return `Tienes una lista de artículos detectados en una factura de proveedor de laboratorio, numerados, y una lista de líneas de un pedido interno con su id.
+
+Líneas del pedido interno:
+${listaLineas}
+
+Artículos detectados en la factura:
+${listaItems}
+
+Para cada artículo (por su índice numérico), indica qué id_linea del pedido interno le corresponde, si alguna. Usa tu conocimiento de productos de laboratorio: marcas comerciales, sinónimos y nombres técnicos equivalentes pueden ser el mismo producto aunque el texto no se parezca (ejemplo: "Aquatex" es un medio de montaje acuoso; "Calcofluor White Stain" es una tinción de blanco de calcoflúor). Si tienes dudas razonables o no hay ninguna línea que corresponda, usa null — mejor no emparejar que emparejar mal. Si dos artículos podrían corresponder a la misma línea, quédate solo con el que tengas más confianza y deja el otro en null.
+
+Devuelve SOLO un array JSON, uno por artículo en el mismo orden, con: indice (el número del artículo), id_linea (el id o null), confianza (0 a 1, 0 si id_linea es null).`;
+}
+
+const ESQUEMA_MATCHING = {
+  type: "ARRAY",
+  items: {
+    type: "OBJECT",
+    properties: {
+      indice: { type: "INTEGER" },
+      id_linea: { type: "STRING", nullable: true },
+      confianza: { type: "NUMBER" },
+    },
+    required: ["indice", "confianza"],
+  },
+};
+
+// Nunca se fía a ciegas de lo que devuelva Gemini: descarta cualquier
+// id_linea que no exista de verdad entre las líneas del pedido, y si dos
 // artículos apuntan a la misma línea se queda solo con el de mayor
 // confianza (el otro pasa a sin_match, no se descarta la información).
-function resolverMatches(items: any[], lineas: any[]) {
+function resolverMatches(
+  items: any[],
+  asignaciones: { indice: number; id_linea: string | null; confianza: number }[],
+  lineas: any[],
+) {
   const porId = new Map(lineas.map((l) => [l.id_linea, l]));
-  const mejorPorLinea = new Map<string, any>();
+  const mejorPorLinea = new Map<string, { itemIdx: number; confianza: number }>();
 
-  for (const item of items) {
-    const idSugerido = item.id_linea_sugerida;
-    if (!idSugerido || !porId.has(idSugerido)) continue;
-    const actual = mejorPorLinea.get(idSugerido);
-    const confianza = typeof item.confianza_match === "number" ? item.confianza_match : 0;
-    if (!actual || confianza > actual.confianza) mejorPorLinea.set(idSugerido, { item, confianza });
+  for (const a of asignaciones) {
+    if (a.id_linea == null || !porId.has(a.id_linea) || a.indice == null || !items[a.indice]) continue;
+    const actual = mejorPorLinea.get(a.id_linea);
+    if (!actual || a.confianza > actual.confianza) mejorPorLinea.set(a.id_linea, { itemIdx: a.indice, confianza: a.confianza });
   }
 
-  const itemsEmparejados = new Set(Array.from(mejorPorLinea.values()).map((v) => v.item));
-  const matches = Array.from(mejorPorLinea.entries()).map(([idLinea, { item, confianza }]) => {
+  const indicesEmparejados = new Set(Array.from(mejorPorLinea.values()).map((v) => v.itemIdx));
+  const matches = Array.from(mejorPorLinea.entries()).map(([idLinea, { itemIdx, confianza }]) => {
     const linea = porId.get(idLinea);
     return {
       id_linea: idLinea,
       material_linea: linea.material,
       cantidad_pedida: linea.cantidad_pedida,
       cantidad_recibida: linea.cantidad_recibida,
-      item_detectado: item,
+      item_detectado: items[itemIdx],
       confianza: Math.round(confianza * 100) / 100,
     };
   });
 
-  const sinMatch = items.filter((i) => !itemsEmparejados.has(i));
+  const sinMatch = items.filter((_, idx) => !indicesEmparejados.has(idx));
   return { matches, sinMatch };
 }
 
@@ -159,46 +214,35 @@ Deno.serve(async (req) => {
 
   const base64 = arrayBufferABase64(await archivo.arrayBuffer());
   const mimeType = mimeDesdeNombre(doc.nombre_archivo);
-  const prompt = construirPrompt(lineas || []);
-
-  let respuestaGemini: Response;
-  try {
-    respuestaGemini = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: base64 } }] }],
-          generationConfig: {
-            responseMimeType: "application/json", responseSchema: ESQUEMA_RESPUESTA, temperature: 0.1,
-            thinkingConfig: { thinkingLevel: "low" }, // extracción + emparejamiento simple, no hace falta razonamiento largo — ahorra tokens/coste
-          },
-        }),
-      },
-    );
-  } catch (e) {
-    return jsonError(`No se pudo contactar con Gemini: ${(e as Error).message}`, 502);
-  }
-
-  if (!respuestaGemini.ok) {
-    const detalle = await respuestaGemini.text().catch(() => "");
-    return jsonError(`Gemini devolvió un error (${respuestaGemini.status}): ${detalle.slice(0, 300)}`, 502);
-  }
-
-  const dataGemini = await respuestaGemini.json();
-  const textoJson = dataGemini?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!textoJson) return jsonError("Gemini no devolvió contenido interpretable", 502);
 
   let extraido: { items?: any[]; cargo_extra?: { concepto: string; importe: number } | null };
   try {
-    extraido = JSON.parse(textoJson);
-  } catch {
-    return jsonError("La respuesta de Gemini no es JSON válido", 502);
+    extraido = await llamarGemini(
+      geminiKey,
+      [{ text: PROMPT_EXTRACCION }, { inline_data: { mime_type: mimeType, data: base64 } }],
+      ESQUEMA_EXTRACCION,
+    );
+  } catch (e) {
+    return jsonError(`Error extrayendo el documento: ${(e as Error).message}`, 502);
   }
 
   const items = Array.isArray(extraido.items) ? extraido.items : [];
-  const { matches, sinMatch } = resolverMatches(items, lineas || []);
+
+  let matches: any[] = [];
+  let sinMatch = items;
+  if (items.length && (lineas || []).length) {
+    try {
+      const asignaciones = await llamarGemini(
+        geminiKey,
+        [{ text: construirPromptMatching(items, lineas || []) }],
+        ESQUEMA_MATCHING,
+      );
+      ({ matches, sinMatch } = resolverMatches(items, Array.isArray(asignaciones) ? asignaciones : [], lineas || []));
+    } catch {
+      // Si falla el emparejamiento, no perdemos la extracción — se guarda
+      // todo como sin_match y el Gestor puede aplicarlo a mano igualmente.
+    }
+  }
 
   const resultado = {
     items,
