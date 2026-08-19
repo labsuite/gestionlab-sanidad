@@ -1,6 +1,6 @@
 // Edge Function PÚBLICA (sin sesión de usuario) — link que se comparte con
-// una casa comercial para que suba la factura/presupuesto de un pedido
-// concreto, sin darle acceso al resto de la app. La seguridad la da el
+// una casa comercial para que suba la factura (no el presupuesto) de un
+// pedido concreto, sin darle acceso al resto de la app. La seguridad la da el
 // `token` (aleatorio, generado por gestionar-pedido/accion=generar_link_publico
 // y guardado en pedidos.token_publico), no una sesión de Supabase Auth — por
 // eso este fichero NO usa requireAdminOrGestor/requireStaff. El navegador

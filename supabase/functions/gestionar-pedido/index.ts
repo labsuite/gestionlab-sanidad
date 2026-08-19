@@ -144,5 +144,18 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idPedido });
   }
 
+  if (accion === "eliminar_documento") {
+    // Para cuando el proveedor sube el archivo equivocado (o duplicado) por
+    // el link público — borra el archivo de Storage además de la fila.
+    const idDocumento = String(body.id_documento || "").trim();
+    if (!idDocumento) return jsonError("id_documento es obligatorio", 400);
+    const { data: doc } = await supabaseAdmin.from("documentos_proveedor").select("*").eq("id_documento", idDocumento).eq("pedido", idPedido).maybeSingle();
+    if (!doc) return jsonError("Documento no encontrado", 404);
+    await supabaseAdmin.storage.from("documentos").remove([doc.path]); // best-effort: si falla, no bloquea el borrado de la fila
+    const { error } = await supabaseAdmin.from("documentos_proveedor").delete().eq("id_documento", idDocumento);
+    if (error) return jsonError(`No se pudo eliminar el documento: ${error.message}`, 400);
+    return jsonOk({ eliminado: idDocumento });
+  }
+
   return jsonError("accion no reconocida", 400);
 });

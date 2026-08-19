@@ -473,6 +473,19 @@ async function leerDocumentoConIA(idDocumento, pedidoId) {
   hideLoading();
 }
 
+async function eliminarDocumentoProveedor(idDocumento, pedidoId) {
+  if (!confirm('¿Eliminar este documento? No se puede deshacer.')) return;
+  showLoading('Eliminando...');
+  try {
+    await callEdgeFunction('gestionar-pedido', { accion: 'eliminar_documento', id_pedido: pedidoId, id_documento: idDocumento });
+    DATA.documentosProveedor = DATA.documentosProveedor.filter(d => d.ID_Documento !== idDocumento);
+    showToast('Documento eliminado', 'success');
+    verDetallePedido(pedidoId);
+    renderPedidos();
+  } catch (e) { showToast('Error eliminando: ' + e.message, 'error'); console.error(e); }
+  hideLoading();
+}
+
 // Aplica en lote los precios marcados en el modal de revisión — misma
 // acción actualizar_precio que ya usa 💶 Precios (js/contabilidad.js), así
 // que también queda registrado en historico_precio. Nunca toca

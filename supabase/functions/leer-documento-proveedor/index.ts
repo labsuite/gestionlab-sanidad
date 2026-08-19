@@ -1,6 +1,7 @@
-// Lee con IA (Gemini) un documento subido por el proveedor a través del link
-// público (ver pedido-publico) — factura o presupuesto — y extrae sus líneas
-// de artículo, emparejándolas contra las líneas ya existentes en el pedido
+// Lee con IA (Gemini) la factura subida por el proveedor a través del link
+// público (ver pedido-publico; solo facturas, no presupuestos — el precio de
+// un presupuesto no es firme) y extrae sus líneas de artículo, emparejándolas
+// contra las líneas ya existentes en el pedido
 // (lineas_pedido). Solo Admin/Gestor puede disparar la lectura, y solo se
 // guarda el resultado; no toca cantidad_recibida/precio_unitario de ninguna
 // línea — eso lo hace el Gestor a mano en el modal de revisión, precargado
@@ -75,7 +76,7 @@ async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown
 }
 
 // ── Paso 1: extracción pura del documento, sin matching ────────────────
-const PROMPT_EXTRACCION = `Eres un asistente que extrae las líneas de artículo de una factura o presupuesto de un proveedor de material de laboratorio clínico/sanitario.
+const PROMPT_EXTRACCION = `Eres un asistente que extrae las líneas de artículo de una factura de un proveedor de material de laboratorio clínico/sanitario.
 
 Devuelve SOLO un objeto JSON. Reglas:
 - "items": un array con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Ignora completamente cabeceras, totales, subtotales y el IVA — nunca los devuelvas como si fueran un artículo.

@@ -76,9 +76,9 @@ let archivoElegido = null;
 
 function renderFormulario(info) {
   contenido.innerHTML = `
-    <h1>Subir factura o presupuesto</h1>
+    <h1>Subir factura</h1>
     <div class="subtitle">${info.nombre_lista || pedido}${info.proveedor ? ' · ' + info.proveedor : ''}</div>
-    <div class="info-box">Sube aquí el PDF (o foto) de la factura o el presupuesto de este pedido. Solo lo verá el equipo del laboratorio.</div>
+    <div class="info-box">Sube aquí el PDF (o foto) de la factura de este pedido (no del presupuesto). Solo lo verá el equipo del laboratorio.</div>
     <div class="file-drop" id="drop">📎 Toca para elegir un archivo<br><span style="font-size:11px">PDF, JPG o PNG · máx. 10 MB</span></div>
     <div class="file-name" id="file-name"></div>
     <input type="file" id="file-input" accept="application/pdf,image/jpeg,image/png">

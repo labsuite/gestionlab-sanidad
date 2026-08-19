@@ -342,7 +342,7 @@ function renderPedidos(filtroEstado = '') {
     const lineas    = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
     const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
     const facturaSubida = DATA.documentosProveedor.some(d => d.Pedido === p.ID_Pedido);
-    const docTitulos = [p.Doc_Hoja_Generada==='TRUE'?'📄 Hoja de pedido generada':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬 Enviada a jefatura':'', facturaSubida?'📎 Factura/presupuesto subido':''].filter(Boolean);
+    const docTitulos = [p.Doc_Hoja_Generada==='TRUE'?'📄 Hoja de pedido generada':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬 Enviada a jefatura':'', facturaSubida?'📎 Factura subida':''].filter(Boolean);
     const docBadges = docTitulos.length ? `<span style="font-size:14px" title="${docTitulos.join(' · ')}">${docTitulos.map(t => t.slice(0, t.indexOf(' '))).join(' ')}</span>` : '';
     return `<div class="pedido-card" onclick="verDetallePedido('${p.ID_Pedido}')">
       <div class="pedido-card-header">
@@ -617,7 +617,7 @@ function verDetallePedido(pedidoId) {
         </div>
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:default">
           <input type="checkbox" ${docsProv.length?'checked':''} disabled style="width:16px;height:16px">
-          <span style="${docsProv.length?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📎 Factura/presupuesto subido${docsProv.length ? ` (${docsProv.length})` : ''}</span>
+          <span style="${docsProv.length?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📎 Factura subida${docsProv.length ? ` (${docsProv.length})` : ''}</span>
         </label>
         ${docsProv.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
             ${docsProv.map(d => `<div class="linea-row">
@@ -628,6 +628,7 @@ function verDetallePedido(pedidoId) {
                      <button class="icon-btn" title="Releer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🔄</button>`
                   : `<button class="icon-btn" title="Leer con IA" onclick="leerDocumentoConIA('${d.ID_Documento}','${pedidoId}')">🤖</button>`}
                 <button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button>
+                <button class="icon-btn danger" title="Eliminar documento" onclick="eliminarDocumentoProveedor('${d.ID_Documento}','${pedidoId}')">🗑️</button>
               </div>
             </div>`).join('')}
           </div>` : `<div style="font-size:12px;color:var(--text-muted);margin-top:6px">Pulsa "🔗 Link para proveedor" arriba y compártelo con la casa comercial.</div>`}

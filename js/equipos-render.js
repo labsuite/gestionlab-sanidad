@@ -50,6 +50,12 @@ function renderDashboard() {
     alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('solicitudes')"><div class="alert-icon">📋</div><div class="alert-content"><div class="alert-title">${solPendientes.length} solicitud(es) de material pendiente(s) de gestión</div><div class="alert-text">${solPendientes.slice(0,4).map(s => s.Material + ' · ' + s.Solicitante).join(' – ')}${solPendientes.length > 4 ? ' y ' + (solPendientes.length-4) + ' más...' : ''}</div></div></div>`;
   }
 
+  const facturasSinLeer = DATA.documentosProveedor.filter(d => !d.Extraido_En && DATA.pedidos.some(p => p.ID_Pedido === d.Pedido && p.Estado !== 'Archivado'));
+  if (facturasSinLeer.length && puedeHacer('gestionarPedidos')) {
+    const nombresPedidos = [...new Set(facturasSinLeer.map(d => { const p = DATA.pedidos.find(x => x.ID_Pedido === d.Pedido); return p ? p.Nombre_Lista : d.Pedido; }))];
+    alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('pedidos')"><div class="alert-icon">📎</div><div class="alert-content"><div class="alert-title">${facturasSinLeer.length} factura(s) de proveedor sin leer</div><div class="alert-text">${nombresPedidos.slice(0,4).join(' – ')}${nombresPedidos.length > 4 ? ' y ' + (nombresPedidos.length-4) + ' más...' : ''}</div></div></div>`;
+  }
+
   const consultasRes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente');
   const rolDash = getUserRole();
   if (consultasRes.length && (rolDash === 'Administrador' || rolDash === 'Gestor')) {
