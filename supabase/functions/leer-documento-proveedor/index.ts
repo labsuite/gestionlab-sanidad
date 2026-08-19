@@ -80,9 +80,10 @@ const PROMPT_EXTRACCION = `Eres un asistente que extrae las líneas de artículo
 Devuelve SOLO un objeto JSON. Reglas:
 - "items": un array con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Ignora completamente cabeceras, totales, subtotales y el IVA — nunca los devuelvas como si fueran un artículo.
   - "material": el nombre del artículo tal como figura en el documento (incluye referencia/SKU si aparece), sin inventar ni completar información que no esté.
-  - "cantidad": número de unidades de esa línea, o null si no aparece.
+  - "cantidad": número de unidades de esa línea tal como lo indica la factura (no lo recalcules), o null si no aparece.
   - "precio_unitario": el precio POR UNIDAD SIN IVA (la base imponible de esa línea, no el total de la línea ni el precio con IVA incluido). Null si no se indica.
   - "unidad": texto breve de unidad si aparece (ej: "ud", "caja", "L", "kg"); si no aparece, cadena vacía.
+  - "unidades_por_envase": si el propio nombre/descripción del artículo indica cuántas unidades trae cada paquete/caja/envase (ej. "pack 10 uds", "c/100 uds", "c/480 uds"), extrae ese número tal cual aparece escrito. Si el texto no menciona ningún tamaño de envase, pon null. No hagas ningún cálculo ni intentes adivinarlo — solo repórtalo si está escrito explícitamente.
 - "cargo_extra": si el documento tiene, aparte del listado de artículos, algún cargo que NO es un artículo del inventario ni el IVA — transporte, portes, envasado especial, hielo, tasas de manipulación, etc. — inclúyelo aquí como {"concepto": "...", "importe": número sin IVA}. Si hay varios, súmalos en uno solo con un concepto conjunto. Si no hay ninguno, "cargo_extra" debe ser null. Nunca metas estos cargos dentro de "items".
 - No inventes artículos que no estén en el documento.`;
 
@@ -98,6 +99,7 @@ const ESQUEMA_EXTRACCION = {
           cantidad: { type: "NUMBER", nullable: true },
           precio_unitario: { type: "NUMBER", nullable: true },
           unidad: { type: "STRING" },
+          unidades_por_envase: { type: "NUMBER", nullable: true },
         },
         required: ["material"],
       },

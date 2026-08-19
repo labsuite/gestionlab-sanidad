@@ -490,14 +490,18 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     const it = m.item_detectado || {};
     const unidad = it.unidad ? ' ' + it.unidad : '';
     const tienePrecio = it.precio_unitario != null;
-    const cantidadDetectada = it.cantidad != null ? it.cantidad + unidad : '—';
-    const cantidadDistinta = it.cantidad != null && Number(it.cantidad) !== Number(m.cantidad_pedida);
+    // Sin semáforo rojo/verde: no hay forma de saber desde la factura si esta
+    // línea se cuenta por unidad suelta o por envase (eso es un criterio tuyo,
+    // no algo deducible del documento) — solo se muestra el envase tal cual lo
+    // dice la factura, sin comparar ni juzgar si "coincide" con lo pedido.
+    const envase = it.unidades_por_envase != null ? `<div style="font-size:11px;color:var(--text-muted)">envase de ${it.unidades_por_envase}${unidad}</div>` : '';
+    const cantidadDetectada = it.cantidad != null ? `${it.cantidad}${unidad}${envase}` : '—';
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:6px 8px;text-align:center"><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
       <td style="padding:6px 8px">${m.material_linea}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_pedida ?? '—'}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_recibida || '0'}</td>
-      <td style="padding:6px 8px;text-align:center${cantidadDistinta ? ';color:var(--danger,#dc2626)' : ''}" title="${cantidadDistinta ? 'Distinto de lo pedido — solo informativo, no se toca nada' : ''}">${cantidadDetectada}</td>
+      <td style="padding:6px 8px;text-align:center">${cantidadDetectada}</td>
       <td style="padding:6px 8px;text-align:right"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right"></td>
     </tr>`;
   }).join('');
