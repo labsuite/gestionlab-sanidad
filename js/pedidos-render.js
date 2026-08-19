@@ -341,13 +341,15 @@ function renderPedidos(filtroEstado = '') {
   const _card = p => {
     const lineas    = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
     const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
-    const docBadges = [p.Doc_Hoja_Generada==='TRUE'?'📄':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬':''].filter(Boolean).join(' ');
+    const facturaSubida = DATA.documentosProveedor.some(d => d.Pedido === p.ID_Pedido);
+    const docTitulos = [p.Doc_Hoja_Generada==='TRUE'?'📄 Hoja de pedido generada':'', p.Doc_Enviada_Jefatura==='TRUE'?'📬 Enviada a jefatura':'', facturaSubida?'📎 Factura/presupuesto subido':''].filter(Boolean);
+    const docBadges = docTitulos.length ? `<span style="font-size:14px" title="${docTitulos.join(' · ')}">${docTitulos.map(t => t.slice(0, t.indexOf(' '))).join(' ')}</span>` : '';
     return `<div class="pedido-card" onclick="verDetallePedido('${p.ID_Pedido}')">
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
         <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
           ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
-          ${docBadges ? `<span style="font-size:14px" title="Documentación">${docBadges}</span>` : ''}
+          ${docBadges}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${!['Archivado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Cambiar estado" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄</button>` : ''}
         </div>
@@ -592,11 +594,10 @@ function verDetallePedido(pedidoId) {
       </div>
       ${puedeEditar ? `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación</div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación interna</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
-            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -609,9 +610,16 @@ function verDetallePedido(pedidoId) {
             <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
           </label>
         </div>
-        <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
-          <div style="font-size:12px;font-weight:600;color:var(--text-soft);margin-bottom:8px">📎 Factura / presupuesto del proveedor${docsProv.length ? ` (${docsProv.length})` : ''}</div>
-          ${docsProv.length ? `<div style="display:flex;flex-direction:column;gap:8px">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;margin-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación del proveedor</div>
+          <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:default">
+          <input type="checkbox" ${docsProv.length?'checked':''} disabled style="width:16px;height:16px">
+          <span style="${docsProv.length?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📎 Factura/presupuesto subido${docsProv.length ? ` (${docsProv.length})` : ''}</span>
+        </label>
+        ${docsProv.length ? `<div style="margin-top:10px;display:flex;flex-direction:column;gap:8px">
             ${docsProv.map(d => `<div class="linea-row">
               <div class="linea-nombre">${d.Nombre_Archivo}<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${formatDate(d.Fecha_Subida)||''}</div></div>
               <div class="linea-actions">
@@ -622,8 +630,8 @@ function verDetallePedido(pedidoId) {
                 <button class="icon-btn" title="Abrir" onclick="abrirDocumento('${d.Path}')">📄</button>
               </div>
             </div>`).join('')}
-          </div>` : `<div style="font-size:12px;color:var(--text-muted)">Aún no se ha subido ningún documento — pulsa "🔗 Link para proveedor" arriba y compártelo con la casa comercial.</div>`}
-        </div>
+          </div>` : `<div style="font-size:12px;color:var(--text-muted);margin-top:6px">Pulsa "🔗 Link para proveedor" arriba y compártelo con la casa comercial.</div>`}
+
         ${p.Estado==='Recepción completa'&&p.Doc_Hoja_Generada==='TRUE'&&p.Doc_Enviada_Jefatura==='TRUE' ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
       </div>` : ''}
     </div>
