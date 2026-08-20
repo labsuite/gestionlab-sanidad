@@ -529,7 +529,7 @@ function renderLotesModal() {
     const opciones = valorActual && !opcionesUnidad.includes(valorActual) ? [...opcionesUnidad, valorActual] : opcionesUnidad;
     const selectorUnidad = opciones.length > 1
       ? `<label style="font-size:12px;color:var(--text-muted)">Unidad</label>
-        <select style="width:110px" onchange="_lotesTemp[${i}].Unidad_Lote=this.value">
+        <select style="width:160px" onchange="_lotesTemp[${i}].Unidad_Lote=this.value">
           <option value=""${valorActual ? '' : ' selected'}>(la del material)</option>
           ${opciones.map(u => `<option value="${u}"${u === valorActual ? ' selected' : ''}>${u}</option>`).join('')}
         </select>`
