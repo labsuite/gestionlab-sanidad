@@ -361,7 +361,8 @@ create table material_ubicaciones (
   stock_minimo_local   numeric,
   stock_optimo_local   numeric,
   id_lote_padre        text references material_ubicaciones(id),
-  unidad_lote          text
+  unidad_lote          text,
+  requiere_esteril     boolean not null default false
 );
 
 create table pedidos (

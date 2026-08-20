@@ -233,6 +233,7 @@ function _materialUbicacionSbToObj(l) {
     Stock_Optimo_Local: l.stock_optimo_local != null ? String(l.stock_optimo_local) : '',
     ID_Lote_Padre: l.id_lote_padre || '',
     Unidad_Lote: l.unidad_lote || '',
+    Requiere_Esteril: l.requiere_esteril === true,
   };
 }
 

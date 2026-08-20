@@ -219,12 +219,17 @@ function renderFilaMaterial(m) {
     : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
 
   const rowId = `mat-row-${safeId}`;
+  // Aviso visible sin desplegar: si CUALQUIER bote de este material exige
+  // entorno estéril, se marca ya en la fila colapsada — no se puede depender
+  // de que alguien despliegue la fila para enterarse.
+  const avisoEsteril = lotes.some(l => l.Requiere_Esteril)
+    ? `<span title="Tiene al menos un bote de uso ESTÉRIL — comprueba antes de abrir" style="margin-left:6px">☣️</span>` : '';
 
   // Fila principal: siempre expandable con el mismo estilo
   let html = `<tr class="equipo-row expandable" id="${rowId}" style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')">
     <td><strong>${m.ID_Material}</strong></td>
     <td>
-      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}
+      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}${avisoEsteril}
     </td>
     <td><span class="badge badge-gray">${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</span></td>
     <td>${ubiLabel}</td>
@@ -257,9 +262,11 @@ function renderFilaMaterial(m) {
       const etiquetaLinaje = lotePadre
         ? `<span title="Subdividido de: ${getNombreUbicacion(lotePadre.ID_Ubicacion)}" style="margin-right:4px">↳🧪</span>`
         : (esMadre ? `<span title="Bote madre — tiene subdivisiones" style="margin-right:4px">🫙</span>` : '');
+      const badgeEsteril = l.Requiere_Esteril
+        ? `<span class="badge" style="background:var(--danger);color:#fff;font-size:10px;font-weight:700;margin-left:6px" title="Solo se puede abrir en zona estéril">☣️ ESTÉRIL</span>` : '';
       return `<tr class="mat-ubic-row" id="mat-ubic-${safeId}-${li}" style="display:none;background:var(--surface2)">
         <td></td>
-        <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">${etiquetaLinaje}📍 ${getNombreUbicacion(l.ID_Ubicacion)}</td>
+        <td colspan="3" style="text-align:right;padding-right:16px;font-size:12px;color:var(--text-soft)">${etiquetaLinaje}📍 ${getNombreUbicacion(l.ID_Ubicacion)}${badgeEsteril}</td>
         <td>
           <div class="stock-bar-wrap">
             <div class="stock-bar"><div class="stock-bar-fill" style="width:${pctL}%;background:${colL}"></div></div>
@@ -550,6 +557,13 @@ function renderLotesModal() {
             style="width:14px;height:14px">
           Gestión automática
         </label>
+        <!-- Checkbox estéril: exige entorno estéril para abrir/usar este bote -->
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--danger)">
+          <input type="checkbox" ${l.Requiere_Esteril ? 'checked' : ''}
+            onchange="_lotesTemp[${i}].Requiere_Esteril=this.checked"
+            style="width:14px;height:14px">
+          ☣️ Estéril
+        </label>
         <button class="icon-btn" onclick="_eliminarLoteTemp(${i})"
           title="Quitar ubicación" style="color:var(--danger)">🗑</button>
       </div>
@@ -655,6 +669,7 @@ function editMaterial(idx) {
     Stock_Optimo_Local: l.Stock_Optimo_Local,
     Unidad_Lote: l.Unidad_Lote || '',
     ID_Lote_Padre: l.ID_Lote_Padre || '',
+    Requiere_Esteril: !!l.Requiere_Esteril,
     _loteId: l.ID,
     Gestion_Auto: (parseFloat(l.Stock_Minimo_Local) > 0 || parseFloat(l.Stock_Optimo_Local) > 0),
     _nuevo: false,
@@ -838,7 +853,8 @@ function _mostrarSelectorUbicConsumo(matId) {
     sel.innerHTML = lotes.map(l => {
       const s = parseFloat(l.Stock_Local) || 0;
       const u = l.Unidad_Lote || mat?.Unidad || '';
-      return `<option value="${l.ID}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
+      const aviso = l.Requiere_Esteril ? '☣️ ESTÉRIL — ' : '';
+      return `<option value="${l.ID}">${aviso}${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
     }).join('');
   }
   ubiGrp.style.display = '';
@@ -904,7 +920,8 @@ function _mostrarSelectorUbicEntrada(matId) {
     sel.innerHTML = lotes.map(l => {
       const s = parseFloat(l.Stock_Local) || 0;
       const u = l.Unidad_Lote || mat?.Unidad || '';
-      return `<option value="${l.ID}">${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
+      const aviso = l.Requiere_Esteril ? '☣️ ESTÉRIL — ' : '';
+      return `<option value="${l.ID}">${aviso}${getNombreUbicacion(l.ID_Ubicacion)} (stock: ${s} ${u})</option>`;
     }).join('');
   }
   ubiGrp.style.display = '';
@@ -959,6 +976,7 @@ async function guardarMaterial() {
       id_ubicacion: l.ID_Ubicacion, stock_local: l.Stock_Local,
       stock_minimo_local: l.Stock_Minimo_Local, stock_optimo_local: l.Stock_Optimo_Local,
       unidad_lote: (l.Unidad_Lote || '').trim(),
+      requiere_esteril: !!l.Requiere_Esteril,
     }));
 
   showLoading('Guardando...');
@@ -1288,7 +1306,7 @@ function openModalSubdividirLote(loteId) {
   document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
   document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
   document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
-  _subdivTemp = [{ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }];
+  _subdivTemp = [{ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '', esteril: false }];
   renderSubdivModal();
   openModal('modal-subdividir-lote');
 }
@@ -1335,6 +1353,11 @@ function renderSubdivModal() {
         <input type="number" min="0" step="0.01" placeholder="Óptimo" value="${f.stockOpt}"
           style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
           oninput="_subdivTemp[${i}].stockOpt=this.value">
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;white-space:nowrap;color:var(--danger)">
+          <input type="checkbox" ${f.esteril ? 'checked' : ''}
+            onchange="_subdivTemp[${i}].esteril=this.checked" style="width:14px;height:14px">
+          ☣️ Estéril
+        </label>
         <button class="icon-btn" onclick="_subdivTemp.splice(${i},1);renderSubdivModal()" title="Quitar destino" style="margin-left:auto">🗑️</button>
       </div>
     </div>`).join('');
@@ -1376,7 +1399,7 @@ function limpiarDestinoSubdiv(i) {
   renderSubdivModal();
 }
 
-function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '' }); renderSubdivModal(); }
+function _subdivAddFila() { _subdivTemp.push({ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '', esteril: false }); renderSubdivModal(); }
 
 async function guardarSubdivision() {
   const matId = v('subdiv-mat-id');
@@ -1403,7 +1426,7 @@ async function guardarSubdivision() {
     // elegir a ciegas entre varios botes que pudiera haber ya en esa misma ubicación.
     await callEdgeFunction('gestionar-material', {
       accion: 'subdivision', id_material: matId, lote_origen_id: loteOrigenId, usuario: currentUser?.name || 'Usuario',
-      destinos: filas.map(f => ({ id_ubicacion: f.idUbicacion, cantidad: f.cantidad, unidad: f.unidad.trim(), stock_min: f.stockMin, stock_opt: f.stockOpt })),
+      destinos: filas.map(f => ({ id_ubicacion: f.idUbicacion, cantidad: f.cantidad, unidad: f.unidad.trim(), stock_min: f.stockMin, stock_opt: f.stockOpt, esteril: !!f.esteril })),
     });
     await loadAllData();
     showToast(`Repartido en ${filas.length} ubicación${filas.length > 1 ? 'es' : ''}`, 'success');

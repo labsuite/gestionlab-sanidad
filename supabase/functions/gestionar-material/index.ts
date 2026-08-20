@@ -205,6 +205,7 @@ Deno.serve(async (req) => {
             stock_minimo_local: numField(l.stock_minimo_local) || 0,
             stock_optimo_local: numField(l.stock_optimo_local) || 0,
             unidad_lote: strField(l.unidad_lote),
+            requiere_esteril: l.requiere_esteril === true,
           }).eq("id", loteId).select().single();
           if (error) return jsonError(`No se pudo actualizar un lote: ${error.message}`, 400);
           lotesFinal.push(data);
@@ -213,6 +214,7 @@ Deno.serve(async (req) => {
             id: genId("LU"), id_material: idMaterial, id_ubicacion: String(l.id_ubicacion || ""),
             stock_local: numField(l.stock_local) || 0, stock_minimo_local: numField(l.stock_minimo_local) || 0,
             stock_optimo_local: numField(l.stock_optimo_local) || 0, unidad_lote: strField(l.unidad_lote),
+            requiere_esteril: l.requiere_esteril === true,
           };
           const { data, error } = await supabaseAdmin.from("material_ubicaciones").insert(nuevo).select().single();
           if (error) return jsonError(`No se pudo crear un lote: ${error.message}`, 400);
@@ -284,6 +286,7 @@ Deno.serve(async (req) => {
           id: genId("LU"), id_material: idMaterial, id_ubicacion: String(f.id_ubicacion),
           stock_local: cant, stock_minimo_local: numField(f.stock_min) || 0, stock_optimo_local: numField(f.stock_opt) || 0,
           id_lote_padre: loteOrigenId, unidad_lote: strField(f.unidad),
+          requiere_esteril: f.esteril === true,
         };
         const { data, error } = await supabaseAdmin.from("material_ubicaciones").insert(nuevo).select().single();
         if (error) return jsonError(`No se pudo subdividir: ${error.message}`, 400);
