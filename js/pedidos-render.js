@@ -498,13 +498,23 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     // dice la factura, sin comparar ni juzgar si "coincide" con lo pedido.
     const envase = it.unidades_por_envase != null ? `<div style="font-size:11px;color:var(--text-muted)">envase de ${it.unidades_por_envase}${unidad}</div>` : '';
     const cantidadDetectada = it.cantidad != null ? `${it.cantidad}${unidad}${envase}` : '—';
+    // El precio detectado es el que factura el proveedor por SU unidad de
+    // venta (aquí, "envase") — que no tiene por qué ser la misma unidad en
+    // la que se pidió la línea (Cantidad pedida). Aplicar el precio del
+    // envase directo sobre una Cantidad_Pedida en unidades sueltas infla el
+    // coste tantas veces como unidades tenga el envase (caso real: "Pinzas
+    // estériles, pack 10 uds" a 10,50 €/pack aplicado sobre
+    // Cantidad_Pedida=10 unidades sueltas → coste 10× el real). Es un aviso,
+    // no una corrección automática — solo tú sabes en qué unidad se pidió.
+    const precioPorUnidad = (tienePrecio && it.unidades_por_envase > 1)
+      ? `<div style="font-size:11px;color:var(--text-muted)">= ${(it.precio_unitario / it.unidades_por_envase).toFixed(2)} €/ud si se pidió suelta</div>` : '';
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:6px 8px;text-align:center"><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
       <td style="padding:6px 8px">${m.material_linea}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_pedida ?? '—'}</td>
       <td style="padding:6px 8px;text-align:center">${m.cantidad_recibida || '0'}</td>
       <td style="padding:6px 8px;text-align:center">${cantidadDetectada}</td>
-      <td style="padding:6px 8px;text-align:right"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right"></td>
+      <td style="padding:6px 8px;text-align:right"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right">${precioPorUnidad}</td>
     </tr>`;
   }).join('');
 
@@ -598,6 +608,7 @@ function verDetallePedido(pedidoId) {
         <div class="detail-item"><div class="detail-label">Presupuesto</div><div class="detail-value">${formatDate(p.Fecha_Presupuesto)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Aprobado</div><div class="detail-value">${formatDate(p.Fecha_Aprobacion)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Nº Factura</div><div class="detail-value">${p.Numero_Factura||'—'}</div></div>
+        <div class="detail-item"><div class="detail-label">Fecha factura</div><div class="detail-value">${formatDate(p.Fecha_Factura)||'—'}</div></div>
         <div class="detail-item"><div class="detail-label">Coste total (IVA 21%)</div><div class="detail-value">${(() => { const gastoExtra = parseFloat(p.Gasto_Extra_Importe)||0; const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), gastoExtra); return coste > 0 ? (coste * 1.21).toFixed(2) + ' €' : '—'; })()}</div></div>
         <div class="detail-item"><div class="detail-label">Gasto extra</div><div class="detail-value" style="display:flex;align-items:center;gap:8px">${parseFloat(p.Gasto_Extra_Importe)>0 ? `${p.Gasto_Extra_Concepto||'Gasto extra'} · ${parseFloat(p.Gasto_Extra_Importe).toFixed(2)} €` : '—'}${puedeEditar ? `<button class="icon-btn" title="Añadir/editar gasto extra" onclick="openModalGastoExtra('${p.ID_Pedido}')" style="font-size:12px;padding:2px 6px">✏️</button>` : ''}</div></div>
       </div>
