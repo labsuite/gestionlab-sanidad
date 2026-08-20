@@ -152,33 +152,55 @@ const ESQUEMA_MATCHING = {
 };
 
 // Nunca se fía a ciegas de lo que devuelva Gemini: descarta cualquier
-// id_linea que no exista de verdad entre las líneas del pedido, y si dos
-// artículos apuntan a la misma línea se queda solo con el de mayor
-// confianza (el otro pasa a sin_match, no se descarta la información).
+// id_linea que no exista de verdad entre las líneas del pedido. Varios
+// artículos de la factura pueden apuntar legítimamente a la misma línea del
+// pedido — no es un error del modelo, es que un mismo material a veces se
+// desdobla en varios albaranes/entregas dentro del mismo pedido (visto en
+// una factura real: "Cuenta unidades manual" facturado 2 uds en un albarán y
+// 3 uds en otro, mismo pedido). Antes esta función se quedaba solo con la
+// ocurrencia de mayor confianza y mandaba la otra a sin_match, perdiendo
+// unidades realmente entregadas — ahora se suman todas las ocurrencias
+// asignadas a una misma línea en vez de descartar las demás.
 function resolverMatches(
   items: any[],
   asignaciones: { indice: number; id_linea: string | null; confianza: number }[],
   lineas: any[],
 ) {
   const porId = new Map(lineas.map((l) => [l.id_linea, l]));
-  const mejorPorLinea = new Map<string, { itemIdx: number; confianza: number }>();
+  const porLinea = new Map<string, { indices: number[]; confianzas: number[] }>();
 
   for (const a of asignaciones) {
     if (a.id_linea == null || !porId.has(a.id_linea) || a.indice == null || !items[a.indice]) continue;
-    const actual = mejorPorLinea.get(a.id_linea);
-    if (!actual || a.confianza > actual.confianza) mejorPorLinea.set(a.id_linea, { itemIdx: a.indice, confianza: a.confianza });
+    const actual = porLinea.get(a.id_linea) || { indices: [], confianzas: [] };
+    actual.indices.push(a.indice);
+    actual.confianzas.push(a.confianza);
+    porLinea.set(a.id_linea, actual);
   }
 
-  const indicesEmparejados = new Set(Array.from(mejorPorLinea.values()).map((v) => v.itemIdx));
-  const matches = Array.from(mejorPorLinea.entries()).map(([idLinea, { itemIdx, confianza }]) => {
+  const indicesEmparejados = new Set<number>();
+  const matches = Array.from(porLinea.entries()).map(([idLinea, { indices, confianzas }]) => {
+    indices.forEach((i) => indicesEmparejados.add(i));
     const linea = porId.get(idLinea);
+    const itemsDeLinea = indices.map((i) => items[i]);
+    const cantidad = itemsDeLinea.some((it) => it.cantidad != null)
+      ? itemsDeLinea.reduce((suma, it) => suma + (Number(it.cantidad) || 0), 0)
+      : null;
+    // El precio unitario debería ser el mismo en todas las ocurrencias del
+    // mismo material — se promedia por si hay variación mínima de redondeo
+    // entre albaranes, no porque se espere que difieran de verdad.
+    const precios = itemsDeLinea.filter((it) => it.precio_unitario != null).map((it) => it.precio_unitario);
+    const precio_unitario = precios.length
+      ? Math.round((precios.reduce((suma, p) => suma + p, 0) / precios.length) * 100) / 100
+      : null;
+    const unidad = itemsDeLinea.find((it) => it.unidad)?.unidad || "";
+    const unidades_por_envase = itemsDeLinea.find((it) => it.unidades_por_envase != null)?.unidades_por_envase ?? null;
     return {
       id_linea: idLinea,
       material_linea: linea.material,
       cantidad_pedida: linea.cantidad_pedida,
       cantidad_recibida: linea.cantidad_recibida,
-      item_detectado: items[itemIdx],
-      confianza: Math.round(confianza * 100) / 100,
+      item_detectado: { ...itemsDeLinea[itemsDeLinea.length - 1], cantidad, precio_unitario, unidad, unidades_por_envase },
+      confianza: Math.round(Math.max(...confianzas) * 100) / 100,
     };
   });
 
@@ -229,7 +251,16 @@ Deno.serve(async (req) => {
     return jsonError(`Error extrayendo el documento: ${(e as Error).message}`, 502);
   }
 
-  const items = Array.isArray(extraido.items) ? extraido.items : [];
+  // La factura a veces imprime el precio unitario con 3 decimales (p.ej.
+  // 44,745 €) pero el importe de línea que de verdad se cobra (columna de
+  // más a la derecha) siempre está redondeado a 2 — confirmado a mano contra
+  // una factura real (2026-08-20): 44,745 × 1 ud → importe 44,75 €. Se
+  // redondea aquí, antes de cualquier otro uso, para no arrastrar el
+  // tercer decimal a precios/costes que sí deben ir a 2.
+  const items = (Array.isArray(extraido.items) ? extraido.items : []).map((it) => ({
+    ...it,
+    precio_unitario: it.precio_unitario != null ? Math.round(it.precio_unitario * 100) / 100 : null,
+  }));
 
   let matches: any[] = [];
   let sinMatch = items;
