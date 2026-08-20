@@ -137,7 +137,9 @@ ${listaLineas}
 Artículos detectados en la factura:
 ${listaItems}
 
-Para cada artículo (por su índice numérico), indica qué id_linea del pedido interno le corresponde, si alguna. Usa tu conocimiento de productos de laboratorio: marcas comerciales, sinónimos y nombres técnicos equivalentes pueden ser el mismo producto aunque el texto no se parezca (ejemplo: "Aquatex" es un medio de montaje acuoso; "Calcofluor White Stain" es una tinción de blanco de calcoflúor). Si tienes dudas razonables o no hay ninguna línea que corresponda, usa null — mejor no emparejar que emparejar mal. Si dos artículos podrían corresponder a la misma línea, quédate solo con el que tengas más confianza y deja el otro en null.
+Para cada artículo (por su índice numérico), indica qué id_linea del pedido interno le corresponde, si alguna. Usa tu conocimiento de productos de laboratorio: marcas comerciales, sinónimos y nombres técnicos equivalentes pueden ser el mismo producto aunque el texto no se parezca (ejemplo: "Aquatex" es un medio de montaje acuoso; "Calcofluor White Stain" es una tinción de blanco de calcoflúor). Si tienes dudas razonables o no hay ninguna línea que corresponda, usa null — mejor no emparejar que emparejar mal.
+
+Es NORMAL y CORRECTO que dos o más artículos de la lista (filas distintas de la factura) apunten a la MISMA id_linea cuando son realmente el mismo material — por ejemplo porque la factura agrupa varios albaranes/entregas de un mismo pedido y ese material aparece repetido con distinta cantidad en cada uno. En ese caso asigna la misma id_linea a todas esas filas; no dejes ninguna en null solo porque ya hayas emparejado otra fila con esa línea. Usa null en vez de repetir la id_linea únicamente cuando de verdad se trate de dos PRODUCTOS DISTINTOS compitiendo por la misma línea y no puedas distinguir cuál es el correcto — ahí sí, quédate con el que tengas más confianza y deja el otro en null.
 
 Devuelve SOLO un array JSON, uno por artículo en el mismo orden, con: indice (el número del artículo), id_linea (el id o null), confianza (0 a 1, 0 si id_linea es null).`;
 }
