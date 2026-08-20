@@ -270,7 +270,7 @@ function renderFilaMaterial(m) {
         <td onclick="event.stopPropagation()"><div class="row-actions">
           <button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Consumo en esta ubicación">📦</button>
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
-          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir en botes de uso">✂️</button>` : ''}
+          ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir/alicuotar">✂️</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="eliminarLoteDirecto('${l.ID}')" title="Eliminar este bote">🗑️</button>` : ''}
           <button class="icon-btn" onclick="openModalTrasladoLote('${l.ID}')" title="Trasladar a otra ubicación">🔀</button>
         </div></td>
@@ -296,7 +296,7 @@ function renderFilaMaterial(m) {
       <td onclick="event.stopPropagation()"><div class="row-actions">
         <button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>
         ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaMaterial('${m.ID_Material}')" title="Entrada">📥</button>` : ''}
-        ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir en botes de uso">✂️</button>` : ''}
+        ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir/alicuotar">✂️</button>` : ''}
         ${m.Ubicacion ? `<button class="icon-btn" onclick="trasladarDesdeLegacy('${m.ID_Material}')" title="Trasladar a otra ubicación">🔀</button>` : ''}
       </div></td>
     </tr>`;
