@@ -308,5 +308,19 @@ Deno.serve(async (req) => {
     .eq("id_documento", idDocumento);
   if (updateErr) return jsonError(`No se pudo guardar el resultado: ${updateErr.message}`, 400);
 
-  return jsonOk({ resultado });
+  // El número/fecha de factura detectados se guardan directamente en el
+  // pedido — el mismo campo que ya se rellenaba a mano en "Generar hoja de
+  // pedido" — para que no haga falta un paso manual aparte. Se sobrescribe
+  // lo que hubiera antes porque el dato de la factura real es la fuente de
+  // la verdad; si no se detecta alguno de los dos, no se toca ese campo.
+  let pedidoActualizado: unknown = null;
+  const camposPedido: Record<string, unknown> = {};
+  if (resultado.numero_factura) camposPedido.numero_factura = resultado.numero_factura;
+  if (resultado.fecha_factura) camposPedido.fecha_factura = resultado.fecha_factura;
+  if (Object.keys(camposPedido).length) {
+    const { data } = await supabaseAdmin.from("pedidos").update(camposPedido).eq("id_pedido", doc.pedido).select().maybeSingle();
+    pedidoActualizado = data || null;
+  }
+
+  return jsonOk({ resultado, pedido: pedidoActualizado });
 });

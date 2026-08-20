@@ -538,13 +538,13 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;white-space:nowrap" onclick="closeModal('modal-revision-extraccion');openModalGastoExtra('${pedidoId}','${(r.cargo_extra.concepto||'').replace(/'/g,"\\'")}',${r.cargo_extra.importe})">Precargar en Gasto extra</button>
   </div>` : '';
 
-  // La fecha que debe figurar en la hoja de pedido es la de la factura, no
-  // la de subida del documento ni la de creación del pedido — se detecta
-  // aquí y se ofrece precargar en el generador (nunca se guarda sola, sin
-  // que la vea la persona que genera la hoja).
-  const datosFactura = (r.numero_factura || r.fecha_factura) ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
-    <div>🧾 Factura detectada: ${r.numero_factura ? `<strong>${r.numero_factura}</strong>` : '(sin número)'}${r.fecha_factura ? ` · ${formatDate(r.fecha_factura)}` : ''}</div>
-    <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;white-space:nowrap" onclick="precargarFacturaDetectada('${pedidoId}','${(r.numero_factura||'').replace(/'/g,"\\'")}','${r.fecha_factura||''}')">Precargar en Generar hoja</button>
+  // El número/fecha de factura detectados ya se guardaron directamente en
+  // el pedido al leer el documento (leerDocumentoConIA, pedidos-acciones.js)
+  // — la fecha que figura ahí es la de la factura, no la de subida del
+  // documento ni la de creación del pedido. Este aviso es solo informativo,
+  // no requiere ninguna acción.
+  const datosFactura = (r.numero_factura || r.fecha_factura) ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px">
+    🧾 Factura detectada y guardada en el pedido: ${r.numero_factura ? `<strong>${r.numero_factura}</strong>` : '(sin número)'}${r.fecha_factura ? ` · ${formatDate(r.fecha_factura)}` : ''}
   </div>` : '';
 
   cont.innerHTML = tabla + sinMatch + cargoExtra + datosFactura;
@@ -571,20 +571,6 @@ function anadirLineaDesdeSinMatch(idx) {
   sv('linea-cantidad', it.cantidad != null ? it.cantidad : '');
   sv('linea-precio', it.precio_unitario != null ? it.precio_unitario : '');
   sv('linea-obs', `No estaba en el pedido — detectada en ${doc?.Nombre_Archivo || 'el documento'} leído con IA`);
-}
-
-// abrirGeneradorHoja ya precarga gen-num-factura/gen-fecha-factura desde
-// Numero_Factura/Fecha_Factura del pedido si ya estaban guardados — aquí se
-// sobrescriben (síncronamente, justo después de abrir) con lo detectado en
-// la factura, que es lo que de verdad debe figurar en la hoja de pedido, no
-// la fecha de subida del documento ni la de creación del pedido. No se
-// guarda nada solo con esto: hace falta pulsar "Generar" en ese modal, igual
-// que si se hubiera escrito a mano.
-function precargarFacturaDetectada(pedidoId, numeroFactura, fechaFactura) {
-  closeModal('modal-revision-extraccion');
-  abrirGeneradorHoja(pedidoId);
-  if (numeroFactura) sv('gen-num-factura', numeroFactura);
-  if (fechaFactura) sv('gen-fecha-factura', fechaFactura);
 }
 
 function verDetallePedido(pedidoId) {

@@ -464,9 +464,15 @@ async function archivarPedido(pedidoId) {
 async function leerDocumentoConIA(idDocumento, pedidoId) {
   showLoading('Leyendo documento con IA...');
   try {
-    const { resultado } = await callEdgeFunction('leer-documento-proveedor', { id_documento: idDocumento });
+    const { resultado, pedido } = await callEdgeFunction('leer-documento-proveedor', { id_documento: idDocumento });
     const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
     if (doc) { doc.Datos_Extraidos = resultado; doc.Extraido_En = resultado.generado_en; }
+    // Número y fecha de factura detectados ya se guardaron directamente en
+    // el pedido (sin paso manual) — solo falta reflejarlo en DATA local.
+    if (pedido) {
+      const pedIdx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
+      if (pedIdx !== -1) Object.assign(DATA.pedidos[pedIdx], _pedidoSbToObj(pedido));
+    }
     verDetallePedido(pedidoId);
     abrirModalRevisionExtraccion(idDocumento, pedidoId);
   } catch (e) { showToast('Error leyendo el documento: ' + e.message, 'error'); console.error(e); }
