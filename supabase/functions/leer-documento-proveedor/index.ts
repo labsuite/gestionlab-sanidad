@@ -157,6 +157,39 @@ const ESQUEMA_MATCHING = {
   },
 };
 
+// El precio que factura el proveedor es por SU unidad de venta (el envase:
+// "pack 10 uds", "c/100 uds"...), que no tiene por qué coincidir con la
+// unidad en la que se pidió la línea internamente — a veces se pide por
+// envase completo (p.ej. una caja de guantes) y a veces por unidad suelta
+// aunque el proveedor solo venda por caja (p.ej. 10 pinzas, aunque solo se
+// vendan en packs de 10). La propia factura no dice cuál de las dos es,
+// pero SÍ es deducible sin adivinar comparando la cantidad pedida
+// (cantidad_pedida, ya conocida en Lineas_Pedido) contra la cantidad
+// detectada en la factura: si cantidad_pedida coincide con la cantidad de
+// envases facturados, el precio de envase ya es el correcto tal cual; si en
+// cambio coincide con esa cantidad multiplicada por el tamaño del envase,
+// es que se pidió en unidades sueltas y el precio hay que dividirlo entre
+// el tamaño del envase antes de aplicarlo. Si no encaja ninguna de las dos
+// con margen de error, no se toca nada (mejor dejarlo para revisión manual
+// que ajustar con una suposición sin base).
+function ajustarPrecioPorEnvase(
+  cantidadPedida: number | null,
+  cantidadEnvasesFacturados: number | null,
+  unidadesPorEnvase: number | null,
+  precioUnitario: number | null,
+): { precio: number | null; ajustadoPorEnvase: boolean } {
+  if (precioUnitario == null || unidadesPorEnvase == null || unidadesPorEnvase <= 1 || cantidadPedida == null || cantidadEnvasesFacturados == null) {
+    return { precio: precioUnitario, ajustadoPorEnvase: false };
+  }
+  const TOL = 0.01;
+  const pedidoEnEnvases = Math.abs(cantidadPedida - cantidadEnvasesFacturados) < TOL;
+  const pedidoEnUnidadSuelta = Math.abs(cantidadPedida - cantidadEnvasesFacturados * unidadesPorEnvase) < TOL;
+  if (pedidoEnUnidadSuelta && !pedidoEnEnvases) {
+    return { precio: Math.round((precioUnitario / unidadesPorEnvase) * 100) / 100, ajustadoPorEnvase: true };
+  }
+  return { precio: precioUnitario, ajustadoPorEnvase: false };
+}
+
 // Nunca se fía a ciegas de lo que devuelva Gemini: descarta cualquier
 // id_linea que no exista de verdad entre las líneas del pedido. Varios
 // artículos de la factura pueden apuntar legítimamente a la misma línea del
@@ -195,17 +228,18 @@ function resolverMatches(
     // mismo material — se promedia por si hay variación mínima de redondeo
     // entre albaranes, no porque se espere que difieran de verdad.
     const precios = itemsDeLinea.filter((it) => it.precio_unitario != null).map((it) => it.precio_unitario);
-    const precio_unitario = precios.length
+    const precioEnvase = precios.length
       ? Math.round((precios.reduce((suma, p) => suma + p, 0) / precios.length) * 100) / 100
       : null;
     const unidad = itemsDeLinea.find((it) => it.unidad)?.unidad || "";
     const unidades_por_envase = itemsDeLinea.find((it) => it.unidades_por_envase != null)?.unidades_por_envase ?? null;
+    const { precio: precio_unitario, ajustadoPorEnvase } = ajustarPrecioPorEnvase(linea.cantidad_pedida, cantidad, unidades_por_envase, precioEnvase);
     return {
       id_linea: idLinea,
       material_linea: linea.material,
       cantidad_pedida: linea.cantidad_pedida,
       cantidad_recibida: linea.cantidad_recibida,
-      item_detectado: { ...itemsDeLinea[itemsDeLinea.length - 1], cantidad, precio_unitario, unidad, unidades_por_envase },
+      item_detectado: { ...itemsDeLinea[itemsDeLinea.length - 1], cantidad, precio_unitario, precio_envase_original: ajustadoPorEnvase ? precioEnvase : null, unidad, unidades_por_envase },
       confianza: Math.round(Math.max(...confianzas) * 100) / 100,
     };
   });

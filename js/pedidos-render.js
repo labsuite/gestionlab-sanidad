@@ -498,16 +498,19 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     // dice la factura, sin comparar ni juzgar si "coincide" con lo pedido.
     const envase = it.unidades_por_envase != null ? `<div style="font-size:11px;color:var(--text-muted)">envase de ${it.unidades_por_envase}${unidad}</div>` : '';
     const cantidadDetectada = it.cantidad != null ? `${it.cantidad}${unidad}${envase}` : '—';
-    // El precio detectado es el que factura el proveedor por SU unidad de
-    // venta (aquí, "envase") — que no tiene por qué ser la misma unidad en
-    // la que se pidió la línea (Cantidad pedida). Aplicar el precio del
-    // envase directo sobre una Cantidad_Pedida en unidades sueltas infla el
-    // coste tantas veces como unidades tenga el envase (caso real: "Pinzas
-    // estériles, pack 10 uds" a 10,50 €/pack aplicado sobre
-    // Cantidad_Pedida=10 unidades sueltas → coste 10× el real). Es un aviso,
-    // no una corrección automática — solo tú sabes en qué unidad se pidió.
-    const precioPorUnidad = (tienePrecio && it.unidades_por_envase > 1)
-      ? `<div style="font-size:11px;color:var(--text-muted)">= ${(it.precio_unitario / it.unidades_por_envase).toFixed(2)} €/ud si se pidió suelta</div>` : '';
+    // El precio que factura el proveedor es por SU unidad de venta (el
+    // envase) — el servidor (ajustarPrecioPorEnvase, leer-documento-proveedor)
+    // ya comparó Cantidad_Pedida contra la cantidad de envases facturados
+    // para saber si hacía falta dividir entre el tamaño del envase (caso
+    // real: "Pinzas estériles, pack 10 uds" a 10,50 €/pack, Cantidad_Pedida
+    // = 10 unidades sueltas → precio ya ajustado aquí a 1,05 €/ud). Cuando sí
+    // pudo deducirlo se muestra de dónde sale ese número; cuando no pudo
+    // (p.ej. líneas nuevas sin cantidad_pedida todavía) se deja el precio de
+    // envase tal cual, con un aviso neutro para que se revise a mano.
+    const precioPorUnidad = it.precio_envase_original != null
+      ? `<div style="font-size:11px;color:var(--success,#16a34a)">✓ ${it.precio_envase_original.toFixed(2)} €/envase de ${it.unidades_por_envase} ÷ ${it.unidades_por_envase} = ${it.precio_unitario.toFixed(2)} €/ud (pedido en unidad suelta)</div>`
+      : (tienePrecio && it.unidades_por_envase > 1)
+        ? `<div style="font-size:11px;color:var(--text-muted)">= ${(it.precio_unitario / it.unidades_por_envase).toFixed(2)} €/ud si se pidió suelta</div>` : '';
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:6px 8px;text-align:center"><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
       <td style="padding:6px 8px">${m.material_linea}</td>
