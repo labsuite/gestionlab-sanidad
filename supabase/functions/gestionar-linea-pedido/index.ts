@@ -187,10 +187,13 @@ Deno.serve(async (req) => {
     if (!idLinea) return jsonError("id_linea es obligatorio", 400);
     const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
     if (!linea) return jsonError("Línea no encontrada", 404);
-    const { data: pedido } = await supabaseAdmin.from("pedidos").select("estado").eq("id_pedido", linea.pedido).maybeSingle();
-    if (!pedido) return jsonError("Pedido no encontrado", 404);
-    if (!["Abierto", "Presupuesto solicitado"].includes(pedido.estado)) {
-      return jsonError("El pedido ya no admite cambios en las líneas", 400);
+    // Se bloquea por el estado de la LÍNEA, no del pedido entero — un pedido
+    // pasa a "Recepción parcial" en cuanto se recibe UNA línea cualquiera, y
+    // eso no debe impedir editar otras líneas del mismo pedido que siguen
+    // sin recibirse (p.ej. mientras se completa un pedido con "Pedido súper
+    // atrasado" y llegan los artículos en varios envíos).
+    if (linea.estado_linea && linea.estado_linea !== "Pendiente") {
+      return jsonError("Esta línea ya tiene recepción registrada y no admite cambios", 400);
     }
 
     const datos: Record<string, unknown> = {};
@@ -203,6 +206,7 @@ Deno.serve(async (req) => {
       datos.precio_unitario = body.precio_unitario === "" || body.precio_unitario === null ? null : Number(body.precio_unitario);
     }
     if (body.observaciones !== undefined) datos.observaciones = strField(body.observaciones);
+    if (body.unidad !== undefined) datos.unidad = strField(body.unidad);
     if (!Object.keys(datos).length) return jsonError("Nada que actualizar", 400);
 
     const { data, error } = await supabaseAdmin.from("lineas_pedido").update(datos).eq("id_linea", idLinea).select().single();

@@ -556,7 +556,29 @@ function _toggleLoteAuto(i, checked) {
   }
 }
 
-function _eliminarLoteTemp(i) { _lotesTemp.splice(i, 1); renderLotesModal(); }
+// Los lotes ya guardados (con _loteId) hay que borrarlos también en el
+// servidor aquí mismo — si solo se quitaban del array local, guardarMaterial()
+// nunca mandaba un DELETE (solo actualiza/crea los lotes presentes en
+// _lotesTemp), así que el bote "eliminado" seguía en Material_Ubicaciones y
+// reaparecía en la siguiente edición.
+async function _eliminarLoteTemp(i) {
+  const l = _lotesTemp[i];
+  if (!l._loteId) { _lotesTemp.splice(i, 1); renderLotesModal(); return; }
+  const stock = parseFloat(l.Stock_Local) || 0;
+  const unidad = l.Unidad_Lote || v('mat-unidad') || '';
+  const esMadre = _lotesTemp.some(o => o.ID_Lote_Padre === l._loteId);
+  let msg = `¿Eliminar el bote de "${getNombreUbicacion(l.ID_Ubicacion)}"?`;
+  if (stock > 0) msg += ` Tiene ${stock} ${unidad} registrado — se perderá del stock total.`;
+  if (esMadre) msg += ' Tiene botes de uso subdivididos a partir de él; seguirán existiendo pero perderán la referencia a este bote madre.';
+  if (!confirm(msg)) return;
+  try {
+    await callEdgeFunction('gestionar-material', { accion: 'eliminar_lote', lote_id: l._loteId });
+    const idxGlobal = DATA.materialUbicaciones.findIndex(x => x.ID === l._loteId);
+    if (idxGlobal !== -1) DATA.materialUbicaciones.splice(idxGlobal, 1);
+    _lotesTemp.splice(i, 1);
+    renderLotesModal();
+  } catch(e) { showToast('Error al eliminar el bote', 'error'); console.error(e); }
+}
 
 function seleccionarUbicacionMatLote(id, label) {
   if (_lotesTemp.some(l => l.ID_Ubicacion === id)) {

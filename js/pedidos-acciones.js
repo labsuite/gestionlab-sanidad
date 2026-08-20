@@ -593,10 +593,28 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-id', lineaId);
   sv('edlinea-pedido-id', pedidoId);
   const unidad = _unidadLineaPedido(l);
-  document.getElementById('edlinea-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
+  document.getElementById('edlinea-material-nombre').textContent = l.Material;
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
+
+  // Selector de unidad: solo si el material catalogado tiene más de un tipo
+  // de unidad (Unidad + Unidades_Extra) — igual criterio que al añadir la
+  // línea (ver _mostrarSelectorUnidadLinea). Con un único tipo se mantiene
+  // el texto fijo de siempre, sin selector.
+  const grupo = document.getElementById('edlinea-unidad-group');
+  const sel = document.getElementById('edlinea-unidad');
+  const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+  const extra = (mat?.Unidades_Extra || '').split(',').map(u => u.trim()).filter(Boolean);
+  const opciones = [mat?.Unidad || '', ...extra].filter(Boolean);
+  if (opciones.length > 1) {
+    sel.innerHTML = opciones.map(u => `<option value="${u}"${u === unidad ? ' selected' : ''}>${u}</option>`).join('');
+    grupo.style.display = '';
+  } else {
+    grupo.style.display = 'none';
+    sel.innerHTML = '';
+    document.getElementById('edlinea-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
+  }
   openModal('modal-editar-linea-pedido');
 }
 
@@ -609,11 +627,13 @@ async function guardarEdicionLinea() {
   if (!cantidad || cantidad <= 0) { showToast('Indica una cantidad válida', 'error'); return; }
   const precio = v('edlinea-precio');
   const obs = v('edlinea-obs');
+  const grupoUnidad = document.getElementById('edlinea-unidad-group');
+  const unidad = grupoUnidad && grupoUnidad.style.display !== 'none' ? v('edlinea-unidad') : undefined;
   showLoading('Guardando...');
   try {
     const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
       accion: 'editar', id_linea: lineaId,
-      cantidad_pedida: cantidad, precio_unitario: precio, observaciones: obs,
+      cantidad_pedida: cantidad, precio_unitario: precio, observaciones: obs, unidad,
     });
     DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
     showToast('Línea actualizada', 'success');
