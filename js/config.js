@@ -103,31 +103,67 @@ function getStockMinTotal(mat) {
   return lotes.reduce((sum, l) => sum + (parseFloat(l.Stock_Minimo_Local) || 0), 0);
 }
 
-/** True si el ítem está por debajo del mínimo */
+/**
+ * Agrupa los lotes de un material por unidad (Unidad_Lote del lote, o la
+ * Unidad del material si el lote no la sobreescribe) y suma stock/mínimo/
+ * óptimo dentro de cada grupo. Sumar "2 botellas" + "2 goteros" en un solo
+ * número no significa nada — un material con varios formatos (p.ej. una
+ * botella madre alicuotada en goteros) puede ir sobrado de un formato y
+ * escaso del otro al mismo tiempo. Esta es la base de stockBajoMinimo, de
+ * getStockLabel y de la barra de progreso: cada formato se compara solo
+ * contra su propio mínimo/óptimo, nunca contra la suma de todos.
+ */
+function gruposStockMaterial(mat) {
+  const lotes = getMatUbics(mat.ID_Material);
+  if (!lotes.length) {
+    return [{
+      unidad: mat.Unidad || '',
+      stock: parseFloat(mat.Stock_Actual) || 0,
+      minimo: parseFloat(mat.Stock_Minimo) || 0,
+      optimo: parseFloat(mat.Stock_Optimo) || 0,
+    }];
+  }
+  const grupos = {};
+  const orden = [];
+  lotes.forEach(l => {
+    const u = (l.Unidad_Lote || mat.Unidad || '').trim();
+    if (!(u in grupos)) { grupos[u] = { unidad: u, stock: 0, minimo: 0, optimo: 0 }; orden.push(u); }
+    grupos[u].stock  += parseFloat(l.Stock_Local) || 0;
+    grupos[u].minimo += parseFloat(l.Stock_Minimo_Local) || 0;
+    grupos[u].optimo += parseFloat(l.Stock_Optimo_Local) || 0;
+  });
+  return orden.map(u => grupos[u]);
+}
+
+/** True si ALGÚN formato del material (grupo por unidad) está por debajo de su propio mínimo */
 function stockBajoMinimo(mat) {
-  const total = getStockTotal(mat);
-  const min   = getStockMinTotal(mat);
-  return min > 0 && total <= min;
+  return gruposStockMaterial(mat).some(g => g.minimo > 0 && g.stock <= g.minimo);
 }
 
 /**
  * Etiqueta de stock total para mostrar en la fila principal.
  * Si todos los lotes comparten unidad (o no hay lotes), es "12 ml" como siempre.
  * Si hay lotes con Unidad_Lote distinta (p.ej. bote madre + alícuotas), agrupa
- * por unidad: "1 botella, 2 falcons".
+ * por unidad: "1 botella, 2 goteros".
  */
 function getStockLabel(mat) {
-  const lotes = getMatUbics(mat.ID_Material);
-  if (!lotes.length) return `${getStockTotal(mat)} ${mat.Unidad || ''}`.trim();
-  const grupos = {};
-  const orden = [];
-  lotes.forEach(l => {
-    const u = (l.Unidad_Lote || mat.Unidad || '').trim();
-    if (!(u in grupos)) { grupos[u] = 0; orden.push(u); }
-    grupos[u] += parseFloat(l.Stock_Local) || 0;
-  });
-  if (orden.length <= 1) return `${getStockTotal(mat)} ${mat.Unidad || ''}`.trim();
-  return orden.map(u => `${grupos[u]} ${u}`.trim()).join(', ');
+  const grupos = gruposStockMaterial(mat);
+  if (grupos.length <= 1) return `${getStockTotal(mat)} ${mat.Unidad || ''}`.trim();
+  return grupos.map(g => `${g.stock} ${g.unidad}`.trim()).join(', ');
+}
+
+/**
+ * Etiqueta de mínimo/óptimo para la fila principal — mismo criterio que
+ * getStockLabel: si hay más de un formato, no se suman entre sí (un
+ * "2 / 4" combinado de botellas+goteros no es una cifra real de nada).
+ */
+function getMinOptLabel(mat) {
+  const grupos = gruposStockMaterial(mat);
+  if (grupos.length <= 1) {
+    const g = grupos[0];
+    return `${g.minimo || '—'} / ${g.optimo || '—'}`;
+  }
+  return grupos.map(g => `${g.minimo || 0}/${g.optimo || 0} ${g.unidad}`.trim()).join(', ');
 }
 
 /** Nombre de la ubicación a partir de su ID */
