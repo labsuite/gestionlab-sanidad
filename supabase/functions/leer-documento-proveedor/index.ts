@@ -79,6 +79,8 @@ async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown
 const PROMPT_EXTRACCION = `Eres un asistente que extrae las líneas de artículo de una factura de un proveedor de material de laboratorio clínico/sanitario.
 
 Devuelve SOLO un objeto JSON. Reglas:
+- "numero_factura": el número/identificador de la propia factura tal como figura en el documento (no el número de pedido ni de albarán del cliente). Cadena vacía si no aparece.
+- "fecha_factura": la fecha DE LA FACTURA (fecha de emisión del documento, no la fecha de un albarán ni la de vencimiento), en formato "YYYY-MM-DD". Cadena vacía si no aparece o no se puede determinar sin ambigüedad.
 - "items": un array con un objeto por cada línea de artículo del documento (reactivos, material fungible, equipos, kits...). Ignora completamente cabeceras, totales, subtotales y el IVA — nunca los devuelvas como si fueran un artículo.
   - "material": el nombre del artículo tal como figura en el documento (incluye referencia/SKU si aparece), sin inventar ni completar información que no esté.
   - "cantidad": número de unidades de esa línea tal como lo indica la factura (no lo recalcules), o null si no aparece.
@@ -91,6 +93,8 @@ Devuelve SOLO un objeto JSON. Reglas:
 const ESQUEMA_EXTRACCION = {
   type: "OBJECT",
   properties: {
+    numero_factura: { type: "STRING" },
+    fecha_factura: { type: "STRING" },
     items: {
       type: "ARRAY",
       items: {
@@ -240,7 +244,12 @@ Deno.serve(async (req) => {
   const base64 = arrayBufferABase64(await archivo.arrayBuffer());
   const mimeType = mimeDesdeNombre(doc.nombre_archivo);
 
-  let extraido: { items?: any[]; cargo_extra?: { concepto: string; importe: number } | null };
+  let extraido: {
+    items?: any[];
+    cargo_extra?: { concepto: string; importe: number } | null;
+    numero_factura?: string;
+    fecha_factura?: string;
+  };
   try {
     extraido = await llamarGemini(
       geminiKey,
@@ -278,11 +287,18 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Validación mínima de forma (no de calendario real) — si Gemini devuelve
+  // algo que no es YYYY-MM-DD se descarta en vez de guardar basura en un
+  // campo "date" de Postgres o precargar una fecha inválida en el generador.
+  const fechaFacturaValida = typeof extraido.fecha_factura === "string" && /^\d{4}-\d{2}-\d{2}$/.test(extraido.fecha_factura);
+
   const resultado = {
     items,
     matches,
     sin_match: sinMatch,
     cargo_extra: extraido.cargo_extra || null,
+    numero_factura: extraido.numero_factura || null,
+    fecha_factura: fechaFacturaValida ? extraido.fecha_factura : null,
     generado_en: new Date().toISOString(),
   };
 
