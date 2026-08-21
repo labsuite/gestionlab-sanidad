@@ -246,7 +246,7 @@ function renderResiduosContenedores() {
     const isActive = _tabContenedor === id;
     const base = 'padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;';
     const style = base + (isActive
-      ? 'border-bottom:2px solid var(--primary);color:var(--primary)'
+      ? 'border-bottom:2px solid var(--accent);color:var(--accent)'
       : 'border-bottom:2px solid transparent;color:var(--text-muted)');
     const badgeHtml = badge
       ? `<span style="font-size:11px;background:#f97316;color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${badge}</span>`
@@ -687,7 +687,7 @@ function _chatResSeleccionarLab() {
 function _chatResPintarMensaje(role, texto) {
   const cont = document.getElementById('chat-res-mensajes');
   const alineado = role === 'user' ? 'flex-end' : 'flex-start';
-  const bg = role === 'user' ? 'var(--primary)' : 'var(--surface)';
+  const bg = role === 'user' ? 'var(--accent)' : 'var(--surface)';
   const color = role === 'user' ? '#fff' : 'var(--text)';
   const div = document.createElement('div');
   div.style.cssText = `display:flex;justify-content:${alineado};margin-bottom:8px`;
