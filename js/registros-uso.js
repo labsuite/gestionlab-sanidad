@@ -113,7 +113,7 @@ function renderRegistrosUso() {
   const tabBtn = (id, label) => {
     const base = 'padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;';
     const style = base + (_regTab === id
-      ? 'border-bottom:2px solid var(--primary);color:var(--primary)'
+      ? 'border-bottom:2px solid var(--accent);color:var(--accent)'
       : 'border-bottom:2px solid transparent;color:var(--text-muted)');
     return `<button onclick="_switchRegTab('${id}')" style="${style}">${label}</button>`;
   };
@@ -179,7 +179,7 @@ function _renderRegTab(tipo) {
     </div>
     ${notaManual}
     <div class="card" style="padding:10px 18px;margin-bottom:20px;display:inline-block">
-      <div style="font-size:20px;font-weight:700;color:var(--primary)">${horas.toFixed(1)} h</div>
+      <div style="font-size:20px;font-weight:700;color:var(--accent)">${horas.toFixed(1)} h</div>
       <div style="font-size:11px;color:var(--text-muted)">Horas de uso registradas — apoyo al plan de mantenimiento</div>
     </div>
     ${abiertasHtml}

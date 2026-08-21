@@ -461,7 +461,7 @@ function renderMantenimiento() {
     <!-- Pestañas -->
     <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px">
       <button id="tab-btn-pendientes" onclick="switchMantTab('pendientes')"
-        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--primary);margin-bottom:-2px;color:var(--primary)">
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);margin-bottom:-2px;color:var(--accent)">
         Pendientes <span style="font-size:11px;background:var(--danger);color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${pendientes}</span>
       </button>
       ${canEdit ? `<button id="tab-btn-planes" onclick="switchMantTab('planes')"
@@ -602,8 +602,8 @@ function switchMantTab(tab) {
     const active = t === tab;
     panel.style.display = active ? '' : 'none';
     if (btn) {
-      btn.style.borderBottomColor = active ? 'var(--primary)' : 'transparent';
-      btn.style.color = active ? 'var(--primary)' : 'var(--text-muted)';
+      btn.style.borderBottomColor = active ? 'var(--accent)' : 'transparent';
+      btn.style.color = active ? 'var(--accent)' : 'var(--text-muted)';
     }
   });
 }

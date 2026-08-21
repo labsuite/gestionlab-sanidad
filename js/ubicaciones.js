@@ -228,7 +228,7 @@ function renderUsuarios() {
   const tabBtn = (id, label, count, active) => {
     const base = 'padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;';
     const style = active
-      ? base + 'border-bottom:2px solid var(--primary);color:var(--primary)'
+      ? base + 'border-bottom:2px solid var(--accent);color:var(--accent)'
       : base + 'border-bottom:2px solid transparent;color:var(--text-muted)';
     return `<button id="usr-tab-btn-${id}" onclick="switchUsuariosTab('${id}')" style="${style}">
       ${label} <span style="font-size:11px;background:var(--border);color:var(--text-muted);border-radius:99px;padding:1px 7px;margin-left:4px">${count}</span>
@@ -265,8 +265,8 @@ function switchUsuariosTab(tab) {
     if (panel) panel.style.display = t === tab ? '' : 'none';
     if (btn) {
       const active = t === tab;
-      btn.style.borderBottom = active ? '2px solid var(--primary)' : '2px solid transparent';
-      btn.style.color        = active ? 'var(--primary)' : 'var(--text-muted)';
+      btn.style.borderBottom = active ? '2px solid var(--accent)' : '2px solid transparent';
+      btn.style.color        = active ? 'var(--accent)' : 'var(--text-muted)';
     }
   });
 }
@@ -837,8 +837,8 @@ function _renderPreviewImportarAlumnos() {
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
       <span>${nuevos.length} matrícula(s) nueva(s) de ${_previewAlumnosCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
       <span style="white-space:nowrap">
-        <button type="button" onclick="_toggleSeleccionarTodosImportar(true)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
-        <button type="button" onclick="_toggleSeleccionarTodosImportar(false)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Nada</button>
+        <button type="button" onclick="_toggleSeleccionarTodosImportar(true)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
+        <button type="button" onclick="_toggleSeleccionarTodosImportar(false)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Nada</button>
       </span>
     </div>
     ${ciclosHtml}`;
@@ -1024,8 +1024,8 @@ function _pasoUnoImportarProfesores() {
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
       <span>${nuevos.length} asignación(es) nueva(s) de ${_previewProfesoresCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
       <span style="white-space:nowrap">
-        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(true)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
-        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(false)" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0">Nada</button>
+        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(true)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
+        <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(false)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Nada</button>
       </span>
     </div>
     ${ciclosHtml}`;

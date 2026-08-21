@@ -72,7 +72,7 @@ function renderReservas() {
   const tabBtn = (id, label, badge) => {
     const base = 'padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;margin-bottom:-2px;';
     const style = base + (_reservaTab === id
-      ? 'border-bottom:2px solid var(--primary);color:var(--primary)'
+      ? 'border-bottom:2px solid var(--accent);color:var(--accent)'
       : 'border-bottom:2px solid transparent;color:var(--text-muted)');
     const bdg = badge
       ? `<span style="font-size:11px;background:#f97316;color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${badge}</span>`
@@ -157,7 +157,7 @@ function _renderVisionGeneral() {
 
   let html = `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">`;
   if (enUso) html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--accent)">${enUso}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">En uso ahora</div></div>`;
-  html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--primary)">${hoyCount}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Reservas hoy</div></div>`;
+  html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700;color:var(--accent)">${hoyCount}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Reservas hoy</div></div>`;
   html += `<div class="card" style="padding:10px 18px;flex:1;min-width:120px;text-align:center"><div style="font-size:22px;font-weight:700">${futCount}</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Próximas (14 días)</div></div>`;
   html += `</div>`;
 
@@ -177,7 +177,7 @@ function _renderVisionGeneral() {
     const labelDia = (esHoy ? 'Hoy · ' : '') +
       date.toLocaleDateString('es-ES', { weekday:'long', day:'numeric', month:'long' });
 
-    html += `<div style="font-size:12px;font-weight:600;color:${esHoy?'var(--primary)':'var(--text-muted)'};text-transform:uppercase;letter-spacing:.5px;margin:${primerGrupo?'0':'20px'} 0 8px">${labelDia}</div>`;
+    html += `<div style="font-size:12px;font-weight:600;color:${esHoy?'var(--accent)':'var(--text-muted)'};text-transform:uppercase;letter-spacing:.5px;margin:${primerGrupo?'0':'20px'} 0 8px">${labelDia}</div>`;
     primerGrupo = false;
 
     reservas.forEach(r => {
@@ -262,7 +262,7 @@ function _renderTimeline(idEquipo) {
       }).join('');
 
     html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px${esHoy?';font-weight:600':''}">
-      <div style="min-width:60px;font-size:11px;color:${esHoy?'var(--primary)':'var(--text-muted)'};text-align:right">${label}</div>
+      <div style="min-width:60px;font-size:11px;color:${esHoy?'var(--accent)':'var(--text-muted)'};text-align:right">${label}</div>
       <div style="flex:1;position:relative;height:22px;background:var(--surface2);border-radius:4px;border:1px solid var(--border)">
         ${bloques || '<span style="position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-muted)">Libre</span>'}
       </div>
