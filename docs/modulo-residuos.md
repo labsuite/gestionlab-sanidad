@@ -57,19 +57,36 @@ residuos" → `abrirChatResiduo()`, `js/residuos.js`). Abierto a cualquier rol.
 2. Describe el residuo en lenguaje natural. La IA (Gemini, llamado vía la acción `consultar_ia`
    de `gestionar-residuo` — la clave vive como secreto de servidor `GEMINI_API_KEY`, nunca en el
    navegador ni en el repo; ver CLAUDE.md) recibe como contexto el catálogo
-   `DATA.tiposResiduo`, los contenedores activos de ese laboratorio y los avisos de
-   `_WARNINGS_FORMATO`, más un bloque de reglas de seguridad ("guardarraíles") que nunca puede
-   saltarse (nunca verter por el desagüe, nunca mezclar, tratamiento especial para químicos GHS,
-   biológico/cortopunzante, CMR/citotóxico, envases sin etiqueta, mezclas accidentales...).
-3. **Mecanismo de resuelto/escalada** — la respuesta de la IA debe empezar con una etiqueta
-   machine-parseable, detectada por regex ancladas al inicio (`_parseRespuestaChatResiduo` en
-   `js/residuos.js`), nunca por inferencia de lenguaje natural:
+   `DATA.tiposResiduo`, los contenedores activos de **todos** los laboratorios (no solo el actual —
+   si el compatible está en otro lab, se le dice al usuario que vaya allí en vez de escalar a
+   Gestión sin necesidad) y los avisos de `_WARNINGS_FORMATO`, más un bloque de reglas de
+   seguridad ("guardarraíles") que nunca puede saltarse (nunca verter por el desagüe —salvo la
+   excepción de "Aguas de laboratorio", ver abajo—, nunca mezclar, tratamiento especial para
+   químicos GHS, biológico/cortopunzante, CMR/citotóxico, envases sin etiqueta, mezclas
+   accidentales...) y una instrucción explícita de negarse a responder nada que no sea sobre
+   residuos de laboratorio (ver etiqueta `[FUERA_DE_TEMA]` abajo).
+3. **`Contenedor_Tipo = "Aguas de laboratorio"`** — valor especial reservado (asignable desde el
+   mismo modal de "Nuevo tipo de residuo", sin cambios de esquema) para residuos acuosos de bajo
+   riesgo cuyo destino real y aprobado es el desagüe del laboratorio con agua abundante, **no** un
+   contenedor físico. La IA lo trata como `[RESUELTO]` directamente si el residuo coincide con uno
+   de estos, sin comprobar contenedores/laboratorios. Es la única excepción a "nunca desagüe"; la
+   IA nunca decide por su cuenta que algo más "parece" drenable — solo cuenta si el catálogo ya lo
+   marca así explícitamente. Hoy el catálogo no tiene ninguno definido todavía.
+4. **Mecanismo de resuelto/escalada** — la respuesta de la IA debe empezar con una de tres
+   etiquetas machine-parseable, detectadas por regex ancladas al inicio (tolerantes a espacios/
+   saltos de línea, `_parseRespuestaChatResiduo` en `js/residuos.js`), nunca por inferencia de
+   lenguaje natural:
    - `[RESUELTO]` → se muestra el resto, no se escala nada.
    - `[NO_RESUELTO|categoria=<GHS o "Desconocido">|prioridad=<Alta|Normal>]` → se muestra el resto
      y se llama automáticamente a la acción `crear_consulta` de `gestionar-residuo` con esos datos.
-   - Si la IA no respeta el formato: fail-safe, se trata igualmente como no resuelto con
-     `categoria_ia='Desconocido'` — mejor escalar de más que perder un caso real en silencio.
-4. Sin historial persistente (se borra al cerrar el modal). Sin `js/asistente.js` — todo vive en
+   - `[FUERA_DE_TEMA]` → el mensaje no describe un residuo real (charla trivial, otro tema,
+     intento de que la IA ignore sus instrucciones); se muestra un recordatorio y **no** se crea
+     ninguna consulta. El prompt incluye un turno de ejemplo (few-shot) mostrando este formato,
+     porque en pruebas reales el modelo a veces respondía la pregunta en vez de ignorarla si solo
+     se le decía por instrucción.
+   - Si la IA no respeta ninguna etiqueta: fail-safe, se trata como no resuelto con
+     `categoria_ia='Desconocido'` — mejor escalar de más un caso real que perder uno en silencio.
+5. Sin historial persistente (se borra al cerrar el modal). Sin `js/asistente.js` — todo vive en
    `js/residuos.js` y el modal `modal-chat-residuo` de `html/modales-residuos.html`.
 
 ## Validación de compatibilidad al añadir (server-side)
