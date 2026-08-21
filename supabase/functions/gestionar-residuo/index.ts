@@ -11,6 +11,48 @@ function generarId(prefijo: string): string {
   return prefijo + Date.now().toString(36).toUpperCase().slice(-6);
 }
 
+// ── Compatibilidad de residuos dentro de un mismo contenedor ──
+// Valores idénticos letra por letra a las claves de _GHS en js/residuos.js.
+const GHS_INCOMPATIBLES: [string, string][] = [
+  ["Comburente", "Inflamable"],
+  ["Comburente", "Explosivo"],
+  ["Corrosivo", "Comburente"],
+  ["Explosivo", "Inflamable"],
+  ["Explosivo", "Corrosivo"],
+];
+// Estas categorías nunca deben convivir con ningún otro tipo de residuo distinto
+// en el mismo contenedor, aunque no haya un par específico en la matriz de arriba.
+const GHS_EXCLUSIVAS = ["Citotóxico", "Cancerígeno / CMR"];
+
+function parseRiesgo(riesgo: string | null): string[] {
+  return (riesgo || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+function chequearIncompatibilidad(
+  riesgosNuevo: string[],
+  riesgosExistentes: string[][],
+  hayOtroTipoDistinto: boolean,
+): string | null {
+  for (const exclusiva of GHS_EXCLUSIVAS) {
+    if (hayOtroTipoDistinto && riesgosNuevo.includes(exclusiva)) {
+      return `el nuevo residuo es "${exclusiva}": esta categoría no puede convivir con ningún otro tipo de residuo distinto en el mismo contenedor`;
+    }
+    if (hayOtroTipoDistinto && riesgosExistentes.some((r) => r.includes(exclusiva))) {
+      return `el contenedor ya contiene un residuo "${exclusiva}": no se puede añadir ningún otro tipo distinto`;
+    }
+  }
+  for (const [a, b] of GHS_INCOMPATIBLES) {
+    const nuevoTieneA = riesgosNuevo.includes(a);
+    const nuevoTieneB = riesgosNuevo.includes(b);
+    const existeA = riesgosExistentes.some((r) => r.includes(a));
+    const existeB = riesgosExistentes.some((r) => r.includes(b));
+    if ((nuevoTieneA && existeB) || (nuevoTieneB && existeA)) {
+      return `el contenedor ya tiene un residuo "${nuevoTieneA ? b : a}" y el nuevo es "${nuevoTieneA ? a : b}"`;
+    }
+  }
+  return null;
+}
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -38,6 +80,44 @@ Deno.serve(async (req) => {
     if (!idContenedor || !idResiduo || !nivel) {
       return jsonError("id_contenedor, id_residuo y nivel son obligatorios", 400);
     }
+
+    // ── Nivel 1: el tipo de residuo debe coincidir con la categoría del contenedor ──
+    const { data: residuo, error: errResiduo } = await supabaseAdmin
+      .from("tipos_residuo").select("id_residuo, contenedor_tipo, riesgo")
+      .eq("id_residuo", idResiduo).single();
+    if (errResiduo || !residuo) return jsonError(`No se encontró el tipo de residuo "${idResiduo}"`, 400);
+
+    const { data: contenedorActual, error: errContActual } = await supabaseAdmin
+      .from("contenedores_residuo").select("id_contenedor, categoria")
+      .eq("id_contenedor", idContenedor).single();
+    if (errContActual || !contenedorActual) return jsonError(`No se encontró el contenedor "${idContenedor}"`, 400);
+
+    if ((residuo.contenedor_tipo || "") !== (contenedorActual.categoria || "")) {
+      return jsonError(
+        `Este residuo es de tipo "${residuo.contenedor_tipo || "sin categoría"}" y el contenedor es de categoría "${contenedorActual.categoria || "sin categoría"}": no coinciden.`,
+        400,
+      );
+    }
+
+    // ── Nivel 2: incompatibilidad GHS con lo que ya hay dentro de este contenedor ──
+    const { data: adicionesExistentes, error: errAdicExist } = await supabaseAdmin
+      .from("adiciones_residuo").select("id_residuo").eq("id_contenedor", idContenedor);
+    if (errAdicExist) return jsonError(`No se pudo comprobar el contenido actual del contenedor: ${errAdicExist.message}`, 400);
+
+    const idsExistentesDistintos = [...new Set((adicionesExistentes || []).map((a) => a.id_residuo))]
+      .filter((id) => id !== idResiduo);
+
+    if (idsExistentesDistintos.length > 0) {
+      const { data: tiposExistentes, error: errTiposExist } = await supabaseAdmin
+        .from("tipos_residuo").select("id_residuo, riesgo").in("id_residuo", idsExistentesDistintos);
+      if (errTiposExist) return jsonError(`No se pudo comprobar la compatibilidad: ${errTiposExist.message}`, 400);
+
+      const riesgosNuevo = parseRiesgo(residuo.riesgo);
+      const riesgosExistentes = (tiposExistentes || []).map((t) => parseRiesgo(t.riesgo));
+      const conflicto = chequearIncompatibilidad(riesgosNuevo, riesgosExistentes, true);
+      if (conflicto) return jsonError(`No se puede añadir este residuo a este contenedor: ${conflicto}.`, 400);
+    }
+
     const fecha = hoy();
     const datosAdicion = {
       id_adicion: generarId("AD"), id_contenedor: idContenedor, id_residuo: idResiduo,
@@ -67,10 +147,14 @@ Deno.serve(async (req) => {
     if (!descripcion || !ubicacionDejado) {
       return jsonError("descripcion y ubicacion_dejado son obligatorios", 400);
     }
+    const prioridad = String(body.prioridad || "Normal").trim();
     const datos = {
       id_consulta: generarId("CR-"), fecha: hoy(),
       usuario: body.usuario ? String(body.usuario) : null,
       descripcion, ubicacion_dejado: ubicacionDejado, estado: "Pendiente",
+      categoria_ia: body.categoria_ia ? String(body.categoria_ia) : null,
+      guia_provisional: body.guia_provisional ? String(body.guia_provisional) : null,
+      prioridad: prioridad === "Alta" ? "Alta" : "Normal",
     };
     const { data, error } = await supabaseAdmin.from("consultas_residuo").insert(datos).select().single();
     if (error) return jsonError(`No se pudo enviar el aviso: ${error.message}`, 400);

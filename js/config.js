@@ -11,6 +11,11 @@ const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
 const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
 const _sbMigracion = supabase.createClient(SUPABASE_MIGRACION_URL, SUPABASE_MIGRACION_ANON);
 
+// Consultorio de residuos (Gemini) — pendiente: pegar aquí la clave de Google AI Studio,
+// restringida por referrer HTTP a https://palomafedez.github.io/* (ver CLAUDE.md). Sin
+// clave, el chat del consultorio muestra un error claro en vez de fallar en silencio.
+const GEMINI_API_KEY = '';
+
 // ============================================================
 // ESTADO GLOBAL
 // ============================================================
@@ -62,7 +67,7 @@ const COLS = {
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
   adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],
   revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones'],
-  consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado'],
+  consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado','Categoria_IA','Guia_Provisional','Prioridad'],
   configReservas:         ['ID_Equipo','Politica','Params_Template','Max_Horas','Antelacion_Min_Horas'],
   reservas:               ['ID_Reserva','ID_Equipo','Usuario','Fecha_Inicio','Fecha_Fin','Condiciones','Proposito','Estado','Aprobado_Por','Observaciones_Admin','Inicio_Real','Fin_Real'],
   registrosCabina:        ['ID_Registro','ID_Equipo','Usuario','Fecha','Hora_Inicio','Hora_Fin','Practica_Tecnica','Nivel_Riesgo','Verificacion_Previa','Descontaminacion_Posterior','Incidencias','Estado'],

@@ -39,11 +39,55 @@
 | garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
 
 ## Consultas de residuo desconocido
+- `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado
 - Banner en dashboard para Gestor/Admin cuando hay consultas pendientes
 - Stat card en dashboard: "Residuos por clasificar"
-- Cuando la búsqueda no encuentra resultados: mensaje "No lo tires todavía" + botón "Avisar a la gestora"
-- Desde el panel de consultas: botón "＋ Añadir a guía" abre modal de nuevo tipo con descripción pre-rellenada
+- Cuando la búsqueda no encuentra resultados: mensaje "No lo tires todavía" + botón "Avisar a la gestora" (camino manual, sigue existiendo como fallback)
+- Panel de consultas (`renderPanelConsultasResiduo`, Gestor/Admin): ordena `Prioridad='Alta'` primero, muestra badge rojo "PRIORIDAD ALTA" y badge "IA: <categoría>", y un extracto de la guía provisional ya dada
+- Desde el panel de consultas: botón "＋ Añadir a guía" abre modal de nuevo tipo con descripción pre-rellenada y, si `Categoria_IA` coincide con un valor canónico de `_GHS`, pre-marca ese riesgo
+
+## Consultorio de residuos (IA)
+
+Camino principal para identificar un residuo, en `residuos-guia` (botón "💬 Abrir consultorio de
+residuos" → `abrirChatResiduo()`, `js/residuos.js`). Abierto a cualquier rol.
+
+1. El usuario elige su laboratorio actual en un `<select>` (poblado con los `Lab` que tienen al
+   menos un contenedor `activo`; se preselecciona si coincide con `_getLabsDeUbics()` del usuario).
+2. Describe el residuo en lenguaje natural. La IA (Gemini, `fetch()` directo desde el navegador —
+   ver `GEMINI_API_KEY` en `js/config.js`, pendiente de rellenar) recibe como contexto el catálogo
+   `DATA.tiposResiduo`, los contenedores activos de ese laboratorio y los avisos de
+   `_WARNINGS_FORMATO`, más un bloque de reglas de seguridad ("guardarraíles") que nunca puede
+   saltarse (nunca verter por el desagüe, nunca mezclar, tratamiento especial para químicos GHS,
+   biológico/cortopunzante, CMR/citotóxico, envases sin etiqueta, mezclas accidentales...).
+3. **Mecanismo de resuelto/escalada** — la respuesta de la IA debe empezar con una etiqueta
+   machine-parseable, detectada por regex ancladas al inicio (`_parseRespuestaChatResiduo` en
+   `js/residuos.js`), nunca por inferencia de lenguaje natural:
+   - `[RESUELTO]` → se muestra el resto, no se escala nada.
+   - `[NO_RESUELTO|categoria=<GHS o "Desconocido">|prioridad=<Alta|Normal>]` → se muestra el resto
+     y se llama automáticamente a la acción `crear_consulta` de `gestionar-residuo` con esos datos.
+   - Si la IA no respeta el formato: fail-safe, se trata igualmente como no resuelto con
+     `categoria_ia='Desconocido'` — mejor escalar de más que perder un caso real en silencio.
+4. Sin historial persistente (se borra al cerrar el modal). Sin `js/asistente.js` — todo vive en
+   `js/residuos.js` y el modal `modal-chat-residuo` de `html/modales-residuos.html`.
+
+## Validación de compatibilidad al añadir (server-side)
+
+`añadir_adicion` en `supabase/functions/gestionar-residuo/index.ts` valida, antes de insertar
+(bloqueo total, sin excepción de rol — ni Gestor ni Admin pueden forzarlo desde la app; aplica
+igual si se llega por selección manual que por escaneo NFC, porque ambos llaman a la misma acción):
+
+- **Nivel 1 — categoría**: el `Contenedor_Tipo` del tipo de residuo debe coincidir con la
+  `Categoria` del contenedor de destino.
+- **Nivel 2 — incompatibilidad GHS**: el `Riesgo` del nuevo residuo se compara contra el de los
+  tipos ya registrados en ese contenedor concreto (vía su historial en `Adiciones_Residuo`), usando
+  una matriz pequeña de pares incompatibles (Comburente↔Inflamable, Comburente↔Explosivo,
+  Corrosivo↔Comburente, Explosivo↔Inflamable, Explosivo↔Corrosivo) más una regla de categorías
+  exclusivas: Citotóxico y Cancerígeno/CMR nunca pueden convivir con ningún otro tipo de residuo
+  distinto en el mismo contenedor (añadir más del mismo tipo exacto sí está permitido).
+
+Si hay conflicto, la Edge Function devuelve 400 con un mensaje explicando qué ya hay dentro y por
+qué no es compatible; el cliente lo muestra vía `showToast` (patrón ya usado en todo el módulo).
 
 ## Etiquetas NFC/QR
 La URL codifica **categoría + lab** (no el ID del contenedor) → la etiqueta nunca necesita reprogramarse al cerrar un contenedor. `_checkPendingNfcAction()` en `ui.js` detecta los parámetros tras el login y redirige al modal de adición correcto.

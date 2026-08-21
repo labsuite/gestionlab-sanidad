@@ -270,8 +270,16 @@ create table consultas_residuo (
   usuario                text,
   descripcion            text,
   ubicacion_dejado       text,
-  estado                 text not null default 'Pendiente'
+  estado                 text not null default 'Pendiente',
+  categoria_ia           text,
+  guia_provisional       text,
+  prioridad              text not null default 'Normal'
 );
+
+-- Migración: columnas del consultorio IA de residuos (aplicar a mano en el proyecto ya desplegado)
+alter table consultas_residuo add column if not exists categoria_ia text;
+alter table consultas_residuo add column if not exists guia_provisional text;
+alter table consultas_residuo add column if not exists prioridad text not null default 'Normal';
 
 -- ============================================================
 -- 5. RESERVAS DE EQUIPOS

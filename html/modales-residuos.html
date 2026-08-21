@@ -192,3 +192,26 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL: Consultorio de residuos (chat IA) -->
+<div class="modal-overlay" id="modal-chat-residuo">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <div class="modal-title">🤖 Consultorio de residuos</div>
+      <button class="modal-close" onclick="cerrarChatResiduo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>¿En qué laboratorio estás ahora mismo? *</label>
+        <select id="chat-res-lab" onchange="_chatResSeleccionarLab()">
+          <option value="">— Selecciona tu laboratorio —</option>
+        </select>
+      </div>
+      <div id="chat-res-mensajes" style="display:none;max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin:12px 0;background:var(--surface2)"></div>
+      <div id="chat-res-input-row" style="display:none;gap:8px">
+        <input id="chat-res-texto" placeholder="Describe el residuo…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();_chatResEnviar();}">
+        <button class="btn btn-primary" onclick="_chatResEnviar()">Enviar</button>
+      </div>
+    </div>
+  </div>
+</div>

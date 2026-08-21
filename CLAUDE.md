@@ -260,60 +260,25 @@ Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
 
 ---
 
-### Asistente de IA guiado (Gemini Flash)
+### Consultorio de residuos (Gemini) — implementado, pendiente la clave de API
 
-Añadir un asistente de IA contextual accesible desde cualquier página de la app.
+El antiguo plan de "asistente de IA guiado" genérico (6 temas, botón flotante) se descartó sin
+llegar a implementarse. En su lugar se implementó un **consultorio de residuos** enfocado, dentro
+de `residuos-guia` (`js/residuos.js`, funciones `abrirChatResiduo` / `_chatRes*`) — ver
+`docs/modulo-residuos.md` para el diseño completo (guardarraíles del prompt, mecanismo de
+etiquetas `[RESUELTO]`/`[NO_RESUELTO|...]`, validación de compatibilidad al añadir a un
+contenedor). No hay `js/asistente.js` ni `html/modal-asistente.html` — todo vive en
+`js/residuos.js` y `html/modales-residuos.html`.
 
-#### Requisito previo (usuario)
+**Pendiente (usuario):** `GEMINI_API_KEY` en `js/config.js` está vacía. Sin ella el chat muestra
+un error claro en vez de fallar en silencio. Para activarlo:
 1. Ir a [Google AI Studio](https://aistudio.google.com/) → "Get API key" → copiar la clave (formato `AIza…`).
 2. En Google Cloud Console → "Credenciales" → hacer clic en la clave → "Restricciones de aplicación" → "Referentes HTTP" → añadir `https://palomafedez.github.io/*`.
 3. En "Cuotas" del servicio "Generative Language API", poner un límite diario razonable (p.ej. 500 peticiones/día).
-4. Proporcionar la clave a Claude para incluirla en `js/config.js` como `GEMINI_API_KEY`.
+4. Proporcionar la clave a Claude para pegarla en `js/config.js` (`GEMINI_API_KEY`).
+5. **Antes de fijar el nombre del modelo en `_llamarGemini()`** (`js/residuos.js`), comprobar cuál está vigente con `GET https://generativelanguage.googleapis.com/v1beta/models?key=...` (filtrando por `supportedGenerationMethods` que incluya `generateContent`) — Google retira modelos con relativa frecuencia, no dar por bueno el nombre que haya en el código si lleva tiempo sin tocarse.
 
-#### Archivos a crear/modificar
-- **`js/asistente.js`** — lógica completa (nuevo archivo)
-- **`html/modal-asistente.html`** — HTML del modal (nuevo archivo)
-- **`css/styles.css`** — estilos del botón flotante y el modal
-- **`index.html`** — cargar `asistente.js` al final; cargar `modal-asistente.html`; añadir `<button id="btn-asistente">` antes de `</body>`
-- **`js/config.js`** — añadir constante `GEMINI_API_KEY`
-
-#### Interfaz de usuario
-- **Botón flotante** en esquina inferior derecha, solo tras login: icono 🤖, circular, color `var(--primary)`.
-- Al hacer clic: modal centrado (~560px). Dos pantallas:
-  1. **Selección de tema** — grid de 6 tarjetas.
-  2. **Chat** — área de mensajes + campo de texto + botón Enviar + botón "← Volver".
-- El historial se borra al cambiar de tema o al cerrar el modal.
-
-#### Temas y contexto inyectado
-| Tema | Icono | Contexto inyectado |
-|---|---|---|
-| Residuos | 🧪 | `DATA.tiposResiduo` (ID, nombre, Riesgo GHS, contenedor_tipo) + contenedores activos |
-| Uso de equipos | ⚙️ | Ficha del equipo seleccionado (tipo, marca, modelo, ubicación, Protocolo_Uso, estado) |
-| Mantenimiento | 🔧 | Planes del equipo + tipos de intervención canónicos + últimos 10 registros |
-| Resultados analíticos | 📊 | Solo prompt genérico sobre técnicas de laboratorio clínico y anatomía patológica |
-| Gestión de incidencias | 🚨 | Tipos de intervención canónicos + estados de equipos (ID, tipo, estado, ubicación) |
-| Búsqueda de SAT | 📋 | Marca y modelo del equipo; Gemini sugiere cómo localizar el SAT oficial en España |
-
-Para "Uso de equipos", "Mantenimiento" y "Búsqueda de SAT": mostrar `<select>` con equipos antes de activar el chat.
-
-#### Llamada a la API de Gemini
-```js
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${GEMINI_API_KEY}`;
-const body = {
-  contents: _chatHistory, // [{role:'user'|'model', parts:[{text:'...'}]}]
-  generationConfig: { maxOutputTokens: 1024, temperature: 0.3 }
-};
-// _chatHistory[0]: mensaje de sistema como role:'user' + respuesta ficticia role:'model' "Entendido."
-```
-Respuesta en `response.candidates[0].content.parts[0].text`. Mostrar spinner mientras espera.
-
-#### Lo que NO hacer
-- No historial persistente (sin localStorage, sin Sheets).
-- No enviar el contenido completo de todas las hojas — solo los campos relevantes.
-- Usar siempre el modelo "flash" más barato/ligero disponible, nunca uno "pro" — pero **antes de escribir el nombre del modelo en código, comprobar cuál es vigente** con `GET https://generativelanguage.googleapis.com/v1beta/models?key=...` (filtrando por `supportedGenerationMethods` que incluya `generateContent`). Google retira modelos con relativa frecuencia — `gemini-1.5-flash` y `gemini-2.5-flash` ya no existían en agosto de 2026 pese a estar documentados aquí; no dar por bueno un nombre de modelo solo porque aparece en este fichero o en conversaciones antiguas.
-- No enviar datos personales de usuarios a Gemini.
-
-`asistente.js` se carga después de `reservas.js` (al final de todo).
+No enviar datos personales de usuarios a Gemini. Sin historial persistente (se borra al cerrar el modal).
 
 ---
 

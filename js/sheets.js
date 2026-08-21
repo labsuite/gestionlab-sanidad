@@ -404,6 +404,9 @@ function _consultaResiduoSbToObj(c) {
     Descripcion: c.descripcion || '',
     Ubicacion_Dejado: c.ubicacion_dejado || '',
     Estado: c.estado || 'Pendiente',
+    Categoria_IA: c.categoria_ia || '',
+    Guia_Provisional: c.guia_provisional || '',
+    Prioridad: c.prioridad || 'Normal',
   };
 }
 

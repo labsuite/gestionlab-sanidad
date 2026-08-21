@@ -79,6 +79,14 @@ function renderResiduosGuia() {
   const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
   el.innerHTML = `
     <div id="panel-consultas-residuo"></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <div class="card-title">🤖 ¿No sabes qué es o dónde tirarlo?</div>
+      </div>
+      <div style="padding:14px 18px">
+        <button class="btn btn-primary" onclick="abrirChatResiduo()">💬 Abrir consultorio de residuos</button>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <input type="text" id="res-search" class="form-input"
         placeholder="Buscar residuo, descripción o contenedor…"
@@ -567,7 +575,8 @@ function renderPanelConsultasResiduo() {
   const contenedor = document.getElementById('panel-consultas-residuo');
   if (!contenedor) return;
   const rol = getUserRole();
-  const pendientes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente');
+  const pendientes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente')
+    .sort((a, b) => (b.Prioridad === 'Alta') - (a.Prioridad === 'Alta'));
   if ((rol !== 'Administrador' && rol !== 'Gestor') || !pendientes.length) {
     contenedor.style.display = 'none';
     return;
@@ -581,9 +590,15 @@ function renderPanelConsultasResiduo() {
       </div>
       ${pendientes.map(c => {
         const idx = DATA.consultasResiduo.indexOf(c);
-        return `<div style="border-top:1px solid var(--border);padding:10px 0;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
+        const esAlta = c.Prioridad === 'Alta';
+        return `<div style="border-top:1px solid var(--border);${esAlta ? 'background:#fef2f2;' : ''}padding:10px 8px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
           <div>
-            <div style="font-size:13px;font-weight:500;margin-bottom:3px">${c.Descripcion}</div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:3px">
+              ${esAlta ? '<span style="background:#dc2626;color:#fff;border-radius:8px;padding:1px 7px;font-size:11px;margin-right:6px">PRIORIDAD ALTA</span>' : ''}
+              ${c.Categoria_IA ? `<span style="background:#e0e7ff;color:#3730a3;border-radius:8px;padding:1px 7px;font-size:11px;margin-right:6px">IA: ${c.Categoria_IA}</span>` : ''}
+              ${c.Descripcion}
+            </div>
+            ${c.Guia_Provisional ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin-bottom:3px">Guía provisional ya dada: "${c.Guia_Provisional.slice(0,140)}${c.Guia_Provisional.length>140?'…':''}"</div>` : ''}
             <div style="font-size:12px;color:var(--text-muted)">
               📍 ${c.Ubicacion_Dejado || '—'} &nbsp;·&nbsp; 👤 ${c.Usuario || '—'} &nbsp;·&nbsp; 📅 ${formatDate(c.Fecha)||c.Fecha||'—'}
             </div>
@@ -604,6 +619,11 @@ function abrirModalTipoDesdeConsulta(idxConsulta) {
   if (!c) return;
   openModalTipoResiduo();
   sv('tr-descripcion', c.Descripcion || '');
+  if (c.Categoria_IA && _GHS[c.Categoria_IA]) {
+    document.querySelectorAll('#tr-riesgo-checks input[type=checkbox]').forEach(cb => {
+      cb.checked = (cb.value === c.Categoria_IA);
+    });
+  }
 }
 
 async function resolverConsultaResiduo(idx) {
@@ -619,6 +639,195 @@ async function resolverConsultaResiduo(idx) {
     showToast('Consulta marcada como resuelta', 'success');
   } catch(e) { showToast(e.message || 'Error al actualizar', 'error'); console.error(e); }
   hideLoading();
+}
+
+// ── Consultorio de residuos (chat IA) ────────────────────────
+let _chatResLab = '';
+let _chatResHistory = [];   // [{role:'user'|'model', parts:[{text}]}] — turno 0 es el system prompt disfrazado
+
+function abrirChatResiduo() {
+  _chatResLab = '';
+  _chatResHistory = [];
+  document.getElementById('chat-res-mensajes').style.display = 'none';
+  document.getElementById('chat-res-mensajes').innerHTML = '';
+  document.getElementById('chat-res-input-row').style.display = 'none';
+
+  const labsConContenedor = [...new Set(
+    DATA.contenedoresResiduo.filter(c => (c.Estado || 'activo') === 'activo').map(c => c.Lab).filter(Boolean)
+  )].sort();
+  const sel = document.getElementById('chat-res-lab');
+  sel.innerHTML = '<option value="">— Selecciona tu laboratorio —</option>' +
+    labsConContenedor.map(l => `<option value="${l}">Lab ${l}</option>`).join('');
+
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const usuarioFila = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const misLabs = _getLabsDeUbics(usuarioFila?.Ubicaciones_Asignadas || '');
+  const preferido = misLabs.find(l => labsConContenedor.includes(l));
+  if (preferido) sel.value = preferido;
+
+  openModal('modal-chat-residuo');
+  if (preferido) _chatResSeleccionarLab();
+}
+
+function cerrarChatResiduo() {
+  closeModal('modal-chat-residuo');
+  _chatResHistory = [];
+}
+
+function _chatResSeleccionarLab() {
+  _chatResLab = v('chat-res-lab');
+  if (!_chatResLab) return;
+  document.getElementById('chat-res-mensajes').style.display = 'block';
+  document.getElementById('chat-res-input-row').style.display = 'flex';
+  document.getElementById('chat-res-mensajes').innerHTML = '';
+  _chatResHistory = [_construirSystemPromptResiduo(_chatResLab)];
+  _chatResPintarMensaje('model', 'Cuéntame qué residuo tienes y te digo dónde tirarlo o cómo manejarlo mientras tanto.');
+}
+
+function _chatResPintarMensaje(role, texto) {
+  const cont = document.getElementById('chat-res-mensajes');
+  const alineado = role === 'user' ? 'flex-end' : 'flex-start';
+  const bg = role === 'user' ? 'var(--primary)' : 'var(--surface)';
+  const color = role === 'user' ? '#fff' : 'var(--text)';
+  const div = document.createElement('div');
+  div.style.cssText = `display:flex;justify-content:${alineado};margin-bottom:8px`;
+  div.innerHTML = `<div style="max-width:80%;background:${bg};color:${color};padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;white-space:pre-wrap"></div>`;
+  div.firstElementChild.textContent = texto;
+  cont.appendChild(div);
+  cont.scrollTop = cont.scrollHeight;
+}
+
+function _construirSystemPromptResiduo(lab) {
+  const catalogo = DATA.tiposResiduo.map(t =>
+    `- ${t.Nombre} | Riesgo: ${t.Riesgo || 'ninguno'} | Contenedor: ${t.Contenedor_Tipo || 'sin asignar'}`
+  ).join('\n');
+  const contenedoresLab = DATA.contenedoresResiduo
+    .filter(c => (c.Estado || 'activo') === 'activo' && c.Lab === lab)
+    .map(c => `- Categoria: ${c.Categoria} | Formato: ${c.Formato || 'sin especificar'}`)
+    .join('\n') || '(No hay contenedores activos registrados en este laboratorio)';
+  const avisos = _WARNINGS_FORMATO.map(w => `- Si el contenedor es "${w.match}": ${w.texto}`).join('\n');
+
+  const systemText = `Eres el consultorio de residuos de un laboratorio de un instituto de FP sanitaria (CIFP Manuel Antonio). Un alumno, profesor o gestor te va a describir un residuo que quiere tirar. Tu trabajo es decirle en qué contenedor de este laboratorio concreto va, o si no hay un contenedor adecuado, darle instrucciones de manejo provisional seguras.
+
+CATÁLOGO DE TIPOS DE RESIDUO CONOCIDOS:
+${catalogo}
+
+CONTENEDORES ACTIVOS EN EL LABORATORIO ${lab}:
+${contenedoresLab}
+
+AVISOS POR FORMATO DE CONTENEDOR (inclúyelos si aplica):
+${avisos}
+
+REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
+- Nunca digas que se puede verter por el desagüe ni tirar a la basura general.
+- Nunca sugieras mezclar con el contenido de otro contenedor ni con otro residuo pendiente.
+- Siempre indica que debe quedarse en su propio envase cerrado y rotulado (qué es, quién, fecha) en la zona de residuos pendientes del laboratorio, alejado de calor, luz directa y otros reactivos.
+- Si el usuario describe derrame, olor fuerte, exposición o cualquier riesgo agudo inmediato: corta ahí mismo, di literalmente "Avisa ya a tu profesor/a presente, esto no se resuelve por chat" y no des más pasos.
+- Si es un químico con pictograma GHS conocido (inflamable, corrosivo, tóxico, comburente, explosivo, gas comprimido): nunca digas que abra el envase para identificarlo ni que lo trasvase; si hay burbujeo o presión, dile que avise sin esperar.
+- Si es biológico o cortopunzante (sangre, cultivos, agujas, bisturís): nunca digas que se manipule con la mano aunque lleve guantes, nunca reencapuchar una aguja, indicar usar pinzas.
+- Si es cancerígeno/CMR o citotóxico: nunca manipular sin doble guante, y este caso siempre es prioridad Alta.
+- Si el envase no tiene etiqueta o es de origen desconocido: trátalo siempre como el peor caso plausible, nunca decir que se huela o pruebe.
+- Si es una mezcla accidental de dos residuos incompatibles: nunca intentes que se separen, y esto siempre es prioridad Alta.
+
+FORMATO DE RESPUESTA — MUY IMPORTANTE, sigue esto exactamente:
+Si encuentras un contenedor adecuado en el catálogo/lista de arriba para este laboratorio, tu respuesta debe EMPEZAR literalmente con la etiqueta:
+[RESUELTO]
+seguida de la categoría de contenedor y el formato, y el aviso de formato si aplica.
+
+Si NO hay ningún tipo o contenedor compatible en este laboratorio, tu respuesta debe EMPEZAR literalmente con la etiqueta:
+[NO_RESUELTO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, o "Desconocido">|prioridad=<Alta o Normal>]
+seguida de las instrucciones de manejo provisional en texto libre, respetando siempre las reglas de arriba.
+
+Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta.`;
+
+  return [
+    { role: 'user', parts: [{ text: systemText }] },
+    { role: 'model', parts: [{ text: 'Entendido.' }] },
+  ];
+}
+
+async function _chatResEnviar() {
+  const texto = v('chat-res-texto');
+  if (!texto) return;
+  sv('chat-res-texto', '');
+  _chatResPintarMensaje('user', texto);
+  _chatResHistory.push({ role: 'user', parts: [{ text: texto }] });
+
+  _chatResPintarMensaje('model', '…');
+  try {
+    const respuesta = await _llamarGemini(_chatResHistory);
+    document.getElementById('chat-res-mensajes').lastElementChild.remove();
+    _chatResHistory.push({ role: 'model', parts: [{ text: respuesta }] });
+    await _chatResProcesarRespuesta(respuesta);
+  } catch (e) {
+    document.getElementById('chat-res-mensajes').lastElementChild.remove();
+    _chatResPintarMensaje('model', 'No he podido conectar con el asistente. Si es urgente, avisa directamente a tu profesor/a. También puedes usar el aviso manual a la gestora.');
+    console.error(e);
+  }
+}
+
+async function _llamarGemini(history) {
+  if (!GEMINI_API_KEY) throw new Error('Consultorio de IA no configurado todavía (falta GEMINI_API_KEY)');
+  const GEMINI_MODEL = 'gemini-flash-latest'; // ⚠️ Verificar contra GET /v1beta/models antes de fijar en producción
+  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const res = await fetch(GEMINI_URL, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ contents: history, generationConfig: { maxOutputTokens: 1024, temperature: 0.2 } }),
+  });
+  if (!res.ok) throw new Error(`Gemini respondió ${res.status}`);
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Respuesta vacía de Gemini');
+  return text;
+}
+
+// Función pura: interpreta la respuesta de la IA. Mecanismo robusto y no ambiguo —
+// la etiqueta va anclada al principio de la respuesta, no se infiere del lenguaje natural.
+// Si la IA no respeta el formato, se trata como no resuelto (fail-safe: mejor escalar
+// de más que perder un caso real sin avisar a Gestión).
+function _parseRespuestaChatResiduo(texto) {
+  const resuelto = /^\[RESUELTO\]/.exec(texto);
+  if (resuelto) {
+    return { resuelto: true, cuerpo: texto.replace(/^\[RESUELTO\]\s*/, '') };
+  }
+  const noResuelto = /^\[NO_RESUELTO\|categoria=([^|]+)\|prioridad=(Alta|Normal)\]/.exec(texto);
+  if (noResuelto) {
+    return {
+      resuelto: false,
+      categoria: noResuelto[1].trim(),
+      prioridad: noResuelto[2],
+      cuerpo: texto.replace(/^\[NO_RESUELTO\|[^\]]+\]\s*/, ''),
+    };
+  }
+  return { resuelto: false, categoria: 'Desconocido', prioridad: 'Normal', cuerpo: texto };
+}
+
+async function _chatResProcesarRespuesta(texto) {
+  const parsed = _parseRespuestaChatResiduo(texto);
+  _chatResPintarMensaje('model', parsed.cuerpo);
+  if (!parsed.resuelto) {
+    await _chatResEscalarAConsulta(parsed.cuerpo, parsed.categoria, parsed.prioridad);
+  }
+}
+
+async function _chatResEscalarAConsulta(guiaProvisional, categoriaIa, prioridad) {
+  try {
+    const ultimoMensajeUsuario = [..._chatResHistory].reverse().find(m => m.role === 'user' && !m.parts[0].text.startsWith('Eres el consultorio'));
+    const { consulta } = await callEdgeFunction('gestionar-residuo', {
+      accion: 'crear_consulta',
+      descripcion: `[Consultorio IA] ${ultimoMensajeUsuario?.parts[0].text || '(sin descripción)'} (Lab ${_chatResLab})`,
+      ubicacion_dejado: `Lab ${_chatResLab} (zona de residuos pendientes)`,
+      usuario: currentUser?.name || currentUser?.email || '',
+      categoria_ia: categoriaIa, guia_provisional: guiaProvisional, prioridad,
+    });
+    DATA.consultasResiduo.push(_consultaResiduoSbToObj(consulta));
+    _updateBadgeResiduos();
+    renderPanelConsultasResiduo();
+    if (typeof renderDashboard === 'function') renderDashboard();
+    _chatResPintarMensaje('model', '✅ Se ha avisado a Gestión con esta información.');
+  } catch (e) {
+    console.error('No se pudo crear la consulta automática', e);
+  }
 }
 
 // ── NFC: generar URL para etiqueta de contenedor ─────────────
