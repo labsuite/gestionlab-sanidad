@@ -54,8 +54,9 @@ residuos" → `abrirChatResiduo()`, `js/residuos.js`). Abierto a cualquier rol.
 
 1. El usuario elige su laboratorio actual en un `<select>` (poblado con los `Lab` que tienen al
    menos un contenedor `activo`; se preselecciona si coincide con `_getLabsDeUbics()` del usuario).
-2. Describe el residuo en lenguaje natural. La IA (Gemini, `fetch()` directo desde el navegador —
-   ver `GEMINI_API_KEY` en `js/config.js`, pendiente de rellenar) recibe como contexto el catálogo
+2. Describe el residuo en lenguaje natural. La IA (Gemini, llamado vía la acción `consultar_ia`
+   de `gestionar-residuo` — la clave vive como secreto de servidor `GEMINI_API_KEY`, nunca en el
+   navegador ni en el repo; ver CLAUDE.md) recibe como contexto el catálogo
    `DATA.tiposResiduo`, los contenedores activos de ese laboratorio y los avisos de
    `_WARNINGS_FORMATO`, más un bloque de reglas de seguridad ("guardarraíles") que nunca puede
    saltarse (nunca verter por el desagüe, nunca mezclar, tratamiento especial para químicos GHS,

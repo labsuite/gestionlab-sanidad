@@ -11,6 +11,35 @@ function generarId(prefijo: string): string {
   return prefijo + Date.now().toString(36).toUpperCase().slice(-6);
 }
 
+// gemini-1.5-flash y gemini-2.5-flash ya no están disponibles para claves nuevas (Google
+// los retiró) — mismo modelo ya confirmado en supabase/functions/leer-documento-proveedor
+// el 2026-08-19. Si esto vuelve a dar 404 "is not found for API version v1beta", comprobar
+// modelos vigentes con GET /v1beta/models?key=... antes de asumir otra causa.
+const GEMINI_MODELO = "gemini-3.6-flash";
+
+// La clave nunca sale de este servidor — el chat del consultorio de residuos
+// (js/residuos.js) manda aquí el historial y solo recibe el texto de vuelta.
+async function llamarGeminiChat(history: unknown): Promise<string> {
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
+  if (!geminiKey) throw new Error("Falta configurar GEMINI_API_KEY en los secretos del proyecto");
+  const respuesta = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: history, generationConfig: { maxOutputTokens: 1024, temperature: 0.2 } }),
+    },
+  );
+  if (!respuesta.ok) {
+    const detalle = await respuesta.text().catch(() => "");
+    throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+  }
+  const data = await respuesta.json();
+  const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
+  return texto;
+}
+
 // ── Compatibilidad de residuos dentro de un mismo contenedor ──
 // Valores idénticos letra por letra a las claves de _GHS en js/residuos.js.
 const GHS_INCOMPATIBLES: [string, string][] = [
@@ -135,6 +164,23 @@ Deno.serve(async (req) => {
     if (errCont) return jsonError(`Adición guardada pero no se pudo actualizar el nivel: ${errCont.message}`, 400);
 
     return jsonOk({ adicion, contenedor });
+  }
+
+  // ── Consultorio de residuos: proxy del chat con Gemini (cualquier sesión válida) ──
+  if (accion === "consultar_ia") {
+    const { error: authError } = await requireValidSession(req);
+    if (authError) return authError;
+
+    const history = body.history;
+    if (!Array.isArray(history) || !history.length) {
+      return jsonError("history es obligatorio (array de turnos role/parts)", 400);
+    }
+    try {
+      const texto = await llamarGeminiChat(history);
+      return jsonOk({ texto });
+    } catch (e) {
+      return jsonError(e instanceof Error ? e.message : "Error al consultar la IA", 502);
+    }
   }
 
   // ── Consulta de residuo desconocido (cualquiera puede avisar) ──

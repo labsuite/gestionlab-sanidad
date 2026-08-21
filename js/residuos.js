@@ -766,19 +766,13 @@ async function _chatResEnviar() {
   }
 }
 
+// La clave de Gemini nunca toca el navegador: vive como secreto de servidor
+// (Deno.env GEMINI_API_KEY, ya configurado en el proyecto Supabase — el mismo
+// que usa supabase/functions/leer-documento-proveedor). Este helper solo llama
+// a la Edge Function, que es quien de verdad habla con Gemini.
 async function _llamarGemini(history) {
-  if (!GEMINI_API_KEY) throw new Error('Consultorio de IA no configurado todavía (falta GEMINI_API_KEY)');
-  const GEMINI_MODEL = 'gemini-flash-latest'; // ⚠️ Verificar contra GET /v1beta/models antes de fijar en producción
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  const res = await fetch(GEMINI_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ contents: history, generationConfig: { maxOutputTokens: 1024, temperature: 0.2 } }),
-  });
-  if (!res.ok) throw new Error(`Gemini respondió ${res.status}`);
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!text) throw new Error('Respuesta vacía de Gemini');
-  return text;
+  const { texto } = await callEdgeFunction('gestionar-residuo', { accion: 'consultar_ia', history });
+  return texto;
 }
 
 // Función pura: interpreta la respuesta de la IA. Mecanismo robusto y no ambiguo —

@@ -11,11 +11,6 @@ const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
 const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
 const _sbMigracion = supabase.createClient(SUPABASE_MIGRACION_URL, SUPABASE_MIGRACION_ANON);
 
-// Consultorio de residuos (Gemini) — pendiente: pegar aquí la clave de Google AI Studio,
-// restringida por referrer HTTP a https://palomafedez.github.io/* (ver CLAUDE.md). Sin
-// clave, el chat del consultorio muestra un error claro en vez de fallar en silencio.
-const GEMINI_API_KEY = '';
-
 // ============================================================
 // ESTADO GLOBAL
 // ============================================================

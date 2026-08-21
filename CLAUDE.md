@@ -260,7 +260,7 @@ Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
 
 ---
 
-### Consultorio de residuos (Gemini) — implementado, pendiente la clave de API
+### Consultorio de residuos (Gemini) — implementado y activo
 
 El antiguo plan de "asistente de IA guiado" genérico (6 temas, botón flotante) se descartó sin
 llegar a implementarse. En su lugar se implementó un **consultorio de residuos** enfocado, dentro
@@ -270,13 +270,25 @@ etiquetas `[RESUELTO]`/`[NO_RESUELTO|...]`, validación de compatibilidad al añ
 contenedor). No hay `js/asistente.js` ni `html/modal-asistente.html` — todo vive en
 `js/residuos.js` y `html/modales-residuos.html`.
 
-**Pendiente (usuario):** `GEMINI_API_KEY` en `js/config.js` está vacía. Sin ella el chat muestra
-un error claro en vez de fallar en silencio. Para activarlo:
-1. Ir a [Google AI Studio](https://aistudio.google.com/) → "Get API key" → copiar la clave (formato `AIza…`).
-2. En Google Cloud Console → "Credenciales" → hacer clic en la clave → "Restricciones de aplicación" → "Referentes HTTP" → añadir `https://palomafedez.github.io/*`.
-3. En "Cuotas" del servicio "Generative Language API", poner un límite diario razonable (p.ej. 500 peticiones/día).
-4. Proporcionar la clave a Claude para pegarla en `js/config.js` (`GEMINI_API_KEY`).
-5. **Antes de fijar el nombre del modelo en `_llamarGemini()`** (`js/residuos.js`), comprobar cuál está vigente con `GET https://generativelanguage.googleapis.com/v1beta/models?key=...` (filtrando por `supportedGenerationMethods` que incluya `generateContent`) — Google retira modelos con relativa frecuencia, no dar por bueno el nombre que haya en el código si lleva tiempo sin tocarse.
+**La clave de Gemini nunca vive en el navegador ni en el repo.** El chat (`js/residuos.js`,
+`_llamarGemini()`) llama a `callEdgeFunction('gestionar-residuo', {accion:'consultar_ia', history})`,
+y es la Edge Function (`llamarGeminiChat()` en `supabase/functions/gestionar-residuo/index.ts`)
+quien de verdad habla con Gemini, leyendo la clave de `Deno.env.get("GEMINI_API_KEY")` — el mismo
+secreto de servidor que ya usaba `leer-documento-proveedor` para leer facturas, configurado una
+vez en Supabase (`updated_at` 2026-08-18), nunca en un archivo con `git`.
+
+Se intentó primero un `fetch()` directo desde el navegador con la clave embebida en
+`js/config.js` (como describía este plan originalmente) y GitHub bloqueó el push por
+"push protection": la clave resultó ser de tipo "API Key ligada a una cuenta de servicio" de
+Google Cloud, no una API Key normal restringida por referrer — exponerla en el HTML público
+habría sido un riesgo real, no solo un secreto detectado por error. De ahí el cambio a proxy
+server-side: **cualquier integración futura con Gemini (o cualquier API de terceros) debe pasar
+por una Edge Function**, nunca por una clave incluida en JS/HTML servido desde GitHub Pages.
+
+Modelo usado: `gemini-3.6-flash` (constante `GEMINI_MODELO` en el Edge Function, igual que
+`leer-documento-proveedor` — confirmado vigente el 2026-08-19/21). Si en el futuro deja de
+responder, **volver a comprobar el modelo vigente** con `GET /v1beta/models?key=...` antes de
+cambiar el nombre a ciegas — Google puede retirar modelos con el tiempo.
 
 No enviar datos personales de usuarios a Gemini. Sin historial persistente (se borra al cerrar el modal).
 
