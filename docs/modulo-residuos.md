@@ -65,13 +65,19 @@ residuos" → `abrirChatResiduo()`, `js/residuos.js`). Abierto a cualquier rol.
    químicos GHS, biológico/cortopunzante, CMR/citotóxico, envases sin etiqueta, mezclas
    accidentales...) y una instrucción explícita de negarse a responder nada que no sea sobre
    residuos de laboratorio (ver etiqueta `[FUERA_DE_TEMA]` abajo).
-3. **`Contenedor_Tipo = "Aguas de laboratorio"`** — valor especial reservado (asignable desde el
-   mismo modal de "Nuevo tipo de residuo", sin cambios de esquema) para residuos acuosos de bajo
-   riesgo cuyo destino real y aprobado es el desagüe del laboratorio con agua abundante, **no** un
-   contenedor físico. La IA lo trata como `[RESUELTO]` directamente si el residuo coincide con uno
-   de estos, sin comprobar contenedores/laboratorios. Es la única excepción a "nunca desagüe"; la
-   IA nunca decide por su cuenta que algo más "parece" drenable — solo cuenta si el catálogo ya lo
-   marca así explícitamente. Hoy el catálogo no tiene ninguno definido todavía.
+3. **"Aguas Laboratorio" es un `Contenedor_Tipo` normal, no un caso especial** — ya existe como
+   categoría real con contenedores físicos activos (garrafas 20L en varios labs) para residuos
+   acuosos de bajo riesgo (buffers diluidos, colorantes acuosos, medios de cultivo sin DMSO...).
+   Se probó primero una excepción "sin contenedor físico" para esto y se descartó: el fallo real
+   detectado (residuo de tinción de Gram mal clasificado) no era de arquitectura, era que el
+   catálogo enviado a la IA solo incluía Nombre/Riesgo/Contenedor_Tipo, sin la `Descripcion` — y
+   ahí es donde vivían las pistas para desambiguar (p.ej. "Colorantes acuosos diluidos... gram
+   acuosos etc."). Ahora `catalogo` en `_construirSystemPromptResiduo` incluye también el
+   `Detalle` (Descripcion), y se instruye a la IA a preguntar para aclarar si la descripción del
+   usuario podría encajar con más de un tipo con `Contenedor_Tipo` distinto, en vez de adivinar.
+   La excepción a "nunca desagüe" queda ligada a lo que la propia `Descripcion` del tipo ya
+   dice explícitamente (algunas entradas, como los calibradores de pHmetro, ya traen su propia
+   condición de vertido directo escrita por Gestión) — la IA nunca la generaliza a otros residuos.
 4. **Mecanismo de resuelto/escalada** — la respuesta de la IA debe empezar con una de tres
    etiquetas machine-parseable, detectadas por regex ancladas al inicio (tolerantes a espacios/
    saltos de línea, `_parseRespuestaChatResiduo` en `js/residuos.js`), nunca por inferencia de
