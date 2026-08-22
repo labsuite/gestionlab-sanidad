@@ -146,12 +146,13 @@ function renderDashboard() {
 // ============================================================
 // EQUIPOS — RENDER
 // ============================================================
-let _filtroEquipos = '', _filtroEquiposEstado = '', _filtroEquiposModulo = '';
+let _filtroEquipos = '', _filtroEquiposEstado = '', _filtroEquiposModulo = '', _filtroEquiposUbicacion = '';
 
-function renderEquipos(filtro, filtroEstado, filtroModulo) {
+function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
   if (filtro !== undefined) _filtroEquipos = filtro;
   if (filtroEstado !== undefined) _filtroEquiposEstado = filtroEstado;
   if (filtroModulo !== undefined) _filtroEquiposModulo = filtroModulo;
+  if (filtroUbicacion !== undefined) _filtroEquiposUbicacion = filtroUbicacion;
   const tbody = document.getElementById('tabla-equipos');
   let items = DATA.equipos;
   if (_filtroEquipos) items = items.filter(e => JSON.stringify(e).toLowerCase().includes(_filtroEquipos.toLowerCase()));
@@ -160,11 +161,20 @@ function renderEquipos(filtro, filtroEstado, filtroModulo) {
     const q = _filtroEquiposModulo.toLowerCase();
     items = items.filter(e => (e.Modulos_Responsables || '').toLowerCase().includes(q));
   }
+  if (_filtroEquiposUbicacion) {
+    const q = _filtroEquiposUbicacion.toLowerCase();
+    items = items.filter(e => (e.Ubicacion || '').toLowerCase().includes(q));
+  }
 
   const dlModulos = document.getElementById('equipos-modulos-datalist');
   if (dlModulos) {
     const modulos = [...new Set(DATA.equipos.flatMap(e => (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean)))].sort();
     dlModulos.innerHTML = modulos.map(m => `<option value="${_escAttr(m)}">`).join('');
+  }
+  const dlUbicaciones = document.getElementById('equipos-ubicaciones-datalist');
+  if (dlUbicaciones) {
+    const ubicaciones = [...new Set(DATA.equipos.map(e => e.Ubicacion).filter(Boolean))].sort();
+    dlUbicaciones.innerHTML = ubicaciones.map(u => `<option value="${_escAttr(u)}">`).join('');
   }
 
   if (!items.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🔬</div><div class="empty-state-title">Sin equipos registrados</div><div class="empty-state-text">Añade el primer equipo con el botón superior</div></div></td></tr>`; return; }
@@ -336,6 +346,7 @@ function buildIntervencionesEquipo(equipoId) {
 function filtrarEquipos(val)       { renderEquipos(val, undefined); }
 function filtrarEquiposEstado(val) { renderEquipos(undefined, val); }
 function filtrarEquiposModulo(val) { renderEquipos(undefined, undefined, val); }
+function filtrarEquiposUbicacion(val) { renderEquipos(undefined, undefined, undefined, val); }
 
 // ============================================================
 // INTERVENCIONES — RENDER
