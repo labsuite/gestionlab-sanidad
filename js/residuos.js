@@ -716,7 +716,8 @@ CATÁLOGO DE TIPOS DE RESIDUO CONOCIDOS (usa también el "Detalle" para desambig
 tipos pueden sonar parecido en el nombre pero tener destinos distintos, p.ej. un mismo
 procedimiento de laboratorio puede generar más de un residuo con destinos diferentes; si la
 descripción del usuario podría encajar con más de un tipo del catálogo con Contenedor distinto,
-pregúntale para aclarar cuál es exactamente antes de responder, en vez de adivinar):
+pregúntale para aclarar cuál es exactamente antes de responder, en vez de adivinar — usando la
+etiqueta [PREGUNTA] descrita más abajo, nunca intentes meter la pregunta dentro de [RESUELTO] o [NO_RESUELTO]):
 ${catalogo}
 
 CONTENEDORES ACTIVOS EN EL LABORATORIO ${lab} (donde está el usuario ahora):
@@ -760,12 +761,14 @@ tu respuesta ENTERA debe ser únicamente la etiqueta [FUERA_DE_TEMA] seguida de 
 breve de que este consultorio solo sirve para decir dónde tirar residuos de laboratorio — nada más.
 
 FORMATO DE RESPUESTA — MUY IMPORTANTE, sigue esto exactamente. Tu respuesta debe EMPEZAR
-literalmente con una de estas tres etiquetas, sin ningún texto antes:
+literalmente con una de estas cuatro etiquetas, sin ningún texto antes, y debe ser BREVE
+(unas pocas frases, nunca una lista larga ni una explicación extensa):
 - [RESUELTO] → cuando hay contenedor adecuado (en este laboratorio o en otro), seguido de dónde está, el formato, y el aviso de formato si aplica.
 - [NO_RESUELTO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, o "Desconocido">|prioridad=<Alta o Normal>] → cuando describe un residuo real pero no hay ningún contenedor compatible en ningún laboratorio del centro, seguido de las instrucciones de manejo provisional respetando siempre las reglas de arriba.
+- [PREGUNTA] → cuando la descripción del usuario es ambigua entre varios tipos del catálogo con destino distinto y necesitas que aclare antes de poder responder, seguido de UNA sola pregunta corta y concreta (no una lista larga de opciones). No es un caso resuelto ni escalado, la conversación sigue en el siguiente mensaje del usuario.
 - [FUERA_DE_TEMA] → cuando el mensaje no describe un residuo real a tirar, seguido solo del recordatorio, sin responder nada más.
 
-Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea esas tres.`;
+Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea esas cuatro.`;
 
   return [
     { role: 'user', parts: [{ text: systemText }] },
@@ -806,11 +809,13 @@ async function _llamarGemini(history) {
 
 // Función pura: interpreta la respuesta de la IA. Mecanismo robusto y no ambiguo —
 // la etiqueta va anclada al principio de la respuesta, no se infiere del lenguaje natural.
-// Tres desenlaces posibles ('resuelto' / 'no_resuelto' / 'fuera_de_tema'). Si la IA no
+// Cuatro desenlaces posibles ('resuelto' / 'no_resuelto' / 'pregunta' / 'fuera_de_tema').
+// 'pregunta' NO escala ni se da por perdido — la IA solo necesita que el usuario aclare algo,
+// la conversación sigue en el siguiente mensaje (el historial ya lo mantiene). Si la IA no
 // respeta el formato (no reconoce ninguna etiqueta), fail-safe: se trata como no_resuelto
 // —mejor escalar de más un caso real que perder uno sin avisar a Gestión— pero un mensaje
-// realmente fuera de tema casi siempre trae su propia etiqueta [FUERA_DE_TEMA] explícita,
-// así que no debería colar hasta el fail-safe salvo que la IA ignore las instrucciones.
+// realmente fuera de tema o una pregunta aclaratoria casi siempre traen su propia etiqueta
+// explícita, así que no deberían colar hasta el fail-safe salvo que la IA ignore las instrucciones.
 function _parseRespuestaChatResiduo(texto) {
   const limpio = (texto || '').trim();
   const resuelto = /^\[RESUELTO\]/.exec(limpio);
@@ -820,6 +825,10 @@ function _parseRespuestaChatResiduo(texto) {
   const fueraDeTema = /^\[FUERA_DE_TEMA\]/.exec(limpio);
   if (fueraDeTema) {
     return { tipo: 'fuera_de_tema', cuerpo: limpio.replace(/^\[FUERA_DE_TEMA\]\s*/, '') };
+  }
+  const pregunta = /^\[PREGUNTA\]/.exec(limpio);
+  if (pregunta) {
+    return { tipo: 'pregunta', cuerpo: limpio.replace(/^\[PREGUNTA\]\s*/, '') };
   }
   const noResuelto = /^\[NO_RESUELTO\|categoria=([^|]+)\|prioridad=(Alta|Normal)\]/.exec(limpio);
   if (noResuelto) {

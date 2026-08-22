@@ -27,7 +27,14 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: history, generationConfig: { maxOutputTokens: 1024, temperature: 0.2 } }),
+      body: JSON.stringify({
+        contents: history,
+        // thinkingLevel "low": sin esto, gemini-3.6-flash gasta una parte variable del
+        // presupuesto de tokens en "pensar" internamente antes de responder, y con
+        // maxOutputTokens ajustado el texto visible puede quedar cortado a media frase
+        // (visto en pruebas reales) — mismo ajuste ya usado en leer-documento-proveedor.
+        generationConfig: { maxOutputTokens: 2048, temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
+      }),
     },
   );
   if (!respuesta.ok) {
@@ -36,7 +43,9 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
   }
   const data = await respuesta.json();
   const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
+  const finishReason = data?.candidates?.[0]?.finishReason;
+  if (!texto) throw new Error(`Gemini no devolvió contenido interpretable (finishReason: ${finishReason || "desconocido"})`);
+  if (finishReason === "MAX_TOKENS") throw new Error("La respuesta de Gemini se cortó por longitud (MAX_TOKENS) — sube maxOutputTokens");
   return texto;
 }
 
