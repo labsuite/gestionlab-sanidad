@@ -36,6 +36,28 @@ function _esMomentoFin(plan) {
          op.startsWith('inspecci') && op.includes('limpieza');
 }
 
+// Curso académico ("2025-2026") → año de inicio numérico, para comparar ciclos multianuales
+function _añoInicioCurso(cursoAcademico) {
+  return parseInt(cursoAcademico.split('-')[0], 10);
+}
+
+// Nº de cursos que debe esperar cada periodicidad multianual antes de volver a pedirse
+const _CICLO_ANIOS = { 'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3 };
+
+// Para Bianual/Trianual: solo "debido" cuando han pasado N cursos desde el último
+// registro real de este plan. Si nunca se ha realizado, se sigue pidiendo cada curso
+// (para no perder el aviso a la espera de que alguien lo confirme la primera vez).
+function _esCursoDebidoMultianual(plan, cursoAcademico) {
+  const n = _CICLO_ANIOS[plan.Periodicidad];
+  if (!n) return true; // Anual u otra: sin restricción de ciclo
+  const cursosRealizados = DATA.registroMantenimientos
+    .filter(r => r.ID_Plan === plan.ID_Plan)
+    .map(r => _añoInicioCurso(r.Curso_Academico));
+  if (!cursosRealizados.length) return true;
+  const ultimoAño = Math.max(...cursosRealizados);
+  return _añoInicioCurso(cursoAcademico) - ultimoAño >= n;
+}
+
 function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   const [añoInicio, añoFin] = cursoAcademico.split('-').map(Number);
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -60,6 +82,7 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
     case 'Bianual':
     case 'Trianual':
     case 'Cada 2 años': {
+      if (!_esCursoDebidoMultianual(plan, cursoAcademico)) return [];
       const mes = _esMomentoFin(plan) ? mesesBase[mesesBase.length - 1] : mesesBase[0];
       return mesesPasados.some(m => m.str === mes.str) ? [mes.str] : [];
     }
@@ -639,6 +662,7 @@ async function exportarModeloCalidad(cursoAcademico) {
         return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
       }
       case 'Anual': case 'Bianual': case 'Trianual': case 'Cada 2 años': {
+        if (!_esCursoDebidoMultianual(plan, curso)) return [];
         const mes = _esMomentoFin(plan) ? meses[meses.length - 1] : meses[0];
         return [mes.str];
       }
