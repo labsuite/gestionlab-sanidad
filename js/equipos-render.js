@@ -146,15 +146,26 @@ function renderDashboard() {
 // ============================================================
 // EQUIPOS — RENDER
 // ============================================================
-let _filtroEquipos = '', _filtroEquiposEstado = '';
+let _filtroEquipos = '', _filtroEquiposEstado = '', _filtroEquiposModulo = '';
 
-function renderEquipos(filtro, filtroEstado) {
+function renderEquipos(filtro, filtroEstado, filtroModulo) {
   if (filtro !== undefined) _filtroEquipos = filtro;
   if (filtroEstado !== undefined) _filtroEquiposEstado = filtroEstado;
+  if (filtroModulo !== undefined) _filtroEquiposModulo = filtroModulo;
   const tbody = document.getElementById('tabla-equipos');
   let items = DATA.equipos;
   if (_filtroEquipos) items = items.filter(e => JSON.stringify(e).toLowerCase().includes(_filtroEquipos.toLowerCase()));
   if (_filtroEquiposEstado) items = items.filter(e => e.Estado_Operativo === _filtroEquiposEstado);
+  if (_filtroEquiposModulo) {
+    const q = _filtroEquiposModulo.toLowerCase();
+    items = items.filter(e => (e.Modulos_Responsables || '').toLowerCase().includes(q));
+  }
+
+  const dlModulos = document.getElementById('equipos-modulos-datalist');
+  if (dlModulos) {
+    const modulos = [...new Set(DATA.equipos.flatMap(e => (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean)))].sort();
+    dlModulos.innerHTML = modulos.map(m => `<option value="${_escAttr(m)}">`).join('');
+  }
 
   if (!items.length) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon">🔬</div><div class="empty-state-title">Sin equipos registrados</div><div class="empty-state-text">Añade el primer equipo con el botón superior</div></div></td></tr>`; return; }
 
@@ -324,6 +335,7 @@ function buildIntervencionesEquipo(equipoId) {
 
 function filtrarEquipos(val)       { renderEquipos(val, undefined); }
 function filtrarEquiposEstado(val) { renderEquipos(undefined, val); }
+function filtrarEquiposModulo(val) { renderEquipos(undefined, undefined, val); }
 
 // ============================================================
 // INTERVENCIONES — RENDER
