@@ -1065,16 +1065,23 @@ function _pasoDosImportarProfesores() {
     if (p.modulo) porEmail[email].modulos.add(p.modulo);
     if (p.laboratorio) porEmail[email].labs.add(p.laboratorio);
   });
-  _profesoresAImportar = Object.values(porEmail).map(p => ({
+  const todosLosSeleccionados = Object.values(porEmail).map(p => ({
     nombre: p.nombre, email: p.email, ciclo: p.ciclo,
     modulo: [...p.modulos].join(','), modulos: [...p.modulos], laboratorio: [...p.labs].join(','), labs: [...p.labs],
   }));
+  // Sin lab asignado en Sanidad CMA en ninguno de sus módulos => no se puede saber de qué
+  // equipos es responsable, así que no se importa (decisión de la usuaria, 2026-08-22).
+  const sinLab = todosLosSeleccionados.filter(p => !p.labs.length);
+  _profesoresAImportar = todosLosSeleccionados.filter(p => p.labs.length);
+
+  if (!_profesoresAImportar.length) {
+    showToast('Ninguno de los seleccionados tiene laboratorio asignado en Sanidad CMA — no se importa ninguno', 'error');
+    return;
+  }
 
   const cont = document.getElementById('importar-profesores-contenido');
   const tarjetasHtml = _profesoresAImportar.map(p => {
-    const equiposDeSusLabs = p.labs.length
-      ? DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)))
-      : [];
+    const equiposDeSusLabs = DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)));
 
     // Si el equipo tiene Módulo(s) responsable(s) etiquetado, solo se premarca cuando
     // coincide con alguno de los módulos de este profesor (evita marcar todo el lab
@@ -1100,11 +1107,9 @@ function _pasoDosImportarProfesores() {
         <div class="card-title">${p.nombre} <span style="font-weight:400;color:var(--text-muted)">(${p.email})</span></div>
       </div>
       <div style="padding:8px 16px 14px">
-        ${!p.labs.length
-          ? `<div style="font-size:12px;color:var(--text-muted)">Sus módulos seleccionados no tienen lab asignado en Sanidad CMA — no se puede sugerir equipos automáticamente. Se importará igualmente, sin marcarlo responsable de ningún equipo.</div>`
-          : !equiposDeSusLabs.length
-            ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
-            : `<table>
+        ${!equiposDeSusLabs.length
+          ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
+          : `<table>
                 <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Módulo(s)</th><th>Responsable(s) actual(es)</th></tr></thead>
                 <tbody>${filasEquipos}</tbody>
               </table>`}
@@ -1112,7 +1117,14 @@ function _pasoDosImportarProfesores() {
     </div>`;
   }).join('');
 
+  const avisoSinLab = sinLab.length
+    ? `<div style="margin-bottom:10px;font-size:13px;color:var(--text-orange, #b45309)">
+        ⚠️ No se importa${sinLab.length > 1 ? 'n' : ''}: ${sinLab.map(p => `${p.nombre} (${p.email})`).join(', ')} — ningún módulo suyo tiene laboratorio asignado en Sanidad CMA.
+      </div>`
+    : '';
+
   cont.innerHTML = `
+    ${avisoSinLab}
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
       Equipos sugeridos según el lab de sus módulos. Los que ya tienen un Módulo responsable etiquetado solo se premarcan si coincide con uno de los suyos; el resto se premarca por laboratorio, como hasta ahora. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
     </div>
