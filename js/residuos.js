@@ -775,6 +775,8 @@ Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea es
     { role: 'model', parts: [{ text: 'Entendido.' }] },
     { role: 'user', parts: [{ text: '¿Qué hora es en Tokio?' }] },
     { role: 'model', parts: [{ text: '[FUERA_DE_TEMA] Este consultorio solo sirve para decir dónde tirar residuos de laboratorio, no puedo ayudarte con eso. Cuéntame qué residuo tienes y te digo qué hacer con él.' }] },
+    { role: 'user', parts: [{ text: 'Tengo el líquido que quedó en el cristalizador tras hacer una tinción de Gram, ¿qué hago con él?' }] },
+    { role: 'model', parts: [{ text: '[PREGUNTA] Ese líquido puede ser el etanol decolorante o las aguas de enjuague acuosas, y cada uno va a un sitio distinto — ¿cuál de los dos es?' }] },
   ];
 }
 
