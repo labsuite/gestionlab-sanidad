@@ -94,6 +94,7 @@ function _equipoSbToObj(e) {
     Numero_Serie: e.numero_serie || '',
     Ubicacion: e.ubicacion || '',
     Responsable: e.responsable || '',
+    Modulos_Responsables: e.modulos_responsables || '',
     Fecha_Adquisicion: e.fecha_adquisicion || '',
     Origen_Financiacion: e.origen_financiacion || '',
     Proveedor_Compra: e.proveedor_compra || '',

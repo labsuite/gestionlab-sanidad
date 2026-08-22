@@ -1067,7 +1067,7 @@ function _pasoDosImportarProfesores() {
   });
   _profesoresAImportar = Object.values(porEmail).map(p => ({
     nombre: p.nombre, email: p.email, ciclo: p.ciclo,
-    modulo: [...p.modulos].join(','), laboratorio: [...p.labs].join(','), labs: [...p.labs],
+    modulo: [...p.modulos].join(','), modulos: [...p.modulos], laboratorio: [...p.labs].join(','), labs: [...p.labs],
   }));
 
   const cont = document.getElementById('importar-profesores-contenido');
@@ -1076,13 +1076,24 @@ function _pasoDosImportarProfesores() {
       ? DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)))
       : [];
 
-    const filasEquipos = equiposDeSusLabs.map(e => `
+    // Si el equipo tiene Módulo(s) responsable(s) etiquetado, solo se premarca cuando
+    // coincide con alguno de los módulos de este profesor (evita marcar todo el lab
+    // entero para equipos ya afinados, p.ej. el Coulter solo para Hematología).
+    // Si el equipo no tiene ninguna etiqueta todavía, se mantiene el fallback anterior
+    // (premarcado por laboratorio) para no perder cobertura mientras se va etiquetando.
+    const filasEquipos = equiposDeSusLabs.map(e => {
+      const modulosEquipo = (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean);
+      const coincideModulo = modulosEquipo.some(me => p.modulos.some(m => _normCiclo(m) === _normCiclo(me)));
+      const marcado = modulosEquipo.length ? coincideModulo : true;
+      return `
       <tr>
-        <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" value="${_escAttr(e.ID_Activo)}" checked></td>
+        <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" value="${_escAttr(e.ID_Activo)}" ${marcado ? 'checked' : ''}></td>
         <td>${e.Tipo_Equipo || '—'} ${e.Marca || ''} ${e.Modelo || ''} <span style="color:var(--text-muted)">(${e.ID_Activo})</span></td>
         <td>${e.Ubicacion || '—'}</td>
+        <td style="color:var(--text-muted);font-size:12px">${modulosEquipo.join(', ') || '—'}</td>
         <td style="color:var(--text-muted);font-size:12px">${e.Responsable || '—'}</td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
 
     return `<div class="card" style="margin-bottom:12px">
       <div class="card-header">
@@ -1094,7 +1105,7 @@ function _pasoDosImportarProfesores() {
           : !equiposDeSusLabs.length
             ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
             : `<table>
-                <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Responsable(s) actual(es)</th></tr></thead>
+                <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Módulo(s)</th><th>Responsable(s) actual(es)</th></tr></thead>
                 <tbody>${filasEquipos}</tbody>
               </table>`}
       </div>
@@ -1103,7 +1114,7 @@ function _pasoDosImportarProfesores() {
 
   cont.innerHTML = `
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
-      Equipos sugeridos según el lab de sus módulos. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
+      Equipos sugeridos según el lab de sus módulos. Los que ya tienen un Módulo responsable etiquetado solo se premarcan si coincide con uno de los suyos; el resto se premarca por laboratorio, como hasta ahora. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
     </div>
     ${tarjetasHtml}`;
 

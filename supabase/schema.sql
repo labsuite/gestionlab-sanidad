@@ -141,6 +141,7 @@ create table equipos (
   numero_serie                    text,
   ubicacion                       text,   -- sin FK: datos pendientes de limpiar (ver CLAUDE.md)
   responsable                     text,   -- nombres separados por coma, texto libre
+  modulos_responsables            text,   -- nombres de módulo separados por coma, texto libre — de qué módulo(s) depende el equipo (para premarcar responsables al importar profesorado de Sanidad CMA)
   fecha_adquisicion               text,   -- texto libre, no date: hay valores como "ND", "2015", "5/2016" en el origen
   origen_financiacion             text,
   proveedor_compra                text,   -- nombre libre, no FK: ver nota más abajo

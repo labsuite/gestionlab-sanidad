@@ -55,4 +55,19 @@ Botón **📥 Importar profesorado** junto al de alumnado (renombrado a "📥 Im
 - `confirmarImportarProfesores()` envía `{accion:'importar', profesores:[{nombre,email,ciclo,modulo,laboratorio,equipos_responsable:[id_activo,...]}]}`. La Edge Function crea usuarios+Auth+public.users igual que alumnado (rol `Profesor`), y por cada `id_activo` en `equipos_responsable` **añade** el nombre al campo `equipos.responsable` (split por coma, evita duplicados) sin pisar los responsables que ya hubiera.
 - Resultados: misma tabla de contraseñas temporales que alumnado, más una columna de equipos actualizados por profesor.
 
+**Afinado por módulo, no solo por laboratorio (2026-08-22):** la sugerencia por laboratorio
+tiene un problema en labs compartidos grandes (Lab 205 tiene 122 equipos): dos profesoras de
+especialidades distintas en el mismo lab (p.ej. Hematología y Microbiología) recibían
+exactamente el mismo checklist completo, obligando a desmarcar a mano equipos que no les
+correspondían (el Coulter no es de Microbiología, aunque esté en el mismo lab). Para
+resolverlo, `equipos` tiene ahora un campo opcional `Modulos_Responsables` (nombres de módulo
+separados por coma, editable en el modal de equipo igual que "Responsable(s)", con
+autocompletado sobre `DATA.ciclosModulos`). En `_pasoDosImportarProfesores()`
+(`js/ubicaciones.js`): si un equipo tiene módulo(s) etiquetado(s), solo se premarca cuando
+coincide con alguno de los módulos del profesor (comparación insensible a tildes/mayúsculas
+vía `_normCiclo`); si no tiene ninguno, se mantiene el comportamiento anterior (premarcado por
+laboratorio). La tabla del paso 2 ahora muestra también la columna "Módulo(s)" del equipo. Es
+un campo opcional de etiquetado progresivo: no hace falta rellenarlo en los 305 equipos de
+golpe, solo en los que compartan laboratorio con equipos de otras especialidades.
+
 **Historia de esta sesión, por si se repite:** la API de Sanidad CMA (`sanidade-cma-app.vercel.app`) tuvo en algún momento un problema aparente de doble codificación UTF-8 en `nombre`/`ciclo`/`modulo` — resultó ser un falso positivo: los bytes en origen ya eran UTF-8 correcto (verificado con inspección de bytes crudos), el mojibake era solo cómo lo mostraba la terminal local. El equipo de Sanidad CMA añadió igualmente `charset=utf-8` explícito al `Content-Type` como medida defensiva (no hacía falta para Deno `fetch().json()`, que decodifica UTF-8 siempre, pero no está de más).

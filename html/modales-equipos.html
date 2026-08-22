@@ -91,6 +91,22 @@
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Solo Administradores, Gestores y Profesores</div>
         </div>
         <div class="form-group">
+          <label>Módulo(s) responsable(s) <span class="label-hint">De qué módulo(s) depende este equipo — al importar profesorado de Sanidad CMA, solo se premarcará como responsable a quien imparta uno de estos módulos, en vez de a todo el laboratorio.</span></label>
+          <div style="position:relative" id="modulos-field-wrap">
+            <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;min-height:38px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--bg-card);cursor:text" id="modulos-wrap" onclick="document.getElementById('modulos-search').focus()">
+              <div id="modulos-tags" style="display:contents"></div>
+              <input type="text" id="modulos-search" placeholder="Buscar módulo…"
+                     style="border:none;outline:none;background:transparent;font-size:13px;min-width:160px;flex:1"
+                     oninput="filtrarModulosResponsables(this.value)"
+                     onfocus="filtrarModulosResponsables(this.value)"
+                     autocomplete="off">
+            </div>
+            <div class="autocomplete-list" id="modulos-autocomplete"></div>
+          </div>
+          <input type="hidden" id="eq-modulos-responsables">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Opcional — si se deja vacío, se sigue sugiriendo por laboratorio como hasta ahora</div>
+        </div>
+        <div class="form-group">
           <label>Fecha adquisición</label>
           <input id="eq-fecha-adq" type="date">
         </div>

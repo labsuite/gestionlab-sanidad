@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
       numero_serie: strField(body.numero_serie),
       ubicacion: strField(body.ubicacion),
       responsable: strField(body.responsable),
+      modulos_responsables: strField(body.modulos_responsables),
       fecha_adquisicion: strField(body.fecha_adquisicion),
       origen_financiacion: strField(body.origen_financiacion),
       proveedor_compra: strField(body.proveedor_compra),

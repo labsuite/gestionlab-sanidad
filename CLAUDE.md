@@ -203,9 +203,15 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 ## Tabla `equipos` — columnas
 
 id_activo, tipo_equipo, marca, modelo, numero_serie, ubicacion, responsable,
-fecha_adquisicion, origen_financiacion, proveedor_compra, proveedor_servicio_tecnico,
-estado_operativo, manual_ficha_tecnica, observaciones, coste, protocolo_uso,
-tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada.
+modulos_responsables, fecha_adquisicion, origen_financiacion, proveedor_compra,
+proveedor_servicio_tecnico, estado_operativo, manual_ficha_tecnica, observaciones, coste,
+protocolo_uso, tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada.
+
+`modulos_responsables` (añadido 2026-08-22): nombres de módulo separados por coma, texto
+libre, igual que `responsable`. De qué módulo(s) depende el equipo — se usa al importar
+profesorado desde Sanidad CMA para premarcar responsables por módulo coincidente en vez de
+por laboratorio entero (ver "Importar profesorado" en `docs/modulo-usuarios.md`). Campo
+opcional: si un equipo no lo tiene, se sigue premarcando por laboratorio como antes.
 
 Las columnas legado de Sheets (Periodicidad_Mantenimiento, Periodicidad_Custom,
 Fecha_Ultimo_Preventivo, Fecha_Proximo_Preventivo — sustituidas hace tiempo por

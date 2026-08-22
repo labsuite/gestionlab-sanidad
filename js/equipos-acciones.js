@@ -73,6 +73,72 @@ function _initResponsables(valor) {
   if (srch) srch.value = '';
 }
 
+// ============================================================
+// MULTI-TAG — MÓDULO(S) RESPONSABLE(S) DEL EQUIPO
+// Mismo patrón que Responsable(s), pero de qué módulo(s) depende el equipo
+// (para premarcar responsables al importar profesorado, ver _pasoDosImportarProfesores).
+// Almacena nombres de módulo en array y sincroniza con el input oculto #eq-modulos-responsables
+// ============================================================
+let _modulosResponsablesSelec = [];
+
+function _syncModulosResponsablesHidden() {
+  const hidden = document.getElementById('eq-modulos-responsables');
+  if (hidden) hidden.value = _modulosResponsablesSelec.join(', ');
+}
+
+function _renderModulosResponsablesTags() {
+  const container = document.getElementById('modulos-tags');
+  if (!container) return;
+  container.innerHTML = _modulosResponsablesSelec.map(nombre =>
+    `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:var(--accent-light);color:var(--accent);border-radius:20px;font-size:12px;font-weight:500">
+      ${nombre}
+      <span style="cursor:pointer;font-size:14px;line-height:1" onclick="_quitarModuloResponsable('${nombre.replace(/'/g, "\\'")}')">×</span>
+    </span>`
+  ).join('');
+  _syncModulosResponsablesHidden();
+}
+
+function _quitarModuloResponsable(nombre) {
+  _modulosResponsablesSelec = _modulosResponsablesSelec.filter(n => n !== nombre);
+  _renderModulosResponsablesTags();
+}
+
+function _agregarModuloResponsable(nombre) {
+  if (!_modulosResponsablesSelec.includes(nombre)) {
+    _modulosResponsablesSelec.push(nombre);
+    _renderModulosResponsablesTags();
+  }
+  const srch = document.getElementById('modulos-search');
+  if (srch) { srch.value = ''; }
+  const ac = document.getElementById('modulos-autocomplete');
+  if (ac) ac.classList.remove('open');
+}
+
+function filtrarModulosResponsables(val) {
+  const ac = document.getElementById('modulos-autocomplete');
+  if (!ac) return;
+  const q = (val || '').toLowerCase().trim();
+  const nombresModulo = [...new Set((DATA.ciclosModulos || []).map(cm => cm.Modulo).filter(Boolean))].sort();
+  const candidatos = nombresModulo.filter(m =>
+    !_modulosResponsablesSelec.includes(m) &&
+    (!q || m.toLowerCase().includes(q))
+  );
+  if (!candidatos.length) { ac.classList.remove('open'); return; }
+  ac.innerHTML = candidatos.map(m =>
+    `<div class="autocomplete-item" onclick="_agregarModuloResponsable('${m.replace(/'/g, "\\'")}')">
+      <div class="autocomplete-item-name">${m}</div>
+    </div>`
+  ).join('');
+  ac.classList.add('open');
+}
+
+function _initModulosResponsables(valor) {
+  _modulosResponsablesSelec = (valor || '').split(',').map(s => s.trim()).filter(Boolean);
+  _renderModulosResponsablesTags();
+  const srch = document.getElementById('modulos-search');
+  if (srch) srch.value = '';
+}
+
 
 
 // ============================================================
@@ -103,6 +169,7 @@ function openModalEquipo() {
   ['eq-marca','eq-modelo','eq-serie','eq-fecha-adq','eq-coste','eq-observaciones'].forEach(id => sv(id,''));
   ['eq-tipo','eq-financiacion','eq-proveedor-compra','eq-proveedor-sat'].forEach(id => sv(id,''));
   _initResponsables(''); // limpia tags responsable
+  _initModulosResponsables(''); // limpia tags módulos responsables
   sv('eq-estado','Operativo'); sv('eq-pdf-url','');
   sv('eq-protocolo-uso',''); sv('eq-mes-inicio',''); sv('eq-mes-fin','');
   document.getElementById('eq-pdf-preview').style.display = 'none';
@@ -130,7 +197,7 @@ function editEquipo(idx) {
   if (btnDesbloquearId) btnDesbloquearId.style.display = puedeHacer('editarEquipos') ? '' : 'none';
   sv('eq-tipo',e.Tipo_Equipo); sv('eq-marca',e.Marca);
   sv('eq-modelo',e.Modelo); sv('eq-serie',e.Numero_Serie); sv('eq-ubicacion',e.Ubicacion);
-  _initResponsables(e.Responsable); sv('eq-fecha-adq',e.Fecha_Adquisicion);
+  _initResponsables(e.Responsable); _initModulosResponsables(e.Modulos_Responsables); sv('eq-fecha-adq',e.Fecha_Adquisicion);
   sv('eq-financiacion',e.Origen_Financiacion); sv('eq-proveedor-compra',e.Proveedor_Compra);
   sv('eq-proveedor-sat',e.Proveedor_Servicio_Tecnico); sv('eq-estado',e.Estado_Operativo);
   sv('eq-observaciones',e.Observaciones);
@@ -890,7 +957,7 @@ async function guardarEquipo() {
   const datos = {
     id_activo: id, tipo_equipo: tipo, marca,
     modelo: v('eq-modelo'), numero_serie: v('eq-serie'), ubicacion: v('eq-ubicacion'),
-    responsable: v('eq-responsable'), fecha_adquisicion: v('eq-fecha-adq'),
+    responsable: v('eq-responsable'), modulos_responsables: v('eq-modulos-responsables'), fecha_adquisicion: v('eq-fecha-adq'),
     origen_financiacion: v('eq-financiacion'), proveedor_compra: v('eq-proveedor-compra'),
     proveedor_servicio_tecnico: v('eq-proveedor-sat'), estado_operativo: v('eq-estado'),
     manual_ficha_tecnica: manualUrl, observaciones: v('eq-observaciones'),
