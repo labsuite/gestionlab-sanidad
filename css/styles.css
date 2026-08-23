@@ -121,40 +121,49 @@
     }
 
     .sidebar-header {
-      padding: 24px 20px 20px;
+      padding: 20px 16px 18px;
       border-bottom: 1px solid var(--border);
     }
 
     .sidebar-logo {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 4px;
+      gap: 9px;
     }
 
     .sidebar-logo-icon {
-      width: 32px; height: 32px;
+      width: 34px; height: 34px;
       background: var(--accent);
-      border-radius: 8px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 15px;
       flex-shrink: 0;
+    }
+
+    .sidebar-logo-lockup {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      flex: 1 1 auto;
+      min-width: 0;
     }
 
     .sidebar-logo-text {
       font-family: 'DM Serif Display', serif;
-      font-size: 16px;
+      font-size: 20px;
+      line-height: 1.15;
       color: var(--text);
-      line-height: 1.2;
     }
 
     .sidebar-subtitle {
-      font-size: 11px;
+      font-size: 11.5px;
+      line-height: 1.3;
       color: var(--text-muted);
-      margin-top: 2px;
-      padding-left: 42px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .sidebar-nav { padding: 16px 12px; flex: 1; }
@@ -1256,7 +1265,7 @@
     overflow: visible;
   }
   .sidebar-header { padding: 16px 10px; }
-  .sidebar-logo-text, .sidebar-subtitle,
+  .sidebar-logo-text, .sidebar-subtitle, .sidebar-logo-lockup,
   .nav-section-label, .user-info, .btn-signout { display: none; }
   .sidebar-logo { justify-content: center; }
   .sidebar-logo-icon { margin: 0; }
@@ -1414,6 +1423,7 @@
   /* Restaurar textos que la tablet-landscape ocultaba */
   .sidebar-logo-text, .sidebar-subtitle,
   .nav-section-label, .user-info, .btn-signout { display: revert; }
+  .sidebar-logo-lockup { display: flex; }
   .nav-item span:not(.nav-icon):not(.nav-badge)  { display: revert; }
   .nav-item { justify-content: flex-start; padding: 6px 16px; }
   .sidebar-footer { padding: 8px 16px; }

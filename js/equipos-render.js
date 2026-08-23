@@ -43,7 +43,7 @@ function renderDashboard() {
     : esProfesor
       ? incAbiertas.filter(i => { const eq = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)); return eq ? esResponsableDeEquipo(eq) : false; })
       : [];
-  if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}</div></div></div>`;
+  if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('incidencias')"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.slice(0,3).map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}${incVisibles.length > 3 ? ' y ' + (incVisibles.length-3) + ' más...' : ''}</div></div></div>`;
 
   const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
   if (solPendientes.length && puedeHacer('gestionarPedidos')) {
