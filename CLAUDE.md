@@ -2,7 +2,7 @@
 
 App web de gestión de laboratorio para el CIFP Manuel Antonio (Vigo).
 Stack: JS vanilla + HTML/CSS, Supabase (Postgres + Auth + Storage + Edge Functions) como backend.
-URL de la app: `https://palomafedez.github.io/gestionlab-sanidad/`
+URL de la app: `https://labsuite.github.io/gestionlab-sanidad/`
 
 ---
 
