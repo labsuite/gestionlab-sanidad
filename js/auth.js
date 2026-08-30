@@ -33,15 +33,18 @@ async function initAuth() {
   }
 
   if (params.get('type') === 'recovery' && params.get('access_token')) {
+    const accessToken = params.get('access_token');
     let ok = false;
-    try {
-      const { error } = await _sbMigracion.auth.setSession({
-        access_token: params.get('access_token'),
-        refresh_token: params.get('refresh_token') || ''
-      });
-      ok = !error;
-    } catch (e) {
-      ok = false;   // token corrupto o caducado: setSession puede lanzar
+    if (_pareceJWT(accessToken)) {
+      try {
+        const { error } = await _sbMigracion.auth.setSession({
+          access_token: accessToken,
+          refresh_token: params.get('refresh_token') || ''
+        });
+        ok = !error;
+      } catch (e) {
+        ok = false;   // token caducado/rechazado: setSession puede lanzar
+      }
     }
     _limpiarHashAuth();
     if (!ok) {
@@ -235,6 +238,22 @@ function _mostrarPantallaNuevaPassword() {
   const auth = document.getElementById('auth-screen');    if (auth) auth.style.display = 'none';
   const noAuth = document.getElementById('no-auth-screen'); if (noAuth) noAuth.style.display = 'none';
   const rec = document.getElementById('recovery-screen'); if (rec) rec.style.display = 'flex';
+}
+
+// ¿Tiene pinta de JWT válido (3 segmentos base64url con payload JSON legible)?
+// Evita pasarle a setSession() un token corrupto, que puede colgarse o lanzar
+// un "Invalid UTF-8 sequence" sin capturar.
+function _pareceJWT(token) {
+  if (!token || typeof token !== 'string') return false;
+  const partes = token.split('.');
+  if (partes.length !== 3) return false;
+  try {
+    const payload = partes[1].replace(/-/g, '+').replace(/_/g, '/');
+    JSON.parse(atob(payload));
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 function _limpiarHashAuth() {
