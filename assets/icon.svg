@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2d5a3d"/>
+  <g transform="translate(0,8)">
+    <defs>
+      <clipPath id="tube">
+        <path d="M226 128 h60 v212 a30 30 0 0 1 -60 0 z"/>
+      </clipPath>
+    </defs>
+    <g clip-path="url(#tube)">
+      <rect x="196" y="252" width="120" height="160" fill="#8fd3ab"/>
+      <circle cx="248" cy="300" r="9" fill="#ffffff" opacity="0.85"/>
+      <circle cx="272" cy="332" r="6" fill="#ffffff" opacity="0.7"/>
+      <circle cx="254" cy="356" r="4" fill="#ffffff" opacity="0.6"/>
+    </g>
+    <path d="M226 128 v212 a30 30 0 0 0 60 0 v-212" fill="none" stroke="#ffffff" stroke-width="20" stroke-linejoin="round"/>
+    <rect x="203" y="108" width="106" height="30" rx="15" fill="#ffffff"/>
+  </g>
+</svg>
