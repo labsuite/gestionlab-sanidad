@@ -1,6 +1,11 @@
 // ============================================================
 // CONFIGURACIÓN
 // ============================================================
+// Capturamos el hash de la URL cuanto antes: si venimos del enlace de
+// recuperación de contraseña del email trae el token en el fragmento, y hay
+// que leerlo antes de que nadie lo toque. Lo procesa initAuth() en auth.js.
+window.__authRecoveryHash = window.location.hash || '';
+
 // Proyecto Supabase compartido con la app de Vercel (ciclos, módulos, asignaciones usuario-módulo)
 const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
@@ -9,7 +14,13 @@ const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 // Proyecto Supabase propio de GestionLab (migración módulo a módulo desde Sheets) — tablas migradas y Edge Functions propias
 const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
 const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
-const _sbMigracion = supabase.createClient(SUPABASE_MIGRACION_URL, SUPABASE_MIGRACION_ANON);
+// detectSessionInUrl:false — el login es solo email+contraseña, no hay OAuth ni
+// magic links, así que no queremos que supabase-js toque el hash de la URL. El
+// único caso con token en el fragmento es la recuperación de contraseña, y ese
+// lo gestiona initAuth() a mano (setSession con el token del enlace).
+const _sbMigracion = supabase.createClient(SUPABASE_MIGRACION_URL, SUPABASE_MIGRACION_ANON, {
+  auth: { detectSessionInUrl: false }
+});
 
 // ============================================================
 // ESTADO GLOBAL

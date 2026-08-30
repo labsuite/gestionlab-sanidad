@@ -613,11 +613,9 @@
 <script src="js/reservas.js"></script>
 <script src="js/registros-uso.js"></script>
 <script>
-  // Capturamos el hash ANTES de que supabase-js procese (y borre) el token de
-  // recuperación de contraseña que viene en la URL del email.
-  window.__authRecoveryHash = window.location.hash || '';
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional
+  // (el hash de recuperación de contraseña se captura en js/config.js)
 </script>
 
 <!-- Backdrop móvil para sidebar -->

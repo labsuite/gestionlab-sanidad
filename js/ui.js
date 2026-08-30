@@ -298,6 +298,7 @@ function showPage(page) {
     reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', perfil: 'Mi perfil'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
+  if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
 }
 
 function showApp() {

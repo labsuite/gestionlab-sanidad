@@ -18,10 +18,10 @@ async function initAuth() {
   });
 
   // ¿Volvemos del enlace de recuperación de contraseña del email?
-  const hash = window.__authRecoveryHash || '';
+  const hash = window.__authRecoveryHash || window.location.hash || '';
+  const params = new URLSearchParams(hash.replace(/^#/, ''));
 
-  if (hash.includes('error=') || hash.includes('error_code=')) {
-    const params = new URLSearchParams(hash.replace(/^#/, ''));
+  if (params.get('error') || params.get('error_code')) {
     const code = params.get('error_code') || '';
     _limpiarHashAuth();
     _mostrarPantallaLogin();
@@ -32,7 +32,17 @@ async function initAuth() {
     return;
   }
 
-  if (hash.includes('type=recovery')) {
+  if (params.get('type') === 'recovery' && params.get('access_token')) {
+    const { error } = await _sbMigracion.auth.setSession({
+      access_token: params.get('access_token'),
+      refresh_token: params.get('refresh_token') || ''
+    });
+    _limpiarHashAuth();
+    if (error) {
+      _mostrarPantallaLogin();
+      showToast('El enlace de recuperación ya no es válido. Pide uno nuevo con "Olvidé mi contraseña".', 'error');
+      return;
+    }
     _mostrarPantallaNuevaPassword();
     return;
   }
