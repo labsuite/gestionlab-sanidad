@@ -133,7 +133,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     crearIncidencias: false,
     gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,
@@ -146,7 +146,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias',
           'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
+          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
@@ -165,7 +165,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: false, configurarReservas: false,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -175,7 +175,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
@@ -295,7 +295,7 @@ function showPage(page) {
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
     contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo',
     'residuos-guia': 'Guía de residuos', 'residuos-contenedores': 'Contenedores de residuos',
-    reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso'
+    reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', perfil: 'Mi perfil'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
 }
@@ -329,6 +329,7 @@ function showApp() {
     return;
   }
   document.getElementById('auth-screen').style.display = 'none';
+  const _rec = document.getElementById('recovery-screen'); if (_rec) _rec.style.display = 'none';
   document.getElementById('app').style.display = 'block';
   const rol = getUserRole();
   const p = PERMISOS[rol] || PERMISOS.Alumno;
@@ -411,6 +412,7 @@ function renderAll() {
   _updateBadgeReservas();
   renderRegistrosUso();
   _updateBadgeRegistrosUso();
+  renderPerfil();
   _avisarSesionesAbiertasAntiguas();
 }
 

@@ -33,7 +33,8 @@
     }
 
     /* AUTH SCREEN */
-    #auth-screen {
+    #auth-screen,
+    #recovery-screen {
       display: flex;
       align-items: center;
       justify-content: center;

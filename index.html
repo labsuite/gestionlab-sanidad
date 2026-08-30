@@ -40,6 +40,33 @@
       <button type="button" onclick="recuperarPassword()" style="background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;text-decoration:underline;padding:2px">
         Olvidé mi contraseña
       </button>
+      <p style="font-size:11px;color:var(--text-muted);margin:2px 0 0;line-height:1.5">
+        El correo para restablecerla llega desde <strong>Supabase</strong>
+        (remitente <em>noreply@mail.app.supabase.io</em>, asunto «Reset your password»).
+        Si no lo ves, revisa la carpeta de spam.
+      </p>
+    </form>
+  </div>
+</div>
+
+<!-- RECOVERY SCREEN — nueva contraseña tras pulsar el enlace del email -->
+<div id="recovery-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">🔑</div>
+    <h1>Nueva contraseña</h1>
+    <p>Escribe la nueva contraseña para tu cuenta de GestionLab.</p>
+    <form onsubmit="event.preventDefault(); guardarNuevaPassword();" style="display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:8px">
+      <div>
+        <label for="rec-pass" style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Nueva contraseña</label>
+        <input type="password" id="rec-pass" autocomplete="new-password" required
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px">
+      </div>
+      <div>
+        <label for="rec-pass2" style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Repite la nueva contraseña</label>
+        <input type="password" id="rec-pass2" autocomplete="new-password" required
+          style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px">
+      </div>
+      <button type="submit" class="btn btn-primary" id="btn-rec-pass" style="margin-top:4px;width:100%;padding:10px">Guardar contraseña</button>
     </form>
   </div>
 </div>
@@ -121,6 +148,10 @@
       </div>
       <div class="nav-item" onclick="showPage('usuarios')" id="nav-usuarios" style="display:none">
         <span class="nav-icon">👥</span> Usuarios
+      </div>
+      <div class="nav-section-label" style="margin-top:12px">Mi cuenta</div>
+      <div class="nav-item" onclick="showPage('perfil')">
+        <span class="nav-icon">👤</span> Mi perfil
       </div>
     </div>
     <div class="sidebar-footer">
@@ -545,6 +576,11 @@
         <div id="usuarios-contenido"></div>
       </div>
 
+      <!-- PERFIL -->
+      <div class="page" id="page-perfil">
+        <div id="perfil-contenido"></div>
+      </div>
+
       <!-- RESERVAS -->
       <div class="page" id="page-reservas"></div>
       <div class="page" id="page-registros-uso"></div>
@@ -577,6 +613,9 @@
 <script src="js/reservas.js"></script>
 <script src="js/registros-uso.js"></script>
 <script>
+  // Capturamos el hash ANTES de que supabase-js procese (y borre) el token de
+  // recuperación de contraseña que viene en la URL del email.
+  window.__authRecoveryHash = window.location.hash || '';
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional
 </script>
