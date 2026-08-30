@@ -33,12 +33,18 @@ async function initAuth() {
   }
 
   if (params.get('type') === 'recovery' && params.get('access_token')) {
-    const { error } = await _sbMigracion.auth.setSession({
-      access_token: params.get('access_token'),
-      refresh_token: params.get('refresh_token') || ''
-    });
+    let ok = false;
+    try {
+      const { error } = await _sbMigracion.auth.setSession({
+        access_token: params.get('access_token'),
+        refresh_token: params.get('refresh_token') || ''
+      });
+      ok = !error;
+    } catch (e) {
+      ok = false;   // token corrupto o caducado: setSession puede lanzar
+    }
     _limpiarHashAuth();
-    if (error) {
+    if (!ok) {
       _mostrarPantallaLogin();
       showToast('El enlace de recuperación ya no es válido. Pide uno nuevo con "Olvidé mi contraseña".', 'error');
       return;
