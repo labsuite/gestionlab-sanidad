@@ -1125,21 +1125,23 @@ function _pasoDosImportarProfesores() {
   }
 
   const cont = document.getElementById('importar-profesores-contenido');
+  const linkBtn = 'background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0';
   const tarjetasHtml = _profesoresAImportar.map(p => {
     const equiposDeSusLabs = DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)));
 
-    // Si el equipo tiene Módulo(s) responsable(s) etiquetado, solo se premarca cuando
-    // coincide con alguno de los módulos de este profesor (evita marcar todo el lab
-    // entero para equipos ya afinados, p.ej. el Coulter solo para Hematología).
-    // Si el equipo no tiene ninguna etiqueta todavía, se mantiene el fallback anterior
-    // (premarcado por laboratorio) para no perder cobertura mientras se va etiquetando.
+    // Premarcado: SOLO los equipos cuyo Módulo(s) responsable(s) etiquetado coincide con un
+    // módulo del profesor. Los equipos sin etiqueta (o con etiqueta que no casa) quedan sin
+    // marcar — con varios profesores a la vez, premarcar el lab entero era inrevisable y
+    // sobreasignaba. Botones "Todos / Ninguno / Solo por módulo" para ajustar en bloque.
+    let nMarcados = 0;
     const filasEquipos = equiposDeSusLabs.map(e => {
       const modulosEquipo = (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean);
       const coincideModulo = modulosEquipo.some(me => p.modulos.some(m => _normCiclo(m) === _normCiclo(me)));
-      const marcado = modulosEquipo.length ? coincideModulo : true;
+      if (coincideModulo) nMarcados++;
+      const buscar = `${e.Tipo_Equipo || ''} ${e.Marca || ''} ${e.Modelo || ''} ${e.ID_Activo || ''} ${e.Ubicacion || ''}`.toLowerCase();
       return `
-      <tr>
-        <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" value="${_escAttr(e.ID_Activo)}" ${marcado ? 'checked' : ''}></td>
+      <tr data-buscar="${_escAttr(buscar)}">
+        <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" data-modmatch="${coincideModulo ? '1' : '0'}" value="${_escAttr(e.ID_Activo)}" ${coincideModulo ? 'checked' : ''} onchange="_actualizarContadorEquiposImportar('${_escAttr(p.email)}')"></td>
         <td>${e.Tipo_Equipo || '—'} ${e.Marca || ''} ${e.Modelo || ''} <span style="color:var(--text-muted)">(${e.ID_Activo})</span></td>
         <td>${e.Ubicacion || '—'}</td>
         <td style="color:var(--text-muted);font-size:12px">${modulosEquipo.join(', ') || '—'}</td>
@@ -1147,37 +1149,76 @@ function _pasoDosImportarProfesores() {
       </tr>`;
     }).join('');
 
-    return `<div class="card" style="margin-bottom:12px">
-      <div class="card-header">
-        <div class="card-title">${p.nombre} <span style="font-weight:400;color:var(--text-muted)">(${p.email})</span></div>
-      </div>
-      <div style="padding:8px 16px 14px">
-        ${!equiposDeSusLabs.length
-          ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
-          : `<table>
-                <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Módulo(s)</th><th>Responsable(s) actual(es)</th></tr></thead>
-                <tbody>${filasEquipos}</tbody>
-              </table>`}
-      </div>
-    </div>`;
+    const cuerpo = !equiposDeSusLabs.length
+      ? `<div style="font-size:12px;color:var(--text-muted)">No se han encontrado equipos en el lab ${p.labs.join(', ')}.</div>`
+      : `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 8px">
+           <input type="text" placeholder="Filtrar equipos…" oninput="_filtrarEquiposImportar('${_escAttr(p.email)}',this.value)" style="flex:1 1 140px;font-size:12px;padding:5px 8px">
+           <button type="button" style="${linkBtn}" onclick="_bulkEquiposImportar('${_escAttr(p.email)}','todos')">Todos</button> ·
+           <button type="button" style="${linkBtn}" onclick="_bulkEquiposImportar('${_escAttr(p.email)}','ninguno')">Ninguno</button> ·
+           <button type="button" style="${linkBtn}" onclick="_bulkEquiposImportar('${_escAttr(p.email)}','modulo')">Solo por módulo</button>
+         </div>
+         <table>
+           <thead><tr><th></th><th>Equipo</th><th>Ubicación</th><th>Módulo(s)</th><th>Responsable(s) actual(es)</th></tr></thead>
+           <tbody>${filasEquipos}</tbody>
+         </table>`;
+
+    return `<details class="card importar-prof-details" style="margin-bottom:12px">
+      <summary>
+        <span class="caret">▸</span>
+        <span style="font-weight:600">${p.nombre}</span>
+        <span style="color:var(--text-muted);font-size:12px">${p.email}</span>
+        <span style="margin-left:auto;font-size:12px;color:var(--text-soft);white-space:nowrap">
+          ${p.labs.map(l => 'Lab ' + l).join(', ')} · ${equiposDeSusLabs.length} equipos ·
+          <b data-cnt-email="${_escAttr(p.email)}">${nMarcados} marcado${nMarcados === 1 ? '' : 's'}</b>
+        </span>
+      </summary>
+      <div style="padding:0 16px 14px">${cuerpo}</div>
+    </details>`;
   }).join('');
 
   const avisoSinLab = sinLab.length
-    ? `<div style="margin-bottom:10px;font-size:13px;color:var(--text-orange, #b45309)">
-        ⚠️ No se importa${sinLab.length > 1 ? 'n' : ''}: ${sinLab.map(p => `${p.nombre} (${p.email})`).join(', ')} — ningún módulo suyo tiene laboratorio asignado en Sanidad CMA.
+    ? `<div style="margin-bottom:10px;font-size:13px;color:var(--warning, #b45309)">
+        ⚠️ No se importa${sinLab.length > 1 ? 'n' : ''}: ${sinLab.map(p => `${p.nombre} (${p.email})`).join(', ')} — ningún módulo suyo está en un laboratorio con equipos.
       </div>`
     : '';
 
   cont.innerHTML = `
     ${avisoSinLab}
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted)">
-      Equipos sugeridos según el lab de sus módulos. Los que ya tienen un Módulo responsable etiquetado solo se premarcan si coincide con uno de los suyos; el resto se premarca por laboratorio, como hasta ahora. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
+      Cada profesor sale plegado. Se premarcan solo los equipos cuyo "Módulo(s) responsable(s)" coincide con los suyos; usa <b>Todos</b> para marcar el lab entero o <b>Solo por módulo</b> para volver a la sugerencia. Se añadirá el profesor a "Responsable" de los marcados, sin quitar a quien ya estuviera.
     </div>
     ${tarjetasHtml}`;
 
   document.getElementById('btn-siguiente-importar-profesores').style.display = 'none';
   document.getElementById('btn-atras-importar-profesores').style.display = '';
   document.getElementById('btn-confirmar-importar-profesores').style.display = '';
+}
+
+function _equiposImportarChecks(email) {
+  return Array.from(document.querySelectorAll(`.importar-equipo-check[data-email="${CSS.escape(email)}"]`));
+}
+
+function _actualizarContadorEquiposImportar(email) {
+  const n = _equiposImportarChecks(email).filter(cb => cb.checked).length;
+  const badge = document.querySelector(`[data-cnt-email="${CSS.escape(email)}"]`);
+  if (badge) badge.textContent = `${n} marcado${n === 1 ? '' : 's'}`;
+}
+
+function _bulkEquiposImportar(email, modo) {
+  _equiposImportarChecks(email).forEach(cb => {
+    if (modo === 'todos') cb.checked = true;
+    else if (modo === 'ninguno') cb.checked = false;
+    else if (modo === 'modulo') cb.checked = cb.dataset.modmatch === '1';
+  });
+  _actualizarContadorEquiposImportar(email);
+}
+
+function _filtrarEquiposImportar(email, texto) {
+  const q = (texto || '').toLowerCase().trim();
+  _equiposImportarChecks(email).forEach(cb => {
+    const tr = cb.closest('tr');
+    if (tr) tr.style.display = (!q || (tr.dataset.buscar || '').includes(q)) ? '' : 'none';
+  });
 }
 
 async function confirmarImportarProfesores() {

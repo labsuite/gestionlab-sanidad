@@ -1155,6 +1155,20 @@
     }
     .mant-plan-row:last-child { border-bottom: none; }
 
+    /* Importar profesorado – paso 2: una tarjeta plegable por profesor */
+    .importar-prof-details > summary {
+      cursor: pointer;
+      list-style: none;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .importar-prof-details > summary::-webkit-details-marker { display: none; }
+    .importar-prof-details > summary .caret { transition: transform 0.15s; color: var(--text-muted); }
+    .importar-prof-details[open] > summary .caret { transform: rotate(90deg); }
+
     /* MULTI-SELECT CHECKBOXES para tipos de proveedor */
     .checkbox-group {
       display: flex;
