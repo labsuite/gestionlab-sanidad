@@ -946,10 +946,18 @@ async function _cargarPreviewImportarProfesores() {
   try {
     const { profesores } = await callEdgeFunction('importar-profesores', { accion: 'preview' });
     const todas = profesores || [];
-    // Solo se importan asignaciones profesor×módulo que tengan laboratorio asignado en
-    // Sanidad CMA: sin lab no se puede deducir de qué equipos es responsable. Se descartan
-    // ya en el preview (decisión de la usuaria) — se muestra cuántas para que no sea silencioso.
-    _previewProfesoresCMA = todas.filter(p => p.laboratorio && String(p.laboratorio).trim());
+    // Solo se importan asignaciones profesor×módulo cuyo laboratorio (viene de Sanidad CMA,
+    // que a su vez lo saca del horario real) tenga equipos en GestionLab: sin equipos no hay
+    // responsabilidad que asignar y suele ser un aula teórica. `laboratorio` puede traer
+    // varias aulas ("Lab 209, Lab 205"); nos quedamos con los nº de lab con equipos.
+    const labsConEquipos = new Set(
+      (DATA.equipos || []).map(e => _extraerLabDeUbicacion(e.Ubicacion)).filter(Boolean)
+    );
+    todas.forEach(p => {
+      const nums = String(p.laboratorio || '').match(/\d{3}/g) || [];
+      p.labsValidos = [...new Set(nums)].filter(n => labsConEquipos.has(n));
+    });
+    _previewProfesoresCMA = todas.filter(p => p.labsValidos.length);
     _profesoresSinLabDescartados = todas.length - _previewProfesoresCMA.length;
     _pasoUnoImportarProfesores();
   } catch (e) {
@@ -973,14 +981,14 @@ function _pasoUnoImportarProfesores() {
 
   const avisoSinLab = _profesoresSinLabDescartados
     ? `<div style="margin-bottom:10px;font-size:12px;color:var(--warning, #b45309)">
-        ⚠️ ${_profesoresSinLabDescartados} asignación(es) sin laboratorio en Sanidad CMA no se muestran: sin lab no se puede saber de qué equipos sería responsable el profesor.
+        ⚠️ ${_profesoresSinLabDescartados} asignación(es) no se muestran: su aula en el horario de Sanidad CMA no es un laboratorio con equipos en GestionLab (o no tiene aula asignada).
       </div>`
     : '';
 
   if (!_previewProfesoresCMA.length) {
     cont.innerHTML = `${avisoSinLab}<div class="empty-state" style="padding:40px 0">
       <div class="empty-state-icon">🧑‍🏫</div>
-      <div class="empty-state-title">No hay asignaciones de profesorado con laboratorio para importar</div>
+      <div class="empty-state-title">No hay asignaciones de profesorado en un laboratorio con equipos para importar</div>
     </div>`;
     btnSiguiente.style.display = 'none';
     return;
@@ -1010,7 +1018,7 @@ function _pasoUnoImportarProfesores() {
             <span style="font-weight:500">${p.nombre || '—'}</span>
             <span style="display:block;font-size:12px;color:var(--text-muted);word-break:break-all">${p.email || '—'}</span>
           </span>
-          <span style="font-size:12px;color:var(--text-soft);white-space:nowrap">Lab ${p.laboratorio}</span>
+          <span style="font-size:12px;color:var(--text-soft);white-space:nowrap">${p.labsValidos.map(l => 'Lab ' + l).join(', ')}</span>
           <span class="badge ${p.existe ? 'badge-gray' : 'badge-green'}">${p.existe ? 'Ya existe' : 'Nuevo'}</span>
         </label>`;
       }).join('');
@@ -1078,19 +1086,19 @@ function _pasoDosImportarProfesores() {
     if (!email) return;
     (porEmail[email] ??= { nombre: p.nombre, email, ciclo: p.ciclo, modulos: new Set(), labs: new Set() });
     if (p.modulo) porEmail[email].modulos.add(p.modulo);
-    if (p.laboratorio) porEmail[email].labs.add(p.laboratorio);
+    (p.labsValidos || []).forEach(l => porEmail[email].labs.add(l));
   });
   const todosLosSeleccionados = Object.values(porEmail).map(p => ({
     nombre: p.nombre, email: p.email, ciclo: p.ciclo,
     modulo: [...p.modulos].join(','), modulos: [...p.modulos], laboratorio: [...p.labs].join(','), labs: [...p.labs],
   }));
-  // Sin lab asignado en Sanidad CMA en ninguno de sus módulos => no se puede saber de qué
-  // equipos es responsable, así que no se importa (decisión de la usuaria, 2026-08-22).
+  // Defensa: si ninguno acaba con un lab con equipos, no hay nada que asignar. En la práctica
+  // ya se filtró en el paso 1 (labsValidos), este guard no debería dispararse.
   const sinLab = todosLosSeleccionados.filter(p => !p.labs.length);
   _profesoresAImportar = todosLosSeleccionados.filter(p => p.labs.length);
 
   if (!_profesoresAImportar.length) {
-    showToast('Ninguno de los seleccionados tiene laboratorio asignado en Sanidad CMA — no se importa ninguno', 'error');
+    showToast('Ninguno de los seleccionados está en un laboratorio con equipos — no se importa ninguno', 'error');
     return;
   }
 
