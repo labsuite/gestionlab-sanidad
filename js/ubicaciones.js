@@ -927,6 +927,26 @@ let _previewProfesoresCMA = [];
 let _profesoresSinLabDescartados = 0;
 let _profesoresAImportar = [];
 
+// Módulos transversales / no técnicos: nunca conllevan responsabilidad de equipos, así que se
+// descartan del import de profesorado sea cual sea el aula del horario (p.ej. Afondamento se da
+// en "Lab 201", que sí tiene equipos, pero no procede marcar responsable por ello). Comparación
+// por subcadena normalizada (_normCiclo) — "Proxecto" cubre "Proxecto integrado de ...", etc.
+// Ampliar aquí si aparecen más.
+const MODULOS_SIN_RESPONSABILIDAD_EQUIPOS = [
+  'Afondamento nas Competencias Profesionais',
+  'Formación en Centros de Traballo',
+  'Proxecto',
+  'Formación e Orientación Laboral',
+  'Empresa e Iniciativa Emprendedora',
+  'Itinerario Personal para a Empregabilidade',
+  'Dixitalización Aplicada aos Sectores Produtivos',
+  'Sustentabilidade Aplicada ao Sistema Produtivo',
+];
+function _moduloDaResponsabilidadEquipos(modulo) {
+  const m = _normCiclo(modulo || '');
+  return !!m && !MODULOS_SIN_RESPONSABILIDAD_EQUIPOS.some(x => m.includes(_normCiclo(x)));
+}
+
 function abrirModalImportarProfesores() {
   _previewProfesoresCMA = [];
   _profesoresAImportar = [];
@@ -955,7 +975,9 @@ async function _cargarPreviewImportarProfesores() {
     );
     todas.forEach(p => {
       const nums = String(p.laboratorio || '').match(/\d{3}/g) || [];
-      p.labsValidos = [...new Set(nums)].filter(n => labsConEquipos.has(n));
+      p.labsValidos = _moduloDaResponsabilidadEquipos(p.modulo)
+        ? [...new Set(nums)].filter(n => labsConEquipos.has(n))
+        : [];
     });
     _previewProfesoresCMA = todas.filter(p => p.labsValidos.length);
     _profesoresSinLabDescartados = todas.length - _previewProfesoresCMA.length;
@@ -981,7 +1003,7 @@ function _pasoUnoImportarProfesores() {
 
   const avisoSinLab = _profesoresSinLabDescartados
     ? `<div style="margin-bottom:10px;font-size:12px;color:var(--warning, #b45309)">
-        ⚠️ ${_profesoresSinLabDescartados} asignación(es) no se muestran: su aula en el horario de Sanidad CMA no es un laboratorio con equipos en GestionLab (o no tiene aula asignada).
+        ⚠️ ${_profesoresSinLabDescartados} asignación(es) no se muestran: su aula en el horario no es un laboratorio con equipos en GestionLab, o el módulo es transversal (FCT, Proxecto, Afondamento, FOL…).
       </div>`
     : '';
 
