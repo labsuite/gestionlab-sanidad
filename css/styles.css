@@ -717,6 +717,10 @@
       border-color: var(--accent);
     }
 
+    /* Los checkbox y radio nunca deben estirarse al 100% (regla de arriba): dentro
+       de un <label> flex empujarían el texto al extremo opuesto y aparecen "flotando". */
+    input[type="checkbox"], input[type="radio"] { width: auto; }
+
     textarea { resize: vertical; min-height: 80px; }
 
     .form-footer {

@@ -924,6 +924,7 @@ function _renderResultadosImportarAlumnos(resultados) {
 // IMPORTAR PROFESORADO DESDE SANIDAD CMA (2 pasos: módulos → equipos)
 // ============================================================
 let _previewProfesoresCMA = [];
+let _profesoresSinLabDescartados = 0;
 let _profesoresAImportar = [];
 
 function abrirModalImportarProfesores() {
@@ -944,7 +945,12 @@ async function _cargarPreviewImportarProfesores() {
   const cont = document.getElementById('importar-profesores-contenido');
   try {
     const { profesores } = await callEdgeFunction('importar-profesores', { accion: 'preview' });
-    _previewProfesoresCMA = profesores || [];
+    const todas = profesores || [];
+    // Solo se importan asignaciones profesor×módulo que tengan laboratorio asignado en
+    // Sanidad CMA: sin lab no se puede deducir de qué equipos es responsable. Se descartan
+    // ya en el preview (decisión de la usuaria) — se muestra cuántas para que no sea silencioso.
+    _previewProfesoresCMA = todas.filter(p => p.laboratorio && String(p.laboratorio).trim());
+    _profesoresSinLabDescartados = todas.length - _previewProfesoresCMA.length;
     _pasoUnoImportarProfesores();
   } catch (e) {
     cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
@@ -965,10 +971,16 @@ function _pasoUnoImportarProfesores() {
   document.getElementById('btn-confirmar-importar-profesores').style.display = 'none';
   const btnSiguiente = document.getElementById('btn-siguiente-importar-profesores');
 
+  const avisoSinLab = _profesoresSinLabDescartados
+    ? `<div style="margin-bottom:10px;font-size:12px;color:var(--warning, #b45309)">
+        ⚠️ ${_profesoresSinLabDescartados} asignación(es) sin laboratorio en Sanidad CMA no se muestran: sin lab no se puede saber de qué equipos sería responsable el profesor.
+      </div>`
+    : '';
+
   if (!_previewProfesoresCMA.length) {
-    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
+    cont.innerHTML = `${avisoSinLab}<div class="empty-state" style="padding:40px 0">
       <div class="empty-state-icon">🧑‍🏫</div>
-      <div class="empty-state-title">Sanidad CMA no tiene profesorado disponible ahora mismo</div>
+      <div class="empty-state-title">No hay asignaciones de profesorado con laboratorio para importar</div>
     </div>`;
     btnSiguiente.style.display = 'none';
     return;
@@ -992,20 +1004,22 @@ function _pasoUnoImportarProfesores() {
       const habilesModulo = ids.some(i => !_previewProfesoresCMA[i].existe);
       const filas = ids.map(i => {
         const p = _previewProfesoresCMA[i];
-        return `<tr style="${p.existe ? 'opacity:0.5' : ''}">
-          <td><input type="checkbox" class="importar-profesor-check" data-ciclo="${_escAttr(ciclo)}" data-modulo="${_escAttr(modulo)}" value="${i}" ${p.existe ? 'disabled' : 'checked'}></td>
-          <td>${p.nombre || '—'}</td>
-          <td>${p.email || '—'}</td>
-          <td>${p.laboratorio || '<span style="color:var(--text-muted)">sin lab</span>'}</td>
-          <td>${p.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
-        </tr>`;
+        return `<label style="display:flex;align-items:center;gap:10px;padding:7px 0;flex-wrap:wrap;${p.existe ? 'opacity:0.5' : 'cursor:pointer'}">
+          <input type="checkbox" class="importar-profesor-check" data-ciclo="${_escAttr(ciclo)}" data-modulo="${_escAttr(modulo)}" value="${i}" ${p.existe ? 'disabled' : 'checked'}>
+          <span style="flex:1 1 160px;min-width:0">
+            <span style="font-weight:500">${p.nombre || '—'}</span>
+            <span style="display:block;font-size:12px;color:var(--text-muted);word-break:break-all">${p.email || '—'}</span>
+          </span>
+          <span style="font-size:12px;color:var(--text-soft);white-space:nowrap">Lab ${p.laboratorio}</span>
+          <span class="badge ${p.existe ? 'badge-gray' : 'badge-green'}">${p.existe ? 'Ya existe' : 'Nuevo'}</span>
+        </label>`;
       }).join('');
-      return `<div style="margin:10px 0">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:${habilesModulo ? 'pointer' : 'default'}">
+      return `<div style="margin:8px 0;padding-left:2px;border-left:2px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:8px;padding-left:8px;font-size:13px;font-weight:600;cursor:${habilesModulo ? 'pointer' : 'default'}">
           <input type="checkbox" ${habilesModulo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportarProfesores('modulo','${_escAttr(ciclo)}','${_escAttr(modulo)}',this.checked)">
-          ${modulo} <span style="font-weight:400;color:var(--text-muted)">(${ids.length})</span>
+          <span>${modulo} <span style="font-weight:400;color:var(--text-muted)">(${ids.length})</span></span>
         </label>
-        <table style="margin-top:4px"><tbody>${filas}</tbody></table>
+        <div style="padding-left:10px">${filas}</div>
       </div>`;
     }).join('');
 
@@ -1021,8 +1035,9 @@ function _pasoUnoImportarProfesores() {
   }).join('');
 
   cont.innerHTML = `
-    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <span>${nuevos.length} asignación(es) nueva(s) de ${_previewProfesoresCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
+    ${avisoSinLab}
+    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <span>${nuevos.length} asignación(es) nueva(s) con laboratorio. Marca ciclo y/o módulo para seleccionar en bloque.</span>
       <span style="white-space:nowrap">
         <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(true)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
         <button type="button" onclick="_toggleSeleccionarTodosImportarProfesores(false)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Nada</button>
