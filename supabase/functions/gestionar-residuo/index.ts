@@ -36,12 +36,15 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
   // Timeout explícito por intento: si Gemini no responde, el worker de Supabase
   // acaba matando todo el isolate con WORKER_RESOURCE_LIMIT (un 546 sin cuerpo
   // útil) en vez de dejar que este throw lo capture el llamador.
-  const REINTENTOS = [0, 1500, 3500];
+  // 2 intentos: alguien de pie junto al contenedor no puede esperar 3×22 s. Un
+  // 503 suele venir rápido y el retry a los 2 s a menudo sale; el caso malo
+  // (fetch colgado) queda acotado a ~2×16 s.
+  const REINTENTOS = [0, 2000];
   let ultimoError = "";
   for (let intento = 0; intento < REINTENTOS.length; intento++) {
     if (REINTENTOS[intento]) await new Promise((r) => setTimeout(r, REINTENTOS[intento]));
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 22000);
+    const timeoutId = setTimeout(() => ctrl.abort(), 16000);
     let respuesta: Response;
     try {
       respuesta = await fetch(
@@ -50,7 +53,7 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
       );
     } catch (e) {
       ultimoError = e instanceof DOMException && e.name === "AbortError"
-        ? "Gemini no respondió a tiempo (timeout de 22 s)"
+        ? "Gemini no respondió a tiempo (timeout de 16 s)"
         : (e instanceof Error ? e.message : String(e));
       continue;
     } finally {
@@ -65,7 +68,14 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
       const detalle = await respuesta.text().catch(() => "");
       throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
     }
-    return extraerTextoGemini(await respuesta.json());
+    try {
+      return extraerTextoGemini(await respuesta.json());
+    } catch (e) {
+      // 200 pero sin texto aprovechable (respuesta vacía / cortada por MAX_TOKENS
+      // gastado en "pensar" bajo carga) — reintentar, suele salir bien al segundo.
+      ultimoError = e instanceof Error ? e.message : String(e);
+      continue;
+    }
   }
   throw new Error(ultimoError || "Gemini no disponible tras varios intentos");
 }
@@ -162,8 +172,18 @@ function construirHistoryComprobacionIA(ctx: ContextoIA): unknown[] {
     ? `- Tipo del catálogo: ${ctx.itemCatalogo.nombre} | Riesgo GHS: ${ctx.itemCatalogo.riesgo || "ninguno"} | Contenedor asignado en el catálogo: ${ctx.itemCatalogo.contenedorTipo || "sin asignar"}${ctx.itemCatalogo.detalle ? " | Detalle: " + ctx.itemCatalogo.detalle : ""}`
     : "";
   const aAnadirLibre = ctx.textoLibre ? `- Descrito por la persona en texto libre: "${ctx.textoLibre}"` : "";
+  // El catálogo completo con todos los Detalle son ~23k caracteres y hace que
+  // gemini-3.6-flash tarde mucho o devuelva 503 bajo carga. Se manda el Detalle
+  // solo de los tipos que importan para este contenedor (misma categoría de
+  // destino o ya presentes dentro); del resto basta nombre|riesgo|contenedor
+  // para poder señalar a dónde llevarlo si no encaja aquí.
+  const dentroNombres = new Set(ctx.contenidoActual.map((t) => t.nombre));
   const catalogo = ctx.catalogo
-    .map((t) => `- ${t.nombre} | Riesgo: ${t.riesgo || "ninguno"} | Contenedor: ${t.contenedorTipo || "sin asignar"}${t.detalle ? " | Detalle: " + t.detalle : ""}`)
+    .map((t) => {
+      const relevante = t.contenedorTipo === ctx.contenedor.categoria || dentroNombres.has(t.nombre);
+      const detalle = relevante && t.detalle ? " | Detalle: " + t.detalle : "";
+      return `- ${t.nombre} | Riesgo: ${t.riesgo || "ninguno"} | Contenedor: ${t.contenedorTipo || "sin asignar"}${detalle}`;
+    })
     .join("\n");
   const activos = ctx.contenedoresActivos.length
     ? ctx.contenedoresActivos.map((c) => `- Lab ${c.lab} · ${c.categoria}${c.formato ? " (" + c.formato + ")" : ""}`).join("\n")
@@ -181,9 +201,6 @@ CONTENEDOR DE DESTINO:
 
 LO QUE YA HAY DENTRO DE ESTE CONTENEDOR (tipos distintos ya registrados):
 ${dentro}
-
-LO QUE SE QUIERE AÑADIR AHORA:
-${[aAnadir, aAnadirLibre].filter(Boolean).join("\n")}
 
 CATÁLOGO COMPLETO DE TIPOS DE RESIDUO DEL CENTRO (para localizar el contenedor correcto si este no lo es; usa el Detalle para desambiguar):
 ${catalogo}
@@ -207,13 +224,19 @@ FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con 
 
 Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la etiqueta inicial.`;
 
+  // El historial DEBE terminar en un turno "user" (Gemini rechaza con 400
+  // "Requests ending with a model turn are not supported."): el caso concreto a
+  // evaluar va como último mensaje del usuario, no dentro del systemText.
+  const casoText = `CASO A EVALUAR — se quiere añadir al contenedor de categoría "${cont.categoria || "sin categoría"}" (Lab ${cont.lab || "?"}):\n${[aAnadir, aAnadirLibre].filter(Boolean).join("\n") || "(no se ha indicado qué se quiere añadir)"}`;
+
   return [
     { role: "user", parts: [{ text: systemText }] },
-    { role: "model", parts: [{ text: "Entendido." }] },
-    { role: "user", parts: [{ text: "Contenedor destino categoría 'Aguas Laboratorio'. Se quiere añadir: PBS diluido sobrante de lavados, riesgo ninguno." }] },
+    { role: "model", parts: [{ text: "Entendido. Dame el caso a evaluar." }] },
+    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"PBS diluido sobrante de lavados, sin nada tóxico\"" }] },
     { role: "model", parts: [{ text: "[OK] El PBS diluido es un residuo acuoso de bajo riesgo y encaja en el contenedor de Aguas de Laboratorio. Mantén la garrafa cerrada entre adiciones." }] },
-    { role: "user", parts: [{ text: "Contenedor destino categoría 'Aguas Laboratorio'. Se quiere añadir: etanol del paso de decoloración de una tinción de Gram." }] },
+    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"etanol del paso de decoloración de una tinción de Gram\"" }] },
     { role: "model", parts: [{ text: "[BLOQUEO|categoria=Inflamable|contenedor_sugerido=Disolventes no halogenados] El etanol de decoloración es un disolvente inflamable y no va en Aguas de Laboratorio. Llévalo al contenedor de Disolventes no halogenados; si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
+    { role: "user", parts: [{ text: casoText }] },
   ];
 }
 
@@ -355,11 +378,13 @@ Deno.serve(async (req) => {
         // IA no disponible: si hay tipo del catálogo, ya ha pasado la validación
         // determinista (Nivel 1/2) y se permite; si es solo texto libre, no hay
         // nada que lo respalde, así que se devuelve "no verificado" y decide la persona.
-        console.error("Comprobación IA no disponible:", e instanceof Error ? e.message : e);
+        const detalle = e instanceof Error ? e.message : String(e);
+        console.error("Comprobación IA no disponible:", detalle);
         if (!residuo) {
           return jsonOk({
             ia_no_verificado: true,
             mensaje: "No se ha podido comprobar la compatibilidad con la IA en este momento. Si estás seguro, puedes registrarlo igualmente; si no, deja el residuo etiquetado en la zona de residuos pendientes y avisa a tu profesor/a.",
+            detalle: body.debug === true ? detalle : undefined,
           });
         }
       }

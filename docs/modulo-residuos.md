@@ -132,9 +132,16 @@ determinista **no es forzable**.
     Nivel 1/2) se permite y se inserta; si es **solo texto libre**, la Edge Function responde
     `{ ia_no_verificado:true, mensaje }` y `_mostrarIaNoVerificado` ofrece "Registrar sin comprobar"
     (`ia_override:true`, `registrar_excepcion:false` — no crea excepción porque no hubo juicio de la IA).
-  - `llamarGeminiChat` reintenta hasta 3 veces (0 / 1,5 / 3,5 s) ante 503/429/500 —
-    `gemini-3.6-flash` sufre picos de "high demand"— y aborta cada intento a los 22 s para que el
-    worker de Supabase no muera con `WORKER_RESOURCE_LIMIT` (546 sin cuerpo útil).
+  - `llamarGeminiChat` reintenta 2 veces (0 / 2 s) ante 503/429/500 —`gemini-3.6-flash` sufre
+    picos de "high demand" que afectan por igual al consultorio— y aborta cada intento a los 16 s
+    para que el worker de Supabase no muera con `WORKER_RESOURCE_LIMIT` (546 sin cuerpo útil).
+  - El historial que se manda a Gemini **debe terminar en un turno `user`** (si no: 400
+    "Requests ending with a model turn are not supported"): el caso concreto a evaluar va como
+    último mensaje del usuario en `construirHistoryComprobacionIA`, no dentro del systemText. El
+    catálogo se manda con el `Detalle` solo de los tipos de la categoría de destino o ya presentes
+    dentro (el resto, una línea) para no inflar el prompt y disparar los 503.
+  - `añadir_adicion` acepta `debug: true` en el body: añade un campo `detalle` con el texto real
+    del error de Gemini a la respuesta `ia_no_verificado` (solo para diagnóstico manual).
 
 ### Registro de adiciones no catalogadas
 
