@@ -22,26 +22,57 @@ const GEMINI_MODELO = "gemini-3.6-flash";
 async function llamarGeminiChat(history: unknown): Promise<string> {
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) throw new Error("Falta configurar GEMINI_API_KEY en los secretos del proyecto");
-  const respuesta = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: history,
-        // thinkingLevel "low": sin esto, gemini-3.6-flash gasta una parte variable del
-        // presupuesto de tokens en "pensar" internamente antes de responder, y con
-        // maxOutputTokens ajustado el texto visible puede quedar cortado a media frase
-        // (visto en pruebas reales) — mismo ajuste ya usado en leer-documento-proveedor.
-        generationConfig: { maxOutputTokens: 2048, temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
-      }),
-    },
-  );
-  if (!respuesta.ok) {
-    const detalle = await respuesta.text().catch(() => "");
-    throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+  const cuerpo = JSON.stringify({
+    contents: history,
+    // thinkingLevel "low": sin esto, gemini-3.6-flash gasta una parte variable del
+    // presupuesto de tokens en "pensar" internamente antes de responder, y con
+    // maxOutputTokens ajustado el texto visible puede quedar cortado a media frase
+    // (visto en pruebas reales) — mismo ajuste ya usado en leer-documento-proveedor.
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
+  });
+
+  // El modelo flash sufre picos de 503 "high demand" que Google describe como
+  // temporales: reintentar un par de veces con espera corta rescata la mayoría.
+  // Timeout explícito por intento: si Gemini no responde, el worker de Supabase
+  // acaba matando todo el isolate con WORKER_RESOURCE_LIMIT (un 546 sin cuerpo
+  // útil) en vez de dejar que este throw lo capture el llamador.
+  const REINTENTOS = [0, 1500, 3500];
+  let ultimoError = "";
+  for (let intento = 0; intento < REINTENTOS.length; intento++) {
+    if (REINTENTOS[intento]) await new Promise((r) => setTimeout(r, REINTENTOS[intento]));
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), 22000);
+    let respuesta: Response;
+    try {
+      respuesta = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal, body: cuerpo },
+      );
+    } catch (e) {
+      ultimoError = e instanceof DOMException && e.name === "AbortError"
+        ? "Gemini no respondió a tiempo (timeout de 22 s)"
+        : (e instanceof Error ? e.message : String(e));
+      continue;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (respuesta.status === 503 || respuesta.status === 429 || respuesta.status === 500) {
+      ultimoError = `Gemini devolvió ${respuesta.status} (sobrecarga temporal)`;
+      await respuesta.body?.cancel().catch(() => {});
+      continue;
+    }
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text().catch(() => "");
+      throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+    }
+    return extraerTextoGemini(await respuesta.json());
   }
-  const data = await respuesta.json();
+  throw new Error(ultimoError || "Gemini no disponible tras varios intentos");
+}
+
+function extraerTextoGemini(
+  data: { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[] },
+): string {
   const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   const finishReason = data?.candidates?.[0]?.finishReason;
   if (!texto) throw new Error(`Gemini no devolvió contenido interpretable (finishReason: ${finishReason || "desconocido"})`);

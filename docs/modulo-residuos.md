@@ -102,7 +102,7 @@ residuos" → `abrirChatResiduo()`, `js/residuos.js`). Abierto a cualquier rol.
 igual si se llega por selección manual que por escaneo NFC, porque ambos llaman a la misma acción):
 
 - **Nivel 1 — categoría**: el `Contenedor_Tipo` del tipo de residuo debe coincidir con la
-  `Categoria` del contenedor de destino.
+  `Categoria` del contenedor de destino. Solo se aplica si se ha elegido un tipo del catálogo.
 - **Nivel 2 — incompatibilidad GHS**: el `Riesgo` del nuevo residuo se compara contra el de los
   tipos ya registrados en ese contenedor concreto (vía su historial en `Adiciones_Residuo`), usando
   una matriz pequeña de pares incompatibles (Comburente↔Inflamable, Comburente↔Explosivo,
@@ -110,8 +110,50 @@ igual si se llega por selección manual que por escaneo NFC, porque ambos llaman
   exclusivas: Citotóxico y Cancerígeno/CMR nunca pueden convivir con ningún otro tipo de residuo
   distinto en el mismo contenedor (añadir más del mismo tipo exacto sí está permitido).
 
-Si hay conflicto, la Edge Function devuelve 400 con un mensaje explicando qué ya hay dentro y por
-qué no es compatible; el cliente lo muestra vía `showToast` (patrón ya usado en todo el módulo).
+Si hay conflicto en Nivel 1/2, la Edge Function devuelve **400** con un mensaje explicando qué ya
+hay dentro y por qué no es compatible; el cliente lo muestra vía `showToast`. Este bloqueo
+determinista **no es forzable**.
+
+- **Nivel 3 — comprobación con IA** (desde 2026-09): si Nivel 1/2 pasan y no viene `ia_override`,
+  la Edge Function llama a Gemini (`llamarGeminiChat`, misma clave de servidor que el consultorio)
+  con: el contenedor de destino (categoría, lab, formato + aviso de `_WARNINGS_FORMATO`), los tipos
+  distintos que ya lleva dentro con su `Riesgo`/`Descripcion`, lo que se quiere añadir (tipo del
+  catálogo **y/o** un texto libre que escribe la persona en el modal), el catálogo completo, los
+  contenedores activos de todo el centro y las excepciones ya aprobadas para esa categoría. La
+  respuesta empieza con etiqueta anclada, parseada por `parseRespuestaComprobacionIA`:
+  - `[OK]` → sigue adelante e inserta.
+  - `[BLOQUEO|categoria=<GHS|Desconocido>|contenedor_sugerido=<Contenedor_Tipo|ninguno>]` → la
+    Edge Function responde **200** con `{ ia_bloqueo:true, mensaje, categoria_ia, contenedor_sugerido }`
+    (no un 400, para que `callEdgeFunction` no lo convierta en throw). El cliente
+    (`_mostrarBloqueoIaAdicion`) muestra el motivo + a dónde llevarlo y un botón **"La IA se
+    equivoca — registrar igualmente"** que reenvía con `ia_override:true` + `registrar_excepcion:true`.
+  - Si la IA no respeta el formato → fail-safe: se trata como bloqueo (`categoria=Desconocido`).
+  - Si Gemini falla o da 503 (reintentos agotados): si hay tipo del catálogo (ya validado por
+    Nivel 1/2) se permite y se inserta; si es **solo texto libre**, la Edge Function responde
+    `{ ia_no_verificado:true, mensaje }` y `_mostrarIaNoVerificado` ofrece "Registrar sin comprobar"
+    (`ia_override:true`, `registrar_excepcion:false` — no crea excepción porque no hubo juicio de la IA).
+  - `llamarGeminiChat` reintenta hasta 3 veces (0 / 1,5 / 3,5 s) ante 503/429/500 —
+    `gemini-3.6-flash` sufre picos de "high demand"— y aborta cada intento a los 22 s para que el
+    worker de Supabase no muera con `WORKER_RESOURCE_LIMIT` (546 sin cuerpo útil).
+
+### Registro de adiciones no catalogadas
+
+`adiciones_residuo.id_residuo` es **nullable** y hay columna `descripcion_libre`: una adición
+puede quedar registrada solo con el texto que escribió la persona (sin tipo del catálogo). El
+historial de adiciones (`_renderContenedoresActivos`) muestra `Descripcion_Libre` con la etiqueta
+"(texto libre)" cuando no hay tipo.
+
+### Tabla `excepciones_residuo_ia`
+
+`id_excepcion, id_contenedor, categoria_contenedor, id_residuo (nullable), descripcion_libre
+(nullable), motivo_ia, usuario, fecha`. Una fila por cada vez que alguien pulsa "registrar
+igualmente" tras un `[BLOQUEO]` real de la IA (no tras "IA no disponible"). Doble uso:
+1. **Auditoría para Gestión** — panel en `renderPanelConsultasResiduo` (Admin/Gestor): bloque
+   "🤖 Adiciones registradas pese al aviso de la IA" con qué se añadió, a qué contenedor, qué
+   objetó la IA, quién y cuándo. El panel se muestra si hay consultas pendientes **o** excepciones.
+2. **Realimentación del prompt** — `añadir_adicion` pasa a la IA las excepciones ya aprobadas para
+   esa `categoria_contenedor` con la instrucción de considerar compatible el caso si coincide
+   claramente con una de ellas ("aprende" sin reentrenar nada).
 
 ## Etiquetas NFC/QR
 La URL codifica **categoría + lab** (no el ID del contenedor) → la etiqueta nunca necesita reprogramarse al cerrar un contenedor. `_checkPendingNfcAction()` en `ui.js` detecta los parámetros tras el login y redirige al modal de adición correcto.

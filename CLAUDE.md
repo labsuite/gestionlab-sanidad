@@ -292,11 +292,29 @@ server-side: **cualquier integración futura con Gemini (o cualquier API de terc
 por una Edge Function**, nunca por una clave incluida en JS/HTML servido desde GitHub Pages.
 
 Modelo usado: `gemini-3.6-flash` (constante `GEMINI_MODELO` en el Edge Function, igual que
-`leer-documento-proveedor` — confirmado vigente el 2026-08-19/21). Si en el futuro deja de
-responder, **volver a comprobar el modelo vigente** con `GET /v1beta/models?key=...` antes de
-cambiar el nombre a ciegas — Google puede retirar modelos con el tiempo.
+`leer-documento-proveedor` — confirmado vigente el 2026-08-19/21, y de nuevo el 2026-09-02 vía
+`GET /v1beta/models`). Si en el futuro deja de responder, **volver a comprobar el modelo vigente**
+con `GET /v1beta/models?key=...` antes de cambiar el nombre a ciegas — Google puede retirar modelos
+con el tiempo. Ojo: `gemini-3.6-flash` devuelve **503 "high demand"** con cierta frecuencia (visto
+el 2026-09-02, con el modelo perfectamente vigente); no confundir esos picos temporales con un
+modelo retirado. `llamarGeminiChat` ya reintenta hasta 3 veces ante 503/429/500 y aborta cada
+intento a los 22 s para no morir con `WORKER_RESOURCE_LIMIT`.
 
 No enviar datos personales de usuarios a Gemini. Sin historial persistente (se borra al cerrar el modal).
+
+### Comprobación de compatibilidad con IA al añadir a un contenedor (2026-09)
+
+Además del consultorio, `añadir_adicion` en `gestionar-residuo` tiene una **capa IA** (Nivel 3)
+que revisa si un residuo —del catálogo o descrito en texto libre en el modal "Añadir residuo"—
+encaja de verdad en ESE contenedor con lo que ya lleva dentro. Ver `docs/modulo-residuos.md`
+("Validación de compatibilidad al añadir"). Puntos a recordar al tocarlo:
+- La validación determinista de Nivel 1/2 (categoría + matriz GHS) sigue siendo bloqueo duro y va
+  **antes** de la IA; `ia_override` solo salta la IA, nunca Nivel 1/2.
+- El bloqueo de la IA se devuelve como **200** con `{ ia_bloqueo:true, ... }` (no 400) para que
+  `callEdgeFunction` no lo convierta en throw; el cliente inspecciona el objeto.
+- `adiciones_residuo.id_residuo` es nullable + columna `descripcion_libre` (residuos no catalogados).
+- Tabla `excepciones_residuo_ia`: se llena al pulsar "registrar igualmente" tras un `[BLOQUEO]`;
+  es auditoría para Gestión y realimenta el prompt (casos ya aprobados no se vuelven a bloquear).
 
 ---
 
