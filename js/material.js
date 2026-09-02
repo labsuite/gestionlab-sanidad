@@ -1305,7 +1305,13 @@ function openModalSubdividirLote(loteId) {
   sv('subdiv-lote-origen-id', loteOrigen.ID);
   document.getElementById('subdiv-mat-nombre').textContent = mat.Nombre;
   document.getElementById('subdiv-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
-  document.getElementById('subdiv-stock-origen').textContent = (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
+  const stockOrigen = parseFloat(loteOrigen.Stock_Local) || 0;
+  const unidadOrigen = loteOrigen.Unidad_Lote || mat.Unidad || '';
+  document.getElementById('subdiv-stock-origen').textContent = stockOrigen + ' ' + unidadOrigen;
+  // Por defecto se decanta el bote madre entero (comportamiento de siempre); la usuaria puede
+  // bajarlo si solo alicuota una parte. Ya no limita las cantidades de los botes de uso.
+  sv('subdiv-descontar', stockOrigen);
+  document.getElementById('subdiv-descontar-unidad').textContent = unidadOrigen;
   _subdivTemp = [{ idUbicacion: '', cantidad: '', unidad: '', stockMin: '', stockOpt: '', esteril: false }];
   renderSubdivModal();
   openModal('modal-subdividir-lote');
@@ -1418,14 +1424,19 @@ async function guardarSubdivision() {
   const idOrigen = loteOrigen.ID_Ubicacion;
   const unidadOrigen = loteOrigen.Unidad_Lote || mat.Unidad || '';
   const stockOrigen = parseFloat(loteOrigen.Stock_Local) || 0;
-  const totalRepartido = filas.reduce((s, f) => s + (parseFloat(f.cantidad) || 0), 0);
-  if (totalRepartido > stockOrigen) { showToast(`Stock insuficiente en el bote madre (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
+  // Las cantidades de los botes de uso ya no se comparan con el stock de la madre: al alicuotar
+  // "1 bote → 10 goteros" no son magnitudes comparables. Lo que se resta de la madre lo fija
+  // la usuaria en su propio campo.
+  const descontarMadre = parseFloat(v('subdiv-descontar'));
+  if (!(descontarMadre >= 0)) { showToast('Indica cuánto se descuenta del bote madre', 'error'); return; }
+  if (descontarMadre > stockOrigen) { showToast(`No puedes descontar más de lo que hay en el bote madre (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
   showLoading('Subdividiendo...');
   try {
     // Siempre se crea un bote nuevo por destino (nunca se fusiona con uno existente): evita
     // elegir a ciegas entre varios botes que pudiera haber ya en esa misma ubicación.
     await callEdgeFunction('gestionar-material', {
       accion: 'subdivision', id_material: matId, lote_origen_id: loteOrigenId, usuario: currentUser?.name || 'Usuario',
+      descontar_madre: descontarMadre,
       destinos: filas.map(f => ({ id_ubicacion: f.idUbicacion, cantidad: f.cantidad, unidad: f.unidad.trim(), stock_min: f.stockMin, stock_opt: f.stockOpt, esteril: !!f.esteril })),
     });
     await loadAllData();

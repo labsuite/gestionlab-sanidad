@@ -263,7 +263,15 @@ Deno.serve(async (req) => {
       if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
       const stockOrigen = Number(loteOrigen.stock_local) || 0;
       const totalRepartido = validos.reduce((s, f) => s + Number(f.cantidad), 0);
-      if (totalRepartido > stockOrigen) return jsonError(`Stock insuficiente en el bote madre (${stockOrigen})`, 400);
+      // Lo que se resta del bote madre lo fija quien subdivide (al alicuotar "1 bote → 10 goteros"
+      // las cantidades de los botes de uso no son comparables con el stock de la madre). Si no
+      // llega el campo (llamadas antiguas), se cae al comportamiento previo: restar el total.
+      const descontarMadreRaw = body.descontar_madre;
+      const descontarMadre = descontarMadreRaw === undefined || descontarMadreRaw === null || descontarMadreRaw === ""
+        ? totalRepartido
+        : Number(descontarMadreRaw);
+      if (!Number.isFinite(descontarMadre) || descontarMadre < 0) return jsonError("descontar_madre debe ser un número ≥ 0", 400);
+      if (descontarMadre > stockOrigen) return jsonError(`No puedes descontar más de lo que hay en el bote madre (${stockOrigen})`, 400);
 
       // Bloqueo optimista: la condición eq("stock_local", stockOrigen) hace que la escritura
       // solo tenga efecto si nadie más ha tocado el bote madre desde que lo leímos arriba. Sin
@@ -271,7 +279,7 @@ Deno.serve(async (req) => {
       // ambas la validación, y la segunda escritura pisaría a la primera (double-spend).
       const { data: loteActualizado, error: updateError } = await supabaseAdmin
         .from("material_ubicaciones")
-        .update({ stock_local: stockOrigen - totalRepartido })
+        .update({ stock_local: stockOrigen - descontarMadre })
         .eq("id", loteOrigenId)
         .eq("stock_local", loteOrigen.stock_local)
         .select()

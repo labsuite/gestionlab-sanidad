@@ -113,6 +113,12 @@ Caso real: alícuotas guardadas junto al bote madre (mismo estante/armario), no 
 - **Limitación que queda pendiente:** `guardarTraslado` sigue resolviendo el destino por `(matId, ubicación)` — si esa ubicación ya tiene 2+ lotes, coge el primero que encuentra. No es el caso de uso que motivó este cambio (trasladar es para mover a un sitio distinto, no para juntar en el mismo), pero si aparece, habría que aplicarle el mismo tratamiento de "siempre crear nuevo" o pedir explícitamente a qué lote sumar.
 - La UI de "editar material" (`_lotesTemp`, `seleccionarUbicacionMatLote`) **todavía bloquea** añadir dos ubicaciones iguales a mano (`js/material.js:582`) — ese camino no se tocó; solo Subdividir permite el caso de misma ubicación por ahora.
 
+### Cantidad a descontar de la madre desacoplada (2026-09-02)
+Antes, `guardarSubdivision` y la acción `subdivision` de `gestionar-material` sumaban las cantidades de todos los botes de uso y bloqueaban si el total superaba el stock del bote madre. Eso rompía el caso real de alicuotar "1 bote → 10 goteros": las cantidades de los botes de uso no son magnitudes comparables con el stock de la madre.
+- El modal `modal-subdividir-lote` tiene un campo nuevo **"A descontar del bote madre"** (`subdiv-descontar`), independiente de las cantidades de cada destino. Por defecto trae el stock entero de la madre (comportamiento previo: decantar el envase completo); se puede bajar si solo se alicuota una parte.
+- `guardarSubdivision` ya no compara `totalRepartido` con `stockOrigen`; solo valida que lo indicado en el campo sea `≥ 0` y `≤ stock de la madre`. Envía `descontar_madre` a la Edge Function.
+- La Edge Function resta `descontar_madre` del bote madre (con el mismo bloqueo optimista). Si el campo no llega (llamadas antiguas), cae al comportamiento previo de restar `totalRepartido`.
+
 ### Auditoría de la subdivisión (2026-08-12)
 - La resta de stock en el bote madre (acción `subdivision` de `gestionar-material`) usa bloqueo optimista: el `UPDATE` incluye `.eq("stock_local", <valor leído>)`, así que si dos subdivisiones del mismo bote madre se solapan, la segunda no pisa a la primera — falla con 409 y un mensaje pidiendo reintentar.
 - `guardarSubdivision` en `js/material.js` ya no descarta en silencio las filas a medio rellenar (ubicación sin cantidad o viceversa): bloquea el envío entero y pide completarlas o quitarlas. Las filas totalmente vacías (fila añadida con "+ Añadir destino" y no tocada) se siguen ignorando sin más, eso sí es lo esperado.

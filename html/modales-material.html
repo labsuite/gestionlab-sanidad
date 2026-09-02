@@ -311,6 +311,15 @@
         <div style="color:var(--text-muted);font-size:12px;margin-top:4px">
           Bote madre: <strong id="subdiv-origen-label"></strong> · Stock disponible: <strong id="subdiv-stock-origen"></strong>
         </div>
+        <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label for="subdiv-descontar" style="font-size:12px">A descontar del bote madre:</label>
+          <input type="number" id="subdiv-descontar" min="0" step="0.01"
+            style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <span id="subdiv-descontar-unidad" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Lo que se resta del bote madre al alicuotar (p.ej. <strong>1</strong> = se decanta un envase entero). Independiente de las cantidades de cada bote de uso.
+        </div>
       </div>
       <div id="subdiv-filas"></div>
       <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="_subdivAddFila()">+ Añadir destino</button>
