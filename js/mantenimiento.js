@@ -199,8 +199,8 @@ function buildMantenimientoEquipo(equipoId) {
             if (!periodos.length) {
               return `<div class="mant-plan-row" style="opacity:.6">
                 <span class="badge badge-gray" style="font-size:10px;min-width:80px">${plan.Tipo_Intervencion||'—'}</span>
-                <span style="font-size:11px;font-weight:500;flex:1">${plan.Periodicidad}</span>
-                <span style="font-size:11px;color:var(--text-muted);flex:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
+                <span style="font-size:11px;font-weight:500;flex:1;min-width:0">${plan.Periodicidad}</span>
+                <span style="font-size:11px;color:var(--text-muted);flex:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
                 <span class="badge badge-gray" style="font-size:10px">No aplica aún</span>
               </div>`;
             }
@@ -215,17 +215,20 @@ function buildMantenimientoEquipo(equipoId) {
                   : `<span class="badge badge-orange" style="font-size:10px">Pendiente</span>`);
               const tipoBadge = plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
               const instrKey = `${plan.ID_Plan}-${periodo}`.replace(/[^a-z0-9]/gi,'_');
-              const instrBtn = plan.Instrucciones
-                ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="Ver instrucciones"
+              // Si el plan no tiene instrucciones paso a paso, el propio texto de la
+              // operación hace de "cómo" — así toda fila pendiente tiene el botón.
+              const comoTexto = plan.Instrucciones || plan.Operacion || '';
+              const instrBtn = comoTexto
+                ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="Ver instrucciones"
                     onclick="event.stopPropagation();toggleMantInstr('${instrKey}')">▸ Cómo</button>`
                 : '';
-              const instrDiv = plan.Instrucciones
-                ? `<div id="mant-instr-${instrKey}" style="display:none;grid-column:1/-1;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.6;color:var(--text);margin-top:2px">${plan.Instrucciones}</div>`
+              const instrDiv = comoTexto
+                ? `<div id="mant-instr-${instrKey}" style="display:none;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.6;color:var(--text);margin-top:2px;overflow-wrap:break-word">${comoTexto}</div>`
                 : '';
               return `<div class="mant-plan-row">
                 <span class="badge ${tipoBadge}" style="font-size:10px;min-width:60px">${plan.Tipo_Intervencion||'—'}</span>
                 <span style="font-size:11px;font-weight:500;min-width:90px">${plan.Periodicidad} · ${labelPeriodo(periodo)}</span>
-                <span style="font-size:11px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
+                <span style="font-size:11px;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
                 ${instrBtn}
                 ${badge}
               </div>${instrDiv}`;
@@ -575,8 +578,9 @@ function _renderFilasPendientes(lista, canLog) {
   return lista.map(s => {
     const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
     const instrKey = `pend-${s.plan.ID_Plan}-${s.periodo}`.replace(/[^a-z0-9]/gi,'_');
-    const instrRow = s.plan.Instrucciones
-      ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${s.plan.Instrucciones}</td></tr>`
+    const comoTexto = s.plan.Instrucciones || s.plan.Operacion || '';
+    const instrRow = comoTexto
+      ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${comoTexto}</td></tr>`
       : '';
     const alumBadge = _esConAlumnado(s.plan)
       ? `<span title="Se puede realizar con alumnado" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0">👨‍🎓 alumnado</span>`
@@ -588,7 +592,7 @@ function _renderFilasPendientes(lista, canLog) {
       <td>${labelPeriodo(s.periodo)}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
       <td style="white-space:nowrap">
-        ${s.plan.Instrucciones ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
+        ${comoTexto ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
         ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
             onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
       </td>

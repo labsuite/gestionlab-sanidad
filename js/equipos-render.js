@@ -307,7 +307,10 @@ function buildIntervencionesEquipo(equipoId) {
       return b.origIdx - a.origIdx;             // mismo día → mayor índice (más reciente) primero
     })
     .slice(0, 8);
-  const mantSection = buildMantenimientoEquipo(equipoId);
+  // Envuelto en min-width:0 + overflow-x:auto por el mismo motivo que las intervenciones:
+  // que su min-content sea 0 y las filas del plan no expandan la tabla exterior.
+  const _mantHtml = buildMantenimientoEquipo(equipoId);
+  const mantSection = _mantHtml ? `<div style="min-width:0;overflow-x:auto">${_mantHtml}</div>` : '';
 
   if (!ints.length) return panelDetalles + mantSection + `<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Sin intervenciones registradas para este equipo.</div>`;
   const tipoBadge    = {'Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Validación':'badge-blue','Limpieza':'badge-gray','Descontaminación':'badge-gray','Sustitución de pieza':'badge-orange','Cambio de consumibles':'badge-orange','Control de temperatura':'badge-blue','Puesta en marcha':'badge-green','Actualización de software':'badge-blue'};
@@ -445,6 +448,7 @@ function renderIntervenciones(filtroTipo = '') {
     const pdfLink = i.URL_Adjunto ? `<a href="#" onclick="abrirDocumento('${i.URL_Adjunto}'); return false;" title="${i.Nombre_Adjunto||'Ver documento'}" class="icon-btn">📄</a>` : '';
     const intIdx  = DATA.intervenciones.indexOf(i);
     const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
+    const actFinalizada     = i.Actuacion_Finalizada === 'Sí';
     const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
 
     const chain = getChainIntervencion(i.ID_Intervencion);
@@ -469,7 +473,7 @@ function renderIntervenciones(filtroTipo = '') {
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
         ${pdfLink}
-        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">📋 Añadir tarea</button>` : ''}
+        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">${actFinalizada ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>` : ''}
         ${pendienteFactura ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalAdjuntarFactura(${intIdx})">📎 Factura</button>` : ''}
       </div></td>
     </tr>`;
