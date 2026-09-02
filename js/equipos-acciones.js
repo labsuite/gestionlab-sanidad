@@ -409,7 +409,7 @@ function abrirHiloIncidencia(incId) {
       if (c.Estado === 'Planificada')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">🔧 Ejecutar</button>`;
       else if (c.Estado === 'En gestión')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">📋 Añadir tarea</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>`;
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalAdjuntarFactura(${cIdx})">📎 Factura</button>`;
       if (c.Estado !== 'Cerrada')
@@ -660,8 +660,69 @@ function openModalRegistrarActuacion(intIdx) {
   else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
   toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
 
+  _aplicarModoModalActuacion(i);
   _renderTareasEnModal(i.ID_Intervencion);
   openModal('modal-registrar-actuacion');
+}
+
+// Ajusta el modal de actuación según si se está CREANDO una actuación nueva
+// (i == null, o intervención sin fecha de realización) o EDITANDO una ya
+// registrada / finalizada — para que quede claro que no se crea una nueva.
+function _aplicarModoModalActuacion(i) {
+  const titulo  = document.getElementById('act-modal-title');
+  const bEditar = document.getElementById('act-modo-editar-banner');
+  const bNueva  = document.getElementById('act-modo-nueva-banner');
+  const btnReab = document.getElementById('act-btn-reabrir');
+  const btnFin  = document.getElementById('act-btn-finalizar');
+
+  const finalizada   = !!i && i.Actuacion_Finalizada === 'Sí';
+  const yaRegistrada = !!i && !!i.Fecha_Realizacion;
+  const fechaTxt     = (i && i.Fecha_Realizacion) ? ' del ' + formatDate(i.Fecha_Realizacion) : '';
+
+  if (btnReab) btnReab.style.display = finalizada ? '' : 'none';
+  if (btnFin)  btnFin.textContent = finalizada ? 'Guardar cambios' : 'Guardar y finalizar actuación';
+
+  if (finalizada || yaRegistrada) {
+    if (titulo) titulo.textContent = `✏️ Editar actuación ${i.ID_Intervencion}`;
+    if (bNueva) bNueva.style.display = 'none';
+    if (bEditar) {
+      bEditar.style.display = '';
+      if (finalizada) {
+        bEditar.style.background = 'var(--warning-light,#fdf3e7)';
+        bEditar.style.border     = '1px solid var(--warning,#c17f3a)';
+        bEditar.style.color      = 'var(--warning,#c17f3a)';
+        bEditar.innerHTML = `Estás <strong>editando una actuación ya finalizada</strong>${fechaTxt}. Los cambios se guardan sobre <strong>${i.ID_Intervencion}</strong> — <strong>no se crea una actuación nueva</strong>. Para registrar una actuación distinta, cierra esto y usa «📅 Programar otra actuación» desde la ficha de la intervención.`;
+      } else {
+        bEditar.style.background = 'var(--accent-light)';
+        bEditar.style.border     = 'none';
+        bEditar.style.color      = 'var(--accent)';
+        bEditar.innerHTML = `Estás <strong>añadiendo a la actuación ${i.ID_Intervencion}</strong>${fechaTxt}, ya registrada. Puedes sumar tareas o corregir sus datos; no se crea una actuación nueva.`;
+      }
+    }
+  } else {
+    if (titulo) titulo.textContent = '🔧 Registrar actuación';
+    if (bEditar) bEditar.style.display = 'none';
+    if (bNueva)  bNueva.style.display = '';
+  }
+}
+
+// Reabre una actuación finalizada para poder seguir trabajando en ella.
+async function reabrirActuacion() {
+  const intIdx = parseInt(v('act-int-idx'));
+  const i = DATA.intervenciones[intIdx];
+  if (!i) { showToast('Intervención no encontrada', 'error'); return; }
+  if (!confirm(`Vas a reabrir la actuación ${i.ID_Intervencion}. Volverá a quedar en curso y podrás finalizarla otra vez cuando termines. ¿Continuar?`)) return;
+  showLoading('Reabriendo...');
+  try {
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'actualizar', id_intervencion: i.ID_Intervencion, actuacion_finalizada: false,
+    });
+    DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    _aplicarModoModalActuacion(DATA.intervenciones[intIdx]);
+    showToast('Actuación reabierta', 'success');
+    renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error al reabrir', 'error'); console.error(e); }
+  hideLoading();
 }
 
 function toggleActEjecucion(tipo) {
@@ -725,6 +786,7 @@ async function guardarActuacion(finalizar) {
         accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
         fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
         coste_intervencion: coste, estado: 'Planificada',
+        actuacion_finalizada: !!finalizar,
       }));
       DATA.intervenciones.push(_intervencionSbToObj(intervencion));
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
@@ -785,6 +847,7 @@ async function guardarActuacion(finalizar) {
       accion: 'actualizar', id_intervencion: i.ID_Intervencion,
       fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
       coste_intervencion: coste,
+      ...(finalizar ? { actuacion_finalizada: true } : {}),
       ...(urlAdjunto ? { url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto } : {}),
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
@@ -799,7 +862,9 @@ async function guardarActuacion(finalizar) {
 
     if (finalizar) {
       closeModal('modal-registrar-actuacion');
-      showToast(desc ? 'Tarea añadida como Pendiente. Márcala desde la ficha cuando toque.' : 'Actuación guardada', 'success');
+      showToast(desc
+        ? 'Actuación finalizada. Tarea añadida como Pendiente — márcala desde la ficha cuando toque.'
+        : 'Actuación finalizada. Para registrar otra distinta, usa «Programar otra actuación».', 'success');
       renderAll();
     } else {
       if (desc) _resetCamposTarea();
@@ -1090,6 +1155,7 @@ function openModalRegistrarActuacionDirecta(equipoId) {
   const radInterna = document.getElementById('act-ejec-interna');
   if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
 
+  _aplicarModoModalActuacion(null);
   openModal('modal-registrar-actuacion');
 }
 

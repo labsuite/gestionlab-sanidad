@@ -150,6 +150,7 @@ function _intervencionSbToObj(i) {
     Estado: i.estado || '',
     Fecha_Estimada_Resolucion: i.fecha_estimada_resolucion || '',
     Coste_Intervencion: i.coste_intervencion != null ? String(i.coste_intervencion) : '',
+    Actuacion_Finalizada: _boolSb(i.actuacion_finalizada),
   };
 }
 

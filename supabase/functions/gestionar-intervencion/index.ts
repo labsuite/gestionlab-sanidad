@@ -87,6 +87,7 @@ Deno.serve(async (req) => {
       coste_intervencion: numField(body.coste_intervencion),
       url_adjunto: strField(body.url_adjunto),
       nombre_adjunto: strField(body.nombre_adjunto),
+      actuacion_finalizada: boolField(body.actuacion_finalizada) ?? false,
     };
     const { data: intervencion, error } = await supabaseAdmin.from("intervenciones").insert(datos).select().single();
     if (error) return jsonError(`No se pudo crear: ${error.message}`, 400);
@@ -114,6 +115,9 @@ Deno.serve(async (req) => {
     for (const c of CAMPOS) if (c in body) datos[c] = (c === "coste_intervencion") ? numField(body[c]) : strField(body[c]);
     if ("equipo_operativo_tras_intervencion" in body) datos.equipo_operativo_tras_intervencion = boolField(body.equipo_operativo_tras_intervencion);
     if ("actualiza_proximo_preventivo" in body) datos.actualiza_proximo_preventivo = boolField(body.actualiza_proximo_preventivo);
+    // "Finalizar actuación" — marca explícita de la usuaria, independiente de `estado`
+    // (que se deriva de las tareas). boolField devuelve false tal cual, para poder reabrir.
+    if ("actuacion_finalizada" in body) datos.actuacion_finalizada = boolField(body.actuacion_finalizada);
 
     const { data: intervencion, error } = await supabaseAdmin.from("intervenciones")
       .update(datos).eq("id_intervencion", idIntervencion).select().single();

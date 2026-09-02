@@ -176,7 +176,8 @@ create table intervenciones (
   nombre_adjunto                         text,
   estado                                 text,   -- derivado de tareas_intervencion
   fecha_estimada_resolucion              date,
-  coste_intervencion                     numeric
+  coste_intervencion                     numeric,
+  actuacion_finalizada                   boolean not null default false  -- la usuaria pulsó "finalizar actuación"; distinto de estado (derivado de tareas)
 );
 
 create table incidencias (

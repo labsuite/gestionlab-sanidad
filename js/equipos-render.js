@@ -524,8 +524,9 @@ function renderIncidencias(filtroEstado = '') {
             ? `<button class="btn btn-secondary btn-sm" onclick="openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         } else {
+          const lblAccion = (intEnl && intEnl.Actuacion_Finalizada === 'Sí') ? '✏️ Editar actuación' : 'Ver / Actuar';
           btnAccion = intIdx >= 0
-            ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">Ver / Actuar</button>`
+            ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">${lblAccion}</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         }
       }
@@ -709,22 +710,27 @@ function openFichaIntervencion(intIdx) {
     : '<span style="color:var(--text-muted);font-size:12px">Sin documento adjunto</span>';
 
   // Botones de acción
+  const actFinalizada = i.Actuacion_Finalizada === 'Sí';
   const puedeRegistrar = puedeHacer('crearIntervenciones') &&
     (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
+  // Una actuación finalizada se puede reabrir/editar aunque ya esté Cerrada — a veces
+  // se registra algo mal y hay que corregirlo (el modal lo deja claro y ofrece "Reabrir").
+  const puedeEditarFinalizada = puedeHacer('crearIntervenciones') && actFinalizada;
   const pendienteFactura = i.Estado === 'Pendiente factura';
   // "Pendiente factura" solo significa que esta visita concreta se factura — no que el
   // problema esté resuelto (una tarea puede quedar Resuelto siendo solo un diagnóstico).
   // Por eso también se puede programar otra visita en ese estado, no solo desde "En gestión".
-  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && i.Estado !== 'Cerrada';
-  const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea';
+  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && (i.Estado !== 'Cerrada' || actFinalizada);
+  const equipoIdFicha = (i.Equipo || '').split(' – ')[0].trim();
+  const btnLabel = actFinalizada ? '✏️ Editar actuación' : (i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea');
   const acciones = document.getElementById('ficha-int-acciones');
   let btns = '';
-  if (puedeRegistrar)
-    btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
+  if (puedeRegistrar || puedeEditarFinalizada)
+    btns += `<button class="btn ${actFinalizada ? 'btn-secondary' : 'btn-primary'}" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
   if (pendienteFactura && puedeHacer('crearIntervenciones'))
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
   if (puedeNuevaVisita)
-    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');programarOtraVisita(${intIdx})">📅 Programar otra actuación</button>`;
+    btns += `<button class="btn ${actFinalizada ? 'btn-primary' : 'btn-secondary'}" onclick="closeModal('modal-ficha-intervencion');${incVinculada ? `programarOtraVisita(${intIdx})` : `openModalRegistrarActuacionDirecta('${equipoIdFicha}')`}">${incVinculada ? '📅 Programar otra actuación' : '🔧 Registrar otra actuación'}</button>`;
   if (incVinculada)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
   acciones.innerHTML = btns;
