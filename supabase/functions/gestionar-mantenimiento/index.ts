@@ -26,25 +26,93 @@ Deno.serve(async (req) => {
 
   const accion = String(body.accion || "");
 
-  if (accion === "registrar") {
+  // Ejecución de un mantenimiento: "guardar_progreso" deja/actualiza una fila 'en_curso'
+  // con el checklist a medias (compartida entre todo el personal, para retomarla en otra
+  // sesión); "finalizar" (alias antiguo: "registrar") la cierra fijando la fecha. Todo lo
+  // puede hacer también el Profesor responsable (requireStaff, igual que antes).
+  if (accion === "registrar" || accion === "finalizar" ||
+      accion === "guardar_progreso" || accion === "descartar_ejecucion") {
     const { error: authError, supabaseAdmin } = await requireStaff(req);
     if (authError) return authError;
+
+    if (accion === "descartar_ejecucion") {
+      const idRegistro = String(body.id_registro || "").trim();
+      if (!idRegistro) return jsonError("id_registro es obligatorio", 400);
+      const { error } = await supabaseAdmin.from("registro_mantenimientos")
+        .delete().eq("id_registro", idRegistro).eq("estado", "en_curso");
+      if (error) return jsonError(`No se pudo descartar la ejecución: ${error.message}`, 400);
+      return jsonOk({ descartado: idRegistro });
+    }
+
     const idPlan = String(body.id_plan || "").trim();
     const idEquipo = String(body.id_equipo || "").trim();
+    if (!idPlan || !idEquipo) return jsonError("id_plan e id_equipo son obligatorios", 400);
+    const curso = body.curso_academico ? String(body.curso_academico) : null;
+    const periodo = body.periodo ? String(body.periodo) : null;
+
+    const pasos = Array.isArray(body.pasos)
+      ? (body.pasos as unknown[]).map((p) => {
+          const o = (p ?? {}) as Record<string, unknown>;
+          return { texto: String(o.texto ?? ""), hecho: o.hecho === true };
+        })
+      : null;
+
+    // ¿Hay ya una ejecución en curso de este mismo mantenimiento?
+    let enCurso: Record<string, unknown> | null = null;
+    {
+      let q = supabaseAdmin.from("registro_mantenimientos").select("*")
+        .eq("id_plan", idPlan).eq("estado", "en_curso");
+      q = curso === null ? q.is("curso_academico", null) : q.eq("curso_academico", curso);
+      q = periodo === null ? q.is("periodo", null) : q.eq("periodo", periodo);
+      const { data } = await q.limit(1);
+      enCurso = data && data[0] ? data[0] : null;
+    }
+
+    if (accion === "guardar_progreso") {
+      const ahora = new Date().toISOString();
+      if (enCurso) {
+        const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+          .update({ pasos, actualizado_en: ahora })
+          .eq("id_registro", enCurso.id_registro as string).select().single();
+        if (error) return jsonError(`No se pudo guardar el progreso: ${error.message}`, 400);
+        return jsonOk({ registro: data });
+      }
+      const datos = {
+        id_registro: generarIdRegistro(), id_plan: idPlan, id_equipo: idEquipo,
+        curso_academico: curso, periodo,
+        estado: "en_curso", pasos,
+        fecha_inicio: ahora.slice(0, 10),
+        iniciado_por: body.iniciado_por ? String(body.iniciado_por) : null,
+        actualizado_en: ahora,
+      };
+      const { data, error } = await supabaseAdmin.from("registro_mantenimientos").insert(datos).select().single();
+      if (error) return jsonError(`No se pudo guardar el progreso: ${error.message}`, 400);
+      return jsonOk({ registro: data });
+    }
+
+    // accion === "finalizar" | "registrar"
     const fecha = String(body.fecha_realizacion || "").trim();
     const realizadoPor = String(body.realizado_por || "").trim();
-    if (!idPlan || !idEquipo || !fecha || !realizadoPor) {
-      return jsonError("id_plan, id_equipo, fecha_realizacion y realizado_por son obligatorios", 400);
+    if (!fecha || !realizadoPor) {
+      return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
-    const datos = {
-      id_registro: generarIdRegistro(), id_plan: idPlan, id_equipo: idEquipo,
-      curso_academico: body.curso_academico ? String(body.curso_academico) : null,
-      periodo: body.periodo ? String(body.periodo) : null,
+    const comun: Record<string, unknown> = {
+      id_equipo: idEquipo, curso_academico: curso, periodo,
       fecha_realizacion: fecha, realizado_por: realizadoPor,
       supervisado_por: body.supervisado_por ? String(body.supervisado_por) : null,
       observaciones: body.observaciones ? String(body.observaciones) : null,
+      estado: "finalizado",
+      actualizado_en: new Date().toISOString(),
     };
-    const { data, error } = await supabaseAdmin.from("registro_mantenimientos").insert(datos).select().single();
+    if (pasos) comun.pasos = pasos;
+    if (enCurso) {
+      const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+        .update(comun).eq("id_registro", enCurso.id_registro as string).select().single();
+      if (error) return jsonError(`No se pudo finalizar: ${error.message}`, 400);
+      return jsonOk({ registro: data });
+    }
+    const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+      .insert({ id_registro: generarIdRegistro(), id_plan: idPlan, ...comun }).select().single();
     if (error) return jsonError(`No se pudo registrar: ${error.message}`, 400);
     return jsonOk({ registro: data });
   }
@@ -88,5 +156,5 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idPlan });
   }
 
-  return jsonError("accion debe ser 'registrar', 'crear_plan', 'actualizar_plan' o 'eliminar_plan'", 400);
+  return jsonError("accion debe ser 'guardar_progreso', 'finalizar', 'registrar', 'descartar_ejecucion', 'crear_plan', 'actualizar_plan' o 'eliminar_plan'", 400);
 });

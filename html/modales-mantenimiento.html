@@ -1,8 +1,8 @@
-<!-- Modal Registrar Mantenimiento -->
+<!-- Modal Ejecutar / Registrar Mantenimiento -->
 <div class="modal-overlay" id="modal-registrar-mant">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Registrar mantenimiento realizado</div>
+      <div class="modal-title">Ejecutar mantenimiento</div>
       <button class="modal-close" onclick="closeModal('modal-registrar-mant')">✕</button>
     </div>
     <div class="modal-body">
@@ -11,6 +11,19 @@
       <input type="hidden" id="mant-id-equipo">
       <input type="hidden" id="mant-periodo">
       <input type="hidden" id="mant-curso">
+
+      <div class="form-group full" style="margin-bottom:14px">
+        <label style="display:flex;justify-content:space-between;align-items:center">
+          <span>Pasos del mantenimiento</span>
+          <span id="mant-checklist-progreso" style="font-weight:400;color:var(--text-muted);font-size:12px"></span>
+        </label>
+        <div id="mant-checklist" class="mant-checklist"></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">
+          Marca los pasos según los completes. Puedes <strong>guardar el progreso</strong> y retomarlo en otra sesión;
+          cuando esté todo hecho, pulsa <strong>Finalizar</strong>.
+        </div>
+      </div>
+
       <div class="form-grid form-grid-2">
         <div class="form-group">
           <label>Fecha de realización *</label>
@@ -31,7 +44,8 @@
       </div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-registrar-mant')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarRegistroMant()">Guardar registro</button>
+        <button class="btn btn-secondary" onclick="guardarProgresoMant()">💾 Guardar progreso</button>
+        <button class="btn btn-primary" onclick="finalizarMant()">Finalizar</button>
       </div>
     </div>
   </div>

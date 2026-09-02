@@ -1155,6 +1155,29 @@
     }
     .mant-plan-row:last-child { border-bottom: none; }
 
+    /* Checklist de ejecución de un mantenimiento (modal-registrar-mant) */
+    .mant-checklist {
+      display: flex; flex-direction: column; gap: 2px;
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 6px; margin-top: 6px;
+      max-height: 300px; overflow-y: auto;
+    }
+    .mant-checklist:empty::after {
+      content: "Este plan no tiene pasos definidos.";
+      color: var(--text-muted); font-size: 12px; padding: 8px;
+    }
+    .mant-check-item {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 8px; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 13px; line-height: 1.45;
+    }
+    .mant-check-item:hover { background: var(--bg); }
+    .mant-check-item input {
+      width: 17px; height: 17px; margin: 1px 0 0; flex: none;
+      accent-color: var(--accent); cursor: pointer;
+    }
+    .mant-check-item input:checked + span { color: var(--text-muted); text-decoration: line-through; }
+
     /* Importar profesorado – paso 2: una tarjeta plegable por profesor */
     .importar-prof-details > summary {
       cursor: pointer;

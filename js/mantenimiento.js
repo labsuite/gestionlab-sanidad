@@ -51,7 +51,7 @@ function _esCursoDebidoMultianual(plan, cursoAcademico) {
   const n = _CICLO_ANIOS[plan.Periodicidad];
   if (!n) return true; // Anual u otra: sin restricción de ciclo
   const cursosRealizados = DATA.registroMantenimientos
-    .filter(r => r.ID_Plan === plan.ID_Plan)
+    .filter(r => r.ID_Plan === plan.ID_Plan && r.Estado !== 'en_curso')
     .map(r => _añoInicioCurso(r.Curso_Academico));
   if (!cursosRealizados.length) return true;
   const ultimoAño = Math.max(...cursosRealizados);
@@ -103,10 +103,37 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   }
 }
 
+// Registro FINALIZADO (mantenimiento dado por hecho). Las ejecuciones a medias
+// (estado 'en_curso') NO cuentan aquí: para eso está getEjecucionMant().
 function getRegistroMant(idPlan, cursoAcademico, periodo) {
   return DATA.registroMantenimientos.find(r =>
-    r.ID_Plan === idPlan && r.Curso_Academico === cursoAcademico && r.Periodo === periodo
+    r.ID_Plan === idPlan && r.Curso_Academico === cursoAcademico &&
+    r.Periodo === periodo && r.Estado !== 'en_curso'
   );
+}
+
+// Ejecución a medias (checklist guardado sin finalizar) de este mantenimiento, si la hay.
+function getEjecucionMant(idPlan, cursoAcademico, periodo) {
+  return DATA.registroMantenimientos.find(r =>
+    r.ID_Plan === idPlan && r.Curso_Academico === cursoAcademico &&
+    r.Periodo === periodo && r.Estado === 'en_curso'
+  );
+}
+
+// Convierte el texto de "Instrucciones" del plan (una línea = un paso) en items de
+// checklist. Si el plan no tiene instrucciones, un único paso con el texto de la operación.
+function _pasosDesdePlan(plan) {
+  const lineas = (plan.Instrucciones || '').split(/\r?\n/)
+    .map(l => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, '').trim())
+    .filter(Boolean);
+  const textos = lineas.length ? lineas : [(plan.Operacion || 'Mantenimiento').trim()];
+  return textos.map(t => ({ texto: t, hecho: false }));
+}
+
+function _upsertRegistroMant(obj) {
+  const i = DATA.registroMantenimientos.findIndex(r => r.ID_Registro === obj.ID_Registro);
+  if (i >= 0) DATA.registroMantenimientos[i] = obj;
+  else DATA.registroMantenimientos.push(obj);
 }
 
 function getPlanStatusParaEquipo(equipoId) {
@@ -207,12 +234,22 @@ function buildMantenimientoEquipo(equipoId) {
             return periodos.map(periodo => {
               const reg = getRegistroMant(plan.ID_Plan, curso, periodo);
               const hecho = !!reg;
-              const badge = hecho
-                ? `<span class="badge badge-green" style="font-size:10px">✓ ${formatDate(reg.Fecha_Realizacion)||'Hecho'}</span>`
-                : (canLog
-                  ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap"
-                      onclick="event.stopPropagation();openModalRegistrarMant('${plan.ID_Plan}','${equipoId.replace(/'/g,"\\'")}','${periodo}','${curso}')">Registrar</button>`
-                  : `<span class="badge badge-orange" style="font-size:10px">Pendiente</span>`);
+              const eje = hecho ? null : getEjecucionMant(plan.ID_Plan, curso, periodo);
+              const ejeN = eje && Array.isArray(eje.Pasos) ? eje.Pasos.filter(p => p.hecho).length : 0;
+              const ejeTot = eje && Array.isArray(eje.Pasos) ? eje.Pasos.length : 0;
+              const abrirEjec = `event.stopPropagation();openModalRegistrarMant('${plan.ID_Plan}','${equipoId.replace(/'/g,"\\'")}','${periodo}','${curso}')`;
+              let badge;
+              if (hecho) {
+                badge = `<span class="badge badge-green" style="font-size:10px">✓ ${formatDate(reg.Fecha_Realizacion)||'Hecho'}</span>`;
+              } else if (eje) {
+                badge = canLog
+                  ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="${abrirEjec}">Continuar <span style="opacity:.65">${ejeN}/${ejeTot}</span></button>`
+                  : `<span class="badge badge-orange" style="font-size:10px">En curso ${ejeN}/${ejeTot}</span>`;
+              } else {
+                badge = canLog
+                  ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="${abrirEjec}">Registrar</button>`
+                  : `<span class="badge badge-orange" style="font-size:10px">Pendiente</span>`;
+              }
               const tipoBadge = plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
               const instrKey = `${plan.ID_Plan}-${periodo}`.replace(/[^a-z0-9]/gi,'_');
               // Si el plan no tiene instrucciones paso a paso, el propio texto de la
@@ -242,72 +279,157 @@ function buildMantenimientoEquipo(equipoId) {
 }
 
 // ============================================================
-// MODAL REGISTRAR MANTENIMIENTO
+// MODAL EJECUTAR MANTENIMIENTO (checklist de pasos + guardar a medias)
 // ============================================================
+let _mantEjecActual = null;   // { idPlan, idEquipo, periodo, curso }
+let _mantPasosActual = [];     // [{ texto, hecho }] — fuente de verdad de los textos
+
 function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
   const plan   = DATA.planesMantenimiento.find(p => p.ID_Plan === idPlan);
   const equipo = DATA.equipos.find(e => e.ID_Activo === idEquipo);
   if (!plan || !equipo) return;
 
+  const enCurso = getEjecucionMant(idPlan, curso, periodo);
+  const pasos = enCurso && Array.isArray(enCurso.Pasos) && enCurso.Pasos.length
+    ? enCurso.Pasos.map(p => ({ texto: String(p.texto || ''), hecho: p.hecho === true }))
+    : _pasosDesdePlan(plan);
+
+  _mantEjecActual = { idPlan, idEquipo, periodo, curso };
+
   const nombreEquipo = `${equipo.ID_Activo} – ${equipo.Tipo_Equipo || ''} ${equipo.Marca || ''}`.trim();
-  const instrHtml = plan.Instrucciones ? `
-    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Instrucciones paso a paso</div>
-      <div style="white-space:pre-line;line-height:1.7;color:var(--text)">${plan.Instrucciones}</div>
-    </div>` : '';
   document.getElementById('mant-info-plan').innerHTML = `
     <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:14px;font-size:12px;line-height:1.6">
       <div><strong>Equipo:</strong> ${nombreEquipo}</div>
-      <div><strong>Operación:</strong> ${plan.Operacion}</div>
+      <div><strong>Operación:</strong> ${plan.Operacion || '—'}</div>
       <div><strong>Tipo:</strong> ${plan.Tipo_Intervencion} · ${plan.Periodicidad} · ${labelPeriodo(periodo)}</div>
-      ${instrHtml}
+      ${enCurso ? `<div style="margin-top:6px;color:var(--accent)"><strong>▶ Ejecución empezada</strong> el ${formatDate(enCurso.Fecha_Inicio) || '—'}${enCurso.Iniciado_Por ? ' por ' + enCurso.Iniciado_Por : ''} — continúa donde se dejó.
+        <button class="btn-link" style="margin-left:8px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:11px;text-decoration:underline;padding:0" onclick="descartarEjecucionMant('${enCurso.ID_Registro}')">Descartar y empezar de cero</button></div>` : ''}
     </div>`;
+
+  _renderMantChecklist(pasos);
 
   document.getElementById('mant-id-plan').value    = idPlan;
   document.getElementById('mant-id-equipo').value  = idEquipo;
   document.getElementById('mant-periodo').value     = periodo;
   document.getElementById('mant-curso').value       = curso;
 
-  const hoy = new Date().toISOString().split('T')[0];
-  document.getElementById('mant-fecha').value = hoy;
+  document.getElementById('mant-fecha').value = new Date().toISOString().split('T')[0];
 
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
   document.getElementById('mant-realizado-por').value = u?.Nombre || currentUser?.name || '';
   document.getElementById('mant-supervisado-por').value = '';
-  document.getElementById('mant-observaciones').value   = '';
+  document.getElementById('mant-observaciones').value   = enCurso?.Observaciones || '';
 
   openModal('modal-registrar-mant');
 }
 
-async function guardarRegistroMant() {
-  const idPlan    = document.getElementById('mant-id-plan').value;
-  const idEquipo  = document.getElementById('mant-id-equipo').value;
-  const periodo   = document.getElementById('mant-periodo').value;
-  const curso     = document.getElementById('mant-curso').value;
-  const fecha     = document.getElementById('mant-fecha').value;
-  const quien     = document.getElementById('mant-realizado-por').value.trim();
+function _renderMantChecklist(pasos) {
+  _mantPasosActual = pasos.map(p => ({ texto: String(p.texto || ''), hecho: p.hecho === true }));
+  const cont = document.getElementById('mant-checklist');
+  if (!cont) return;
+  cont.innerHTML = _mantPasosActual.map((p, i) => `
+    <label class="mant-check-item">
+      <input type="checkbox" data-idx="${i}" ${p.hecho ? 'checked' : ''} onchange="_mantChecklistChanged()">
+      <span></span>
+    </label>`).join('');
+  cont.querySelectorAll('.mant-check-item span').forEach((s, i) => { s.textContent = _mantPasosActual[i].texto; });
+  _mantChecklistChanged();
+}
 
+function _mantChecklistChanged() {
+  const items = [...document.querySelectorAll('#mant-checklist input[type=checkbox]')];
+  const done = items.filter(cb => cb.checked).length;
+  const lbl = document.getElementById('mant-checklist-progreso');
+  if (lbl) lbl.textContent = items.length ? `${done}/${items.length} pasos` : '';
+}
+
+function _leerChecklist() {
+  return _mantPasosActual.map((p, i) => ({
+    texto: p.texto,
+    hecho: !!document.querySelector(`#mant-checklist input[data-idx="${i}"]`)?.checked,
+  }));
+}
+
+function _nombreUsuarioActual() {
+  const emailNorm = (currentUser?.email || '').toLowerCase().trim();
+  const u = DATA.usuarios.find(x => (x.Email || '').toLowerCase().trim() === emailNorm);
+  return u?.Nombre || currentUser?.name || '';
+}
+
+function _refrescarTrasMant() {
+  renderEquipos();
+  if (document.getElementById('page-mantenimiento')?.classList.contains('active')) renderMantenimiento();
+}
+
+async function guardarProgresoMant() {
+  if (!_mantEjecActual) return;
+  const { idPlan, idEquipo, periodo, curso } = _mantEjecActual;
+  showLoading('Guardando progreso...');
+  try {
+    const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'guardar_progreso',
+      id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
+      pasos: _leerChecklist(), iniciado_por: _nombreUsuarioActual(),
+    });
+    _upsertRegistroMant(_registroMantSbToObj(registro));
+    closeModal('modal-registrar-mant');
+    showToast('Progreso guardado — puedes retomarlo más adelante', 'success');
+    _refrescarTrasMant();
+  } catch (e) {
+    showToast('Error guardando el progreso', 'error');
+    console.error(e);
+  }
+  hideLoading();
+}
+
+async function descartarEjecucionMant(idRegistro) {
+  if (!idRegistro || !_mantEjecActual) return;
+  if (!confirm('¿Descartar el progreso guardado de este mantenimiento y empezar de cero?')) return;
+  const { idPlan, idEquipo, periodo, curso } = _mantEjecActual;
+  showLoading('Descartando...');
+  try {
+    await callEdgeFunction('gestionar-mantenimiento', { accion: 'descartar_ejecucion', id_registro: idRegistro });
+    const i = DATA.registroMantenimientos.findIndex(r => r.ID_Registro === idRegistro);
+    if (i >= 0) DATA.registroMantenimientos.splice(i, 1);
+    closeModal('modal-registrar-mant');
+    showToast('Progreso descartado', 'success');
+    _refrescarTrasMant();
+    openModalRegistrarMant(idPlan, idEquipo, periodo, curso);
+  } catch (e) {
+    showToast('Error al descartar el progreso', 'error');
+    console.error(e);
+  }
+  hideLoading();
+}
+
+async function finalizarMant() {
+  if (!_mantEjecActual) return;
+  const { idPlan, idEquipo, periodo, curso } = _mantEjecActual;
+  const fecha = document.getElementById('mant-fecha').value;
+  const quien = document.getElementById('mant-realizado-por').value.trim();
   if (!fecha) { showToast('Indica la fecha de realización', 'error'); return; }
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
 
-  showLoading('Guardando...');
+  const pasos = _leerChecklist();
+  const faltan = pasos.filter(p => !p.hecho).length;
+  if (faltan && !confirm(`Quedan ${faltan} paso(s) sin marcar. ¿Dar el mantenimiento por finalizado de todas formas?`)) return;
+
+  showLoading('Finalizando...');
   try {
     const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
-      accion: 'registrar', id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso,
-      periodo, fecha_realizacion: fecha, realizado_por: quien,
+      accion: 'finalizar',
+      id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
+      pasos, fecha_realizacion: fecha, realizado_por: quien,
       supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
     });
-    DATA.registroMantenimientos.push(_registroMantSbToObj(registro));
+    _upsertRegistroMant(_registroMantSbToObj(registro));
     closeModal('modal-registrar-mant');
-    showToast('Mantenimiento registrado', 'success');
-    renderEquipos();
-    if (document.getElementById('page-mantenimiento').classList.contains('active')) {
-      renderMantenimiento();
-    }
+    showToast('Mantenimiento finalizado', 'success');
+    _refrescarTrasMant();
   } catch (e) {
-    showToast('Error guardando el registro', 'error');
+    showToast('Error al finalizar el registro', 'error');
     console.error(e);
   }
   hideLoading();
@@ -454,7 +576,8 @@ function renderMantenimiento() {
       const periodos = getPeriodosEsperados(plan, eq, curso);
       periodos.forEach(periodo => {
         const reg = getRegistroMant(plan.ID_Plan, curso, periodo);
-        todoStatus.push({ equipo: eq, plan, periodo, curso, hecho: !!reg, registro: reg || null });
+        const eje = reg ? null : getEjecucionMant(plan.ID_Plan, curso, periodo);
+        todoStatus.push({ equipo: eq, plan, periodo, curso, hecho: !!reg, registro: reg || null, ejecucion: eje || null });
       });
     });
   });
@@ -462,6 +585,7 @@ function renderMantenimiento() {
   const total     = todoStatus.length;
   const hechos    = todoStatus.filter(s => s.hecho).length;
   const pendientes= total - hechos;
+  const enCurso   = todoStatus.filter(s => s.ejecucion).length;
   const pct       = total > 0 ? Math.round(hechos / total * 100) : 0;
 
   _pendientesCache = todoStatus.filter(s => !s.hecho).map(s => ({
@@ -474,7 +598,7 @@ function renderMantenimiento() {
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
       <div class="stat-card"><div class="stat-value">${pct}%</div><div class="stat-label">Completado curso ${curso}</div></div>
       <div class="stat-card"><div class="stat-value">${hechos}</div><div class="stat-label">Realizados</div></div>
-      <div class="stat-card"><div class="stat-value" style="color:${pendientes>0?'var(--danger)':'var(--success)'}">${pendientes}</div><div class="stat-label">Pendientes</div></div>
+      <div class="stat-card"><div class="stat-value" style="color:${pendientes>0?'var(--danger)':'var(--success)'}">${pendientes}</div><div class="stat-label">Pendientes${enCurso>0?` <span style="color:var(--accent);font-weight:600">(${enCurso} en curso)</span>`:''}</div></div>
       <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total esperados</div></div>
     </div>
 
@@ -585,16 +709,22 @@ function _renderFilasPendientes(lista, canLog) {
     const alumBadge = _esConAlumnado(s.plan)
       ? `<span title="Se puede realizar con alumnado" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0">👨‍🎓 alumnado</span>`
       : '';
+    const eje = s.ejecucion;
+    const ejeN = eje && Array.isArray(eje.Pasos) ? eje.Pasos.filter(p => p.hecho).length : 0;
+    const ejeTot = eje && Array.isArray(eje.Pasos) ? eje.Pasos.length : 0;
+    const ejeBadge = eje
+      ? `<span class="badge badge-orange" style="font-size:10px;margin-left:4px">▶ En curso ${ejeN}/${ejeTot}</span>`
+      : '';
     return `<tr>
       <td><strong>${s.equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${s.equipo.Tipo_Equipo||''} ${s.equipo.Marca||''}</span></td>
-      <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span>${alumBadge}</td>
+      <td><span class="badge ${tipoBadge}" style="font-size:10px">${s.plan.Tipo_Intervencion}</span>${alumBadge}${ejeBadge}</td>
       <td>${s.plan.Periodicidad}</td>
       <td>${labelPeriodo(s.periodo)}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s.plan.Operacion}">${s.plan.Operacion}</td>
       <td style="white-space:nowrap">
         ${comoTexto ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
         ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
-            onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">Registrar</button>` : ''}
+            onclick="openModalRegistrarMant('${s.plan.ID_Plan}','${s.equipo.ID_Activo}','${s.periodo}','${s.curso}')">${eje ? `Continuar ${ejeN}/${ejeTot}` : 'Registrar'}</button>` : ''}
       </td>
     </tr>${instrRow}`;
   }).join('');
@@ -646,7 +776,7 @@ function toggleMantInstr(key) {
 // ============================================================
 async function exportarModeloCalidad(cursoAcademico) {
   const curso = cursoAcademico || getCursoAcademico();
-  const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso);
+  const registros = DATA.registroMantenimientos.filter(r => r.Curso_Academico === curso && r.Estado !== 'en_curso');
   const planesActivos = DATA.planesMantenimiento.filter(p => p.Activo !== 'FALSE');
 
   // Devuelve TODOS los periodos del curso (incluidos futuros), para el documento anual
