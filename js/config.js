@@ -39,7 +39,7 @@ let DATA = {
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
-  revisionesInventario: [], consultasResiduo: [],
+  revisionesInventario: [], consultasResiduo: [], excepcionesResiduoIa: [],
   configReservas: [], reservas: [],
   registrosCabina: [], registrosAutoclave: [],
   // Supabase
@@ -68,7 +68,7 @@ const COLS = {
   historicoPrecio:    ['ID_Historico','Nombre_Material','ID_Pedido','Proveedor','Fecha','Precio_Unitario'],
   tareas:             ['ID_Tarea','Email','Texto','Fecha_Limite','Completada','Fecha_Creacion'],
   planesMantenimiento:    ['ID_Plan','ID_Equipo','Tipo_Intervencion','Periodicidad','Operacion','Activo','Instrucciones','Con_Alumnado'],
-  registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones'],
+  registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones','Estado','Pasos','Fecha_Inicio','Iniciado_Por','Actualizado_En'],
   tiposResiduo:           ['ID_Residuo','Nombre','Descripcion','Riesgo','Contenedor_Tipo','Lab','Zona'],
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
   adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],

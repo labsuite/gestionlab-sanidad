@@ -299,11 +299,11 @@ function _renderContenedoresActivos(lista, canEdit) {
       .sort((a,b) => b.Fecha.localeCompare(a.Fecha))
       .slice(0, 5)
       .map(a => {
-        const tr = DATA.tiposResiduo.find(t => t.ID_Residuo === a.ID_Residuo);
+        const tr = a.ID_Residuo ? DATA.tiposResiduo.find(t => t.ID_Residuo === a.ID_Residuo) : null;
         return `<div style="display:flex;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid var(--border-light,#f0f0f0)">
           <span style="color:var(--text-muted);min-width:80px">${formatDate(a.Fecha) || a.Fecha}</span>
           <span style="color:var(--text-muted);min-width:90px">${a.Usuario || '—'}</span>
-          <span><strong>${tr?.Nombre || a.ID_Residuo}</strong>${a.Observaciones ? ` · <span style="color:var(--text-muted)">${a.Observaciones}</span>` : ''}</span>
+          <span><strong>${tr?.Nombre || a.Descripcion_Libre || a.ID_Residuo || '—'}</strong>${!tr && a.Descripcion_Libre ? ' <span style="font-size:10px;color:#9a3412">(texto libre)</span>' : ''}${a.Observaciones ? ` · <span style="color:var(--text-muted)">${a.Observaciones}</span>` : ''}</span>
         </div>`;
       }).join('');
 
@@ -403,34 +403,98 @@ function openModalAdicion(idx) {
     warnEl.style.display = warnTxt ? 'block' : 'none';
   }
 
+  sv('adic-descripcion-libre', '');
+  const iaBox = document.getElementById('adic-ia-resultado');
+  if (iaBox) { iaBox.style.display = 'none'; iaBox.innerHTML = ''; }
+
   openModal('modal-adicion-res');
 }
 
-async function guardarAdicion() {
+// iaOverride=true → "registrar igualmente": salta SOLO la comprobación con IA de la
+// Edge Function, nunca la validación determinista de categoría/GHS. registrarExcepcion
+// solo va a true cuando el override viene de un bloqueo real de la IA (no de "IA no
+// disponible"), para que quede anotado en excepciones_residuo_ia y Gestión lo revise.
+async function guardarAdicion(iaOverride = false, motivoIa = '', registrarExcepcion = false) {
   const idx = editingRow;
   const idResiduo = v('adic-tipo-residuo');
+  const descLibre = (v('adic-descripcion-libre') || '').trim();
   const nuevoNivel = v('adic-nivel');
   const obs = v('adic-observaciones');
-  if (!idResiduo) { showToast('Selecciona el tipo de residuo', 'error'); return; }
+  if (!idResiduo && !descLibre) {
+    showToast('Elige un tipo de residuo de la lista o descríbelo', 'error');
+    return;
+  }
 
   const c = DATA.contenedoresResiduo[idx];
   const usuario = currentUser?.name || currentUser?.email || '';
+  const iaBox = document.getElementById('adic-ia-resultado');
+  if (!iaOverride && iaBox) { iaBox.style.display = 'none'; iaBox.innerHTML = ''; }
 
-  showLoading('Guardando...');
+  showLoading(iaOverride ? 'Guardando…' : 'Comprobando compatibilidad…');
   try {
-    const { adicion, contenedor } = await callEdgeFunction('gestionar-residuo', {
-      accion: 'añadir_adicion', id_contenedor: c.ID_Contenedor, id_residuo: idResiduo,
+    const resp = await callEdgeFunction('gestionar-residuo', {
+      accion: 'añadir_adicion', id_contenedor: c.ID_Contenedor,
+      id_residuo: idResiduo || null, descripcion_libre: descLibre || null,
       nivel: nuevoNivel, usuario, observaciones: obs,
+      ia_override: iaOverride, registrar_excepcion: registrarExcepcion, motivo_ia: motivoIa || null,
     });
-    DATA.adicionesResiduo.push(_adicionResiduoSbToObj(adicion));
-    Object.assign(c, _contenedorResiduoSbToObj(contenedor));
+
+    if (resp.ia_bloqueo) { _mostrarBloqueoIaAdicion(resp.mensaje, resp.contenedor_sugerido); return; }
+    if (resp.ia_no_verificado) { _mostrarIaNoVerificado(resp.mensaje); return; }
+
+    DATA.adicionesResiduo.push(_adicionResiduoSbToObj(resp.adicion));
+    Object.assign(c, _contenedorResiduoSbToObj(resp.contenedor));
+    if (resp.excepcion && Array.isArray(DATA.excepcionesResiduoIa)) {
+      DATA.excepcionesResiduoIa.push(_excepcionResiduoIaSbToObj(resp.excepcion));
+    }
 
     closeModal('modal-adicion-res');
     renderResiduosContenedores();
+    renderPanelConsultasResiduo();
     _updateBadgeResiduos();
-    showToast('Residuo registrado', 'success');
-  } catch(e) { showToast(e.message || 'Error al guardar', 'error'); }
-  hideLoading();
+    showToast(iaOverride ? 'Residuo registrado (aviso de la IA anotado para Gestión)' : 'Residuo registrado', 'success');
+  } catch(e) {
+    showToast(e.message || 'Error al guardar', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function _mostrarBloqueoIaAdicion(mensaje, contenedorSugerido) {
+  const box = document.getElementById('adic-ia-resultado');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:13px;color:#7f1d1d;line-height:1.5">
+      <strong>⛔ La IA no recomienda tirarlo en este contenedor</strong>
+      <div id="adic-ia-msg" style="margin-top:6px;white-space:pre-wrap"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" type="button" style="font-size:12px;padding:5px 12px" onclick="closeModal('modal-adicion-res')">Entendido, no lo tiro</button>
+        <button class="btn btn-danger" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">La IA se equivoca — registrar igualmente</button>
+      </div>
+      <div style="margin-top:6px;font-size:11px;color:#9a3412">Si lo registras igualmente, quedará anotado para que Gestión revise la clasificación.</div>
+    </div>`;
+  let txt = mensaje || 'Este residuo no parece compatible con el contenedor.';
+  if (contenedorSugerido && !/^\s*ningun/i.test(contenedorSugerido)) txt += `\n\nContenedor adecuado: ${contenedorSugerido}`;
+  document.getElementById('adic-ia-msg').textContent = txt;
+  document.getElementById('adic-forzar-ia').onclick = () => guardarAdicion(true, mensaje || '', true);
+}
+
+function _mostrarIaNoVerificado(mensaje) {
+  const box = document.getElementById('adic-ia-resultado');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML = `
+    <div style="padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:13px;color:#713f12;line-height:1.5">
+      <strong>⚠️ No se ha podido comprobar con la IA ahora mismo</strong>
+      <div id="adic-ia-msg" style="margin-top:6px;white-space:pre-wrap"></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-secondary" type="button" style="font-size:12px;padding:5px 12px" onclick="closeModal('modal-adicion-res')">Cancelar</button>
+        <button class="btn btn-primary" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">Registrar sin comprobar</button>
+      </div>
+    </div>`;
+  document.getElementById('adic-ia-msg').textContent = mensaje || 'La IA no está disponible en este momento.';
+  document.getElementById('adic-forzar-ia').onclick = () => guardarAdicion(true, '(IA no disponible)', false);
 }
 
 // ── Cerrar contenedor (lleno → crear nuevo vacío) ────────────
@@ -575,14 +639,19 @@ function renderPanelConsultasResiduo() {
   const contenedor = document.getElementById('panel-consultas-residuo');
   if (!contenedor) return;
   const rol = getUserRole();
+  const esStaff = rol === 'Administrador' || rol === 'Gestor';
   const pendientes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente')
     .sort((a, b) => (b.Prioridad === 'Alta') - (a.Prioridad === 'Alta'));
-  if ((rol !== 'Administrador' && rol !== 'Gestor') || !pendientes.length) {
+  const excepciones = (DATA.excepcionesResiduoIa || [])
+    .slice().sort((a, b) => (b.Fecha || '').localeCompare(a.Fecha || ''));
+
+  if (!esStaff || (!pendientes.length && !excepciones.length)) {
     contenedor.style.display = 'none';
     return;
   }
   contenedor.style.display = '';
-  contenedor.innerHTML = `
+
+  const bloqueConsultas = !pendientes.length ? '' : `
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
       <div style="font-size:13px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px">
         ♻️ Consultas de residuo pendientes de clasificar
@@ -612,6 +681,26 @@ function renderPanelConsultasResiduo() {
         </div>`;
       }).join('')}
     </div>`;
+
+  const bloqueExcepciones = !excepciones.length ? '' : `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px">
+        🤖 Adiciones registradas pese al aviso de la IA
+        <span class="badge badge-orange" style="font-size:11px">${excepciones.length}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Alguien pulsó "registrar igualmente" tras un bloqueo de la IA al añadir a un contenedor. Revisa que la clasificación del contenedor y del tipo de residuo sea correcta.</div>
+      ${excepciones.slice(0, 12).map(e => {
+        const tr = e.ID_Residuo ? DATA.tiposResiduo.find(t => t.ID_Residuo === e.ID_Residuo) : null;
+        const que = tr?.Nombre || e.Descripcion_Libre || e.ID_Residuo || '(sin detalle)';
+        return `<div style="border-top:1px solid var(--border);padding:9px 4px">
+          <div style="font-size:13px;font-weight:500">${que} → contenedor «${e.Categoria_Contenedor || '—'}»</div>
+          ${e.Motivo_IA ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin:2px 0">La IA objetó: "${e.Motivo_IA.slice(0,180)}${e.Motivo_IA.length>180?'…':''}"</div>` : ''}
+          <div style="font-size:12px;color:var(--text-muted)">👤 ${e.Usuario || '—'} &nbsp;·&nbsp; 📅 ${formatDate(e.Fecha)||e.Fecha||'—'}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  contenedor.innerHTML = bloqueConsultas + bloqueExcepciones;
 }
 
 function abrirModalTipoDesdeConsulta(idxConsulta) {

@@ -91,6 +91,115 @@ function chequearIncompatibilidad(
   return null;
 }
 
+// ── Comprobación con IA al añadir a un contenedor concreto ──
+// Segunda capa, por encima de la validación determinista de arriba: Gemini revisa
+// si el residuo (del catálogo o descrito en texto libre) encaja de verdad en ESE
+// contenedor, teniendo en cuenta lo que ya lleva dentro. Devuelve [OK] o
+// [BLOQUEO|categoria=..|contenedor_sugerido=..]. La clave nunca sale del servidor.
+
+// Réplica de _WARNINGS_FORMATO en js/residuos.js (matching parcial, minúsculas).
+const WARNINGS_FORMATO: { match: string; texto: string }[] = [
+  { match: "bidón azul", texto: "Los líquidos van en su propio bote cerrado y rotulado dentro del bidón; no verter directamente." },
+  { match: "cubo con tapa", texto: "No cerrar la tapa hasta que esté lleno y listo para Consenur; dejarla apoyada." },
+  { match: "contenedor rígido", texto: "No cerrar la tapa hasta que esté lleno y listo para Consenur; dejarla apoyada." },
+  { match: "bolsa plástica", texto: "Solo envases vacíos de plástico o aluminio; nada a granel ni con restos líquidos." },
+  { match: "garrafa", texto: "Mantener bien cerrada entre adiciones; zona ventilada, lejos de calor e ignición." },
+];
+function getWarningFormato(formato: string | null): string | null {
+  const f = (formato || "").toLowerCase();
+  if (!f) return null;
+  return WARNINGS_FORMATO.find((w) => f.includes(w.match))?.texto || null;
+}
+
+interface ContextoIA {
+  contenedor: { categoria: string; lab: string; formato: string | null };
+  contenidoActual: { nombre: string; riesgo: string; detalle: string }[];
+  itemCatalogo: { nombre: string; riesgo: string; contenedorTipo: string; detalle: string } | null;
+  textoLibre: string | null;
+  catalogo: { nombre: string; riesgo: string; contenedorTipo: string; detalle: string }[];
+  contenedoresActivos: { categoria: string; lab: string; formato: string | null }[];
+  excepciones: { que: string; motivo: string }[];
+}
+
+function construirHistoryComprobacionIA(ctx: ContextoIA): unknown[] {
+  const cont = ctx.contenedor;
+  const aviso = getWarningFormato(cont.formato);
+  const dentro = ctx.contenidoActual.length
+    ? ctx.contenidoActual.map((t) => `- ${t.nombre} | Riesgo GHS: ${t.riesgo || "ninguno"}${t.detalle ? " | Detalle: " + t.detalle : ""}`).join("\n")
+    : "(el contenedor está vacío o no tiene adiciones registradas)";
+  const aAnadir = ctx.itemCatalogo
+    ? `- Tipo del catálogo: ${ctx.itemCatalogo.nombre} | Riesgo GHS: ${ctx.itemCatalogo.riesgo || "ninguno"} | Contenedor asignado en el catálogo: ${ctx.itemCatalogo.contenedorTipo || "sin asignar"}${ctx.itemCatalogo.detalle ? " | Detalle: " + ctx.itemCatalogo.detalle : ""}`
+    : "";
+  const aAnadirLibre = ctx.textoLibre ? `- Descrito por la persona en texto libre: "${ctx.textoLibre}"` : "";
+  const catalogo = ctx.catalogo
+    .map((t) => `- ${t.nombre} | Riesgo: ${t.riesgo || "ninguno"} | Contenedor: ${t.contenedorTipo || "sin asignar"}${t.detalle ? " | Detalle: " + t.detalle : ""}`)
+    .join("\n");
+  const activos = ctx.contenedoresActivos.length
+    ? ctx.contenedoresActivos.map((c) => `- Lab ${c.lab} · ${c.categoria}${c.formato ? " (" + c.formato + ")" : ""}`).join("\n")
+    : "(no hay contenedores activos registrados)";
+  const excepciones = ctx.excepciones.length
+    ? ctx.excepciones.map((e) => `- ${e.que}${e.motivo ? ` (se había objetado: ${e.motivo})` : ""}`).join("\n")
+    : "(ninguno)";
+
+  const systemText = `Eres el validador de residuos de un laboratorio de FP sanitaria (CIFP Manuel Antonio). Alguien está a punto de tirar un residuo en un contenedor concreto. Tu única tarea es decir si es correcto tirarlo ahí o no.
+
+CONTENEDOR DE DESTINO:
+- Categoría: ${cont.categoria || "sin categoría"}
+- Laboratorio: ${cont.lab || "?"}
+- Formato: ${cont.formato || "sin especificar"}${aviso ? `\n- Aviso de formato: ${aviso}` : ""}
+
+LO QUE YA HAY DENTRO DE ESTE CONTENEDOR (tipos distintos ya registrados):
+${dentro}
+
+LO QUE SE QUIERE AÑADIR AHORA:
+${[aAnadir, aAnadirLibre].filter(Boolean).join("\n")}
+
+CATÁLOGO COMPLETO DE TIPOS DE RESIDUO DEL CENTRO (para localizar el contenedor correcto si este no lo es; usa el Detalle para desambiguar):
+${catalogo}
+
+CONTENEDORES ACTIVOS EN EL CENTRO:
+${activos}
+
+CASOS YA REVISADOS Y APROBADOS POR GESTIÓN para contenedores de categoría "${cont.categoria}". Si lo que se quiere añadir coincide claramente con uno de estos, considéralo COMPATIBLE y responde [OK]:
+${excepciones}
+
+REGLAS:
+- El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
+- Incompatibilidad química con lo que ya hay dentro: nunca juntar Comburente con Inflamable ni con Explosivo; nunca Corrosivo con Comburente; nunca Explosivo con Inflamable ni con Corrosivo. Un residuo Citotóxico o Cancerígeno / CMR nunca puede convivir con ningún otro tipo distinto en el mismo contenedor.
+- Si la descripción en texto libre es ambigua entre varios tipos con contenedor distinto, o no describe un residuo real, es INCOMPATIBLE: mejor parar y que lo revise una persona.
+- Nunca propongas verter por el desagüe ni tirar a la basura general, salvo que el "Detalle" del tipo del catálogo coincidente lo indique explícitamente.
+- Si detectas un riesgo agudo (derrame, presión/burbujeo, olor fuerte, mezcla accidental de incompatibles), es INCOMPATIBLE y dilo con claridad.
+
+FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con una de estas dos etiquetas, sin ningún texto antes, y ser BREVE (2 a 4 frases, sin listas largas):
+- [OK] → el residuo puede ir en ese contenedor. Añade una frase de confirmación y el aviso de formato si aplica.
+- [BLOQUEO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, Desconocido>|contenedor_sugerido=<la categoría de contenedor correcta, o "ninguno">] → el residuo NO puede ir ahí. Explica por qué en una frase y di a qué contenedor y laboratorio llevarlo (si existe uno activo compatible en el centro); si no existe ninguno, di que lo deje en su propio envase cerrado y rotulado en la zona de residuos pendientes y avise a su profesor/a.
+
+Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la etiqueta inicial.`;
+
+  return [
+    { role: "user", parts: [{ text: systemText }] },
+    { role: "model", parts: [{ text: "Entendido." }] },
+    { role: "user", parts: [{ text: "Contenedor destino categoría 'Aguas Laboratorio'. Se quiere añadir: PBS diluido sobrante de lavados, riesgo ninguno." }] },
+    { role: "model", parts: [{ text: "[OK] El PBS diluido es un residuo acuoso de bajo riesgo y encaja en el contenedor de Aguas de Laboratorio. Mantén la garrafa cerrada entre adiciones." }] },
+    { role: "user", parts: [{ text: "Contenedor destino categoría 'Aguas Laboratorio'. Se quiere añadir: etanol del paso de decoloración de una tinción de Gram." }] },
+    { role: "model", parts: [{ text: "[BLOQUEO|categoria=Inflamable|contenedor_sugerido=Disolventes no halogenados] El etanol de decoloración es un disolvente inflamable y no va en Aguas de Laboratorio. Llévalo al contenedor de Disolventes no halogenados; si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
+  ];
+}
+
+function parseRespuestaComprobacionIA(texto: string): { ok: boolean; categoria: string; contenedorSugerido: string; cuerpo: string } {
+  const limpio = (texto || "").trim();
+  if (/^\[OK\]/i.test(limpio)) {
+    return { ok: true, categoria: "", contenedorSugerido: "", cuerpo: limpio.replace(/^\[OK\]\s*/i, "") };
+  }
+  const m = /^\[BLOQUEO\|categoria=([^|\]]+)\|contenedor_sugerido=([^\]]*)\]/i.exec(limpio);
+  if (m) {
+    return { ok: false, categoria: m[1].trim(), contenedorSugerido: m[2].trim(), cuerpo: limpio.replace(/^\[BLOQUEO\|[^\]]*\]\s*/i, "") };
+  }
+  // Fail-safe: la IA respondió pero sin respetar el formato → bloquear (más seguro
+  // que dejar pasar sin verificar; la persona siempre puede forzar el registro).
+  return { ok: false, categoria: "Desconocido", contenedorSugerido: "ninguno", cuerpo: limpio || "No se ha podido interpretar la comprobación de la IA." };
+}
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -113,52 +222,136 @@ Deno.serve(async (req) => {
 
     const idContenedor = String(body.id_contenedor || "").trim();
     const idResiduo = String(body.id_residuo || "").trim();
+    const descripcionLibre = String(body.descripcion_libre || "").trim();
     const nivel = String(body.nivel || "").trim();
     const usuario = String(body.usuario || "").trim();
-    if (!idContenedor || !idResiduo || !nivel) {
-      return jsonError("id_contenedor, id_residuo y nivel son obligatorios", 400);
+    // "registrar igualmente" tras un bloqueo de la IA: salta SOLO la capa IA,
+    // nunca la validación determinista de Nivel 1/2 de abajo.
+    const iaOverride = body.ia_override === true;
+    // true solo cuando el override viene de un bloqueo real de la IA (no de "IA no
+    // disponible"): así queda registrado en excepciones_residuo_ia y alimenta el prompt.
+    const registrarExcepcion = body.registrar_excepcion === true;
+    const motivoIa = String(body.motivo_ia || "").trim();
+
+    if (!idContenedor || !nivel || (!idResiduo && !descripcionLibre)) {
+      return jsonError("id_contenedor, nivel y (id_residuo o descripcion_libre) son obligatorios", 400);
     }
 
-    // ── Nivel 1: el tipo de residuo debe coincidir con la categoría del contenedor ──
-    const { data: residuo, error: errResiduo } = await supabaseAdmin
-      .from("tipos_residuo").select("id_residuo, contenedor_tipo, riesgo")
-      .eq("id_residuo", idResiduo).single();
-    if (errResiduo || !residuo) return jsonError(`No se encontró el tipo de residuo "${idResiduo}"`, 400);
-
     const { data: contenedorActual, error: errContActual } = await supabaseAdmin
-      .from("contenedores_residuo").select("id_contenedor, categoria")
+      .from("contenedores_residuo").select("id_contenedor, categoria, lab, formato")
       .eq("id_contenedor", idContenedor).single();
     if (errContActual || !contenedorActual) return jsonError(`No se encontró el contenedor "${idContenedor}"`, 400);
 
-    if ((residuo.contenedor_tipo || "") !== (contenedorActual.categoria || "")) {
-      return jsonError(
-        `Este residuo es de tipo "${residuo.contenedor_tipo || "sin categoría"}" y el contenedor es de categoría "${contenedorActual.categoria || "sin categoría"}": no coinciden.`,
-        400,
-      );
+    type TipoResiduo = { id_residuo: string; contenedor_tipo: string | null; riesgo: string | null; nombre: string; descripcion: string | null };
+    let residuo: TipoResiduo | null = null;
+    if (idResiduo) {
+      const { data, error: errResiduo } = await supabaseAdmin
+        .from("tipos_residuo").select("id_residuo, nombre, descripcion, contenedor_tipo, riesgo")
+        .eq("id_residuo", idResiduo).single();
+      if (errResiduo || !data) return jsonError(`No se encontró el tipo de residuo "${idResiduo}"`, 400);
+      residuo = data as TipoResiduo;
+
+      // ── Nivel 1 (determinista, bloqueo duro): categoría del contenedor ──
+      if ((residuo.contenedor_tipo || "") !== (contenedorActual.categoria || "")) {
+        return jsonError(
+          `Este residuo es de tipo "${residuo.contenedor_tipo || "sin categoría"}" y el contenedor es de categoría "${contenedorActual.categoria || "sin categoría"}": no coinciden.`,
+          400,
+        );
+      }
     }
 
-    // ── Nivel 2: incompatibilidad GHS con lo que ya hay dentro de este contenedor ──
+    // ── Contenido actual del contenedor (para Nivel 2 y para la IA) ──
     const { data: adicionesExistentes, error: errAdicExist } = await supabaseAdmin
-      .from("adiciones_residuo").select("id_residuo").eq("id_contenedor", idContenedor);
+      .from("adiciones_residuo").select("id_residuo, descripcion_libre").eq("id_contenedor", idContenedor);
     if (errAdicExist) return jsonError(`No se pudo comprobar el contenido actual del contenedor: ${errAdicExist.message}`, 400);
 
-    const idsExistentesDistintos = [...new Set((adicionesExistentes || []).map((a) => a.id_residuo))]
+    const idsExistentesDistintos = [...new Set((adicionesExistentes || []).map((a: { id_residuo: string | null }) => a.id_residuo).filter(Boolean))]
       .filter((id) => id !== idResiduo);
 
+    type TipoContenido = { id_residuo: string; nombre: string; descripcion: string | null; riesgo: string | null };
+    let tiposExistentes: TipoContenido[] = [];
     if (idsExistentesDistintos.length > 0) {
-      const { data: tiposExistentes, error: errTiposExist } = await supabaseAdmin
-        .from("tipos_residuo").select("id_residuo, riesgo").in("id_residuo", idsExistentesDistintos);
-      if (errTiposExist) return jsonError(`No se pudo comprobar la compatibilidad: ${errTiposExist.message}`, 400);
+      const { data } = await supabaseAdmin
+        .from("tipos_residuo").select("id_residuo, nombre, descripcion, riesgo")
+        .in("id_residuo", idsExistentesDistintos);
+      tiposExistentes = (data || []) as TipoContenido[];
+    }
 
+    // ── Nivel 2 (determinista, bloqueo duro): incompatibilidad GHS — solo si hay tipo del catálogo ──
+    if (residuo && idsExistentesDistintos.length > 0) {
       const riesgosNuevo = parseRiesgo(residuo.riesgo);
       const riesgosExistentes = (tiposExistentes || []).map((t) => parseRiesgo(t.riesgo));
       const conflicto = chequearIncompatibilidad(riesgosNuevo, riesgosExistentes, true);
       if (conflicto) return jsonError(`No se puede añadir este residuo a este contenedor: ${conflicto}.`, 400);
     }
 
+    // ── Capa IA: ¿de verdad se puede tirar esto en ESTE contenedor? ──
+    if (!iaOverride) {
+      const [{ data: catalogo }, { data: contenedoresActivos }, { data: excepcionesFilas }] = await Promise.all([
+        supabaseAdmin.from("tipos_residuo").select("nombre, riesgo, contenedor_tipo, descripcion"),
+        supabaseAdmin.from("contenedores_residuo").select("categoria, lab, formato").eq("estado", "activo"),
+        supabaseAdmin.from("excepciones_residuo_ia").select("id_residuo, descripcion_libre, motivo_ia")
+          .eq("categoria_contenedor", contenedorActual.categoria || ""),
+      ]);
+
+      const excepcionesTipoIds = [...new Set((excepcionesFilas || []).map((e: { id_residuo: string | null }) => e.id_residuo).filter(Boolean))];
+      const nombreExcepcion = new Map<string, string>();
+      if (excepcionesTipoIds.length) {
+        const { data: excepcionesTipos } = await supabaseAdmin
+          .from("tipos_residuo").select("id_residuo, nombre").in("id_residuo", excepcionesTipoIds);
+        for (const t of (excepcionesTipos || []) as { id_residuo: string; nombre: string }[]) nombreExcepcion.set(t.id_residuo, t.nombre);
+      }
+
+      const ctx: ContextoIA = {
+        contenedor: { categoria: contenedorActual.categoria || "", lab: String(contenedorActual.lab || ""), formato: contenedorActual.formato },
+        contenidoActual: (tiposExistentes || []).map((t) => ({ nombre: t.nombre, riesgo: t.riesgo || "", detalle: t.descripcion || "" })),
+        itemCatalogo: residuo
+          ? { nombre: residuo.nombre || "", riesgo: residuo.riesgo || "", contenedorTipo: residuo.contenedor_tipo || "", detalle: residuo.descripcion || "" }
+          : null,
+        textoLibre: descripcionLibre || null,
+        catalogo: (catalogo || []).map((t) => ({ nombre: t.nombre, riesgo: t.riesgo || "", contenedorTipo: t.contenedor_tipo || "", detalle: t.descripcion || "" })),
+        contenedoresActivos: (contenedoresActivos || []).map((c) => ({ categoria: c.categoria || "", lab: String(c.lab || ""), formato: c.formato })),
+        excepciones: (excepcionesFilas || []).map((e) => ({
+          que: e.id_residuo ? (nombreExcepcion.get(e.id_residuo) || e.id_residuo) : (e.descripcion_libre || "(sin descripción)"),
+          motivo: e.motivo_ia || "",
+        })),
+      };
+
+      let respuestaIa: string | null = null;
+      try {
+        respuestaIa = await llamarGeminiChat(construirHistoryComprobacionIA(ctx));
+      } catch (e) {
+        // IA no disponible: si hay tipo del catálogo, ya ha pasado la validación
+        // determinista (Nivel 1/2) y se permite; si es solo texto libre, no hay
+        // nada que lo respalde, así que se devuelve "no verificado" y decide la persona.
+        console.error("Comprobación IA no disponible:", e instanceof Error ? e.message : e);
+        if (!residuo) {
+          return jsonOk({
+            ia_no_verificado: true,
+            mensaje: "No se ha podido comprobar la compatibilidad con la IA en este momento. Si estás seguro, puedes registrarlo igualmente; si no, deja el residuo etiquetado en la zona de residuos pendientes y avisa a tu profesor/a.",
+          });
+        }
+      }
+
+      if (respuestaIa !== null) {
+        const veredicto = parseRespuestaComprobacionIA(respuestaIa);
+        if (!veredicto.ok) {
+          return jsonOk({
+            ia_bloqueo: true,
+            mensaje: veredicto.cuerpo,
+            categoria_ia: veredicto.categoria,
+            contenedor_sugerido: veredicto.contenedorSugerido,
+          });
+        }
+      }
+    }
+
+    // ── Registro de la adición ──
     const fecha = hoy();
     const datosAdicion = {
-      id_adicion: generarId("AD"), id_contenedor: idContenedor, id_residuo: idResiduo,
+      id_adicion: generarId("AD"), id_contenedor: idContenedor,
+      id_residuo: idResiduo || null,
+      descripcion_libre: idResiduo ? null : (descripcionLibre || null),
       fecha, usuario: usuario || null,
       observaciones: body.observaciones ? String(body.observaciones) : null,
     };
@@ -166,13 +359,28 @@ Deno.serve(async (req) => {
       .from("adiciones_residuo").insert(datosAdicion).select().single();
     if (errAdicion) return jsonError(`No se pudo registrar la adición: ${errAdicion.message}`, 400);
 
+    let excepcion = null;
+    if (iaOverride && registrarExcepcion) {
+      const { data: exc } = await supabaseAdmin.from("excepciones_residuo_ia").insert({
+        id_excepcion: generarId("EXC"),
+        id_contenedor: idContenedor,
+        categoria_contenedor: contenedorActual.categoria || null,
+        id_residuo: idResiduo || null,
+        descripcion_libre: idResiduo ? null : (descripcionLibre || null),
+        motivo_ia: motivoIa || null,
+        usuario: usuario || null,
+        fecha: new Date().toISOString(),
+      }).select().single();
+      excepcion = exc || null;
+    }
+
     const { data: contenedor, error: errCont } = await supabaseAdmin
       .from("contenedores_residuo")
       .update({ nivel, fecha_actualizacion: fecha, actualizado_por: usuario || null })
       .eq("id_contenedor", idContenedor).select().single();
     if (errCont) return jsonError(`Adición guardada pero no se pudo actualizar el nivel: ${errCont.message}`, 400);
 
-    return jsonOk({ adicion, contenedor });
+    return jsonOk({ adicion, contenedor, excepcion });
   }
 
   // ── Consultorio de residuos: proxy del chat con Gemini (cualquier sesión válida) ──

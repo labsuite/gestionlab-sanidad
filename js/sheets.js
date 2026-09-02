@@ -193,6 +193,11 @@ function _registroMantSbToObj(r) {
     Realizado_Por: r.realizado_por || '',
     Supervisado_Por: r.supervisado_por || '',
     Observaciones: r.observaciones || '',
+    Estado: r.estado || 'finalizado',
+    Pasos: Array.isArray(r.pasos) ? r.pasos : null,
+    Fecha_Inicio: r.fecha_inicio || '',
+    Iniciado_Por: r.iniciado_por || '',
+    Actualizado_En: r.actualizado_en || '',
   };
 }
 
@@ -381,9 +386,23 @@ function _adicionResiduoSbToObj(a) {
     ID_Adicion: a.id_adicion || '',
     ID_Contenedor: a.id_contenedor || '',
     ID_Residuo: a.id_residuo || '',
+    Descripcion_Libre: a.descripcion_libre || '',
     Fecha: (a.fecha || '').slice(0, 10),
     Usuario: a.usuario || '',
     Observaciones: a.observaciones || '',
+  };
+}
+
+function _excepcionResiduoIaSbToObj(e) {
+  return {
+    ID_Excepcion: e.id_excepcion || '',
+    ID_Contenedor: e.id_contenedor || '',
+    Categoria_Contenedor: e.categoria_contenedor || '',
+    ID_Residuo: e.id_residuo || '',
+    Descripcion_Libre: e.descripcion_libre || '',
+    Motivo_IA: e.motivo_ia || '',
+    Usuario: e.usuario || '',
+    Fecha: (e.fecha || '').slice(0, 10),
   };
 }
 
@@ -501,6 +520,7 @@ async function loadAllData() {
            sbConfigReservasRes, sbReservasRes,
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
+           sbExcepcionesResiduoIaRes,
            sbTareasPersonalesRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
@@ -539,6 +559,7 @@ async function loadAllData() {
       _sbMigracion.from('contenedores_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('adiciones_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('excepciones_residuo_ia').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
@@ -566,6 +587,7 @@ async function loadAllData() {
     DATA.adicionesResiduo        = (sbAdicionesResiduoRes?.data || []).map(_adicionResiduoSbToObj);
     DATA.revisionesInventario    = (sbRevisionesRes?.data || []).map(_revisionInventarioSbToObj);
     DATA.consultasResiduo        = (sbConsultasResiduoRes?.data || []).map(_consultaResiduoSbToObj);
+    DATA.excepcionesResiduoIa    = (sbExcepcionesResiduoIaRes?.data || []).map(_excepcionResiduoIaSbToObj);
     DATA.configReservas          = (sbConfigReservasRes?.data || []).map(_configReservaSbToObj);
     DATA.reservas                = (sbReservasRes?.data || []).map(_reservaSbToObj);
     DATA.registrosCabina         = (sbRegistrosCabinaRes?.data || []).map(_registroCabinaSbToObj);

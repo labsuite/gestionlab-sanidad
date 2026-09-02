@@ -226,8 +226,22 @@ create table registro_mantenimientos (
   fecha_realizacion   date,
   realizado_por       text,
   supervisado_por     text,
-  observaciones       text
+  observaciones       text,
+  estado              text not null default 'finalizado',  -- 'en_curso' | 'finalizado'
+  pasos               jsonb,                                -- [{texto, hecho}] checklist de la ejecución
+  fecha_inicio        date,                                 -- cuándo se empezó (ejecución a medias)
+  iniciado_por        text,
+  actualizado_en      timestamptz not null default now()
 );
+
+-- Migración: ejecución de mantenimientos por pasos, con guardado a medias.
+-- Una fila puede quedar 'en_curso' (checklist a medias, sin fecha_realizacion) y pasar a
+-- 'finalizado' cuando se da por terminada. Las filas antiguas quedan 'finalizado'.
+alter table registro_mantenimientos add column if not exists estado text not null default 'finalizado';
+alter table registro_mantenimientos add column if not exists pasos jsonb;
+alter table registro_mantenimientos add column if not exists fecha_inicio date;
+alter table registro_mantenimientos add column if not exists iniciado_por text;
+alter table registro_mantenimientos add column if not exists actualizado_en timestamptz not null default now();
 
 -- ============================================================
 -- 4. RESIDUOS
@@ -282,6 +296,27 @@ create table consultas_residuo (
 alter table consultas_residuo add column if not exists categoria_ia text;
 alter table consultas_residuo add column if not exists guia_provisional text;
 alter table consultas_residuo add column if not exists prioridad text not null default 'Normal';
+
+-- Migración: comprobación IA al añadir a un contenedor.
+-- Se admite registrar una adición de un residuo NO catalogado (texto libre): id_residuo
+-- pasa a ser opcional y se guarda la descripción escrita por la persona.
+alter table adiciones_residuo alter column id_residuo drop not null;
+alter table adiciones_residuo add column if not exists descripcion_libre text;
+
+-- Cada vez que alguien pulsa "registrar igualmente" tras un bloqueo de la IA queda
+-- registrado aquí: sirve de auditoría para Gestión y se le pasa a la IA en futuras
+-- comprobaciones de esa categoría de contenedor para que no vuelva a bloquear el mismo caso.
+create table if not exists excepciones_residuo_ia (
+  id_excepcion          text primary key,
+  id_contenedor         text references contenedores_residuo(id_contenedor) on delete set null,
+  categoria_contenedor  text,
+  id_residuo            text references tipos_residuo(id_residuo) on delete set null,
+  descripcion_libre     text,
+  motivo_ia             text,   -- qué objetó la IA y se decidió ignorar
+  usuario               text,
+  fecha                 timestamptz not null default now()
+);
+alter table excepciones_residuo_ia enable row level security;
 
 -- ============================================================
 -- 5. RESERVAS DE EQUIPOS
@@ -565,4 +600,5 @@ create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon, a
 create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon, authenticated using (true);
 create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon, authenticated using (true);
 create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon, authenticated using (true);
+create policy "excepciones_residuo_ia_select_anon" on excepciones_residuo_ia for select to anon, authenticated using (true);
 create policy "tareas_personales_select_anon" on tareas_personales for select to anon, authenticated using (true);
