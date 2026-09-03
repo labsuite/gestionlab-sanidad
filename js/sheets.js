@@ -260,6 +260,7 @@ function _pedidoSbToObj(p) {
     Numero_Factura: p.numero_factura || '',
     Observaciones: p.observaciones || '',
     Doc_Hoja_Generada: p.doc_hoja_generada ? 'TRUE' : '',
+    Doc_Hoja_Path: p.doc_hoja_path || '',
     Doc_Hoja_Completada: '',
     Doc_Enviada_Jefatura: p.doc_enviada_jefatura ? 'TRUE' : '',
     Ciclo: p.ciclo || '',

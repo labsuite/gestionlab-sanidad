@@ -56,6 +56,18 @@ Búsqueda de solicitud origen: 2 intentos — por ID en Observaciones ("Desde so
 - `Doc_Enviada_Jefatura` (col P) — hoja enviada a jefatura
 - `toggleDocPedido(pedidoId, campo, valor)` — actualiza el campo en Sheets col por col
 
+## Folla de pedido generada — se conserva solo la última (2026-09-03)
+`generarHojaPedido` (`js/generador.js`) sube el `.docx` a Storage y ahora guarda su ruta en
+`pedidos.doc_hoja_path` (columna nueva) vía `gestionar-pedido` `actualizar_campos`. En cada
+regeneración se **reemplaza**: `subir-documento` (`tipo === 'documento'`) hace `storage.list`
++ `remove` de la carpeta `documentos-generados/<id_pedido>/` antes de subir la nueva, así que
+esa carpeta solo tiene un archivo. La ficha del pedido ("Documentación interna",
+`js/pedidos-render.js`) muestra un botón "📥 Abrir" junto a "📄 Hoja de pedido generada"
+cuando `p.Doc_Hoja_Path` tiene valor — antes el único enlace era el efímero del modal de
+generación. `obtener-documento` firma la ruta con `requireValidSession` (no es `facturas/`);
+el botón solo se renderiza para Admin/Gestor porque toda la sección es `puedeEditar`.
+Requiere `python scripts/migrar_doc_hoja_path.py`.
+
 ## Eliminar línea de pedido
 `eliminarLineaPedido(lineaId, pedidoId)` en `js/pedidos-acciones.js`: al eliminar una línea en estado `Pendiente`, busca la solicitud vinculada (2 intentos) y la revierte a `Pendiente` limpiando `Lista_Pedido`, si estaba en `Añadida a pedido` o `En espera de recepción`. Toast diferenciado según si se revirtió o no.
 

@@ -425,6 +425,7 @@ create table pedidos (
   numero_factura                    text,
   observaciones                     text,
   doc_hoja_generada                 boolean not null default false,
+  doc_hoja_path                     text,   -- ruta en Storage de la ÚLTIMA folla de pedido generada (se reemplaza en cada regeneración)
   doc_enviada_jefatura               boolean not null default false,
   ciclo                              text,
   modulo                             text,

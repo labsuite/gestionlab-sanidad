@@ -102,7 +102,7 @@ Deno.serve(async (req) => {
     // Whitelist — cubre proveedor, gasto extra, ciclo/módulo, factura, docs.
     const permitidos = [
       "proveedor", "gasto_extra_concepto", "gasto_extra_importe", "ciclo", "modulo",
-      "numero_factura", "fecha_factura", "numero_presupuesto", "doc_hoja_generada", "doc_enviada_jefatura",
+      "numero_factura", "fecha_factura", "numero_presupuesto", "doc_hoja_generada", "doc_hoja_path", "doc_enviada_jefatura",
     ];
     const campos = (body.campos && typeof body.campos === "object") ? body.campos as Record<string, unknown> : {};
     const datos: Record<string, unknown> = {};

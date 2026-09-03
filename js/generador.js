@@ -209,10 +209,14 @@ async function generarHojaPedido() {
         const base64data = e.target.result.split(',')[1];
         const path = await subirDocumento('documento', pedidoId, base64data, fileName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         setGenEstado(`✅ Listo. <a href="#" onclick="abrirDocumento('${path}'); return false;" style="color:var(--accent);font-weight:600;text-decoration:underline">📥 Abrir documento</a>`, 'ok');
-        // Marcar Doc_Hoja_Generada
-        if (pedIdx !== -1 && DATA.pedidos[pedIdx].Doc_Hoja_Generada !== 'TRUE') {
+        // Guardar la ruta de la hoja generada. Se conserva solo la última
+        // (subir-documento ya borró la anterior de este pedido); se reescribe
+        // en cada regeneración para que la ficha del pedido pueda reabrirla,
+        // no solo el enlace efímero de este modal.
+        if (pedIdx !== -1) {
           DATA.pedidos[pedIdx].Doc_Hoja_Generada = 'TRUE';
-          try { await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { doc_hoja_generada: true } }); } catch(e) { console.warn('No se pudo marcar Doc_Hoja_Generada', e); }
+          DATA.pedidos[pedIdx].Doc_Hoja_Path = path;
+          try { await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { doc_hoja_generada: true, doc_hoja_path: path } }); } catch(e) { console.warn('No se pudo guardar la hoja generada', e); }
           if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
         }
       } catch(err) { setGenEstado('Error subiendo el documento: ' + err.message, 'error'); }

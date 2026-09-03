@@ -624,10 +624,11 @@ function verDetallePedido(pedidoId) {
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px">
             <input type="checkbox" id="chk-hoja-generada" ${p.Doc_Hoja_Generada==='TRUE'?'checked':''} disabled style="width:16px;height:16px">
             <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>
-          </label>
+            ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir</button>` : ''}
+          </div>
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Generada==='TRUE' ? 'pointer' : 'not-allowed'}">
             <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${p.Doc_Hoja_Generada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
             <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>

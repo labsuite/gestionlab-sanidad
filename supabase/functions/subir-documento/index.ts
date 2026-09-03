@@ -75,7 +75,18 @@ Deno.serve(async (req) => {
   }
 
   const nombreSaneado = nombre_archivo.replace(/[^a-zA-Z0-9_.-]/g, "_");
-  const path = `${CARPETAS[tipo]}/${id}/${Date.now()}-${nombreSaneado}`;
+  const carpetaId = `${CARPETAS[tipo]}/${id}`;
+
+  // La folla de pedido generada ("documento") se conserva solo la última:
+  // antes de subir la nueva, se borra cualquier hoja anterior de ESTE pedido.
+  if (tipo === "documento") {
+    const { data: previos } = await supabaseAdmin.storage.from("documentos").list(carpetaId);
+    if (previos?.length) {
+      await supabaseAdmin.storage.from("documentos").remove(previos.map((f) => `${carpetaId}/${f.name}`));
+    }
+  }
+
+  const path = `${carpetaId}/${Date.now()}-${nombreSaneado}`;
 
   const { error: uploadErr } = await supabaseAdmin.storage
     .from("documentos")
