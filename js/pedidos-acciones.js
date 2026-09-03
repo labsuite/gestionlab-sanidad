@@ -282,7 +282,8 @@ async function guardarRecepcionMasiva() {
     .map(l => ({
       id_linea: l.ID_Linea,
       cantidad: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
-      observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || ''
+      observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '',
+      id_ubicacion: document.getElementById('recmas-ubic-' + l.ID_Linea)?.value || ''
     }))
     .filter(x => x.cantidad > 0);
   if (!aRecibir.length) { showToast('Introduce al menos una cantidad', 'error'); return; }
@@ -316,6 +317,7 @@ async function guardarRecepcionLinea() {
     return;
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
+  const idUbicacion = document.getElementById('rec-ubicacion-group')?.style.display !== 'none' ? v('rec-ubicacion-sel') : '';
   const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
   if (!mat && cantRec > 0) {
     closeModal('modal-recepcion-linea');
@@ -334,7 +336,7 @@ async function guardarRecepcionLinea() {
     showToast('Este material no está catalogado. Completa su ficha para continuar.', 'error');
     return;
   }
-  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'));
+  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion);
 }
 
 // ── Orquestador principal de recepción ───────────────────────
@@ -342,10 +344,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');

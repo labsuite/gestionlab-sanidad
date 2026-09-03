@@ -20,9 +20,31 @@ async function buscarMaterialPorNombre(supabaseAdmin: any, nombreLinea: string) 
   return (todos || []).find((m: any) => nombreLinea.startsWith(m.nombre)) || null;
 }
 
-async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: number, pedidoId: string, usuario: string, unidadLinea: string | null) {
-  const { data: lotes } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", mat.id_material);
-  if ((lotes || []).length > 0) {
+async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: number, pedidoId: string, usuario: string, unidadLinea: string | null, idUbicacion: string | null) {
+  const { data: lotesData } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", mat.id_material);
+  const lotes = lotesData || [];
+  if (idUbicacion) {
+    // Ubicación elegida al recibir: usa el bote que ya hubiera ahí, o crea uno
+    // nuevo — un pedido puede reabastecer un sitio que hasta ahora no tenía
+    // stock de este material (mismo criterio que el destino de un Traslado).
+    const loteExistente = lotes.find((l: any) => l.id_ubicacion === idUbicacion);
+    let stockNuevoLote: number;
+    if (loteExistente) {
+      stockNuevoLote = (Number(loteExistente.stock_local) || 0) + cantRec;
+      const datosLote: Record<string, unknown> = { stock_local: stockNuevoLote };
+      if (unidadLinea) datosLote.unidad_lote = unidadLinea;
+      await supabaseAdmin.from("material_ubicaciones").update(datosLote).eq("id", loteExistente.id);
+    } else {
+      stockNuevoLote = cantRec;
+      await supabaseAdmin.from("material_ubicaciones").insert({
+        id: genId("LU"), id_material: mat.id_material, id_ubicacion: idUbicacion,
+        stock_local: cantRec, stock_minimo_local: 0, stock_optimo_local: 0, unidad_lote: unidadLinea || null,
+      });
+    }
+    const idLoteExistente = loteExistente?.id;
+    const nuevoTotal = lotes.reduce((s: number, l: any) => s + (l.id === idLoteExistente ? 0 : (Number(l.stock_local) || 0)), 0) + stockNuevoLote;
+    await supabaseAdmin.from("material").update({ stock_actual: nuevoTotal }).eq("id_material", mat.id_material);
+  } else if (lotes.length > 0) {
     const loteTarget = lotes[0];
     const nuevoLocal = (Number(loteTarget.stock_local) || 0) + cantRec;
     const datosLote: Record<string, unknown> = { stock_local: nuevoLocal };
@@ -74,7 +96,7 @@ async function actualizarSolicitudOrigen(supabaseAdmin: any, linea: any, pedidoI
   }).eq("id_solicitud", solOrigen.id_solicitud);
 }
 
-async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string) {
+async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null) {
   const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
   if (!linea) return { error: jsonError(`No se encontró la línea "${idLinea}"`, 404) };
   const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", linea.pedido).maybeSingle();
@@ -92,7 +114,7 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   // Servicios: no hay stock que tocar.
   if (pedido.tipo !== "Servicio" && cantRec > 0) {
     const mat = await buscarMaterialPorNombre(supabaseAdmin, linea.material);
-    if (mat) await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null);
+    if (mat) await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
   if (estadoLinea === "Recibido") await actualizarSolicitudOrigen(supabaseAdmin, lineaActualizada, linea.pedido);
@@ -219,7 +241,7 @@ Deno.serve(async (req) => {
     const cantRec = Number(body.cantidad);
     if (!idLinea) return jsonError("id_linea es obligatorio", 400);
     if (!cantRec || cantRec <= 0) return jsonError("Indica una cantidad válida", 400);
-    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre);
+    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion));
     if (resultado.error) return resultado.error;
     return jsonOk(resultado);
   }
@@ -234,7 +256,7 @@ Deno.serve(async (req) => {
     for (const l of lineas) {
       const cantRec = Number(l.cantidad);
       if (!cantRec || cantRec <= 0) continue;
-      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre);
+      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion));
       if (r.error) { errores++; resultados.push({ id_linea: l.id_linea, ok: false }); }
       else { procesadas++; resultados.push({ id_linea: l.id_linea, ok: true }); }
     }

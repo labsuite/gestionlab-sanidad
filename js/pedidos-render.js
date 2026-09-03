@@ -875,6 +875,7 @@ function openModalRecepcionMasiva(pedidoId) {
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">En este albarán *</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Ubicación</th>
         <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Obs.</th>
       </tr>
     </thead>
@@ -883,19 +884,49 @@ function openModalRecepcionMasiva(pedidoId) {
         const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
         const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
         const unidad = _unidadLineaPedido(l);
+        const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+        const ubicCell = mat
+          ? `<select id="recmas-ubic-${l.ID_Linea}" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:12px">${_opcionesUbicacionRecepcion(mat.ID_Material, unidad)}</select>`
+          : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
         return `<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:8px 6px;font-weight:500">${l.Material}</td>
           <td style="padding:8px 6px;color:var(--text-soft)">${unidad || '—'}</td>
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${l.Cantidad_Pedida}</td>
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
           <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
+          <td style="padding:8px 6px">${ubicCell}</td>
           <td style="padding:8px 6px"><input type="text" id="recmas-obs-${l.ID_Linea}" placeholder="opcional" style="width:130px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
         </tr>`;
       }).join('')}
     </tbody>
   </table>
   <div style="font-size:11px;color:var(--text-muted);margin-top:8px">* Pon 0 si el artículo no viene en este albarán</div>`;
+  lineas.forEach(l => {
+    const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+    if (!mat) return;
+    const sel = document.getElementById('recmas-ubic-' + l.ID_Linea);
+    if (!sel) return;
+    const lotes = getMatUbics(mat.ID_Material);
+    if (lotes.length === 1) sel.value = lotes[0].ID_Ubicacion;
+    else if (mat.Ubicacion) sel.value = mat.Ubicacion;
+  });
   openModal('modal-recepcion-masiva');
+}
+
+// Opciones de ubicación al recibir una línea de pedido: TODAS las ubicaciones
+// activas del catálogo (no solo las que ya tienen bote de este material),
+// porque a veces un pedido reabastece un sitio nuevo. Las que ya tienen bote
+// muestran su stock actual; elegir una sin bote crea uno nuevo al confirmar
+// (mismo criterio que el destino de un Traslado, ver guardarTraslado).
+function _opcionesUbicacionRecepcion(matId, unidad) {
+  const lotes = getMatUbics(matId);
+  const porUbicacion = {};
+  lotes.forEach(l => { porUbicacion[l.ID_Ubicacion] = l; });
+  return DATA.ubicaciones.filter(u => u.Activa !== 'FALSE').map(u => {
+    const lote = porUbicacion[u.ID_Ubicacion];
+    const stock = lote ? ` (stock: ${parseFloat(lote.Stock_Local) || 0} ${lote.Unidad_Lote || unidad || ''})` : '';
+    return `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}${stock}</option>`;
+  }).join('');
 }
 
 function openModalRecepcion(lineaId, pedidoId) {
@@ -907,6 +938,10 @@ function openModalRecepcion(lineaId, pedidoId) {
   document.getElementById('rec-grupo-cantidad').style.display = esServicio ? 'none' : '';
   document.getElementById('rec-ya-recibida-group').style.display = 'none';
   document.getElementById('btn-confirmar-recepcion').textContent = esServicio ? 'Confirmar realizado' : 'Confirmar recepción';
+  const grupoUbic = document.getElementById('rec-ubicacion-group');
+  const selUbic = document.getElementById('rec-ubicacion-sel');
+  grupoUbic.style.display = 'none';
+  selUbic.innerHTML = '';
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (l) {
     const unidad = esServicio ? '' : _unidadLineaPedido(l);
@@ -918,6 +953,14 @@ function openModalRecepcion(lineaId, pedidoId) {
       if (yaRec > 0) {
         document.getElementById('rec-cantidad-ya-recibida').textContent = yaRec + (unidad ? ' ' + unidad : '');
         document.getElementById('rec-ya-recibida-group').style.display = '';
+      }
+      const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+      if (mat) {
+        selUbic.innerHTML = _opcionesUbicacionRecepcion(mat.ID_Material, unidad);
+        const lotes = getMatUbics(mat.ID_Material);
+        if (lotes.length === 1) selUbic.value = lotes[0].ID_Ubicacion;
+        else if (mat.Ubicacion) selUbic.value = mat.Ubicacion;
+        grupoUbic.style.display = '';
       }
     }
   }
