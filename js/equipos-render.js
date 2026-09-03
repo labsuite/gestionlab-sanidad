@@ -509,10 +509,15 @@ function renderIncidencias(filtroEstado = '') {
   container.innerHTML = items.map(i => {
     let btnAccion = '';
     let metaGestion = '';
+    let badgeInt = '';
     if (i.Estado === 'En gestión' && i.Intervencion_Generada) {
       const intEnl = DATA.intervenciones.find(x => x.ID_Intervencion === i.Intervencion_Generada);
       const intIdx = intEnl ? DATA.intervenciones.indexOf(intEnl) : -1;
       if (intEnl) {
+        // Rótulo que deja claro que hay una intervención abierta enlazada (la edición
+        // de sus actuaciones se hace desde "🔗 Hilo", no desde la tarjeta).
+        if (intEnl.Estado !== 'Cerrada')
+          badgeInt = `<span class="badge badge-blue">🔧 ${intEnl.ID_Intervencion} · ${intEnl.Estado || 'abierta'}</span>`;
         const tareasEnl = getTareasIntervencion(intEnl.ID_Intervencion);
         metaGestion = tareasEnl.length
           ? `<span class="inc-fecha">${tareasEnl.filter(t => t.Resultado==='Resuelto'||t.Resultado==='Descartado').length}/${tareasEnl.length} tareas</span>`
@@ -557,6 +562,7 @@ function renderIncidencias(filtroEstado = '') {
     <div class="inc-card-meta">
       ${i.Urgencia === 'Urgente' ? '<span class="badge badge-red">Urgente</span>' : ''}
       <span class="badge ${estadoBadge[i.Estado] || 'badge-gray'}">${i.Estado || '—'}</span>
+      ${badgeInt}
       ${metaGestion}
       <span class="inc-fecha">${formatDate(i.Fecha_Hora) || '—'}</span>
     </div>
