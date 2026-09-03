@@ -183,3 +183,9 @@ Caso: un material que se compra en más de un formato (ej. azul de lactofenol en
   3. Actualiza `DATA.material` y re-renderiza
 - `eliminarEquipo()` en `js/equipos-acciones.js`: elimina la fila de `Equipos` con `sheetsDeleteRow`
 - `eliminarIncidencia(incId)` en `js/equipos-acciones.js`: botón "Eliminar" en cada `.inc-card` para Administrador. Si tiene `Intervencion_Generada`, el `confirm()` lo advierte. Usa `sheetsDeleteRow('Incidencias', idx)`.
+
+## Subida del Word de "Generar folla de pedido" — dos listas blancas de MIME (2026-09-03)
+`generarHojaPedido` (`js/generador.js`) crea el `.docx` con JSZip y lo sube vía `subirDocumento('documento', ...)` → Edge Function `subir-documento`. Hay **dos** filtros de tipo que deben coincidir:
+1. `TIPOS_MIME_PERMITIDOS` en `supabase/functions/subir-documento/index.ts` (ya incluye `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
+2. `allowed_mime_types` del **bucket `documentos`** en Supabase Storage (config del bucket, no está en el repo). Si falta el tipo aquí, el upload falla con `mime type ... wordprocessingml.document is not supported` **aunque la Edge Function lo permita**.
+Corregido el 2026-09-03 añadiendo el tipo docx al bucket (`update storage.buckets set allowed_mime_types = array_append(...) where id='documentos'`). El bucket ahora acepta: pdf, jpeg, png, docx.

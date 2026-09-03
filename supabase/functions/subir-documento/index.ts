@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     return jsonError("Faltan campos: id, nombre_archivo, tipo_mime, contenido_base64", 400);
   }
   if (!TIPOS_MIME_PERMITIDOS.includes(tipo_mime)) {
-    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (solo PDF, JPEG, PNG)`, 400);
+    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (solo PDF, JPEG, PNG o Word .docx)`, 400);
   }
 
   let bytes: Uint8Array;
