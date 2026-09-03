@@ -523,10 +523,14 @@ function renderIncidencias(filtroEstado = '') {
           btnAccion = intIdx >= 0
             ? `<button class="btn btn-secondary btn-sm" onclick="openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
+        } else if (intEnl && intEnl.Actuacion_Finalizada === 'Sí') {
+          // Actuación finalizada: la edición se hace SOLO desde el hilo. Una incidencia
+          // puede acumular varias actuaciones, así que un botón "Editar actuación" aquí
+          // sería ambiguo (¿cuál se edita?). El botón "🔗 Hilo" ya da acceso a todas.
+          btnAccion = '';
         } else {
-          const lblAccion = (intEnl && intEnl.Actuacion_Finalizada === 'Sí') ? '✏️ Editar actuación' : 'Ver / Actuar';
           btnAccion = intIdx >= 0
-            ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">${lblAccion}</button>`
+            ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">Ver / Actuar</button>`
             : `<span class="text-muted" style="font-size:11px">${i.Intervencion_Generada}</span>`;
         }
       }

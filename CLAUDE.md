@@ -242,8 +242,13 @@ Edge Function; `guardar_tarea` no la toca. Uso en cliente (`Actuacion_Finalizada
   actuación INT-XXX", banner ámbar de aviso ("no se crea una actuación nueva") y botón
   "↩︎ Reabrir actuación" (`reabrirActuacion`, pone la columna a `false`). Si está solo
   registrada (tiene `fecha_realizacion`) pero no finalizada → mismo título con banner azul.
-- Los botones de entrada (tabla Intervenciones, ficha, incidencias, hilo) pasan de
+- Los botones de entrada (tabla Intervenciones, ficha, hilo) pasan de
   "📋 Añadir tarea" a "✏️ Editar actuación" cuando está finalizada.
+- **Excepción — lista de Incidencias reportadas** (`renderIncidencias`): con la actuación
+  finalizada NO se muestra botón de edición en la tarjeta (solo "🔗 Hilo" y "Eliminar"). Una
+  incidencia puede acumular varias actuaciones, así que un "Editar actuación" ahí sería
+  ambiguo; la edición se hace siempre desde el hilo. Mientras la actuación no está finalizada
+  la tarjeta sí muestra "Ver / Actuar".
 - Para una actuación **distinta** del mismo equipo: "📅 Programar otra actuación" en la ficha
   (crea una intervención encadenada), no reabrir la finalizada.
 
