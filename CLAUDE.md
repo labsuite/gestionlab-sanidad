@@ -220,6 +220,35 @@ existen aquí.
 
 ---
 
+## Tabla `intervenciones` — columnas
+
+id_intervencion, id_equipo, tipo, origen, fecha_planificada, fecha_realizacion,
+realizado_por, tecnico_externo, proveedor, descripcion_actuacion, resultado,
+equipo_operativo_tras_intervencion, url_adjunto, factura_asociada,
+actualiza_proximo_preventivo, observaciones, nombre_adjunto, estado,
+fecha_estimada_resolucion, coste_intervencion, actuacion_finalizada.
+
+Una **Intervención** es una actuación/visita; cada `tareas_intervencion` es una acción
+concreta dentro de ella. `resultado` y `estado` son **derivados** de las tareas por la Edge
+Function `gestionar-intervencion` (`calcularResultadoAgregado` / `calcularEstadoIntervencion`)
+— no se editan a mano.
+
+`actuacion_finalizada` (boolean not null default false, añadido 2026-09-02): marca **explícita**
+de que la usuaria pulsó "Guardar y finalizar actuación", independiente de `estado` (que puede
+seguir "En gestión" si quedan tareas Pendiente). La escribe/borra la acción `actualizar` de la
+Edge Function; `guardar_tarea` no la toca. Uso en cliente (`Actuacion_Finalizada` tras
+`_intervencionSbToObj`, valor `'Sí'`/`'No'`):
+- Al abrir el modal de actuación sobre una intervención finalizada → título "✏️ Editar
+  actuación INT-XXX", banner ámbar de aviso ("no se crea una actuación nueva") y botón
+  "↩︎ Reabrir actuación" (`reabrirActuacion`, pone la columna a `false`). Si está solo
+  registrada (tiene `fecha_realizacion`) pero no finalizada → mismo título con banner azul.
+- Los botones de entrada (tabla Intervenciones, ficha, incidencias, hilo) pasan de
+  "📋 Añadir tarea" a "✏️ Editar actuación" cuando está finalizada.
+- Para una actuación **distinta** del mismo equipo: "📅 Programar otra actuación" en la ficha
+  (crea una intervención encadenada), no reabrir la finalizada.
+
+---
+
 ## Tipos de intervención – lista canónica
 
 Aplica a los tres selects: `int-tipo` (modal intervención), `plan-tipo` (plan desde incidencia) y `act-tipo-int` (modal actuación). **No incluir "Preventivo"** — el mantenimiento preventivo se gestiona desde Planes_Mantenimiento.
