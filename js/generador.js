@@ -218,6 +218,8 @@ async function generarHojaPedido() {
           DATA.pedidos[pedIdx].Doc_Hoja_Path = path;
           try { await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { doc_hoja_generada: true, doc_hoja_path: path } }); } catch(e) { console.warn('No se pudo guardar la hoja generada', e); }
           if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
+          if (typeof renderPedidos === 'function') renderPedidos(); // refrescar la lista (badge 📄) sin esperar a recargar
+
         }
       } catch(err) { setGenEstado('Error subiendo el documento: ' + err.message, 'error'); }
       btn.disabled = false; btn.textContent = 'Generar Word';
