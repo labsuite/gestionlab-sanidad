@@ -120,4 +120,23 @@ golpe, solo en los que compartan laboratorio con equipos de otras especialidades
 **Actualización 2026-09-01:** los equipos SIN etiqueta ya no se premarcan por laboratorio (antes sí);
 quedan sin marcar y se añaden con el botón "Todos" o uno a uno. Ver el punto de Paso 2 arriba.
 
+**⚠ Los nombres de módulo se escriben en GALLEGO (2026-09-14).** El catálogo real de
+módulos es el de Sanidad CMA (`/api/bioDesk/profesores`), que los devuelve en gallego
+("Análise Bioquímica", "Microbioloxía Clínica", "Bioloxía Molecular e Citoxenética",
+"Técnicas Xerais de Laboratorio"...) y así se guardan en `usuarios.modulo`.
+`equipos.modulos_responsables` se había rellenado en castellano; como `_normCiclo()` sólo
+quita tildes y mayúsculas —**no traduce**— ninguna etiqueta casaba y el afinado por módulo
+no premarcaba nada en 302 de los 305 equipos. Corregido con
+`scripts/normalizar_modulos_equipos.py`. **Al etiquetar un equipo, usar siempre el nombre
+del catálogo** (el autocompletado del modal ya lo ofrece); una etiqueta en castellano es
+silenciosamente inútil, no da ningún error.
+
+**Criterio de la etiqueta (confirmado 2026-09-14):** identifica el **módulo al que pertenece
+el equipo**, no "material de uso común". Por eso `scripts/reasignar_modulos_labs_207_209.py`
+pasó los 51 equipos generales del Lab 207 a `Procesamento Citolóxico e Tisular` (único módulo
+que se imparte allí) y los 16 microscopios del Lab 209 a `Citoloxía Xeral, Citoloxía
+Xinecolóxica`. Ojo: el laboratorio del horario es una pista, no una regla — un autoanalizador
+guardado en el Lab 203 sigue siendo de `Análise Bioquímica` aunque el módulo se imparta en el
+201. Manda lo que el equipo es, no dónde está guardado.
+
 **Historia de esta sesión, por si se repite:** la API de Sanidad CMA (`sanidade-cma-app.vercel.app`) tuvo en algún momento un problema aparente de doble codificación UTF-8 en `nombre`/`ciclo`/`modulo` — resultó ser un falso positivo: los bytes en origen ya eran UTF-8 correcto (verificado con inspección de bytes crudos), el mojibake era solo cómo lo mostraba la terminal local. El equipo de Sanidad CMA añadió igualmente `charset=utf-8` explícito al `Content-Type` como medida defensiva (no hacía falta para Deno `fetch().json()`, que decodifica UTF-8 siempre, pero no está de más).
