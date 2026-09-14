@@ -113,7 +113,7 @@ Botón **📥 Importar profesorado** junto al de alumnado (renombrado a "📥 Im
      `const nums` usaba `/\d{3}/g` sobre `p.laboratorio`, así que `"Aula 207 (Dpto. Química)"`
      se leía como el Lab 207 y ofrecía sus 61 equipos de Anatomía Patolóxica al profesorado de
      Química (lo mismo con `"Aula 209 (Dpto. Química)"` y los 8 módulos de ese departamento).
-     Ahora se exige el patrón `Lab NNN` (`/Lab\.?\s*(\d{3})/gi`): las aulas propias
+     Ahora se exige el patrón `Lab NNN` (`/\bLab\.?\s*(\d{3})\b/gi`): las aulas propias
      siempre llegan como `"Lab 205"`, las ajenas como `"Aula 207 (Dpto. Química)"` o
      `"Lab A-204.1 (Dpto. Química)"`. Ojo: `_extraerLabDeUbicacion()` sigue usando `\d{3}`
      porque se aplica a `equipos.Ubicacion`, donde sí valen formatos como `205-ZC-2.1`.
