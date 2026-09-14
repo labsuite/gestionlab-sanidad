@@ -277,7 +277,7 @@ function _renderTablaUsuarios(lista, rolActual) {
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">👤</div><div class="empty-state-title">Sin usuarios en esta categoría</div></div>`;
   return `<div class="card">
     <table>
-      <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+      <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Módulo(s)</th><th>Labs</th><th>Activo</th><th></th></tr></thead>
       <tbody>
         ${lista.map(u => {
           const idx = DATA.usuarios.indexOf(u);
@@ -285,6 +285,8 @@ function _renderTablaUsuarios(lista, rolActual) {
             <td><strong>${u.Nombre||'—'}</strong></td>
             <td>${u.Email||'—'}</td>
             <td><span class="badge ${rolBadge[u.Rol]||'badge-gray'}">${u.Rol||'—'}</span></td>
+            <td>${_badgesModulos(u.Modulo)}</td>
+            <td>${_badgesLabs(u.Ubicaciones_Asignadas)}</td>
             <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
             <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
           </tr>`;
@@ -292,6 +294,20 @@ function _renderTablaUsuarios(lista, rolActual) {
       </tbody>
     </table>
   </div>`;
+}
+
+const _SIN_DATO = '<span style="color:var(--text-muted)">—</span>';
+
+function _badgesModulos(modulosStr) {
+  const nombres = (modulosStr || '').split(',').map(m => _moduloNombre(m.trim())).filter(Boolean);
+  if (!nombres.length) return _SIN_DATO;
+  return nombres.map(n => `<span class="badge badge-blue" style="margin-right:2px">${n}</span>`).join('');
+}
+
+function _badgesLabs(ubicStr) {
+  const labs = _getLabsDeUbics(ubicStr || '');
+  if (!labs.length) return _SIN_DATO;
+  return labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('');
 }
 
 // "Ciclo|Módulo" helpers — el separador | evita ambigüedad cuando varios ciclos comparten nombre de módulo
@@ -339,11 +355,9 @@ function _renderSeccionAlumnos(lista, rolActual) {
     const usrs = grupos[ciclo];
     const filas = usrs.map(u => {
       const idx = DATA.usuarios.indexOf(u);
-      const mods = (u.Modulo||'').split(',').map(m => m.trim()).filter(Boolean);
-      const modNombres = mods.map(_moduloNombre);
-      const modBadges = modNombres.map(n => `<span class="badge badge-blue" style="margin-right:2px">${n}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
-      const labs = _getLabsDeUbics(u.Ubicaciones_Asignadas||'');
-      const labBadges = labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('') || '<span style="color:var(--text-muted)">—</span>';
+      const modNombres = (u.Modulo||'').split(',').map(m => _moduloNombre(m.trim())).filter(Boolean);
+      const modBadges = _badgesModulos(u.Modulo);
+      const labBadges = _badgesLabs(u.Ubicaciones_Asignadas);
       return `<tr data-modulos="${modNombres.join(',')}">
         <td><strong>${u.Nombre||'—'}</strong></td>
         <td>${u.Email||'—'}</td>
@@ -402,10 +416,17 @@ function _getLabsDeUbics(ubicStr) {
   vals.forEach(val => {
     if (/^\d{3}$/.test(val)) {
       labs.add(val);
-    } else {
-      const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === val);
-      if (u) ['201','203','205','207'].forEach(n => { if ((u.Laboratorio_Aula||'').includes(n)) labs.add(n); });
+      return;
     }
+    const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === val);
+    if (u) {
+      const n = _extraerLabDeUbicacion(u.Laboratorio_Aula);
+      if (n) labs.add(n);
+      return;
+    }
+    // Texto libre tipo "Lab 209" (lo que devuelve Sanidad CMA al importar profesorado)
+    const suelto = _extraerLabDeUbicacion(val);
+    if (suelto) labs.add(suelto);
   });
   return [...labs].sort();
 }
@@ -414,10 +435,44 @@ function _getUbicacionesDeLabs(labsList) {
   return labsList.join(',');
 }
 
-function _populateModalUsuarioAlumno(modulosStr, ubicStr, cicloPrincipal) {
-  _refreshModuloCheckboxes(modulosStr, cicloPrincipal);
-  const labs = _getLabsDeUbics(ubicStr);
-  document.querySelectorAll('.usr-lab-check').forEach(cb => { cb.checked = labs.includes(cb.value); });
+// Labs que existen de verdad: los de Ubicaciones + los de equipos. Antes estaban
+// escritos a mano (201/203/205/207) y el profesorado importado de Sanidad CMA puede
+// tener labs fuera de esa lista (p.ej. 209), que quedaban invisibles en el modal.
+function _labsConocidos(extra) {
+  const labs = new Set((extra || []).filter(Boolean));
+  (DATA.ubicaciones || []).forEach(u => {
+    const n = _extraerLabDeUbicacion(u.Laboratorio_Aula);
+    if (n) labs.add(n);
+  });
+  (DATA.equipos || []).forEach(e => {
+    const n = _extraerLabDeUbicacion(e.Ubicacion);
+    if (n) labs.add(n);
+  });
+  return [...labs].sort();
+}
+
+function _renderLabsChecks(labsSeleccionados) {
+  const cont = document.getElementById('usr-labs-checks');
+  if (!cont) return;
+  const sel = labsSeleccionados || [];
+  const todos = _labsConocidos(sel);
+  if (!todos.length) {
+    cont.innerHTML = '<span style="font-size:12px;color:var(--text-muted);font-style:italic">Sin laboratorios registrados.</span>';
+    return;
+  }
+  cont.innerHTML = todos.map(l => `<label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+    <input type="checkbox" class="usr-lab-check" value="${l}" ${sel.includes(l) ? 'checked' : ''}> Lab ${l}
+  </label>`).join('');
+}
+
+// Roles a los que se les pueden asignar modulos y labs desde el modal.
+// Administrador queda fuera a proposito: ve toda la app, no se acota por lab.
+const ROLES_CON_ASIGNACION = ['Alumno', 'Profesor', 'Gestor'];
+const _esRolDocente = rol => rol === 'Profesor' || rol === 'Gestor';
+
+function _populateModalUsuarioAsignacion(rol, modulosStr, ubicStr, cicloPrincipal) {
+  _refreshModuloCheckboxes(modulosStr, cicloPrincipal, rol);
+  _renderLabsChecks(_getLabsDeUbics(ubicStr));
 }
 
 function _normCiclo(s) {
@@ -426,7 +481,7 @@ function _normCiclo(s) {
     .replace(/ñ/g,'n').replace(/\s+/g,' ');
 }
 
-function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal) {
+function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal, rol) {
   // Source of truth: plain module names (no ciclo prefix)
   _selectedModulosArray = (preselectedStr || '').split(',')
     .map(m => _moduloNombre(m.trim()))  // strip "Ciclo|" prefix from old format
@@ -448,11 +503,61 @@ function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal) {
     }
   }
 
+  // Un docente puede impartir en varios ciclos, asi que ve el catalogo completo de
+  // modulos en vez de solo los del ciclo seleccionado (que para el es informativo).
+  if (_esRolDocente(rol)) {
+    _renderModuloCheckboxesDocente();
+    return;
+  }
+
   // Resolve canonical ciclo name from DATA for the module lookup
   const cicloCanon = cicloPrincipal
     ? (DATA.ciclosModulos.find(cm => cm.Ciclo && _normCiclo(cm.Ciclo) === _normCiclo(cicloPrincipal))?.Ciclo || cicloPrincipal)
     : '';
   _renderModuloCheckboxesPorCiclo(cicloCanon);
+}
+
+// Checklist de modulos para Profesor/Gestor: todos los ciclos a la vez.
+// Los nombres de modulo se guardan planos (sin prefijo de ciclo), asi que un modulo
+// que se repite en varios ciclos aparece una sola vez indicando en cuales esta.
+function _renderModuloCheckboxesDocente() {
+  const cont = document.getElementById('usr-modulos-checks');
+  if (!cont) return;
+
+  const porModulo = new Map();
+  (DATA.ciclosModulos || []).forEach(cm => {
+    if (!cm.Modulo || !cm.Ciclo) return;
+    if (!porModulo.has(cm.Modulo)) porModulo.set(cm.Modulo, new Set());
+    porModulo.get(cm.Modulo).add(cm.Ciclo);
+  });
+  // Modulos ya guardados que no esten en el catalogo: no se pierden de vista
+  _selectedModulosArray.forEach(m => { if (!porModulo.has(m)) porModulo.set(m, new Set()); });
+
+  const modulos = [...porModulo.keys()].sort((a, b) => a.localeCompare(b, 'es'));
+  if (!modulos.length) {
+    cont.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Sin modulos registrados.</span>';
+    _syncChipsModulos();
+    return;
+  }
+
+  cont.innerHTML = '<div style="display:flex;flex-direction:column;gap:4px">' +
+    modulos.map(m => {
+      const checked = _selectedModulosArray.includes(m) ? 'checked' : '';
+      const ciclos = [...porModulo.get(m)].sort((a, b) => a.localeCompare(b, 'es')).join(' \u00b7 ');
+      return `<label class="usr-modulo-row" data-buscar="${_escAttr((m + ' ' + ciclos).toLowerCase())}"
+        style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;padding:5px 10px;background:var(--bg-soft,#f5f5f5);border-radius:6px;font-size:12px">
+        <input type="checkbox" class="usr-modulo-check" value="${_escAttr(m)}" ${checked} onchange="_onModuloChange(this)" style="margin-top:2px">
+        <span><span style="font-weight:500">${m}</span>${ciclos ? `<br><span style="color:var(--text-muted);font-size:11px">${ciclos}</span>` : ''}</span>
+      </label>`;
+    }).join('') + '</div>';
+  _syncChipsModulos();
+}
+
+function _filtrarModulosChecks(q) {
+  const t = (q || '').toLowerCase().trim();
+  document.querySelectorAll('#usr-modulos-checks .usr-modulo-row').forEach(row => {
+    row.style.display = !t || (row.getAttribute('data-buscar') || '').includes(t) ? '' : 'none';
+  });
 }
 
 function _renderModuloCheckboxesPorCiclo(ciclo) {
@@ -486,6 +591,8 @@ function _renderModuloCheckboxesPorCiclo(ciclo) {
 }
 
 function _onCicloPrincipalChange(ciclo) {
+  // En modo docente el ciclo es solo informativo: los modulos no se filtran por el
+  if (_esRolDocente(v('usr-rol'))) return;
   // Remove selected modules that don't belong to the new ciclo
   const modsDelCiclo = new Set(
     DATA.ciclosModulos.filter(cm => cm.Ciclo === ciclo && cm.Modulo).map(cm => cm.Modulo)
@@ -551,22 +658,45 @@ function openModalUsuario() {
   sv('usr-rol','Profesor');
   const cicloSel = document.getElementById('usr-ciclo-principal');
   if (cicloSel) cicloSel.value = '';
+  _selectedModulosArray = [];
   toggleUbicacionesAsignadasField('Profesor');
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = false;
   openModal('modal-usuario');
 }
 
+// Muestra u oculta el bloque de ciclo / modulos / labs segun el rol, y lo adapta:
+// el alumno tiene un ciclo obligatorio que filtra sus modulos; el docente (Profesor o
+// Gestor) puede impartir en varios ciclos y solo el alumno tiene revision de inventario.
+function _ajustarBloqueAsignacion(rol) {
+  const docente = _esRolDocente(rol);
+  const labelCiclo = document.getElementById('usr-ciclo-label');
+  if (labelCiclo) labelCiclo.textContent = docente ? 'Ciclo principal (opcional)' : 'Ciclo formativo *';
+  const grpRev = document.getElementById('usr-revisar-group');
+  if (grpRev) grpRev.style.display = rol === 'Alumno' ? '' : 'none';
+  const buscar = document.getElementById('usr-modulos-buscar');
+  if (buscar) {
+    buscar.style.display = docente ? '' : 'none';
+    buscar.value = '';
+  }
+}
+
 function toggleUbicacionesAsignadasField(rol) {
-  const grp = document.getElementById('usr-alumno-fields');
+  const grp = document.getElementById('usr-asignacion-fields');
   if (!grp) return;
-  if (rol === 'Alumno') {
-    grp.style.display = '';
-    _populateModalUsuarioAlumno('', '');
+  if (!ROLES_CON_ASIGNACION.includes(rol)) {
+    grp.style.display = 'none';
+    return;
+  }
+  grp.style.display = '';
+  _ajustarBloqueAsignacion(rol);
+  // Cambiar de rol conserva lo ya marcado: solo cambia como se presenta
+  _populateModalUsuarioAsignacion(rol, _selectedModulosArray.join(','),
+    _getUbicacionesDeLabs(_getLabsSeleccionados()),
+    document.getElementById('usr-ciclo-principal')?.value || '');
+  if (rol !== 'Alumno') {
     const cbRev = document.getElementById('usr-puede-revisar');
     if (cbRev) cbRev.checked = false;
-  } else {
-    grp.style.display = 'none';
   }
 }
 
@@ -593,12 +723,15 @@ function editUsuario(idx) {
   // _sbOnly: usuario de Supabase sin fila en Sheets → insertar nuevo al guardar
   editingRow = u._sbOnly ? null : { sheet: 'Usuarios', rowIndex: idx };
   sv('usr-nombre', u.Nombre); sv('usr-email', u.Email); sv('usr-rol', u.Rol);
-  const grp = document.getElementById('usr-alumno-fields');
-  if (grp) grp.style.display = u.Rol === 'Alumno' ? '' : 'none';
-  if (u.Rol === 'Alumno') {
-    _populateModalUsuarioAlumno(u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
+  const grp = document.getElementById('usr-asignacion-fields');
+  const conAsignacion = ROLES_CON_ASIGNACION.includes(u.Rol);
+  if (grp) grp.style.display = conAsignacion ? '' : 'none';
+  _selectedModulosArray = [];
+  if (conAsignacion) {
+    _ajustarBloqueAsignacion(u.Rol);
+    _populateModalUsuarioAsignacion(u.Rol, u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
     const cbRev = document.getElementById('usr-puede-revisar');
-    if (cbRev) cbRev.checked = u.Puede_Revisar_Inventario === 'TRUE';
+    if (cbRev) cbRev.checked = u.Rol === 'Alumno' && u.Puede_Revisar_Inventario === 'TRUE';
   }
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
@@ -711,12 +844,15 @@ async function guardarUsuario() {
   const existingU = editingRow ? DATA.usuarios[editingRow.rowIndex] : null;
   const rol = v('usr-rol') || 'Alumno';
   let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = false;
-  if (rol === 'Alumno') {
+  if (ROLES_CON_ASIGNACION.includes(rol)) {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');  // plain module names
     cicloPrincipal = (document.getElementById('usr-ciclo-principal')?.value || '').trim();
-    if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); return; }
-    puedeRevisarInventario = !!document.getElementById('usr-puede-revisar')?.checked;
+    // El ciclo solo es obligatorio para alumnado: un docente puede impartir en varios
+    if (rol === 'Alumno') {
+      if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); return; }
+      puedeRevisarInventario = !!document.getElementById('usr-puede-revisar')?.checked;
+    }
   }
   const datos = {
     nombre, email, rol, ubicaciones_asignadas: ubicAsignadas, modulo,
@@ -845,7 +981,9 @@ function _renderPreviewImportarAlumnos() {
   btnImportar.style.display = nuevos.length ? '' : 'none';
 }
 
-function _escAttr(s) { return String(s || '').replace(/"/g, '&quot;'); }
+function _escAttr(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 function _toggleGrupoImportar(nivel, ciclo, modulo, checked) {
   document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => {

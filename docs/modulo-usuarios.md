@@ -23,6 +23,49 @@
 - `Ubicaciones_Asignadas` almacena números de lab ("201,203"), NO IDs de zona. `getUbicacionesAlumno()` en config.js los expande a IDs de zona.
 - Búsqueda global por nombre/email y filtro por módulo.
 
+## Módulos y labs del profesorado / Gestores (2026-09-14)
+
+Hasta ahora el bloque de **ciclo + módulos + labs** del modal de usuario solo se mostraba con
+`Rol = Alumno`. El profesorado sí tenía esos datos en `usuarios` (los rellena
+`importar-profesores` desde Sanidad CMA: `modulo`, `ubicaciones_asignadas`, `ciclo_principal`),
+pero no había forma de verlos ni corregirlos desde la app — y peor: editar a un profesor para
+cualquier otra cosa **le borraba módulos y labs**, porque `guardarUsuario` mandaba cadena vacía
+en esos campos para todo rol que no fuera Alumno.
+
+Ahora el bloque se muestra para `Alumno`, `Profesor` y `Gestor` (constante
+`ROLES_CON_ASIGNACION` en `js/ubicaciones.js`). Administrador queda fuera a propósito: ve toda
+la app, no se acota por laboratorio. La Edge Function `gestionar-usuario` ya aceptaba estos
+campos para cualquier rol, así que no hizo falta tocarla.
+
+**Diferencias entre el modo alumno y el modo docente** (`_esRolDocente(rol)`):
+
+| | Alumno | Profesor / Gestor |
+|---|---|---|
+| Ciclo | `Ciclo formativo *`, obligatorio; filtra los módulos | `Ciclo principal (opcional)`; solo informativo, **no** filtra |
+| Módulos | solo los del ciclo elegido | catálogo completo (`_renderModuloCheckboxesDocente`) + buscador `usr-modulos-buscar` |
+| "Puede revisar inventario" | visible | oculto (y se guarda `false`) |
+
+Un docente puede impartir en varios ciclos, de ahí que vea el catálogo entero. Como
+`usuarios.modulo` guarda **nombres planos sin prefijo de ciclo**, un módulo que se repite en
+varios ciclos aparece una sola vez, con los ciclos en los que existe como subtítulo.
+`_onCicloPrincipalChange` sale pronto en modo docente para no borrar los módulos de otros
+ciclos al cambiar el desplegable.
+
+**Labs dinámicos:** los checkbox de laboratorio ya no están escritos a mano (`201/203/205/207`)
+sino que salen de `_labsConocidos()` — números de 3 cifras de `DATA.ubicaciones.Laboratorio_Aula`
+∪ `DATA.equipos.Ubicacion`, más los que ya tuviera el usuario. El profesorado importado puede
+tener labs fuera de esa lista fija (p.ej. 209) y quedaban invisibles. Por lo mismo,
+`_getLabsDeUbics` acepta ahora texto libre tipo `"Lab 209"` (lo que devuelve Sanidad CMA)
+además de `"209"` y de IDs de `Ubicaciones`.
+
+**Listado:** la tabla de `_renderTablaUsuarios` (pestañas *Admins y gestores* y *Profesores*)
+muestra columnas **Módulo(s)** y **Labs**, con los helpers `_badgesModulos` / `_badgesLabs`
+que comparte con la tabla de alumnado.
+
+**IDs del modal renombrados:** `usr-alumno-fields` → `usr-asignacion-fields` y
+`_populateModalUsuarioAlumno()` → `_populateModalUsuarioAsignacion(rol, ...)`, porque ya no son
+solo de alumnado. Los checkbox de lab se pintan en `usr-labs-checks`.
+
 ## Ciclos_Modulos — estructura crítica
 Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laboratorio" aparece en CS Lab Clínico, ZS Lab Clínico y CS Anatomía). Por eso el ciclo se guarda explícitamente en col H y **NO se infiere de los módulos**.
 

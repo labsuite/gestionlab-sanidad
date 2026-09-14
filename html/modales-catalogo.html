@@ -123,9 +123,9 @@
             <option>Profesor</option><option>Alumno</option>
           </select>
         </div>
-        <div class="form-group full" id="usr-alumno-fields" style="display:none">
-          <div style="margin-bottom:14px">
-            <label style="font-weight:500;font-size:13px">Ciclo formativo *</label>
+        <div class="form-group full" id="usr-asignacion-fields" style="display:none">
+          <div style="margin-bottom:14px" id="usr-ciclo-group">
+            <label style="font-weight:500;font-size:13px" id="usr-ciclo-label">Ciclo formativo *</label>
             <select id="usr-ciclo-principal" onchange="_onCicloPrincipalChange(this.value)" style="width:100%;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);font-size:13px">
               <option value="">— Seleccionar ciclo —</option>
             </select>
@@ -133,19 +133,16 @@
           <div style="margin-bottom:12px">
             <label style="font-weight:500;font-size:13px">Módulos</label>
             <div id="usr-modulos-seleccionados" style="display:flex;flex-wrap:wrap;gap:6px;min-height:20px;margin-top:8px;margin-bottom:10px"></div>
+            <input id="usr-modulos-buscar" type="search" placeholder="Filtrar módulos..." oninput="_filtrarModulosChecks(this.value)"
+              style="display:none;width:100%;margin-bottom:8px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px">
             <div id="usr-modulos-checks" style="margin-top:4px;max-height:240px;overflow-y:auto;padding-right:4px"></div>
           </div>
           <div>
             <label style="font-weight:500;font-size:13px">Labs accesibles</label>
-            <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px">
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="201"> Lab 201</label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="203"> Lab 203</label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="205"> Lab 205</label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" class="usr-lab-check" value="207"> Lab 207</label>
-            </div>
+            <div id="usr-labs-checks" style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px"></div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:4px">La zona común se incluye siempre automáticamente.</div>
           </div>
-          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)" id="usr-revisar-group">
             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
               <input type="checkbox" id="usr-puede-revisar" style="width:16px;height:16px">
               <span>Puede revisar inventario de material fungible</span>
