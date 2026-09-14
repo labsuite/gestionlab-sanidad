@@ -147,6 +147,20 @@ golpe, solo en los que compartan laboratorio con equipos de otras especialidades
 **Actualización 2026-09-01:** los equipos SIN etiqueta ya no se premarcan por laboratorio (antes sí);
 quedan sin marcar y se añaden con el botón "Todos" o uno a uno. Ver el punto de Paso 2 arriba.
 
+**Actualización 2026-09-14 — el paso 2 ya no filtra solo por laboratorio.** `equiposDeSusLabs`
+era `DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)))`, así que un
+equipo etiquetado con el módulo del profesor pero **guardado en otro laboratorio** no llegaba
+siquiera a aparecer en la lista: no había forma de premarcarlo ni de marcarlo a mano. Casos
+reales: el lector y el lavador de microplacas de `Técnicas de Inmunodiagnóstico` viven en el Lab
+205 y el módulo se imparte en el 201 (la profesora veía 0 de 27 marcados); los autoanalizadores
+y fotómetros de `Análise Bioquímica` están en el 203 y el módulo se da en el 201. Ahora la lista
+es **equipos de sus labs ∪ equipos etiquetados con alguno de sus módulos**, y el premarcado sigue
+siendo el mismo criterio de coincidencia de módulo.
+
+Efecto conocido y aceptado por la usuaria: como `Técnicas Xerais de Laboratorio` etiqueta 238
+equipos repartidos por todos los laboratorios, quien imparte ese módulo pasa de ~76 a ~171
+equipos premarcados. Para eso están los botones **Ninguno** y **Solo por módulo** del paso 2.
+
 **⚠ Los nombres de módulo se escriben en GALLEGO (2026-09-14).** El catálogo real de
 módulos es el de Sanidad CMA (`/api/bioDesk/profesores`), que los devuelve en gallego
 ("Análise Bioquímica", "Microbioloxía Clínica", "Bioloxía Molecular e Citoxenética",

@@ -1279,7 +1279,17 @@ function _pasoDosImportarProfesores() {
   const cont = document.getElementById('importar-profesores-contenido');
   const linkBtn = 'background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0';
   const tarjetasHtml = _profesoresAImportar.map(p => {
-    const equiposDeSusLabs = DATA.equipos.filter(e => p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)));
+    const _coincideModulo = e => (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean)
+      .some(me => p.modulos.some(m => _normCiclo(m) === _normCiclo(me)));
+    // Equipos de sus laboratorios MÁS los etiquetados con alguno de sus módulos aunque estén
+    // guardados en otro lab: el equipo de un módulo no siempre vive en el aula donde se imparte
+    // (el lector y el lavador de microplacas de Técnicas de Inmunodiagnóstico están en el Lab
+    // 205 y el módulo se da en el 201; los autoanalizadores de Análise Bioquímica están en el
+    // 203 y el módulo se da en el 201). Filtrando solo por laboratorio esos equipos no llegaban
+    // siquiera a aparecer en la lista, así que no había forma de premarcarlos ni de marcarlos
+    // a mano.
+    const equiposDeSusLabs = DATA.equipos.filter(e =>
+      p.labs.includes(_extraerLabDeUbicacion(e.Ubicacion)) || _coincideModulo(e));
 
     // Premarcado: SOLO los equipos cuyo Módulo(s) responsable(s) etiquetado coincide con un
     // módulo del profesor. Los equipos sin etiqueta (o con etiqueta que no casa) quedan sin
@@ -1288,7 +1298,7 @@ function _pasoDosImportarProfesores() {
     let nMarcados = 0;
     const filasEquipos = equiposDeSusLabs.map(e => {
       const modulosEquipo = (e.Modulos_Responsables || '').split(',').map(s => s.trim()).filter(Boolean);
-      const coincideModulo = modulosEquipo.some(me => p.modulos.some(m => _normCiclo(m) === _normCiclo(me)));
+      const coincideModulo = _coincideModulo(e);
       if (coincideModulo) nMarcados++;
       const buscar = `${e.Tipo_Equipo || ''} ${e.Marca || ''} ${e.Modelo || ''} ${e.ID_Activo || ''} ${e.Ubicacion || ''}`.toLowerCase();
       return `
