@@ -1118,6 +1118,15 @@
       padding: 12px 20px 16px;
       overflow-wrap: break-word;
       box-sizing: border-box;
+      /* Esta celda tiene colspan a las 8 columnas: sin containment, un
+         protocolo de uso largo o una fila del plan con texto en
+         white-space:nowrap (para poder truncarlo con elipsis) hace que el
+         algoritmo de auto-layout calcule un ancho de columna basado en ese
+         contenido y ensanche la tabla entera más allá de la tarjeta.
+         contain:inline-size aísla el ancho intrínseco de este bloque de su
+         contenido (usa el ancho ya fijado por las filas de datos) y deja que
+         el contenido que no quepa haga su propio scroll/elipsis por dentro. */
+      contain: inline-size;
     }
     .detail-mobile-only { display: none; }
     .card-equipment-table {
@@ -1682,7 +1691,10 @@
     border-radius: 0 0 var(--radius) var(--radius);
     margin: -8px 0 8px;
   }
-  .card-equipment-table .equipo-row-expand td { display: block; padding: 0; border: none; }
+  /* width se resetea a auto: aquí la celda ya no es table-cell (es un bloque
+     apilado), así que el width:0 del hack de auto-layout desktop la dejaría
+     invisible. */
+  .card-equipment-table .equipo-row-expand td { display: block; width: auto; padding: 0; border: none; }
 
   /* Intervenciones: apiladas en card */
   .intervenciones-mini-header { display: none; }
