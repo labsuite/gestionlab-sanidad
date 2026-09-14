@@ -100,6 +100,33 @@ Botón **📥 Importar profesorado** junto al de alumnado (renombrado a "📥 Im
   - **Origen del dato:** `laboratorio` lo rellena Sanidad CMA (`/api/bioDesk/profesores`). Hasta 2026-09-01 salía de `modulos.aula_id` (aula de teoría por defecto del módulo) y venía `null` casi siempre → el import no encontraba ningún lab. Corregido en el repo `sanidade-cma-app` (`fix/biodesk-profesores-laboratorio-horarios`): ahora `laboratorio` se agrega de las **sesiones reales del docente** en la tabla `horarios` para ese módulo+ciclo (aulas distintas donde imparte, unidas por coma, p.ej. `"Lab 209, Lab 205"`), con fallback a `modulos.aula_lab_id` → `aula_id` si no hay horario.
   - **Filtro en cliente (`_cargarPreviewImportarProfesores`):** de `laboratorio` se extraen los nº de 3 cifras (`/\d{3}/g`), se intersecan con los labs que tienen algún equipo en `DATA.equipos` (`_extraerLabDeUbicacion` sobre `Ubicacion`) y el resultado se guarda en `p.labsValidos`. Una fila solo pasa a `_previewProfesoresCMA` si `labsValidos.length`. Así se descartan aulas teóricas (`"Aula 200-1 (202)"`). El contador de descartadas (`_profesoresSinLabDescartados`) se avisa en el paso 1. Paso 2 usa `p.labsValidos` directamente.
   - **Módulos transversales excluidos siempre:** `MODULOS_SIN_RESPONSABILIDAD_EQUIPOS` (constante en `js/ubicaciones.js`) — Afondamento nas Competencias Profesionais, FCT, Proxecto, FOL, EIE, Itinerario Personal para a Empregabilidade, Dixitalización/Sustentabilidade. `_moduloDaResponsabilidadEquipos()` los detecta por subcadena normalizada y les fuerza `labsValidos = []` aunque su aula del horario sí tenga equipos (caso real: Afondamento se imparte en "Lab 201", que tiene 27 equipos, pero no procede responsabilidad). Ampliar la lista si aparecen más.
+
+  **Revisión 2026-09-14 — tres fallos en este filtro:**
+  1. `Itinerario Personal para a Empregabilidade` y `Sustentabilidade Aplicada ao Sistema
+     Produtivo` estaban escritos con el nombre castellanizado; Sanidad CMA los devuelve como
+     `Itinerario Persoal...` y `Sostenibilidade...`, así que **no excluían nada** y ambos
+     ofrecían los labs 201/207/209.
+  2. Añadidos `Inglés Profesional` y `Habilidades Comunicativas en Lingua Estranxeira`
+     (transversales de idioma que se imparten en labs con equipos) y `Necropsias` (módulo de
+     especialidad que no usa equipamiento inventariado, confirmado por la usuaria).
+  3. **El número de aula de otro departamento se confundía con el laboratorio de Sanidade.**
+     `const nums` usaba `/\d{3}/g` sobre `p.laboratorio`, así que `"Aula 207 (Dpto. Química)"`
+     se leía como el Lab 207 y ofrecía sus 61 equipos de Anatomía Patolóxica al profesorado de
+     Química (lo mismo con `"Aula 209 (Dpto. Química)"` y los 8 módulos de ese departamento).
+     Ahora se exige el patrón `Lab NNN` (`/Lab\.?\s*(\d{3})/gi`): las aulas propias
+     siempre llegan como `"Lab 205"`, las ajenas como `"Aula 207 (Dpto. Química)"` o
+     `"Lab A-204.1 (Dpto. Química)"`. Ojo: `_extraerLabDeUbicacion()` sigue usando `\d{3}`
+     porque se aplica a `equipos.Ubicacion`, donde sí valen formatos como `205-ZC-2.1`.
+
+  Tras la revisión, los módulos que generan responsabilidad de equipos son exactamente los 11
+  de laboratorio de Sanidade más `Elección e Adaptación de Próteses Auditivas` (audioloxía
+  usa el Lab 209 según el horario de origen).
+
+  **Módulos sin equipos a propósito:** `Necropsias` (no usa equipamiento) y `Xestión de
+  Mostras Biolóxicas` (muy general, apenas usa equipamiento propio). No hace falta etiquetarles
+  equipos: la acotación de lo que ve un profesor va por `equipos.Responsable`, no por
+  `Modulos_Responsables` — en Equipos se ve el catálogo completo y solo Dashboard y
+  Mantenimiento se filtran, por responsabilidad nominal.
 - **Layout del paso 1 (2026-09-01):** el checklist ya no usa una `<table>` anidada por módulo (se veía fatal en el modal, peor en tablet/móvil). Cada profesor es un `<label>` flex que envuelve (nombre + email en bloque, lab, badge). Además se corrigió el bug de fondo: la regla global `input { width:100% }` de `css/styles.css` también aplicaba a los checkbox, que dentro de un `<label>` flex empujaban el texto al extremo y aparecían "flotando" — ahora hay `input[type="checkbox"], input[type="radio"] { width:auto }` global.
 - `confirmarImportarProfesores()` envía `{accion:'importar', profesores:[{nombre,email,ciclo,modulo,laboratorio,equipos_responsable:[id_activo,...]}]}`. La Edge Function crea usuarios+Auth+public.users igual que alumnado (rol `Profesor`), y por cada `id_activo` en `equipos_responsable` **añade** el nombre al campo `equipos.responsable` (split por coma, evita duplicados) sin pisar los responsables que ya hubiera.
 - Resultados: misma tabla de contraseñas temporales que alumnado, más una columna de equipos actualizados por profesor.

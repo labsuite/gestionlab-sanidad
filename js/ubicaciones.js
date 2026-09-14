@@ -1076,9 +1076,19 @@ const MODULOS_SIN_RESPONSABILIDAD_EQUIPOS = [
   'Proxecto',
   'Formación e Orientación Laboral',
   'Empresa e Iniciativa Emprendedora',
-  'Itinerario Personal para a Empregabilidade',
+  // Ojo: los dos siguientes estaban escritos con el nombre castellanizado
+  // ('Itinerario Personal', 'Sustentabilidade') y no casaban con lo que devuelve
+  // Sanidad CMA ('Itinerario Persoal', 'Sostenibilidade'), así que no excluían nada.
+  'Itinerario Persoal para a Empregabilidade',
   'Dixitalización Aplicada aos Sectores Produtivos',
-  'Sustentabilidade Aplicada ao Sistema Produtivo',
+  'Sostenibilidade Aplicada ao Sistema Produtivo',
+  // Transversales de idioma: caen en labs con equipos (201, 207, 209) pero no
+  // tienen nada que ver con el equipamiento de esos laboratorios.
+  'Inglés Profesional',
+  'Habilidades Comunicativas en Lingua Estranxeira',
+  // Módulo de especialidad que no usa equipamiento inventariado (confirmado por
+  // la usuaria, 2026-09-14): sus clases son de sala de necropsias, no de equipos.
+  'Necropsias',
 ];
 function _moduloDaResponsabilidadEquipos(modulo) {
   const m = _normCiclo(modulo || '');
@@ -1112,7 +1122,11 @@ async function _cargarPreviewImportarProfesores() {
       (DATA.equipos || []).map(e => _extraerLabDeUbicacion(e.Ubicacion)).filter(Boolean)
     );
     todas.forEach(p => {
-      const nums = String(p.laboratorio || '').match(/\d{3}/g) || [];
+      // Solo cuenta el patrón "Lab NNN": un \d{3} suelto confundía las aulas de otros
+      // departamentos con los laboratorios de Sanidade — "Aula 207 (Dpto. Química)"
+      // se leía como el Lab 207 (Anatomía Patolóxica) y ofrecía sus 61 equipos al
+      // profesorado de Química. Las aulas propias siempre llegan como "Lab 205".
+      const nums = [...String(p.laboratorio || '').matchAll(/\bLab\.?\s*(\d{3})\b/gi)].map(m => m[1]);
       p.labsValidos = _moduloDaResponsabilidadEquipos(p.modulo)
         ? [...new Set(nums)].filter(n => labsConEquipos.has(n))
         : [];
