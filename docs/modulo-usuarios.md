@@ -66,6 +66,46 @@ que comparte con la tabla de alumnado.
 `_populateModalUsuarioAlumno()` → `_populateModalUsuarioAsignacion(rol, ...)`, porque ya no son
 solo de alumnado. Los checkbox de lab se pintan en `usr-labs-checks`.
 
+## `usuarios` (catálogo) vs `public.users` (permisos) — sincronizar el rol (2026-09-14)
+
+⚠ Son dos sitios distintos y **los dos mandan, cada uno en su capa**:
+
+- `usuarios` es el catálogo que lee el navegador; de ahí sale `getRealUserRole()`
+  (`js/ui.js:208`) y por tanto qué botones se ven.
+- `public.users` es lo que consultan las Edge Functions (`_shared/auth.ts`,
+  `requireAdminOrGestor` / `requireStaff`) para decidir si aceptan la escritura.
+
+Hasta ahora `gestionar-usuario` actualizaba solo el catálogo. Consecuencia real: promover a
+alguien a Gestor desde la app le cambiaba el rol en la interfaz —veía los botones de Gestor—
+pero el servidor le seguía tratando como Profesor y le devolvía **403** en todo lo de
+Admin/Gestor. Apareció con el profesorado importado de Sanidad CMA: el import siempre crea
+`public.users` con `rol: "Profesor"`, y al promocionar a alguien después el descuadre quedaba
+fijo (había tres personas así, ya corregidas).
+
+La acción `actualizar` de `gestionar-usuario` replica ahora `nombre`, `rol` y
+`puede_revisar_inventario` en `public.users`, casando por el email **anterior**
+(`existente.email`). El email **no** se sincroniza a propósito: `requireRoles` busca en
+`public.users` por el correo con el que la persona inicia sesión en Auth, y cambiar el correo
+del catálogo no cambia el de la cuenta de Auth — sincronizarlo dejaría a esa persona sin rol.
+Que no exista fila en `public.users` no es un error (la persona aún no tiene cuenta de acceso):
+se registra en el log y la actualización del catálogo sigue adelante.
+
+**Al tocar roles, comprobar siempre las dos tablas.** Consulta de control:
+
+```sql
+SELECT u.nombre, u.rol AS catalogo, p.rol::text AS permisos
+FROM usuarios u LEFT JOIN public.users p ON lower(p.email) = lower(u.email)
+WHERE u.rol <> 'Alumno' AND (p.rol IS NULL OR p.rol::text <> u.rol);
+```
+
+`public.users.rol` es un enum (`user_role`), así que hace falta `::text` para compararlo con el
+`text` de `usuarios.rol`.
+
+**Contraseñas temporales:** la convención que usa el centro para repartirlas no se documenta
+aquí — este repositorio es público. Igual que en `scripts/importar_alumnos.py`, se imprimen una
+vez para repartirlas y nunca se guardan en un fichero. Ojo con el mínimo de 6 caracteres de
+Supabase Auth: algún correo corto no llega y necesita otra contraseña.
+
 ## Ciclos_Modulos — estructura crítica
 Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laboratorio" aparece en CS Lab Clínico, ZS Lab Clínico y CS Anatomía). Por eso el ciclo se guarda explícitamente en col H y **NO se infiere de los módulos**.
 

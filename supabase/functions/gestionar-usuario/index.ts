@@ -68,6 +68,24 @@ Deno.serve(async (req) => {
 
     const { data, error } = await supabaseAdmin.from("usuarios").update(datos).eq("id_usuario", idUsuario).select().single();
     if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
+
+    // Las Edge Functions comprueban el rol contra `public.users` (ver _shared/auth.ts),
+    // no contra este catálogo. Si no se replica aquí, promover a alguien a Gestor desde
+    // la app le cambia el rol en la UI pero el servidor lo sigue tratando como Profesor
+    // y le rechaza con 403 todo lo que sea de Admin/Gestor. Pasó de verdad con las
+    // Gestoras importadas de Sanidad CMA (2026-09-14).
+    const { error: syncError } = await supabaseAdmin
+      .from("users")
+      .update({
+        nombre: datos.nombre,
+        rol: datos.rol,
+        puede_revisar_inventario: datos.puede_revisar_inventario,
+      })
+      .eq("email", existente.email);
+    // Que no exista fila en `users` es normal si la persona aún no tiene cuenta de
+    // acceso: el catálogo manda igual, así que no se aborta la actualización.
+    if (syncError) console.error(`No se pudo sincronizar public.users para ${existente.email}: ${syncError.message}`);
+
     return jsonOk({ usuario: data });
   }
 
