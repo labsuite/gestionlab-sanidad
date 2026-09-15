@@ -66,6 +66,34 @@ que comparte con la tabla de alumnado.
 `_populateModalUsuarioAlumno()` → `_populateModalUsuarioAsignacion(rol, ...)`, porque ya no son
 solo de alumnado. Los checkbox de lab se pintan en `usr-labs-checks`.
 
+## Eliminar usuarios (2026-09-14)
+
+Botón 🗑️ junto al ✏️ en las tres pestañas de Usuarios. **Solo Administrador** —mismo criterio
+que `eliminarItems` en `PERMISOS` (`js/ui.js`), que es como se borran equipos y material—,
+comprobado en cliente (`borrarUsuario` en `js/ubicaciones.js`) y otra vez server-side con
+`requireAdmin` en la acción `eliminar` de `gestionar-usuario`.
+
+**Borra los tres sitios donde vive una persona**, en este orden: la cuenta de Supabase Auth
+(el login), la fila de `public.users` (el rol) y la fila del catálogo `usuarios`. Borrar solo
+el catálogo —que es lo que haría lo obvio— deja un medio-borrado confuso: esa persona sigue
+pudiendo iniciar sesión y `getRealUserRole()` (`js/ui.js`) la trata como **Alumno**.
+
+**Guardarraíles** (los tres devuelven error, no borran nada):
+
+| Caso | Motivo |
+|---|---|
+| Es responsable de algún equipo | `equipos.responsable` guarda el **nombre** en texto; al borrarle, esos equipos quedarían apuntando a alguien que ya no existe. Hay que reasignarlos antes. Mismo criterio que `borrarProveedor` con pedidos asociados. |
+| Es tu propia cuenta | Te dejaría fuera de la app. |
+| Usuario `_sbOnly` | No tiene fila en el catálogo: se gestiona desde la otra app. El botón ni se pinta. |
+
+El bloqueo por equipos es el importante: en septiembre de 2026 hubo que limpiar docentes
+duplicados y dos de ellos eran responsables de 238 y 30 equipos — borrarlos sin más habría
+dejado esos equipos huérfanos y sus dueñas sin verlos al entrar con la otra cuenta. Lo que se
+hizo fue traspasar el nombre primero y borrar después; el guardarraíl obliga a ese orden.
+
+Si la cuenta de Auth no se puede borrar pero sí el resto, la función responde `200` con un
+campo `aviso` y el cliente lo enseña como error sin dar el borrado por limpio.
+
 ## `usuarios` (catálogo) vs `public.users` (permisos) — sincronizar el rol (2026-09-14)
 
 ⚠ Son dos sitios distintos y **los dos mandan, cada uno en su capa**:

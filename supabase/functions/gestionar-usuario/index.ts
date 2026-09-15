@@ -7,7 +7,7 @@
 // (ver la página) pero solo editar filas con Rol=Alumno, y no puede
 // cambiarles el rol — antes esto solo se comprobaba en el cliente
 // (js/ubicaciones.js `guardarUsuario`), aquí se fuerza también server-side.
-import { requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -28,6 +28,71 @@ Deno.serve(async (req) => {
   }
 
   const accion = String(body.accion || "");
+
+  // ── Eliminar: una persona vive en TRES sitios y hay que quitarla de los tres ──
+  // `usuarios` (catálogo que lee el navegador), `public.users` (rol que miran las
+  // Edge Functions) y la cuenta de Supabase Auth (login). Si solo se borra el
+  // catálogo, esa persona sigue pudiendo entrar y getRealUserRole() la trata como
+  // Alumno (ver js/ui.js) — un medio-borrado confuso.
+  if (accion === "eliminar") {
+    const { error: authError, user, supabaseAdmin } = await requireAdmin(req);
+    if (authError) return authError;
+
+    const idUsuario = String(body.id_usuario || "").trim();
+    if (!idUsuario) return jsonError("id_usuario es obligatorio", 400);
+
+    const { data: existente } = await supabaseAdmin.from("usuarios").select("*").eq("id_usuario", idUsuario)
+      .maybeSingle();
+    if (!existente) return jsonError(`No se encontró el usuario "${idUsuario}"`, 404);
+
+    const emailObjetivo = String(existente.email || "").toLowerCase().trim();
+    if (emailObjetivo && emailObjetivo === String(user?.email || "").toLowerCase().trim()) {
+      return jsonError("No puedes eliminar tu propia cuenta", 400);
+    }
+
+    // Igual que un proveedor con pedidos: si es responsable de equipos no se borra,
+    // porque `equipos.responsable` guarda el NOMBRE y quedaría apuntando a nadie.
+    const nombreObjetivo = String(existente.nombre || "").trim();
+    if (nombreObjetivo) {
+      const { data: equipos } = await supabaseAdmin.from("equipos").select("id_activo, responsable")
+        .ilike("responsable", `%${nombreObjetivo}%`);
+      const suyos = (equipos || []).filter((e: { responsable: string | null }) =>
+        String(e.responsable || "").split(",").map((x) => x.trim()).includes(nombreObjetivo)
+      );
+      if (suyos.length) {
+        return jsonError(
+          `No se puede eliminar: es responsable de ${suyos.length} equipo(s). ` +
+            `Reasígnalos a otra persona antes de borrarle.`,
+          400,
+        );
+      }
+    }
+
+    // Orden: primero el login (lo que da acceso), luego permisos, luego catálogo.
+    let avisoAuth: string | null = null;
+    if (emailObjetivo) {
+      const { data: perfil } = await supabaseAdmin.from("users").select("id").eq("email", emailObjetivo)
+        .maybeSingle();
+      let authId: string | null = perfil?.id ?? null;
+      if (!authId) {
+        // Sin fila en `users` hay que buscar la cuenta por email en Auth
+        const { data: lista } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        authId = lista?.users?.find((u: { email?: string }) =>
+          String(u.email || "").toLowerCase().trim() === emailObjetivo
+        )?.id ?? null;
+      }
+      if (authId) {
+        const { error: authDelErr } = await supabaseAdmin.auth.admin.deleteUser(authId);
+        if (authDelErr) avisoAuth = `no se pudo borrar la cuenta de acceso: ${authDelErr.message}`;
+      }
+      await supabaseAdmin.from("users").delete().eq("email", emailObjetivo);
+    }
+
+    const { error: delErr } = await supabaseAdmin.from("usuarios").delete().eq("id_usuario", idUsuario);
+    if (delErr) return jsonError(`No se pudo eliminar: ${delErr.message}`, 400);
+
+    return jsonOk({ eliminado: idUsuario, aviso: avisoAuth });
+  }
 
   const nombre = String(body.nombre || "").trim();
   const email = String(body.email || "").trim();
@@ -89,5 +154,5 @@ Deno.serve(async (req) => {
     return jsonOk({ usuario: data });
   }
 
-  return jsonError("accion debe ser 'crear' o 'actualizar'", 400);
+  return jsonError("accion debe ser 'crear', 'actualizar' o 'eliminar'", 400);
 });

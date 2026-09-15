@@ -274,6 +274,7 @@ function switchUsuariosTab(tab) {
 function _renderTablaUsuarios(lista, rolActual) {
   const rolBadge = {'Administrador':'badge-red','Gestor':'badge-orange','Profesor':'badge-blue','Alumno':'badge-gray'};
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor';
+  const puedeBorrar = rolActual === 'Administrador';  // igual que eliminarItems en PERMISOS
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">👤</div><div class="empty-state-title">Sin usuarios en esta categoría</div></div>`;
   return `<div class="card">
     <table>
@@ -288,7 +289,7 @@ function _renderTablaUsuarios(lista, rolActual) {
             <td>${_badgesModulos(u.Modulo)}</td>
             <td>${_badgesLabs(u.Ubicaciones_Asignadas)}</td>
             <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-            <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+            <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -297,6 +298,66 @@ function _renderTablaUsuarios(lista, rolActual) {
 }
 
 const _SIN_DATO = '<span style="color:var(--text-muted)">—</span>';
+
+// Los usuarios _sbOnly no tienen fila en el catálogo `usuarios` (vienen de la otra
+// app), así que no hay nada que borrar aquí.
+function _botonBorrarUsuario(u, idx, puedeBorrar) {
+  if (!puedeBorrar || u._sbOnly) return '';
+  return `<button class="icon-btn" title="Eliminar usuario" onclick="borrarUsuario(${idx})">🗑️</button>`;
+}
+
+/** Nº de equipos de los que esta persona figura como responsable (campo de texto). */
+function _equiposDeResponsable(nombre) {
+  const n = (nombre || '').trim();
+  if (!n) return [];
+  return (DATA.equipos || []).filter(e =>
+    (e.Responsable || '').split(',').map(x => x.trim()).includes(n));
+}
+
+// Eliminar a una persona la quita de los tres sitios donde vive: catálogo,
+// permisos y cuenta de acceso (lo hace la Edge Function). Aquí solo se avisa y
+// se comprueba lo mismo antes, para no hacer un viaje al servidor en balde.
+async function borrarUsuario(idx) {
+  const u = DATA.usuarios[idx];
+  if (!u) return;
+  if (getUserRole() !== 'Administrador') {
+    showToast('Solo un Administrador puede eliminar usuarios', 'error'); return;
+  }
+  if (u._sbOnly) {
+    showToast('Este usuario se gestiona desde la otra app', 'error'); return;
+  }
+  const miEmail = (currentUser?.email || '').toLowerCase().trim();
+  if ((u.Email || '').toLowerCase().trim() === miEmail) {
+    showToast('No puedes eliminar tu propia cuenta', 'error'); return;
+  }
+
+  // Mismo criterio que borrarProveedor con pedidos: equipos.responsable guarda el
+  // NOMBRE, así que borrar a quien tiene equipos dejaría esos equipos sin dueño real.
+  const suyos = _equiposDeResponsable(u.Nombre);
+  if (suyos.length) {
+    showToast(`No se puede eliminar: es responsable de ${suyos.length} equipo(s). Reasígnalos a otra persona primero.`, 'error');
+    return;
+  }
+
+  if (!confirm(
+    `¿Eliminar a ${u.Nombre} (${u.Email})?\n\n` +
+    `Se borran su ficha, sus permisos y su cuenta de acceso: dejará de poder entrar en la app.\n\n` +
+    `Esta acción no se puede deshacer.`
+  )) return;
+
+  showLoading('Eliminando...');
+  try {
+    const r = await callEdgeFunction('gestionar-usuario', { accion: 'eliminar', id_usuario: u.ID_Usuario });
+    DATA.usuarios.splice(idx, 1);
+    if (r?.aviso) showToast(`Usuario eliminado, pero ${r.aviso}`, 'error');
+    else showToast('Usuario eliminado', 'success');
+    renderAll();
+  } catch (e) {
+    showToast('Error eliminando: ' + e.message, 'error');
+    console.error(e);
+  }
+  hideLoading();
+}
 
 function _badgesModulos(modulosStr) {
   const nombres = (modulosStr || '').split(',').map(m => _moduloNombre(m.trim())).filter(Boolean);
@@ -316,6 +377,7 @@ function _moduloNombre(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(i 
 
 function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
+  const puedeBorrar = rolActual === 'Administrador';  // igual que eliminarItems en PERMISOS
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
 
   // Agrupar por Ciclo_Principal (columna H). Fallback: prefijo embebido "Ciclo|Módulo" o lookup.
@@ -364,7 +426,7 @@ function _renderSeccionAlumnos(lista, rolActual) {
         <td>${modBadges}</td>
         <td>${labBadges}</td>
         <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-        <td><div class="row-actions">${puedeEditar && !u._sbOnly ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}</div></td>
+        <td><div class="row-actions">${puedeEditar && !u._sbOnly ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
       </tr>`;
     }).join('');
     return `<div class="card" style="margin-bottom:16px">
