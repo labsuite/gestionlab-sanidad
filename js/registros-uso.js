@@ -1,36 +1,90 @@
 // ============================================================
-// REGISTROS DE USO (Cabina de bioseguridad / Autoclave)
+// REGISTROS DE USO (Cabina de bioseguridad / Autoclave / Vitrina de gases)
 // ============================================================
-
-const _regConfig = {
-  cabina: {
-    key: 'registrosCabina', sheet: 'Registros_Cabina', lastCol: 'L',
-    tipoEquipo: 'Cabina de bioseguridad', prefix: 'RC', label: 'Cabina de bioseguridad',
-    // La cabina se usa con presencia continua → tiene sentido abrir sesión al entrar y cerrarla al salir.
-    permiteSesionAbierta: true,
-    // Trazabilidad del modelo de calidad: quién usó la cabina debe quedar ligado a su ciclo/módulo.
-    mostrarCicloModulo: true,
-    camposLabels: {
-      Practica_Tecnica: 'Práctica / técnica', Nivel_Riesgo: 'Nivel de riesgo',
-      Verificacion_Previa: 'Verificación previa', Descontaminacion_Posterior: 'Descontaminación posterior'
-    }
-  },
-  autoclave: {
-    key: 'registrosAutoclave', sheet: 'Registros_Autoclave', lastCol: 'K',
-    tipoEquipo: 'Autoclave', prefix: 'RA', label: 'Autoclave',
-    // El autoclave es un ciclo automático: se registra al ponerlo en marcha, no hay presencia que "cerrar" después.
-    permiteSesionAbierta: false,
-    // Trazabilidad del modelo de calidad: quién usó el autoclave debe quedar ligado a su ciclo/módulo.
-    mostrarCicloModulo: true,
-    camposLabels: { Programa_Ciclo: 'Programa / ciclo', Tipo_Carga: 'Tipo de carga', Resultado_Control: 'Resultado del control' }
-  }
-};
+//
+// Cada pestaña se describe entera en `_regConfig`: de qué tipos de equipo del
+// inventario se nutre, si admite sesión abierta y qué campos propios registra.
+// Los campos se pintan, se leen y se validan de forma genérica a partir de
+// `campos[]`, así que añadir un equipo nuevo no toca ninguna función de render.
+//
+//   campo      nombre de la columna en DATA / COLS (`Practica_Tecnica`)
+//   api        nombre de la columna en Supabase (`practica_tecnica`)
+//   label      cabecera en el historial y en el informe
+//   labelForm  etiqueta dentro del modal (por defecto, `label`)
+//   tipo       'text' | 'select' | 'check'  ('check' guarda 'Sí' / 'No')
+//   full       ocupa el ancho completo del form-grid-2
+//   requerido  bloquea el guardado si viene vacío
+//   permiteOtro  añade opción "Otro" + campo de texto libre (select)
 
 const PROGRAMAS_AUTOCLAVE = ['121°C / 15 min', '121°C / 20 min'];
 const CARGAS_AUTOCLAVE    = ['Descontaminación', 'Líquidos', 'Sólidos'];
 
+const _regConfig = {
+  cabina: {
+    key: 'registrosCabina', sheet: 'Registros_Cabina', lastCol: 'L',
+    tiposEquipo: ['Cabina de bioseguridad'], prefix: 'RC',
+    label: 'Cabina de bioseguridad', tabLabel: '🧫 Cabina de bioseguridad',
+    // La cabina se usa con presencia continua → tiene sentido abrir sesión al entrar y cerrarla al salir.
+    permiteSesionAbierta: true,
+    // Trazabilidad del modelo de calidad: quién usó la cabina debe quedar ligado a su ciclo/módulo.
+    mostrarCicloModulo: true,
+    campos: [
+      { campo: 'Practica_Tecnica', api: 'practica_tecnica', label: 'Práctica / técnica',
+        tipo: 'text', full: true, requerido: true, placeholder: 'ej. Siembra en medio de cultivo' },
+      { campo: 'Nivel_Riesgo', api: 'nivel_riesgo', label: 'Nivel de riesgo',
+        labelForm: 'Nivel de riesgo del agente manipulado', tipo: 'select', requerido: true,
+        opciones: ['No aplica', 'BSL-1', 'BSL-2', 'BSL-3'] },
+      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Verificación previa',
+        labelForm: 'Verificación previa del flujo', tipo: 'check' },
+      { campo: 'Descontaminacion_Posterior', api: 'descontaminacion_posterior', label: 'Descontaminación posterior',
+        labelForm: 'Descontaminación posterior realizada', tipo: 'check' }
+    ]
+  },
+  autoclave: {
+    key: 'registrosAutoclave', sheet: 'Registros_Autoclave', lastCol: 'K',
+    tiposEquipo: ['Autoclave'], prefix: 'RA',
+    label: 'Autoclave', tabLabel: '♨️ Autoclave',
+    // El autoclave es un ciclo automático: se registra al ponerlo en marcha, no hay presencia que "cerrar" después.
+    permiteSesionAbierta: false,
+    // Trazabilidad del modelo de calidad: quién usó el autoclave debe quedar ligado a su ciclo/módulo.
+    mostrarCicloModulo: true,
+    campos: [
+      { campo: 'Programa_Ciclo', api: 'programa_ciclo', label: 'Programa / ciclo',
+        tipo: 'select', opciones: PROGRAMAS_AUTOCLAVE, permiteOtro: true },
+      { campo: 'Tipo_Carga', api: 'tipo_carga', label: 'Tipo de carga',
+        tipo: 'select', opciones: CARGAS_AUTOCLAVE },
+      { campo: 'Resultado_Control', api: 'resultado_control', label: 'Resultado del control',
+        labelForm: 'Resultado del control biológico/químico', tipo: 'select', full: true,
+        opciones: ['No aplica', 'Correcto', 'No correcto'] }
+    ]
+  },
+  vitrina: {
+    key: 'registrosVitrina', sheet: 'Registros_Vitrina', lastCol: 'L',
+    // El inventario arrastra tres nombres distintos para lo mismo (vitrina / cabina de
+    // extracción de gases); la pestaña recoge todos para no dejar equipos fuera.
+    tiposEquipo: ['Vitrina de extracción de gases', 'Cabina de extracción de gases'], prefix: 'RV',
+    label: 'Vitrina de extracción de gases', tabLabel: '🌫️ Vitrina de gases',
+    // Como la cabina: presencia continua mientras se trabaja dentro de la vitrina.
+    permiteSesionAbierta: true,
+    mostrarCicloModulo: true,
+    campos: [
+      { campo: 'Practica_Tecnica', api: 'practica_tecnica', label: 'Práctica / técnica',
+        tipo: 'text', full: true, requerido: true, placeholder: 'ej. Digestión ácida de muestras' },
+      { campo: 'Productos_Quimicos', api: 'productos_quimicos', label: 'Productos / reactivos',
+        labelForm: 'Productos / reactivos manipulados', tipo: 'text', full: true, requerido: true,
+        placeholder: 'ej. Ácido clorhídrico, xileno' },
+      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Verificación previa',
+        labelForm: 'Verificación previa de la extracción (caudal y pantalla a la altura marcada)', tipo: 'check' },
+      { campo: 'Limpieza_Posterior', api: 'limpieza_posterior', label: 'Limpieza posterior',
+        labelForm: 'Limpieza y retirada de material al terminar', tipo: 'check' }
+    ]
+  }
+};
+
+const _regTipos = Object.keys(_regConfig);
+
 let _regTab          = 'cabina';
-let _regEquipoSel    = { cabina: '', autoclave: '' };
+let _regEquipoSel    = Object.fromEntries(_regTipos.map(t => [t, '']));
 let _regCtx          = null;   // {tipo, idx: number|null}
 let _regAvisoMostrado = false;
 
@@ -40,13 +94,24 @@ function _puedeGestionarRegistros() { return ['Administrador', 'Gestor'].include
 function _puedeVerNfcRegistros() { return ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole()); }
 
 function _equiposDeTipo(tipo) {
-  return DATA.equipos.filter(e => e.Tipo_Equipo === _regConfig[tipo].tipoEquipo);
+  const tipos = _regConfig[tipo].tiposEquipo;
+  return DATA.equipos.filter(e => tipos.includes(e.Tipo_Equipo));
 }
 
 function _equipoRegDefault(tipo) {
   const equipos = _equiposDeTipo(tipo);
   if (_regEquipoSel[tipo] && equipos.some(e => e.ID_Activo === _regEquipoSel[tipo])) return _regEquipoSel[tipo];
   return equipos.length === 1 ? equipos[0].ID_Activo : (equipos[0]?.ID_Activo || '');
+}
+
+// Mapeo fila de Supabase → objeto de DATA, por pestaña (ver _xSbToObj en js/sheets.js).
+function _regSbToObj(tipo, registro) {
+  const mapa = {
+    cabina: _registroCabinaSbToObj,
+    autoclave: _registroAutoclaveSbToObj,
+    vitrina: _registroVitrinaSbToObj,
+  };
+  return mapa[tipo](registro);
 }
 
 function _nombreEquipoReg(idEquipo) {
@@ -85,7 +150,7 @@ function _updateBadgeRegistrosUso() {
   const el = document.getElementById('badge-registros-uso');
   if (!el) return;
   const email = getEffectiveUser().email;
-  const n = ['cabina', 'autoclave'].reduce((sum, tipo) =>
+  const n = _regTipos.reduce((sum, tipo) =>
     sum + DATA[_regConfig[tipo].key].filter(r => r.Estado === 'Abierta' && (r.Usuario || '').toLowerCase().trim() === email).length, 0);
   el.textContent = n;
   el.style.display = n > 0 ? '' : 'none';
@@ -96,7 +161,7 @@ function _avisarSesionesAbiertasAntiguas() {
   _regAvisoMostrado = true;
   const email = getEffectiveUser().email;
   const hoy = new Date().toISOString().split('T')[0];
-  const antiguas = ['cabina', 'autoclave'].flatMap(tipo =>
+  const antiguas = _regTipos.flatMap(tipo =>
     DATA[_regConfig[tipo].key].filter(r => r.Estado === 'Abierta' && r.Fecha < hoy && (r.Usuario || '').toLowerCase().trim() === email)
   );
   if (antiguas.length) {
@@ -120,11 +185,9 @@ function renderRegistrosUso() {
 
   el.innerHTML = `
     <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;flex-wrap:wrap">
-      ${tabBtn('cabina', '🧫 Cabina de bioseguridad')}
-      ${tabBtn('autoclave', '♨️ Autoclave')}
+      ${_regTipos.map(t => tabBtn(t, _regConfig[t].tabLabel)).join('')}
     </div>
-    <div id="reg-tab-cabina">${_renderRegTab('cabina')}</div>
-    <div id="reg-tab-autoclave" style="display:none">${_renderRegTab('autoclave')}</div>
+    ${_regTipos.map(t => `<div id="reg-tab-${t}" style="display:none">${_renderRegTab(t)}</div>`).join('')}
   `;
 
   _switchRegTab(_regTab);
@@ -132,7 +195,7 @@ function renderRegistrosUso() {
 
 function _switchRegTab(tab) {
   _regTab = tab;
-  ['cabina', 'autoclave'].forEach(t => {
+  _regTipos.forEach(t => {
     const p = document.getElementById(`reg-tab-${t}`);
     if (p) p.style.display = t === tab ? '' : 'none';
   });
@@ -143,7 +206,7 @@ function _renderRegTab(tipo) {
   const equipos = _equiposDeTipo(tipo);
 
   if (!equipos.length) {
-    return `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">No hay ningún equipo de tipo "${cfg.tipoEquipo}" en el inventario</div></div>`;
+    return `<div class="empty-state"><div class="empty-state-icon">⚠️</div><div class="empty-state-title">No hay ningún equipo de tipo "${cfg.tiposEquipo.join('" / "')}" en el inventario</div></div>`;
   }
 
   const idEquipoSel = _equipoRegDefault(tipo);
@@ -232,13 +295,11 @@ function _renderHistorialReg(tipo) {
 
   if (!cerradas.length) return `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin sesiones registradas todavía</div></div>`;
 
-  const campos = Object.keys(cfg.camposLabels);
-
   return `<div class="card" style="padding:0;overflow:hidden">
     <table><thead><tr>
       <th>Fecha</th><th>Horario</th><th>Usuario</th>
       ${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}
-      ${campos.map(c => `<th>${cfg.camposLabels[c]}</th>`).join('')}
+      ${cfg.campos.map(c => `<th>${c.label}</th>`).join('')}
       <th>Incidencias</th>
     </tr></thead>
     <tbody>
@@ -247,7 +308,7 @@ function _renderHistorialReg(tipo) {
         <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
         <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
         ${cfg.mostrarCicloModulo ? `<td style="font-size:12px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
-        ${campos.map(c => `<td style="font-size:12px">${r[c] || '—'}</td>`).join('')}
+        ${cfg.campos.map(c => `<td style="font-size:12px">${r[c.campo] || '—'}</td>`).join('')}
         <td style="font-size:12px">${r.Incidencias || '—'}</td>
       </tr>`).join('')}
     </tbody></table>
@@ -255,80 +316,79 @@ function _renderHistorialReg(tipo) {
 }
 
 // ── Campos dinámicos del modal (según tipo) ──────────────────
+//
+// Se pintan desde `cfg.campos` (ver _regConfig), sin ramas por tipo de equipo.
+// Los checkboxes van todos juntos al final, en una sola columna a ancho completo.
+
+function _idCampoSesion(c) { return `reg-campo-${c.api}`; }
+
+function _renderUnCampoSesion(c, valores) {
+  const label = c.labelForm || c.label;
+  const etiqueta = `<label>${label}${c.requerido ? ' *' : ''}</label>`;
+  const clase = `form-group${c.full ? ' full' : ''}`;
+  const id = _idCampoSesion(c);
+  const valor = valores[c.campo] || '';
+
+  if (c.tipo === 'select') {
+    const opciones = c.permiteOtro ? [...c.opciones, 'Otro'] : c.opciones;
+    const esPreset = c.opciones.includes(valor);
+    const selValue = (c.permiteOtro && valor && !esPreset) ? 'Otro' : valor;
+    const otro = c.permiteOtro
+      ? `<input type="text" id="${id}-otro" placeholder="Especifica el valor" value="${esPreset ? '' : valor}" style="margin-top:6px;${selValue === 'Otro' ? '' : 'display:none'}">`
+      : '';
+    return `<div class="${clase}">
+      ${etiqueta}
+      <select id="${id}" ${c.permiteOtro ? `onchange="_onCampoOtroChange('${c.api}')"` : ''}>
+        ${opciones.map(o => `<option value="${o}" ${selValue === o ? 'selected' : ''}>${o}</option>`).join('')}
+      </select>
+      ${otro}
+    </div>`;
+  }
+
+  return `<div class="${clase}">
+    ${etiqueta}
+    <input type="text" id="${id}" value="${valor.replace(/"/g, '&quot;')}" placeholder="${c.placeholder || ''}">
+  </div>`;
+}
 
 function _renderCamposSesion(tipo, valores = {}) {
   const el = document.getElementById('reg-sesion-campos');
   if (!el) return;
-  if (tipo === 'cabina') {
-    el.innerHTML = `
-      <div class="form-grid-2" style="margin-top:12px">
-        <div class="form-group full">
-          <label>Práctica / técnica *</label>
-          <input type="text" id="reg-campo-practica" value="${valores.Practica_Tecnica || ''}" placeholder="ej. Siembra en medio de cultivo">
-        </div>
-        <div class="form-group">
-          <label>Nivel de riesgo del agente manipulado *</label>
-          <select id="reg-campo-riesgo">
-            ${['No aplica', 'BSL-1', 'BSL-2', 'BSL-3'].map(n => `<option value="${n}" ${valores.Nivel_Riesgo === n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group full" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;min-width:0">
-          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="reg-campo-verif" style="margin-top:3px;flex-shrink:0" ${valores.Verificacion_Previa === 'Sí' ? 'checked' : ''}> <span style="min-width:0">Verificación previa del flujo</span></label>
-          <label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="reg-campo-descon" style="margin-top:3px;flex-shrink:0" ${valores.Descontaminacion_Posterior === 'Sí' ? 'checked' : ''}> <span style="min-width:0">Descontaminación posterior realizada</span></label>
-        </div>
-      </div>`;
-  } else {
-    const progActual   = valores.Programa_Ciclo || '';
-    const progEsPreset = PROGRAMAS_AUTOCLAVE.includes(progActual);
-    const progSelValue = progActual && !progEsPreset ? 'Otro' : progActual;
+  const cfg = _regConfig[tipo];
+  const checks = cfg.campos.filter(c => c.tipo === 'check');
+  const resto  = cfg.campos.filter(c => c.tipo !== 'check');
 
-    el.innerHTML = `
-      <div class="form-grid-2" style="margin-top:12px">
-        <div class="form-group">
-          <label>Programa / ciclo</label>
-          <select id="reg-campo-programa" onchange="_onProgramaCicloChange()">
-            ${[...PROGRAMAS_AUTOCLAVE, 'Otro'].map(p => `<option value="${p}" ${progSelValue === p ? 'selected' : ''}>${p}</option>`).join('')}
-          </select>
-          <input type="text" id="reg-campo-programa-otro" placeholder="Especifica el programa" value="${progEsPreset ? '' : progActual}" style="margin-top:6px;${progSelValue === 'Otro' ? '' : 'display:none'}">
-        </div>
-        <div class="form-group">
-          <label>Tipo de carga</label>
-          <select id="reg-campo-carga">
-            ${CARGAS_AUTOCLAVE.map(n => `<option value="${n}" ${valores.Tipo_Carga === n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-        <div class="form-group full">
-          <label>Resultado del control biológico/químico</label>
-          <select id="reg-campo-resultado">
-            ${['No aplica', 'Correcto', 'No correcto'].map(n => `<option value="${n}" ${valores.Resultado_Control === n ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-      </div>`;
-  }
+  const bloqueChecks = checks.length ? `<div class="form-group full" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;min-width:0">
+      ${checks.map(c => `<label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="${_idCampoSesion(c)}" style="margin-top:3px;flex-shrink:0" ${valores[c.campo] === 'Sí' ? 'checked' : ''}> <span style="min-width:0">${c.labelForm || c.label}</span></label>`).join('')}
+    </div>` : '';
+
+  el.innerHTML = `
+    <div class="form-grid-2" style="margin-top:12px">
+      ${resto.map(c => _renderUnCampoSesion(c, valores)).join('')}
+      ${bloqueChecks}
+    </div>`;
 }
 
-function _onProgramaCicloChange() {
-  const sel  = document.getElementById('reg-campo-programa');
-  const otro = document.getElementById('reg-campo-programa-otro');
+function _onCampoOtroChange(api) {
+  const sel  = document.getElementById(`reg-campo-${api}`);
+  const otro = document.getElementById(`reg-campo-${api}-otro`);
   if (!sel || !otro) return;
   otro.style.display = sel.value === 'Otro' ? '' : 'none';
 }
 
 function _leerCamposSesion(tipo) {
-  if (tipo === 'cabina') {
-    return {
-      Practica_Tecnica: v('reg-campo-practica'),
-      Nivel_Riesgo: v('reg-campo-riesgo'),
-      Verificacion_Previa: document.getElementById('reg-campo-verif')?.checked ? 'Sí' : 'No',
-      Descontaminacion_Posterior: document.getElementById('reg-campo-descon')?.checked ? 'Sí' : 'No'
-    };
+  const out = {};
+  for (const c of _regConfig[tipo].campos) {
+    const id = _idCampoSesion(c);
+    if (c.tipo === 'check') {
+      out[c.campo] = document.getElementById(id)?.checked ? 'Sí' : 'No';
+    } else if (c.tipo === 'select' && c.permiteOtro && v(id) === 'Otro') {
+      out[c.campo] = v(`${id}-otro`);
+    } else {
+      out[c.campo] = v(id);
+    }
   }
-  const progSel = v('reg-campo-programa');
-  return {
-    Programa_Ciclo: progSel === 'Otro' ? v('reg-campo-programa-otro') : progSel,
-    Tipo_Carga: v('reg-campo-carga'),
-    Resultado_Control: v('reg-campo-resultado')
-  };
+  return out;
 }
 
 // ── Modal: nueva sesión completa / cerrar sesión ─────────────
@@ -400,15 +460,14 @@ async function guardarSesionRegistro() {
   if (horaFin && horaFin <= horaIni) { showToast('La hora de fin debe ser posterior a la de inicio', 'error'); return; }
 
   const campos = _leerCamposSesion(tipo);
-  if (tipo === 'cabina' && (!campos.Practica_Tecnica.trim() || !campos.Nivel_Riesgo)) {
-    showToast('Indica la práctica/técnica y el nivel de riesgo', 'error');
+  const faltan = cfg.campos.filter(c => c.requerido && !String(campos[c.campo] || '').trim());
+  if (faltan.length) {
+    showToast(`Completa: ${faltan.map(c => (c.labelForm || c.label).toLowerCase()).join(', ')}`, 'error');
     return;
   }
   const incidencias = v('reg-sesion-incidencias');
   const idRegistro = idx != null ? DATA[cfg.key][idx].ID_Registro : null;
-  const camposApi = tipo === 'cabina'
-    ? { practica_tecnica: campos.Practica_Tecnica, nivel_riesgo: campos.Nivel_Riesgo, verificacion_previa: campos.Verificacion_Previa, descontaminacion_posterior: campos.Descontaminacion_Posterior }
-    : { programa_ciclo: campos.Programa_Ciclo, tipo_carga: campos.Tipo_Carga, resultado_control: campos.Resultado_Control };
+  const camposApi = Object.fromEntries(cfg.campos.map(c => [c.api, campos[c.campo]]));
 
   showLoading('Guardando…');
   try {
@@ -416,7 +475,7 @@ async function guardarSesionRegistro() {
       accion: 'guardar_sesion', tipo, id_registro: idRegistro, id_equipo: idEquipo,
       fecha, hora_inicio: horaIni, hora_fin: horaFin, incidencias, campos: camposApi,
     });
-    const objLocal = tipo === 'cabina' ? _registroCabinaSbToObj(registro) : _registroAutoclaveSbToObj(registro);
+    const objLocal = _regSbToObj(tipo, registro);
     if (idx != null) {
       DATA[cfg.key][idx] = objLocal;
       showToast('Sesión cerrada ✓', 'success');
@@ -475,7 +534,7 @@ async function _iniciarSesionRapida(tipo, idEquipo) {
   showLoading('Iniciando sesión…');
   try {
     const { registro } = await callEdgeFunction('gestionar-registro-uso', { accion: 'iniciar_rapido', tipo, id_equipo: idEquipo });
-    const objLocal = _registroCabinaSbToObj(registro);
+    const objLocal = _regSbToObj(tipo, registro);
     DATA[cfg.key].push(objLocal);
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
@@ -546,7 +605,6 @@ function generarInformeRegistro(tipo) {
 
   if (!cerradas.length) { showToast('No hay sesiones registradas para generar el informe', 'error'); return; }
 
-  const campos = Object.keys(cfg.camposLabels);
   const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const nombreEquipo = equipos.length <= 1 ? _nombreEquipoReg(equipos[0].ID_Activo) : _nombreEquipoReg(idEquipoSel);
 
@@ -555,7 +613,7 @@ function generarInformeRegistro(tipo) {
     <td>${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
     <td>${(r.Usuario || '').split('@')[0]}</td>
     ${cfg.mostrarCicloModulo ? `<td>${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
-    ${campos.map(c => `<td>${r[c] || '—'}</td>`).join('')}
+    ${cfg.campos.map(c => `<td>${r[c.campo] || '—'}</td>`).join('')}
     <td>${r.Incidencias || '—'}</td>
   </tr>`).join('');
 
@@ -579,7 +637,7 @@ function generarInformeRegistro(tipo) {
   <h1>Registro de uso — ${cfg.label}</h1>
   <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${nombreEquipo} &nbsp;·&nbsp; Generado el ${hoy} &nbsp;·&nbsp; ${cerradas.length} sesión${cerradas.length > 1 ? 'es' : ''}</div>
   <table>
-    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${campos.map(c => `<th>${cfg.camposLabels[c]}</th>`).join('')}<th>Incidencias</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${cfg.campos.map(c => `<th>${c.label}</th>`).join('')}<th>Incidencias</th></tr></thead>
     <tbody>${filas}</tbody>
   </table>
 </body>

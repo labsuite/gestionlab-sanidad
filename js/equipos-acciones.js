@@ -298,6 +298,7 @@ function openModalIncidenciaEquipo(equipoId) {
 // FLUJO PASO 1 — Planificar desde incidencia
 // ============================================================
 function abrirPlanificacion(incId, equipo, origenIntId) {
+  _marcarOrigenHilo();
   sv('plan-inc-id', incId);
   sv('plan-equipo', equipo);
   sv('plan-origen-int', origenIntId || '');
@@ -373,9 +374,43 @@ function _toggleEjecucionPlan(tipo) {
 // solo sitio, para no tener que ir a buscarlas por separado en "Próximas
 // visitas" y en la tabla de intervenciones.
 // ============================================================
+// Incidencia cuyo hilo se está mirando. Los modales que se abren DESDE el hilo
+// (ejecutar actuación, ficha, factura) lo consultan para volver al hilo al
+// terminar, en vez de dejar a la usuaria en la pantalla de fondo.
+let _hiloIncidenciaActiva = null;
+
+// Vuelve al hilo desde el que se abrió el modal actual, si lo hubo.
+function volverAlHilo() {
+  if (!_hiloIncidenciaActiva) return false;
+  abrirHiloIncidencia(_hiloIncidenciaActiva);
+  return true;
+}
+
+// Cierra el modal indicado y vuelve al hilo si se venía de él.
+function cerrarYVolverAlHilo(modalId) {
+  closeModal(modalId);
+  volverAlHilo();
+}
+
+// Cierra el hilo del todo (botón Cerrar / ✕): ya no hay hilo al que volver.
+function cerrarHiloIncidencia() {
+  _hiloIncidenciaActiva = null;
+  closeModal('modal-hilo-incidencia');
+}
+
+// Lo llaman los modales que pueden abrirse desde el hilo o desde cualquier otra
+// pantalla. Si el hilo NO está abierto en ese momento, es que se viene de otro
+// sitio y no hay que volver a él al cerrar. Por eso los botones del hilo abren
+// el modal ANTES de cerrarse a sí mismos.
+function _marcarOrigenHilo() {
+  const hilo = document.getElementById('modal-hilo-incidencia');
+  if (!hilo || !hilo.classList.contains('open')) _hiloIncidenciaActiva = null;
+}
+
 function abrirHiloIncidencia(incId) {
   const inc = DATA.incidencias.find(x => x.ID_Incidencia === incId);
   if (!inc) return;
+  _hiloIncidenciaActiva = incId;
   const label = document.getElementById('hilo-inc-label');
   if (label) label.textContent = `${inc.ID_Incidencia} · ${inc.Equipo || ''} · ${inc.Estado}`;
 
@@ -402,16 +437,28 @@ function abrirHiloIncidencia(incId) {
       ? formatDate(c.Fecha_Realizacion)
       : (c.Fecha_Planificada ? formatDate(c.Fecha_Planificada) + ' (planificada)' : 'Por concretar');
 
+    // Dónde se hizo: solo se menciona si el equipo salió del centro (lo habitual
+    // es que el técnico venga aquí, y decirlo en cada línea sería ruido).
+    let lineaLugar = '';
+    if (c.Lugar_Intervencion === 'Equipo retirado') {
+      const desde = c.Fecha_Retirada ? formatDate(c.Fecha_Retirada) : '';
+      lineaLugar = c.Fecha_Devolucion
+        ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📦 Equipo retirado${desde ? ' el ' + desde : ''} · devuelto el ${formatDate(c.Fecha_Devolucion)}</div>`
+        : `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">📦 <strong>Equipo fuera del centro</strong>${desde ? ' desde el ' + desde : ''} · sin devolver</div>`;
+    }
+
     let accion = '';
+    if (c.Lugar_Intervencion === 'Equipo retirado' && !c.Fecha_Devolucion && puedeHacer('crearIntervenciones'))
+      accion += `<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');registrarDevolucionEquipo('${c.ID_Intervencion}')">📦 Devuelto</button>`;
     if (esActiva && puedeHacer('crearIntervenciones')) {
       if (c.Estado === 'Planificada')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">🔧 Ejecutar</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
       else if (c.Estado === 'En gestión')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalActuacionDerivada(${cIdx})">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>`;
       else if (c.Estado === 'Pendiente factura')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');openModalAdjuntarFactura(${cIdx})">📎 Factura</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalAdjuntarFactura(${cIdx});closeModal('modal-hilo-incidencia')">📎 Factura</button>`;
       if (c.Estado !== 'Cerrada')
-        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');programarOtraVisita(${cIdx})">📅 Otra actuación</button>`;
+        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Otra actuación</button>`;
     }
 
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -423,15 +470,113 @@ function abrirHiloIncidencia(incId) {
           ${esActiva ? '<span class="badge badge-blue" style="font-size:9px">actuación activa</span>' : ''}
         </div>
         <div style="font-size:12px;color:var(--text-soft)">${fechaTxt} · ${quien} · ${resumenTareas}</div>
+        ${lineaLugar}
       </div>
       <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-        <button class="icon-btn" onclick="closeModal('modal-hilo-incidencia');openFichaIntervencion(${cIdx})" title="Ver ficha">🔍</button>
+        <button class="icon-btn" onclick="openFichaIntervencion(${cIdx});closeModal('modal-hilo-incidencia')" title="Ver ficha">🔍</button>
         ${accion}
       </div>
     </div>`;
   }).join('');
 
+  _renderCierreHilo(inc);
   openModal('modal-hilo-incidencia');
+}
+
+// Pie del hilo: aquí (y solo aquí) se da la incidencia por resuelta o descartada
+// y se decide con qué estado operativo queda el equipo. Ni completar las tareas
+// de una actuación ni adjuntar la factura cierran nada por su cuenta.
+function _renderCierreHilo(inc) {
+  const cont = document.getElementById('hilo-cierre');
+  if (!cont) return;
+  const equipoId = (inc.Equipo || '').split(' – ')[0].trim();
+  const equipo   = DATA.equipos.find(e => e.ID_Activo === equipoId);
+  const estadoEq = equipo ? (equipo.Estado_Operativo || '—') : '—';
+  const cerrada  = ['Resuelta', 'Descartada'].includes(inc.Estado);
+
+  if (!puedeHacer('crearIntervenciones')) {
+    cont.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding-top:10px;border-top:1px solid var(--border)">Estado del equipo: <strong>${estadoEq}</strong></div>`;
+    return;
+  }
+
+  if (cerrada) {
+    cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
+      <div style="font-size:12px;color:var(--text-soft);margin-bottom:8px">
+        Incidencia <strong>${inc.Estado}</strong>. Estado actual del equipo: <strong>${estadoEq}</strong>.
+      </div>
+      <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="reabrirIncidenciaDesdeHilo()">↩︎ Reabrir incidencia</button>
+    </div>`;
+    return;
+  }
+
+  // Estado propuesto para el equipo: "Operativo" si la actuación activa acabó con
+  // todas sus tareas resueltas; si no, el que ya tiene.
+  const intActiva = DATA.intervenciones.find(x => x.ID_Intervencion === inc.Intervencion_Generada);
+  const tareas    = intActiva ? getTareasIntervencion(intActiva.ID_Intervencion) : [];
+  const todoHecho = tareas.length && tareas.every(t => ['Resuelto', 'Descartado'].includes(t.Resultado));
+  const propuesto = todoHecho ? 'Operativo' : (estadoEq !== '—' ? estadoEq : 'Operativo');
+  const ESTADOS   = ['Operativo', 'Operativo con fallos', 'En revisión', 'Revisión planificada', 'No operativo', 'Averiado', 'Fuera de servicio'];
+
+  cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
+    <div style="font-size:12px;font-weight:600;margin-bottom:6px">Cerrar la incidencia</div>
+    <div style="font-size:12px;color:var(--text-soft);margin-bottom:8px">
+      El equipo está ahora como <strong>${estadoEq}</strong>. Elige con qué estado queda al cerrar.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="hilo-estado-equipo" style="font-size:12px;padding:5px 8px">
+        ${ESTADOS.map(e => `<option${e === propuesto ? ' selected' : ''}>${e}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="cerrarIncidenciaDesdeHilo('Resuelta')">✅ Marcar resuelta</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="cerrarIncidenciaDesdeHilo('Descartada')">🚫 Descartar</button>
+    </div>
+  </div>`;
+}
+
+// Cierra la incidencia del hilo con el estado elegido y fija a propósito el
+// estado operativo del equipo.
+async function cerrarIncidenciaDesdeHilo(estado) {
+  const incId = _hiloIncidenciaActiva;
+  const inc = DATA.incidencias.find(x => x.ID_Incidencia === incId);
+  if (!inc) { showToast('Incidencia no encontrada', 'error'); return; }
+  const estadoEquipo = v('hilo-estado-equipo') || '';
+  const equipoId = (inc.Equipo || '').split(' – ')[0].trim();
+  if (!confirm(`La incidencia ${incId} quedará como ${estado} y el equipo ${equipoId} como «${estadoEquipo}». ¿Continuar?`)) return;
+
+  showLoading('Cerrando incidencia...');
+  try {
+    const { incidencia } = await callEdgeFunction('gestionar-incidencia', {
+      accion: 'cerrar', id_incidencia: incId, estado, estado_equipo: estadoEquipo,
+    });
+    const idx = DATA.incidencias.findIndex(x => x.ID_Incidencia === incId);
+    if (idx !== -1) DATA.incidencias[idx] = _incidenciaSbToObj(incidencia);
+    const eq = DATA.equipos.find(e => e.ID_Activo === equipoId);
+    if (eq && estadoEquipo) eq.Estado_Operativo = estadoEquipo;
+    closeModal('modal-hilo-incidencia');
+    _hiloIncidenciaActiva = null;
+    showToast(`Incidencia ${estado.toLowerCase()}. Equipo → ${estadoEquipo}`, 'success');
+    renderAll();
+  } catch(e) { showToast('Error cerrando la incidencia', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// Vuelve a dejar la incidencia en gestión. No toca el estado del equipo: si hay
+// que cambiarlo, se hace al volver a cerrarla o desde la ficha del equipo.
+async function reabrirIncidenciaDesdeHilo() {
+  const incId = _hiloIncidenciaActiva;
+  if (!incId) return;
+  if (!confirm(`Vas a reabrir la incidencia ${incId}. Volverá a la lista de incidencias en gestión. ¿Continuar?`)) return;
+  showLoading('Reabriendo...');
+  try {
+    const { incidencia } = await callEdgeFunction('gestionar-incidencia', {
+      accion: 'cerrar', id_incidencia: incId, estado: 'En gestión',
+    });
+    const idx = DATA.incidencias.findIndex(x => x.ID_Incidencia === incId);
+    if (idx !== -1) DATA.incidencias[idx] = _incidenciaSbToObj(incidencia);
+    showToast('Incidencia reabierta', 'success');
+    abrirHiloIncidencia(incId);
+    renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error reabriendo la incidencia', 'error'); console.error(e); }
+  hideLoading();
 }
 
 // Programar una NUEVA visita (otro día, posiblemente otro técnico) sobre una incidencia
@@ -617,6 +762,7 @@ function _renderTareasEnModal(intId) {
 // FLUJO PASO 2 — Registrar actuación (tareas de una visita)
 // ============================================================
 function openModalRegistrarActuacion(intIdx) {
+  _marcarOrigenHilo();
   _pendingActFileBase64 = null;
   removeActFile();
   sv('act-equipo-directo', '');
@@ -657,6 +803,10 @@ function openModalRegistrarActuacion(intIdx) {
   if (esExterna) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
   else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
   toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
+  sv('act-lugar', i.Lugar_Intervencion || 'En el centro');
+  sv('act-fecha-retirada',   i.Fecha_Retirada   || '');
+  sv('act-fecha-devolucion', i.Fecha_Devolucion || '');
+  toggleActLugar();
 
   _aplicarModoModalActuacion(i);
   _renderTareasEnModal(i.ID_Intervencion);
@@ -723,6 +873,31 @@ async function reabrirActuacion() {
   hideLoading();
 }
 
+// Marca que el equipo retirado por el SAT ya ha vuelto al centro — con eso
+// desaparece el cartel "Fuera del centro" del inventario y de las incidencias.
+// (La fecha también se puede corregir luego desde el modal de la actuación.)
+async function registrarDevolucionEquipo(intId) {
+  const idx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === intId);
+  const i = DATA.intervenciones[idx];
+  if (!i) { showToast('Intervención no encontrada', 'error'); return; }
+  const hoy = new Date().toISOString().split('T')[0];
+  const fecha = prompt(`¿Qué día volvió el equipo al centro? (AAAA-MM-DD)`, hoy);
+  if (fecha === null) return;
+  const f = (fecha || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) { showToast('Fecha no válida (usa AAAA-MM-DD)', 'error'); return; }
+  if (i.Fecha_Retirada && f < i.Fecha_Retirada) { showToast('La devolución no puede ser anterior a la retirada', 'error'); return; }
+  showLoading('Registrando devolución...');
+  try {
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
+      accion: 'actualizar', id_intervencion: i.ID_Intervencion, fecha_devolucion: f,
+    });
+    DATA.intervenciones[idx] = _intervencionSbToObj(intervencion);
+    showToast('Equipo de vuelta en el centro', 'success');
+    renderAll();
+  } catch(e) { showToast('Error al registrar la devolución', 'error'); console.error(e); }
+  hideLoading();
+}
+
 function toggleActEjecucion(tipo) {
   const intGrp   = document.getElementById('act-interna-group');
   const extGrp   = document.getElementById('act-externa-group');
@@ -730,6 +905,19 @@ function toggleActEjecucion(tipo) {
   if (intGrp)   intGrp.style.display   = tipo === 'Interna' ? '' : 'none';
   if (extGrp)   extGrp.style.display   = tipo === 'Externa' ? '' : 'none';
   if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
+}
+
+// El SAT puede actuar en el propio centro o llevarse el equipo a su taller.
+// Si se lo lleva, hacen falta las fechas de retirada y (cuando vuelva) devolución:
+// mientras no haya devolución, el equipo se marca "fuera del centro" en toda la app.
+function toggleActLugar() {
+  const retirado = v('act-lugar') === 'Equipo retirado';
+  const gRet = document.getElementById('act-fecha-retirada-group');
+  const gDev = document.getElementById('act-fecha-devolucion-group');
+  if (gRet) gRet.style.display = retirado ? '' : 'none';
+  if (gDev) gDev.style.display = retirado ? '' : 'none';
+  // Al marcar "retirado" sin fecha aún, proponer la de la actuación
+  if (retirado && !v('act-fecha-retirada')) sv('act-fecha-retirada', v('act-fecha-real') || new Date().toISOString().split('T')[0]);
 }
 
 // Vuelve a poner el bloque "Nueva tarea" en su estado inicial.
@@ -759,6 +947,20 @@ async function marcarResultadoTarea(tareaId, resultado) {
   hideLoading();
 }
 
+// Lee los campos de "¿dónde se hace?" del modal de actuación. Devuelve null si
+// falta la fecha de retirada (obligatoria cuando el equipo sale del centro).
+function _datosLugarActuacion() {
+  const lugar = v('act-lugar') || 'En el centro';
+  if (lugar !== 'Equipo retirado') {
+    return { lugar_intervencion: lugar, fecha_retirada: '', fecha_devolucion: '' };
+  }
+  const fRet = v('act-fecha-retirada');
+  if (!fRet) { showToast('Indica la fecha en que se llevaron el equipo', 'error'); return null; }
+  const fDev = v('act-fecha-devolucion');
+  if (fDev && fDev < fRet) { showToast('La devolución no puede ser anterior a la retirada', 'error'); return null; }
+  return { lugar_intervencion: lugar, fecha_retirada: fRet, fecha_devolucion: fDev || '' };
+}
+
 async function guardarActuacion(finalizar) {
   const equipoDirecto = v('act-equipo-directo');
   const desc = v('act-descripcion');
@@ -777,6 +979,8 @@ async function guardarActuacion(finalizar) {
     const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
     const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
     const tipoInt = v('act-tipo-int') || 'Correctivo';
+    const lugarDatos = _datosLugarActuacion();
+    if (!lugarDatos) return;
     showLoading('Guardando intervención...');
     let intervencion;
     try {
@@ -784,7 +988,7 @@ async function guardarActuacion(finalizar) {
         accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
         fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
         coste_intervencion: coste, estado: 'Planificada',
-        actuacion_finalizada: !!finalizar,
+        actuacion_finalizada: !!finalizar, ...lugarDatos,
       }));
       DATA.intervenciones.push(_intervencionSbToObj(intervencion));
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
@@ -828,6 +1032,8 @@ async function guardarActuacion(finalizar) {
   const realizadoPor = tipoEjec === 'Interna' ? v('act-realizado-por') : '';
   const proveedorExt = tipoEjec === 'Externa' ? v('act-proveedor-ext') : '';
   const coste        = tipoEjec === 'Externa' ? (v('act-coste') || '') : '';
+  const lugarDatos   = _datosLugarActuacion();
+  if (!lugarDatos) return;
   showLoading('Guardando...');
 
   let urlAdjunto, nombreAdjunto;
@@ -844,7 +1050,7 @@ async function guardarActuacion(finalizar) {
     const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
       accion: 'actualizar', id_intervencion: i.ID_Intervencion,
       fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
-      coste_intervencion: coste,
+      coste_intervencion: coste, ...lugarDatos,
       ...(finalizar ? { actuacion_finalizada: true } : {}),
       ...(urlAdjunto ? { url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto } : {}),
     });
@@ -864,6 +1070,9 @@ async function guardarActuacion(finalizar) {
         ? 'Actuación finalizada. Tarea añadida como Pendiente — márcala desde la ficha cuando toque.'
         : 'Actuación finalizada. Para registrar otra distinta, usa «Programar otra actuación».', 'success');
       renderAll();
+      // Se vino del hilo de una incidencia: se vuelve a él para poder darla por
+      // resuelta (o no) a propósito, en vez de salir a la pantalla de fondo.
+      volverAlHilo();
     } else {
       if (desc) _resetCamposTarea();
       _renderTareasEnModal(i.ID_Intervencion);
@@ -1154,6 +1363,11 @@ function openModalRegistrarActuacionDirecta(equipoId) {
   const radInterna = document.getElementById('act-ejec-interna');
   if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
 
+  sv('act-lugar', 'En el centro');
+  sv('act-fecha-retirada',   '');
+  sv('act-fecha-devolucion', '');
+  toggleActLugar();
+
   _aplicarModoModalActuacion(null);
   openModal('modal-registrar-actuacion');
 }
@@ -1164,6 +1378,7 @@ function openModalRegistrarActuacionDirecta(equipoId) {
 let _pendingFacturaBase64 = null;
 
 function openModalAdjuntarFactura(intIdx) {
+  _marcarOrigenHilo();
   _pendingFacturaBase64 = null;
   sv('factura-int-idx', String(intIdx));
   sv('factura-pdf-url', '');
@@ -1210,22 +1425,20 @@ async function guardarFactura() {
 
   showLoading('Cerrando intervención...');
   try {
+    // Se cierra la INTERVENCIÓN. La incidencia vinculada y el estado operativo del
+    // equipo no se tocan aquí: se marcan a propósito desde el hilo de la incidencia.
     const operativo = i.Equipo_Operativo_Tras_Intervencion;
     const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
       accion: 'actualizar', id_intervencion: i.ID_Intervencion,
       url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto, estado: 'Cerrada',
-      estado_equipo: operativo === 'No' ? 'No operativo' : 'Operativo',
-      incidencia_estado: 'Resuelta',
+      ...(operativo === 'No' ? { estado_equipo: 'No operativo' } : {}),
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
-    const incIdxLocal = DATA.incidencias.findIndex(x => x.Intervencion_Generada === i.ID_Intervencion);
-    if (incIdxLocal !== -1 && !['Resuelta','Descartada'].includes(DATA.incidencias[incIdxLocal].Estado)) {
-      DATA.incidencias[incIdxLocal].Estado = 'Resuelta';
-    }
 
     closeModal('modal-adjuntar-factura');
-    showToast('Intervención cerrada. Factura adjunta.', 'success');
+    showToast('Intervención cerrada. Factura adjunta. Cierra la incidencia desde su hilo cuando proceda.', 'success');
     renderAll();
+    volverAlHilo();
   } catch(e) { showToast('Error cerrando la intervención', 'error'); console.error(e); }
   hideLoading();
 }

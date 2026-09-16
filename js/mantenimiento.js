@@ -1798,9 +1798,16 @@ async function exportarInventario(cursoAcademico) {
       (inc.Estado === 'Abierta' || inc.Estado === 'En gestión') &&
       inc.Equipo && (inc.Equipo === eq.ID_Activo || inc.Equipo.startsWith(eq.ID_Activo + ' '))
     );
-    const desc = incAbierta
+    let desc = incAbierta
       ? 'Incidencia abierta. ' + incAbierta.Impacto + ' (' + incAbierta.ID_Incidencia + ')'
       : (eq.Estado_Operativo || '');
+    // Si el SAT se lo llevó y aún no ha vuelto, el equipo no está en el laboratorio:
+    // conviene que el inventario lo diga, no solo el estado operativo.
+    const intFuera = typeof intervencionEquipoFuera === 'function' ? intervencionEquipoFuera(eq.ID_Activo) : null;
+    if (intFuera) {
+      desc = (desc ? desc + '. ' : '') + 'Equipo retirado por el servicio técnico' +
+        (intFuera.Fecha_Retirada ? ' el ' + formatDate(intFuera.Fecha_Retirada) : '') + ' (no está en el centro)';
+    }
     const denom = [eq.Tipo_Equipo, eq.ID_Activo ? `(${eq.ID_Activo})` : ''].filter(Boolean).join(' ');
     return makeRow(9 + i, denom, labDesdeUbicacion(eq.Ubicacion), marcaModelo, serie, desc);
   }).join('');

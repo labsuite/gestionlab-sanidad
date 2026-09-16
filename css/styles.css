@@ -511,6 +511,9 @@
     .badge-orange { background: var(--warning-light); color: var(--warning); }
     .badge-gray { background: var(--surface2); color: var(--text-soft); border: 1px solid var(--border); }
     .badge-blue { background: #e8f0fd; color: #2d5093; }
+    /* Equipo retirado por el SAT (fuera del centro) — color propio para que no se
+       confunda con los estados operativos ni con el impacto de una incidencia. */
+    .badge-purple { background: #efe9fb; color: #5b3f9e; }
 
     .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 

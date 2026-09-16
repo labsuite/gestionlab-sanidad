@@ -1,17 +1,26 @@
-// Módulo Registros de uso (Cabina de bioseguridad / Autoclave) — ver
+// Módulo Registros de uso (Cabina de bioseguridad / Autoclave / Vitrina de gases) — ver
 // docs/modulo-registros-uso.md. Alta abierta a cualquier rol logueado
 // (incluido Alumno, ver `registros-uso` en `nav` de PERMISOS); cerrar/
 // descartar sesiones ajenas es solo Gestor/Administrador
 // (`_puedeGestionarRegistros()` en js/registros-uso.js).
 import { requireAdminOrGestor, requireValidSession, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
-const TABLAS: Record<string, { tabla: string; prefix: string }> = {
-  cabina: { tabla: "registros_cabina", prefix: "RC" },
-  autoclave: { tabla: "registros_autoclave", prefix: "RA" },
+// `sesionAbierta`: el uso tiene presencia continua, así que admite abrir sesión al entrar y
+// cerrarla al salir (cabina y vitrina). El autoclave es un ciclo automático: se registra de una vez.
+const TABLAS: Record<string, { tabla: string; prefix: string; campos: string[]; sesionAbierta: boolean }> = {
+  cabina: {
+    tabla: "registros_cabina", prefix: "RC", sesionAbierta: true,
+    campos: ["practica_tecnica", "nivel_riesgo", "verificacion_previa", "descontaminacion_posterior"],
+  },
+  autoclave: {
+    tabla: "registros_autoclave", prefix: "RA", sesionAbierta: false,
+    campos: ["programa_ciclo", "tipo_carga", "resultado_control"],
+  },
+  vitrina: {
+    tabla: "registros_vitrina", prefix: "RV", sesionAbierta: true,
+    campos: ["practica_tecnica", "productos_quimicos", "verificacion_previa", "limpieza_posterior"],
+  },
 };
-
-const CAMPOS_CABINA = ["practica_tecnica", "nivel_riesgo", "verificacion_previa", "descontaminacion_posterior"];
-const CAMPOS_AUTOCLAVE = ["programa_ciclo", "tipo_carga", "resultado_control"];
 
 function strField(v: unknown) {
   return (v === "" || v === null || v === undefined) ? null : String(v);
@@ -39,7 +48,7 @@ Deno.serve(async (req) => {
   const accion = String(body.accion || "");
   const tipo = String(body.tipo || "");
   const cfg = TABLAS[tipo];
-  if (!cfg) return jsonError("tipo debe ser 'cabina' o 'autoclave'", 400);
+  if (!cfg) return jsonError(`tipo debe ser uno de: ${Object.keys(TABLAS).join(", ")}`, 400);
   const { tabla, prefix } = cfg;
 
   // ── acciones de cualquier sesión válida ──
@@ -48,7 +57,7 @@ Deno.serve(async (req) => {
     if (authError) return authError;
 
     if (accion === "iniciar_rapido") {
-      if (tipo !== "cabina") return jsonError("Solo la cabina admite sesión abierta", 400);
+      if (!cfg.sesionAbierta) return jsonError("Este tipo de equipo no admite sesión abierta", 400);
       const idEquipo = String(body.id_equipo || "").trim();
       if (!idEquipo) return jsonError("id_equipo es obligatorio", 400);
       const ahora = new Date();
@@ -82,7 +91,7 @@ Deno.serve(async (req) => {
     const horaInicio = String(body.hora_inicio || "").trim();
     const horaFin = strField(body.hora_fin);
     const incidencias = strField(body.incidencias);
-    const camposPermitidos = tipo === "cabina" ? CAMPOS_CABINA : CAMPOS_AUTOCLAVE;
+    const camposPermitidos = cfg.campos;
     const camposInput = (body.campos && typeof body.campos === "object") ? body.campos as Record<string, unknown> : {};
     const campos: Record<string, unknown> = {};
     for (const c of camposPermitidos) campos[c] = strField(camposInput[c]);

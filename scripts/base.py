@@ -38,6 +38,7 @@ _PK = {
     'adiciones_residuo': 'id_adicion', 'consultas_residuo': 'id_consulta',
     'config_reservas': 'id_equipo', 'reservas_equipos': 'id_reserva',
     'registros_cabina': 'id_registro', 'registros_autoclave': 'id_registro',
+    'registros_vitrina': 'id_registro',
     'material': 'id_material', 'material_ubicaciones': 'id', 'pedidos': 'id_pedido',
     'lineas_pedido': 'id_linea', 'solicitudes': 'id_solicitud',
     'historico_precio': 'id_historico', 'movimientos': 'id_movimiento',

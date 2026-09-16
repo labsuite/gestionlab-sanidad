@@ -186,7 +186,7 @@
   <div class="modal" style="max-width:500px">
     <div class="modal-header">
       <div class="modal-title" id="plan-modal-title">🗓 Responder a la incidencia</div>
-      <button class="modal-close" onclick="closeModal('modal-planificar-intervencion')">✕</button>
+      <button class="modal-close" onclick="cerrarYVolverAlHilo('modal-planificar-intervencion')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="plan-inc-id">
@@ -260,7 +260,7 @@
       </div>
 
       <div class="form-footer" style="margin-top:16px">
-        <button class="btn btn-secondary" onclick="closeModal('modal-planificar-intervencion')">Cancelar</button>
+        <button class="btn btn-secondary" onclick="cerrarYVolverAlHilo('modal-planificar-intervencion')">Cancelar</button>
         <button class="btn btn-primary" id="plan-btn-crear" onclick="guardarPlanificacion(true)">Crear intervención planificada</button>
       </div>
     </div>
@@ -274,7 +274,7 @@
   <div class="modal">
     <div class="modal-header">
       <div class="modal-title" id="act-modal-title">🔧 Registrar actuación</div>
-      <button class="modal-close" onclick="closeModal('modal-registrar-actuacion')">✕</button>
+      <button class="modal-close" onclick="cerrarYVolverAlHilo('modal-registrar-actuacion')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="act-int-id">
@@ -336,6 +336,22 @@
           <label>Coste (€, sin IVA)</label>
           <input id="act-coste" type="number" min="0" step="0.01" placeholder="0.00">
         </div>
+        <div class="form-group full">
+          <label>¿Dónde se hace? *</label>
+          <select id="act-lugar" onchange="toggleActLugar()">
+            <option value="En el centro">En el centro (el técnico viene aquí)</option>
+            <option value="Equipo retirado">Equipo retirado — se lo llevan a su taller</option>
+          </select>
+        </div>
+        <div class="form-group" id="act-fecha-retirada-group" style="display:none">
+          <label>Fecha de retirada *</label>
+          <input id="act-fecha-retirada" type="date">
+        </div>
+        <div class="form-group" id="act-fecha-devolucion-group" style="display:none">
+          <label>Fecha de devolución</label>
+          <input id="act-fecha-devolucion" type="date">
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Déjala vacía mientras el equipo siga fuera del centro — se marcará como tal en el inventario y en la incidencia.</div>
+        </div>
       </div>
 
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 6px">Tareas registradas en esta actuación</div>
@@ -375,7 +391,7 @@
         </div>
       </div>
       <div class="form-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-registrar-actuacion')">Cancelar</button>
+        <button class="btn btn-secondary" onclick="cerrarYVolverAlHilo('modal-registrar-actuacion')">Cancelar</button>
         <button class="btn btn-secondary" id="act-btn-reabrir" style="display:none" onclick="reabrirActuacion()">↩︎ Reabrir actuación</button>
         <button class="btn btn-secondary" id="act-btn-guardar" onclick="guardarActuacion(false)">💾 Guardar sin cerrar</button>
         <button class="btn btn-primary" id="act-btn-finalizar" onclick="guardarActuacion(true)">Guardar y finalizar actuación</button>
@@ -443,7 +459,7 @@
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div class="modal-title">Adjuntar factura y cerrar</div>
-      <button class="modal-close" onclick="closeModal('modal-adjuntar-factura')">✕</button>
+      <button class="modal-close" onclick="cerrarYVolverAlHilo('modal-adjuntar-factura')">✕</button>
     </div>
     <div class="modal-body">
       <input type="hidden" id="factura-int-idx">
@@ -465,7 +481,7 @@
         <input type="hidden" id="factura-pdf-url" value="">
       </div>
       <div class="form-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-adjuntar-factura')">Cancelar</button>
+        <button class="btn btn-secondary" onclick="cerrarYVolverAlHilo('modal-adjuntar-factura')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarFactura()">Cerrar intervención</button>
       </div>
     </div>
@@ -482,7 +498,7 @@
         <div class="modal-title">Ficha de intervención</div>
         <div id="ficha-int-id" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-ficha-intervencion')">✕</button>
+      <button class="modal-close" onclick="cerrarYVolverAlHilo('modal-ficha-intervencion')">✕</button>
     </div>
     <div class="modal-body">
       <div id="ficha-int-timeline"></div>
@@ -520,6 +536,10 @@
           <div id="ficha-int-realizado" style="font-size:13px"></div>
         </div>
         <div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Dónde se hace</div>
+          <div id="ficha-int-lugar" style="font-size:13px"></div>
+        </div>
+        <div>
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px">Resultado</div>
           <div id="ficha-int-resultado" style="font-size:13px"></div>
         </div>
@@ -546,7 +566,7 @@
       </div>
       <div class="form-footer" style="justify-content:flex-end">
         <div id="ficha-int-acciones" style="display:flex;gap:8px;flex-wrap:wrap"></div>
-        <button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion')">Cerrar</button>
+        <button class="btn btn-secondary" onclick="cerrarYVolverAlHilo('modal-ficha-intervencion')">Cerrar</button>
       </div>
     </div>
   </div>
@@ -562,12 +582,13 @@
         <div class="modal-title">🔗 Hilo de la incidencia</div>
         <div id="hilo-inc-label" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
       </div>
-      <button class="modal-close" onclick="closeModal('modal-hilo-incidencia')">✕</button>
+      <button class="modal-close" onclick="cerrarHiloIncidencia()">✕</button>
     </div>
     <div class="modal-body">
       <div id="hilo-lista"></div>
+      <div id="hilo-cierre"></div>
       <div class="form-footer" style="justify-content:flex-end">
-        <button class="btn btn-secondary" onclick="closeModal('modal-hilo-incidencia')">Cerrar</button>
+        <button class="btn btn-secondary" onclick="cerrarHiloIncidencia()">Cerrar</button>
       </div>
     </div>
   </div>

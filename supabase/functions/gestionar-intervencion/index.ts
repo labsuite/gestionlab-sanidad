@@ -88,6 +88,9 @@ Deno.serve(async (req) => {
       url_adjunto: strField(body.url_adjunto),
       nombre_adjunto: strField(body.nombre_adjunto),
       actuacion_finalizada: boolField(body.actuacion_finalizada) ?? false,
+      lugar_intervencion: strField(body.lugar_intervencion),
+      fecha_retirada: strField(body.fecha_retirada),
+      fecha_devolucion: strField(body.fecha_devolucion),
     };
     const { data: intervencion, error } = await supabaseAdmin.from("intervenciones").insert(datos).select().single();
     if (error) return jsonError(`No se pudo crear: ${error.message}`, 400);
@@ -110,7 +113,7 @@ Deno.serve(async (req) => {
     const CAMPOS = ["tipo", "origen", "fecha_planificada", "fecha_realizacion", "realizado_por",
       "tecnico_externo", "proveedor", "descripcion_actuacion", "resultado", "url_adjunto",
       "factura_asociada", "observaciones", "nombre_adjunto", "estado", "fecha_estimada_resolucion",
-      "coste_intervencion"];
+      "coste_intervencion", "lugar_intervencion", "fecha_retirada", "fecha_devolucion"];
     const datos: Record<string, unknown> = {};
     for (const c of CAMPOS) if (c in body) datos[c] = (c === "coste_intervencion") ? numField(body[c]) : strField(body[c]);
     if ("equipo_operativo_tras_intervencion" in body) datos.equipo_operativo_tras_intervencion = boolField(body.equipo_operativo_tras_intervencion);
@@ -165,15 +168,18 @@ Deno.serve(async (req) => {
     const { data: intervencionActualizada } = await supabaseAdmin.from("intervenciones")
       .update({ resultado: resultadoAgg, estado: estadoAgg }).eq("id_intervencion", idIntervencion).select().single();
 
-    if (datosTarea.operativo !== null) {
-      const estadoEquipo = (resultadoAgg === "Resuelto" || resultadoAgg === "Descartado")
-        ? (datosTarea.operativo ? "Operativo" : "No operativo")
-        : (datosTarea.operativo ? "Operativo con fallos" : "No operativo");
-      await actualizarEstadoEquipoSiProcede(intervencion.id_equipo, estadoEquipo);
+    // El estado del equipo solo se DEGRADA automáticamente desde las tareas
+    // ("No operativo" / "Operativo con fallos"). Volver a "Operativo" es una
+    // decisión de la usuaria: se marca a propósito al cerrar la incidencia
+    // desde su hilo (accion "cerrar" de gestionar-incidencia).
+    if (datosTarea.operativo !== null && !datosTarea.operativo) {
+      await actualizarEstadoEquipoSiProcede(intervencion.id_equipo, "No operativo");
     }
 
-    const nuevoEstadoInc = estadoAgg === "Cerrada" ? (resultadoAgg === "Descartado" ? "Descartada" : "Resuelta") : "En gestión";
-    await actualizarIncidenciaVinculada(idIntervencion, nuevoEstadoInc);
+    // Tampoco se cierra la incidencia sola aunque todas las tareas queden
+    // resueltas: se queda "En gestión" hasta que alguien la dé por resuelta
+    // (o descartada) desde el hilo.
+    await actualizarIncidenciaVinculada(idIntervencion, "En gestión");
 
     return jsonOk({ tarea, intervencion: intervencionActualizada, resultadoAgg, estadoAgg });
   }

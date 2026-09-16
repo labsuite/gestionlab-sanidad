@@ -42,7 +42,7 @@ let DATA = {
   revisionesInventario: [], consultasResiduo: [], excepcionesResiduoIa: [],
   propuestasUbicacion: [],
   configReservas: [], reservas: [],
-  registrosCabina: [], registrosAutoclave: [],
+  registrosCabina: [], registrosAutoclave: [], registrosVitrina: [],
   // Supabase
   sbUsuarios: [],   // usuarios de Supabase (id uuid, email, role, ciclo_principal…)
   userModulos: []   // asignaciones usuario→módulo enriquecidas con labs
@@ -79,7 +79,8 @@ const COLS = {
   configReservas:         ['ID_Equipo','Politica','Params_Template','Max_Horas','Antelacion_Min_Horas'],
   reservas:               ['ID_Reserva','ID_Equipo','Usuario','Fecha_Inicio','Fecha_Fin','Condiciones','Proposito','Estado','Aprobado_Por','Observaciones_Admin','Inicio_Real','Fin_Real'],
   registrosCabina:        ['ID_Registro','ID_Equipo','Usuario','Fecha','Hora_Inicio','Hora_Fin','Practica_Tecnica','Nivel_Riesgo','Verificacion_Previa','Descontaminacion_Posterior','Incidencias','Estado'],
-  registrosAutoclave:     ['ID_Registro','ID_Equipo','Usuario','Fecha','Hora_Inicio','Hora_Fin','Programa_Ciclo','Tipo_Carga','Resultado_Control','Incidencias','Estado']
+  registrosAutoclave:     ['ID_Registro','ID_Equipo','Usuario','Fecha','Hora_Inicio','Hora_Fin','Programa_Ciclo','Tipo_Carga','Resultado_Control','Incidencias','Estado'],
+  registrosVitrina:       ['ID_Registro','ID_Equipo','Usuario','Fecha','Hora_Inicio','Hora_Fin','Practica_Tecnica','Productos_Quimicos','Verificacion_Previa','Limpieza_Posterior','Incidencias','Estado']
 };
 
 function rowToObj(row, type) {

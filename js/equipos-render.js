@@ -42,6 +42,12 @@ function renderDashboard() {
   const averiados = DATA.equipos.filter(e => e.Estado_Operativo === 'Averiado' || e.Estado_Operativo === 'Fuera de servicio');
 
   if (averiados.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
+  // Equipos que el SAT se ha llevado y aún no ha devuelto — avisa de que no están
+  // físicamente en el laboratorio, aunque su estado operativo diga otra cosa.
+  const fueraDelCentro = DATA.equipos
+    .map(e => ({ e, int: intervencionEquipoFuera(e.ID_Activo) }))
+    .filter(x => x.int);
+  if (fueraDelCentro.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('equipos')"><div class="alert-icon">📦</div><div class="alert-content"><div class="alert-title">${fueraDelCentro.length} equipo(s) fuera del centro (retirado(s) por el servicio técnico)</div><div class="alert-text">${fueraDelCentro.map(({e, int}) => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + (int.Fecha_Retirada ? ' · desde ' + formatDate(int.Fecha_Retirada) : '')).join(' · ')}</div></div></div>`;
   if (pendientesMant > 0 && (esGestorAdmin || esProfesor)) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
   const incVisibles = esGestorAdmin
     ? incAbiertas
@@ -152,6 +158,32 @@ function renderDashboard() {
 }
 
 // ============================================================
+// EQUIPO FUERA DEL CENTRO
+// ============================================================
+// El SAT puede actuar aquí o llevarse el equipo a su taller. Cuando se lo lleva,
+// la actuación queda con Lugar_Intervencion='Equipo retirado'; mientras no se
+// registre la Fecha_Devolucion, el equipo no está físicamente en el centro.
+// El dato no se duplica en Estado_Operativo: se deriva de las intervenciones,
+// así no hay dos sitios que puedan contradecirse (igual que el badge de impacto).
+function intervencionEquipoFuera(equipoId) {
+  if (!equipoId) return null;
+  return DATA.intervenciones
+    .filter(i => i.Lugar_Intervencion === 'Equipo retirado' && !i.Fecha_Devolucion &&
+                 i.Equipo && (i.Equipo === equipoId || i.Equipo.startsWith(equipoId + ' ')))
+    .sort((a, b) => new Date(b.Fecha_Retirada || 0) - new Date(a.Fecha_Retirada || 0))[0] || null;
+}
+
+// Cartel reutilizable "📦 Fuera del centro". `mini` lo encoge para tablas/tarjetas.
+function badgeEquipoFuera(equipoId, mini) {
+  const int = intervencionEquipoFuera(equipoId);
+  if (!int) return '';
+  const desde = int.Fecha_Retirada ? formatDate(int.Fecha_Retirada) : '';
+  const quien = int.Proveedor || int.Realizado_Por || 'el servicio técnico';
+  const titulo = `Retirado por ${quien}${desde ? ' el ' + desde : ''} · ${int.ID_Intervencion}`;
+  return `<span class="badge badge-purple" style="${mini ? 'font-size:10px;margin-left:4px' : ''}" title="${_escAttr(titulo)}">📦 Fuera del centro${desde ? ` · desde ${desde}` : ''}</span>`;
+}
+
+// ============================================================
 // EQUIPOS — RENDER
 // ============================================================
 let _filtroEquipos = '', _filtroEquiposEstado = '', _filtroEquiposModulo = '', _filtroEquiposUbicacion = '';
@@ -252,7 +284,7 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
       <td>${[e.Marca,e.Modelo].filter(Boolean).join(' · ')||'—'}</td>
       <td>${e.Ubicacion||'—'}</td>
       <td>${e.Responsable||'—'}</td>
-      <td><span class="badge ${estadoBadge}"><span class="dot"></span>${e.Estado_Operativo||'—'}</span>${impactoBadge}</td>
+      <td><span class="badge ${estadoBadge}"><span class="dot"></span>${e.Estado_Operativo||'—'}</span>${impactoBadge}${badgeEquipoFuera(e.ID_Activo, true)}</td>
       <td>${planStatus}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
         ${manualLink}
@@ -296,7 +328,14 @@ function buildIntervencionesEquipo(equipoId) {
   const detalle = (label, valor) =>
     `<div><div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px">${label}</div><div style="font-size:12px">${valor||'—'}</div></div>`;
 
-  const panelDetalles = `
+  const intFuera = intervencionEquipoFuera(equipoId);
+  const avisoFuera = intFuera ? `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--purple,#5b3f9e);border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px">
+      <span>📦 <strong>El equipo no está en el centro</strong> — retirado por ${intFuera.Proveedor || intFuera.Realizado_Por || 'el servicio técnico'}${intFuera.Fecha_Retirada ? ' el ' + formatDate(intFuera.Fecha_Retirada) : ''} (${intFuera.ID_Intervencion}).</span>
+      ${puedeHacer('crearIntervenciones') ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();registrarDevolucionEquipo('${intFuera.ID_Intervencion}')">📦 Registrar devolución</button>` : ''}
+    </div>` : '';
+
+  const panelDetalles = avisoFuera + `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px">
       <div class="detail-mobile-only">${detalle('Marca / Modelo', [equipo.Marca, equipo.Modelo].filter(Boolean).join(' · '))}</div>
       <div class="detail-mobile-only">${detalle('Ubicación', equipo.Ubicacion)}</div>
@@ -404,7 +443,7 @@ function renderProximasVisitas() {
     const puedeEjecutar = puedeHacer('crearIntervenciones') &&
       (rol !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)) || {}));
     return `<tr>
-      <td>${i.Equipo||'—'}</td>
+      <td>${i.Equipo||'—'}${badgeEquipoFuera((i.Equipo || '').split(' – ')[0].trim(), true)}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span>${nTareas ? ` <span class="badge badge-blue" style="font-size:10px">${nTareas} prevista${nTareas>1?'s':''}</span>` : ''}</td>
       <td>${i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : '<span class="text-muted">Por concretar</span>'}</td>
       <td>${inc ? `<span class="badge badge-orange" style="font-size:10px;cursor:pointer" onclick="abrirHiloIncidencia('${inc.ID_Incidencia}')" title="Ver hilo completo">🔗 ${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
@@ -474,7 +513,7 @@ function renderIntervenciones(filtroTipo = '') {
 
     return `<tr${esContinuacion ? ' style="background:var(--surface2)"' : ''}>
       <td style="white-space:nowrap">${idCelda}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${i.Equipo||''}">${i.Equipo||'—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${i.Equipo||''}">${i.Equipo||'—'}${badgeEquipoFuera((i.Equipo || '').split(' – ')[0].trim(), true)}</td>
       <td>${incCelda}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span></td>
       <td>${i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—'}</td>
@@ -574,6 +613,7 @@ function renderIncidencias(filtroEstado = '') {
       ${i.Urgencia === 'Urgente' ? '<span class="badge badge-red">Urgente</span>' : ''}
       <span class="badge ${estadoBadge[i.Estado] || 'badge-gray'}">${i.Estado || '—'}</span>
       ${badgeInt}
+      ${badgeEquipoFuera((i.Equipo || '').split(' – ')[0].trim())}
       ${metaGestion}
       <span class="inc-fecha">${formatDate(i.Fecha_Hora) || '—'}</span>
     </div>
@@ -676,6 +716,7 @@ function _buildTimelineIncidencia(inc, chain, currentIntId) {
 function openFichaIntervencion(intIdx) {
   const i = DATA.intervenciones[intIdx];
   if (!i) return;
+  _marcarOrigenHilo();
   const tipoBadge  = {'Preventivo':'badge-green','Correctivo':'badge-red','Calibración':'badge-blue','Verificación funcional':'badge-blue','Limpieza':'badge-gray','Sustitución de pieza':'badge-orange','Control de temperatura':'badge-blue'};
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
 
@@ -702,6 +743,17 @@ function openFichaIntervencion(intIdx) {
   document.getElementById('ficha-int-fecha-real').textContent     = formatDate(i.Fecha_Realizacion) || '—';
   const quienRealizo = i.Realizado_Por || (i.Proveedor ? 'SAT: ' + i.Proveedor : '') || i.Tecnico_Externo || '—';
   document.getElementById('ficha-int-realizado').textContent      = quienRealizo;
+  const elLugar = document.getElementById('ficha-int-lugar');
+  if (elLugar) {
+    if (i.Lugar_Intervencion === 'Equipo retirado') {
+      const desde = i.Fecha_Retirada ? formatDate(i.Fecha_Retirada) : '';
+      elLugar.innerHTML = i.Fecha_Devolucion
+        ? `<span class="badge badge-gray">📦 Se lo llevaron</span><div style="font-size:11px;color:var(--text-muted);margin-top:2px">${desde ? desde + ' → ' : 'Devuelto el '}${formatDate(i.Fecha_Devolucion)}</div>`
+        : `<span class="badge badge-purple">📦 Fuera del centro</span><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Retirado${desde ? ' el ' + desde : ''} · sin devolver</div>`;
+    } else {
+      elLugar.textContent = i.Lugar_Intervencion || 'En el centro';
+    }
+  }
   document.getElementById('ficha-int-resultado').textContent      = i.Resultado || '—';
   document.getElementById('ficha-int-operativo').innerHTML        = i.Equipo_Operativo_Tras_Intervencion === 'Sí'
     ? '<span class="badge badge-green">Sí</span>'
@@ -752,6 +804,8 @@ function openFichaIntervencion(intIdx) {
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
   if (puedeNuevaVisita)
     btns += `<button class="btn ${actFinalizada ? 'btn-primary' : 'btn-secondary'}" onclick="closeModal('modal-ficha-intervencion');${incVinculada ? `programarOtraVisita(${intIdx})` : `openModalRegistrarActuacionDirecta('${equipoIdFicha}')`}">${incVinculada ? '📅 Programar otra actuación' : '🔧 Registrar otra actuación'}</button>`;
+  if (puedeHacer('crearIntervenciones') && i.Lugar_Intervencion === 'Equipo retirado' && !i.Fecha_Devolucion)
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');registrarDevolucionEquipo('${i.ID_Intervencion}')">📦 Registrar devolución</button>`;
   if (incVinculada)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
   acciones.innerHTML = btns;

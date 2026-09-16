@@ -2,7 +2,7 @@
 // tanto Profesor/Gestor/Admin (openModalIncidencia) como el propio Alumno
 // (aviso de problema con un equipo, openModalAvisoAlumno — ver equipos-render.js
 // getUserRole()==='Alumno'). "eliminar" queda restringido a Admin/Gestor.
-import { requireValidSession, requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireValidSession, requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarIdIncidencia(): string {
   return "INC-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -45,6 +45,33 @@ Deno.serve(async (req) => {
     return jsonOk({ incidencia: data });
   }
 
+  // Cierre (o reapertura) EXPLÍCITO de la incidencia desde su hilo. Nada cierra
+  // una incidencia sola: ni completar las tareas de una actuación ni adjuntar la
+  // factura. Aquí es donde además se devuelve el equipo a "Operativo", también
+  // a propósito — ver docs/modulo-incidencias.md.
+  if (accion === "cerrar") {
+    const { error: authError, supabaseAdmin } = await requireStaff(req);
+    if (authError) return authError;
+
+    const idIncidencia = String(body.id_incidencia || "").trim();
+    const estado = String(body.estado || "").trim();
+    const ESTADOS = ["Resuelta", "Descartada", "En gestión", "Abierta"];
+    if (!idIncidencia) return jsonError("id_incidencia es obligatorio", 400);
+    if (!ESTADOS.includes(estado)) return jsonError(`estado debe ser uno de: ${ESTADOS.join(", ")}`, 400);
+
+    const { data: incidencia, error } = await supabaseAdmin.from("incidencias")
+      .update({ estado }).eq("id_incidencia", idIncidencia).select().single();
+    if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
+    if (!incidencia) return jsonError(`No se encontró la incidencia "${idIncidencia}"`, 404);
+
+    const estadoEquipo = body.estado_equipo ? String(body.estado_equipo) : "";
+    if (estadoEquipo) {
+      await supabaseAdmin.from("equipos")
+        .update({ estado_operativo: estadoEquipo }).eq("id_activo", incidencia.id_equipo);
+    }
+    return jsonOk({ incidencia, id_equipo: incidencia.id_equipo, estado_equipo: estadoEquipo });
+  }
+
   if (accion === "eliminar") {
     const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
     if (authError) return authError;
@@ -55,5 +82,5 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idIncidencia });
   }
 
-  return jsonError("accion debe ser 'crear' o 'eliminar'", 400);
+  return jsonError("accion debe ser 'crear', 'cerrar' o 'eliminar'", 400);
 });

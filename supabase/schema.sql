@@ -177,7 +177,10 @@ create table intervenciones (
   estado                                 text,   -- derivado de tareas_intervencion
   fecha_estimada_resolucion              date,
   coste_intervencion                     numeric,
-  actuacion_finalizada                   boolean not null default false  -- la usuaria pulsó "finalizar actuación"; distinto de estado (derivado de tareas)
+  actuacion_finalizada                   boolean not null default false, -- la usuaria pulsó "finalizar actuación"; distinto de estado (derivado de tareas)
+  lugar_intervencion                     text,   -- 'En el centro' | 'Equipo retirado' (el SAT se lo lleva a su taller)
+  fecha_retirada                         date,   -- cuándo se llevaron el equipo (solo si lugar_intervencion='Equipo retirado')
+  fecha_devolucion                       date    -- cuándo volvió; mientras esté vacía, el equipo se marca "fuera del centro"
 );
 
 create table incidencias (
@@ -354,7 +357,7 @@ create table reservas_equipos (
 );
 
 -- ============================================================
--- 6. REGISTROS DE USO (cabina de bioseguridad / autoclave)
+-- 6. REGISTROS DE USO (cabina de bioseguridad / autoclave / vitrina de gases)
 -- ============================================================
 
 create table registros_cabina (
@@ -384,6 +387,21 @@ create table registros_autoclave (
   resultado_control        text,
   incidencias              text,
   estado                   text not null default 'Cerrada'
+);
+
+create table registros_vitrina (
+  id_registro             text primary key,
+  id_equipo               text not null references equipos(id_activo) on delete cascade on update cascade,
+  usuario                 text,
+  fecha                   date not null,
+  hora_inicio             time,
+  hora_fin                time,
+  practica_tecnica        text,
+  productos_quimicos      text,
+  verificacion_previa     text,
+  limpieza_posterior      text,
+  incidencias             text,
+  estado                  text not null default 'Abierta'
 );
 
 -- ============================================================
@@ -604,6 +622,7 @@ create policy "config_reservas_select_anon" on config_reservas for select to ano
 create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon, authenticated using (true);
 create policy "registros_cabina_select_anon" on registros_cabina for select to anon, authenticated using (true);
 create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon, authenticated using (true);
+create policy "registros_vitrina_select_anon" on registros_vitrina for select to anon, authenticated using (true);
 create policy "usuarios_select_anon" on usuarios for select to anon, authenticated using (true);
 create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon, authenticated using (true);
 create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon, authenticated using (true);
