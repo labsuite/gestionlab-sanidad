@@ -611,3 +611,41 @@ create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to
 create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon, authenticated using (true);
 create policy "excepciones_residuo_ia_select_anon" on excepciones_residuo_ia for select to anon, authenticated using (true);
 create policy "tareas_personales_select_anon" on tareas_personales for select to anon, authenticated using (true);
+
+-- ============================================================
+-- 9. INVENTARIO COLABORATIVO — PROPUESTAS DE UBICACIÓN (2026-09-16)
+-- ============================================================
+-- El alumnado recorre el laboratorio y propone la ubicación concreta de cada
+-- equipo (el catálogo `ubicaciones` ya tiene el detalle zona/subzona; lo que
+-- falta es emparejarlo: la mayoría de equipos solo tienen "Lab 205").
+-- Nada de lo que proponen toca `equipos` hasta que se acepta — mismo patrón
+-- que `revisiones_inventario` para el fungible.
+--
+-- Auto-aceptación en dos casos (ver supabase/functions/gestionar-propuesta-ubicacion):
+--   1. Doble verificación: dos personas distintas proponen la MISMA ubicación
+--      para el MISMO equipo → se aplica sola (revisado_por = 'Doble verificación…').
+--   2. Quien propone es Admin/Gestor/Profesor → ya es quien validaría, se aplica directa.
+--
+-- `no_encontrado` no propone ubicación: es un aviso ("este equipo no está donde
+-- dice la app"). Aceptarlo no escribe nada en `equipos`, solo archiva el aviso.
+create table if not exists propuestas_ubicacion_equipo (
+  id_propuesta          text primary key,
+  id_equipo             text not null references equipos(id_activo) on delete cascade on update cascade,
+  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null,
+  no_encontrado         boolean not null default false,
+  ubicacion_anterior    text,          -- lo que tenía el equipo al proponer (para poder revertir)
+  propuesto_por         text,
+  email_propuesto_por   text,
+  observaciones         text,
+  fecha                 timestamptz not null default now(),
+  estado                text not null default 'pendiente',   -- 'pendiente' | 'aceptada' | 'rechazada'
+  revisado_por          text,
+  fecha_revision        timestamptz,
+  notas_revision        text
+);
+
+create index if not exists idx_propuestas_ubic_estado on propuestas_ubicacion_equipo (estado);
+create index if not exists idx_propuestas_ubic_equipo on propuestas_ubicacion_equipo (id_equipo);
+
+alter table propuestas_ubicacion_equipo enable row level security;
+create policy "propuestas_ubicacion_equipo_select_anon" on propuestas_ubicacion_equipo for select to anon, authenticated using (true);

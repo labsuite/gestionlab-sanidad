@@ -40,6 +40,7 @@ let DATA = {
   planesMantenimiento: [], registroMantenimientos: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
   revisionesInventario: [], consultasResiduo: [], excepcionesResiduoIa: [],
+  propuestasUbicacion: [],
   configReservas: [], reservas: [],
   registrosCabina: [], registrosAutoclave: [],
   // Supabase
@@ -73,6 +74,7 @@ const COLS = {
   contenedoresResiduo:    ['ID_Contenedor','Categoria','Lab','Zona','Nivel','Estado','Fecha_Apertura','Fecha_Cierre','Fecha_Actualizacion','Actualizado_Por','Formato'],
   adicionesResiduo:       ['ID_Adicion','ID_Contenedor','ID_Residuo','Fecha','Usuario','Observaciones'],
   revisionesInventario:   ['ID_Revision','Fecha','ID_Material','Nombre_Material','Stock_App','Stock_Real','Diferencia','Usuario','Observaciones'],
+  propuestasUbicacion:    ['ID_Propuesta','ID_Equipo','ID_Ubicacion','No_Encontrado','Ubicacion_Anterior','Propuesto_Por','Email_Propuesto_Por','Observaciones','Fecha','Estado','Revisado_Por','Fecha_Revision','Notas_Revision'],
   consultasResiduo:       ['ID_Consulta','Fecha','Usuario','Descripcion','Ubicacion_Dejado','Estado','Categoria_IA','Guia_Provisional','Prioridad'],
   configReservas:         ['ID_Equipo','Politica','Params_Template','Max_Horas','Antelacion_Min_Horas'],
   reservas:               ['ID_Reserva','ID_Equipo','Usuario','Fecha_Inicio','Fecha_Fin','Condiciones','Proposito','Estado','Aprobado_Por','Observaciones_Admin','Inicio_Real','Fin_Real'],

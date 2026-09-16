@@ -105,6 +105,10 @@
       <div class="nav-item" onclick="showPage('equipos')">
         <span class="nav-icon">🔬</span> Inventario
       </div>
+      <div class="nav-item" onclick="showPage('ubicar-equipos')">
+        <span class="nav-icon">📍</span> Ubicar equipos
+        <span class="nav-badge" id="badge-ubicar-equipos" style="display:none">0</span>
+      </div>
       <div class="nav-item" onclick="showPage('incidencias')">
         <span class="nav-icon">⚠️</span> Incidencias
         <span class="nav-badge" id="badge-incidencias" style="display:none">0</span>
@@ -580,6 +584,7 @@
       </div>
 
       <!-- RESIDUOS -->
+      <div class="page" id="page-ubicar-equipos"></div>
       <div class="page" id="page-residuos-guia"></div>
       <div class="page" id="page-residuos-contenedores"></div>
 
@@ -624,6 +629,7 @@
 <script src="js/residuos.js"></script>
 <script src="js/reservas.js"></script>
 <script src="js/registros-uso.js"></script>
+<script src="js/ubicar-equipos.js"></script>
 <script>
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional

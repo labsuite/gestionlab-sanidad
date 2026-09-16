@@ -355,6 +355,24 @@ function _revisionInventarioSbToObj(r) {
   };
 }
 
+function _propuestaUbicacionSbToObj(p) {
+  return {
+    ID_Propuesta: p.id_propuesta || '',
+    ID_Equipo: p.id_equipo || '',
+    ID_Ubicacion: p.id_ubicacion || '',
+    No_Encontrado: p.no_encontrado ? 'TRUE' : '',
+    Ubicacion_Anterior: p.ubicacion_anterior || '',
+    Propuesto_Por: p.propuesto_por || '',
+    Email_Propuesto_Por: p.email_propuesto_por || '',
+    Observaciones: p.observaciones || '',
+    Fecha: (p.fecha || '').slice(0, 10),
+    Estado: p.estado || 'pendiente',
+    Revisado_Por: p.revisado_por || '',
+    Fecha_Revision: (p.fecha_revision || '').slice(0, 10),
+    Notas_Revision: p.notas_revision || '',
+  };
+}
+
 function _tipoResiduoSbToObj(t) {
   return {
     ID_Residuo: t.id_residuo || '',
@@ -523,6 +541,7 @@ async function loadAllData() {
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbUsuariosCatalogoRes,
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
+           sbPropuestasUbicacionRes,
            sbTareasPersonalesRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
@@ -562,6 +581,7 @@ async function loadAllData() {
       _sbMigracion.from('adiciones_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('excepciones_residuo_ia').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('propuestas_ubicacion_equipo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
@@ -590,6 +610,7 @@ async function loadAllData() {
     DATA.revisionesInventario    = (sbRevisionesRes?.data || []).map(_revisionInventarioSbToObj);
     DATA.consultasResiduo        = (sbConsultasResiduoRes?.data || []).map(_consultaResiduoSbToObj);
     DATA.excepcionesResiduoIa    = (sbExcepcionesResiduoIaRes?.data || []).map(_excepcionResiduoIaSbToObj);
+    DATA.propuestasUbicacion     = (sbPropuestasUbicacionRes?.data || []).map(_propuestaUbicacionSbToObj);
     DATA.configReservas          = (sbConfigReservasRes?.data || []).map(_configReservaSbToObj);
     DATA.reservas                = (sbReservasRes?.data || []).map(_reservaSbToObj);
     DATA.registrosCabina         = (sbRegistrosCabinaRes?.data || []).map(_registroCabinaSbToObj);
