@@ -421,7 +421,7 @@ function renderAll() {
   renderRegistrosUso();
   _updateBadgeRegistrosUso();
   renderUbicarEquipos();
-  _updateBadgeUbicaciones();
+  _ubicRenderAviso();
   renderPerfil();
   _avisarSesionesAbiertasAntiguas();
 }

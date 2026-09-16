@@ -11,6 +11,11 @@
 // Para staff (Profesor/Gestor/Admin) la propuesta se aplica en el acto: ya
 // son quienes validarían.
 //
+// NO es una sección fija del menú: es una herramienta puntual que se abre desde
+// el Inventario de equipos (botón "📍 Ubicar equipos"). Cuando hay propuestas
+// esperando validación, el aviso sale en el propio Inventario — mismo patrón que
+// las revisiones de inventario del fungible en js/material.js.
+//
 // Diseño de la pantalla del alumno: primero eliges DÓNDE ESTÁS (una sola vez)
 // y después marcas todos los equipos que hay en ese sitio. Es como se inventaría
 // de verdad — de pie delante de una estantería —, no equipo por equipo.
@@ -20,6 +25,10 @@ let _ubicUbicacionActual = '';
 let _ubicFiltro          = '';
 let _ubicSeleccion       = new Set();
 let _ubicVerUbicados     = false;
+
+// `.card` no trae padding (está pensada para cabecera + tabla a sangre), así que
+// el contenido libre necesita el suyo o queda pegado al borde.
+const UBIC_PAD = 'padding:16px 20px';
 
 // ------------------------------------------------------------
 // HELPERS
@@ -119,9 +128,13 @@ function renderUbicarEquipos() {
   if (!_ubicLabActivo || !labs.includes(_ubicLabActivo)) _ubicLabActivo = labs[0] || '';
 
   cont.innerHTML =
+    `<div style="margin-bottom:16px">
+       <button class="btn btn-secondary" onclick="showPage('equipos')">← Volver al inventario</button>
+     </div>` +
     (esStaff ? _ubicRenderPanelValidacion() : '') +
     _ubicRenderProgreso(labs) +
-    _ubicRenderHerramienta(labs, esStaff) +
+    _ubicRenderHerramienta(labs) +
+    _ubicRenderBarraAccion() +
     (esStaff ? '' : _ubicRenderMisPropuestas());
 }
 
@@ -133,22 +146,36 @@ function _ubicRenderProgreso(labs) {
   const pct = total ? Math.round(ubicados / total * 100) : 0;
   return `
     <div class="card" style="margin-bottom:18px">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:600">📍 Equipos con ubicación concreta</div>
-        <div style="font-size:13px;color:var(--text-muted)"><strong style="color:var(--text)">${ubicados}</strong> de ${total} · ${pct}%</div>
+      <div class="card-header">
+        <div class="card-title">📍 Equipos con ubicación concreta</div>
+        <div class="card-actions" style="font-size:13px;color:var(--text-muted)">
+          <strong style="color:var(--text)">${ubicados}</strong>&nbsp;de ${total} · ${pct}%
+        </div>
       </div>
-      <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:var(--success);transition:width .3s"></div>
-      </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-top:8px;line-height:1.5">
-        Una ubicación concreta es la del catálogo (zona y subzona: "Derecha · 3º cajón encimera"),
-        no solo el número de laboratorio.
+      <div style="${UBIC_PAD}">
+        <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:var(--success);transition:width .3s"></div>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:10px;line-height:1.5">
+          Una ubicación concreta es la del catálogo (zona y subzona: "Derecha · 3º cajón encimera"),
+          no solo el número de laboratorio.
+        </div>
       </div>
     </div>`;
 }
 
+/** Equipos del laboratorio activo que toca mostrar, ya filtrados. */
+function _ubicEquiposDelLab() {
+  const filtro = _ubicFiltro.toLowerCase();
+  return DATA.equipos
+    .filter(e => _ubicClaveLab(e) === _ubicLabActivo)
+    .filter(e => _ubicVerUbicados || !_ubicEsConcreta(e))
+    .filter(e => !filtro || (e.ID_Activo + ' ' + _ubicNombreEquipo(e)).toLowerCase().includes(filtro))
+    .sort((a, b) => (a.Tipo_Equipo || '').localeCompare(b.Tipo_Equipo || '') || a.ID_Activo.localeCompare(b.ID_Activo));
+}
+
 /** Herramienta de campo: elegir dónde estás → marcar los equipos que hay ahí. */
-function _ubicRenderHerramienta(labs, esStaff) {
+function _ubicRenderHerramienta(labs) {
   const ubicacionesLab = DATA.ubicaciones
     .filter(u => _ubicNumLab(u.Laboratorio_Aula) === _ubicLabActivo && u.Activa !== 'FALSE')
     .sort((a, b) => (a.Zona || '').localeCompare(b.Zona || '') || (a.Subzona || '').localeCompare(b.Subzona || ''));
@@ -166,26 +193,22 @@ function _ubicRenderHerramienta(labs, esStaff) {
     .filter(p => (p.Email_Propuesto_Por || '').toLowerCase() === getEffectiveUser().email)
     .map(p => p.ID_Equipo));
 
-  const filtro = _ubicFiltro.toLowerCase();
-  const equiposLab = DATA.equipos
-    .filter(e => _ubicClaveLab(e) === _ubicLabActivo)
-    .filter(e => _ubicVerUbicados || !_ubicEsConcreta(e))
-    .filter(e => !filtro || (e.ID_Activo + ' ' + _ubicNombreEquipo(e)).toLowerCase().includes(filtro))
-    .sort((a, b) => (a.Tipo_Equipo || '').localeCompare(b.Tipo_Equipo || '') || a.ID_Activo.localeCompare(b.ID_Activo));
-
+  const equiposLab = _ubicEquiposDelLab();
   const sinUbicaciones = !ubicacionesLab.length;
-  const nSel = _ubicSeleccion.size;
 
   return `
     <div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
-        <div style="font-size:15px;font-weight:600">🔎 Ubicar equipos</div>
+      <div class="card-header">
+        <div class="card-title">🔎 Ubicar equipos</div>
         ${labs.length > 1 ? `
-          <select onchange="_ubicCambiarLab(this.value)" style="max-width:160px">
-            ${labs.map(l => `<option value="${l}" ${l === _ubicLabActivo ? 'selected' : ''}>${_esc(_ubicEtiquetaLab(l))}</option>`).join('')}
-          </select>` : ''}
+          <div class="card-actions">
+            <select class="filter" onchange="_ubicCambiarLab(this.value)">
+              ${labs.map(l => `<option value="${l}" ${l === _ubicLabActivo ? 'selected' : ''}>${_esc(_ubicEtiquetaLab(l))}</option>`).join('')}
+            </select>
+          </div>` : ''}
       </div>
 
+      <div style="${UBIC_PAD}">
       ${sinUbicaciones ? `
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.6;color:var(--text-muted)">
           ${_ubicLabActivo === UBIC_SIN_LAB
@@ -200,7 +223,7 @@ function _ubicRenderHerramienta(labs, esStaff) {
             ${equiposLab.length > 20 ? `<div style="font-size:12px;opacity:.7">…y ${equiposLab.length - 20} más</div>` : ''}
           </div>
         </div>` : `
-        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+        <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:16px">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">1 · ¿Dónde estás ahora?</label>
           <select id="ubic-ubicacion-actual" onchange="_ubicCambiarUbicacion(this.value)" style="width:100%">
             <option value="">Elige la zona concreta…</option>
@@ -219,7 +242,7 @@ function _ubicRenderHerramienta(labs, esStaff) {
         <input type="text" placeholder="Buscar por tipo, marca o ID…" value="${_escAttr(_ubicFiltro)}"
                oninput="_ubicCambiarFiltro(this.value)" style="width:100%;margin-bottom:10px">
 
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-bottom:12px;cursor:pointer">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);margin-bottom:14px;cursor:pointer">
           <input type="checkbox" ${_ubicVerUbicados ? 'checked' : ''} onchange="_ubicToggleVerUbicados(this.checked)">
           Mostrar también los que ya tienen ubicación concreta (para corregirla)
         </label>
@@ -229,18 +252,10 @@ function _ubicRenderHerramienta(labs, esStaff) {
             ${equiposLab.map(e => _ubicFilaEquipo(e, misPendientesIds)).join('')}
           </div>` : `
           <div style="text-align:center;padding:28px 12px;color:var(--text-muted);font-size:13px">
-            🎉 No queda ningún equipo por ubicar en el laboratorio ${_ubicLabActivo}.
+            🎉 No queda ningún equipo por ubicar en ${_esc(_ubicEtiquetaLab(_ubicLabActivo))}.
           </div>`}
-
-        ${equiposLab.length ? `
-          <div style="position:sticky;bottom:0;background:var(--surface);border-top:1px solid var(--border);padding:12px 0 2px;margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn btn-primary" onclick="guardarUbicacionesLote()"
-                    ${(!_ubicUbicacionActual || !nSel) ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
-              📍 Están aquí${nSel ? ` (${nSel})` : ''}
-            </button>
-            ${nSel ? `<button class="btn btn-secondary" onclick="_ubicLimpiarSeleccion()">Quitar selección</button>` : ''}
-          </div>` : ''}
       `}
+      </div>
     </div>`;
 }
 
@@ -265,6 +280,26 @@ function _ubicFilaEquipo(eq, misPendientesIds) {
     </div>`;
 }
 
+/** Barra de acción pegada abajo. Va FUERA de la .card a propósito: `.card` lleva
+ *  overflow:hidden, y dentro de un ancestro así `position:sticky` no se pega al
+ *  viewport (el navegador lo ancla a una caja que no hace scroll). */
+function _ubicRenderBarraAccion() {
+  const n = _ubicSeleccion.size;
+  if (!n) return '';
+  const listo = !!_ubicUbicacionActual;
+  return `
+    <div style="position:sticky;bottom:0;z-index:5;margin-top:-1px;background:var(--surface);border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);padding:12px 20px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 -2px 8px rgba(0,0,0,.06)">
+      <button class="btn btn-primary" onclick="guardarUbicacionesLote()"
+              ${listo ? '' : 'disabled style="opacity:.5;cursor:not-allowed"'}>
+        📍 Están aquí (${n})
+      </button>
+      <button class="btn btn-secondary" onclick="_ubicLimpiarSeleccion()">Quitar selección</button>
+      ${listo
+        ? `<span style="font-size:12px;color:var(--text-muted)">→ ${_esc(_ubicEtiqueta(_ubicUbicacionActual))}</span>`
+        : `<span style="font-size:12px;color:var(--warning)">Elige arriba dónde estás</span>`}
+    </div>`;
+}
+
 /** Lo que el alumno ha propuesto y aún está esperando validación. */
 function _ubicRenderMisPropuestas() {
   const email = getEffectiveUser().email;
@@ -282,8 +317,10 @@ function _ubicRenderMisPropuestas() {
 
   return `
     <div class="card" style="margin-top:18px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px">📨 Lo que has propuesto</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
+      <div class="card-header">
+        <div class="card-title">📨 Lo que has propuesto</div>
+      </div>
+      <div style="${UBIC_PAD};display:flex;flex-direction:column;gap:6px">
         ${mias.map(p => {
           const eq = DATA.equipos.find(e => e.ID_Activo === p.ID_Equipo);
           return `
@@ -346,25 +383,49 @@ function _ubicRenderPanelValidacion() {
 
   return `
     <div class="card" style="margin-bottom:18px;border-left:3px solid var(--accent)">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
-        <div style="font-size:15px;font-weight:600">
+      <div class="card-header">
+        <div class="card-title">
           ✅ Propuestas pendientes de validar
           <span class="badge badge-orange" style="font-size:11px;margin-left:6px">${pendientes.length}</span>
         </div>
         ${limpias.length ? `
-          <button class="btn btn-primary" style="font-size:12px;padding:5px 12px"
-                  onclick="aceptarTodasPropuestasUbic()">✓ Aceptar las ${limpias.length} sin discrepancia</button>` : ''}
+          <div class="card-actions">
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px"
+                    onclick="aceptarTodasPropuestasUbic()">✓ Aceptar las ${limpias.length} sin discrepancia</button>
+          </div>` : ''}
       </div>
 
-      ${propuestas.length ? `<div style="display:flex;flex-direction:column;gap:6px">${propuestas.map(fila).join('')}</div>` : ''}
+      <div style="${UBIC_PAD}">
+        ${propuestas.length ? `<div style="display:flex;flex-direction:column;gap:6px">${propuestas.map(fila).join('')}</div>` : ''}
 
-      ${avisos.length ? `
-        <div style="font-size:13px;font-weight:600;margin:16px 0 8px">❓ Equipos que no encuentran (${avisos.length})</div>
-        <div style="display:flex;flex-direction:column;gap:6px">${avisos.map(fila).join('')}</div>` : ''}
+        ${avisos.length ? `
+          <div style="font-size:13px;font-weight:600;margin:16px 0 8px">❓ Equipos que no encuentran (${avisos.length})</div>
+          <div style="display:flex;flex-direction:column;gap:6px">${avisos.map(fila).join('')}</div>` : ''}
 
-      <div style="font-size:11px;color:var(--text-muted);margin-top:12px;line-height:1.5">
-        Al aceptar, tu nombre queda como responsable de la validación. Las propuestas en las que
-        dos personas coinciden se aplican solas y no llegan aquí.
+        <div style="font-size:11px;color:var(--text-muted);margin-top:12px;line-height:1.5">
+          Al aceptar, tu nombre queda como responsable de la validación. Las propuestas en las que
+          dos personas coinciden se aplican solas y no llegan aquí.
+        </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Aviso en el Inventario de equipos cuando hay propuestas esperando.
+ * Sustituye al badge del menú: la herramienta ya no tiene sección fija, así que
+ * el recordatorio tiene que estar donde la usuaria ya trabaja.
+ */
+function _ubicRenderAviso() {
+  const cont = document.getElementById('aviso-propuestas-ubicacion');
+  if (!cont) return;
+  const n = getUserRole() === 'Alumno' ? 0 : _ubicPendientes().length;
+  if (!n) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `
+    <div class="alert" style="margin-bottom:16px;cursor:pointer" onclick="showPage('ubicar-equipos')">
+      <span class="alert-icon">📍</span>
+      <div class="alert-content">
+        <div class="alert-title">${n} propuesta(s) de ubicación esperando tu visto bueno</div>
+        <div class="alert-text">Del alumnado que está inventariando. Pulsa aquí para revisarlas.</div>
       </div>
     </div>`;
 }
@@ -421,7 +482,7 @@ async function guardarUbicacionesLote() {
 
   renderUbicarEquipos();
   renderEquipos();
-  _updateBadgeUbicaciones();
+  _ubicRenderAviso();
 }
 
 async function marcarEquipoNoEncontrado(idEquipo) {
@@ -437,7 +498,7 @@ async function marcarEquipoNoEncontrado(idEquipo) {
     await loadAllData();
     showToast('Aviso enviado', 'success');
     renderUbicarEquipos();
-    _updateBadgeUbicaciones();
+    _ubicRenderAviso();
   } catch (e) {
     showToast(e.message || 'No se pudo enviar el aviso', 'error');
     console.error(e);
@@ -451,7 +512,7 @@ async function aceptarPropuestaUbic(idPropuesta) {
     await callEdgeFunction('gestionar-propuesta-ubicacion', { accion: 'aceptar', id_propuesta: idPropuesta });
     await loadAllData();
     showToast('Propuesta aceptada', 'success');
-    renderUbicarEquipos(); renderEquipos(); _updateBadgeUbicaciones();
+    renderUbicarEquipos(); renderEquipos(); _ubicRenderAviso();
   } catch (e) {
     showToast(e.message || 'No se pudo aceptar', 'error');
     console.error(e);
@@ -469,7 +530,7 @@ async function rechazarPropuestaUbic(idPropuesta) {
     });
     await loadAllData();
     showToast('Propuesta rechazada', 'success');
-    renderUbicarEquipos(); _updateBadgeUbicaciones();
+    renderUbicarEquipos(); _ubicRenderAviso();
   } catch (e) {
     showToast(e.message || 'No se pudo rechazar', 'error');
     console.error(e);
@@ -492,19 +553,10 @@ async function aceptarTodasPropuestasUbic() {
     await callEdgeFunction('gestionar-propuesta-ubicacion', { accion: 'aceptar_varias', ids_propuesta: ids });
     await loadAllData();
     showToast(`${ids.length} equipo(s) ubicados`, 'success');
-    renderUbicarEquipos(); renderEquipos(); _updateBadgeUbicaciones();
+    renderUbicarEquipos(); renderEquipos(); _ubicRenderAviso();
   } catch (e) {
     showToast(e.message || 'No se pudieron aplicar', 'error');
     console.error(e);
   }
   hideLoading();
-}
-
-/** Badge del menú: propuestas pendientes de validar (solo staff). */
-function _updateBadgeUbicaciones() {
-  const badge = document.getElementById('badge-ubicar-equipos');
-  if (!badge) return;
-  const n = getUserRole() === 'Alumno' ? 0 : _ubicPendientes().length;
-  badge.textContent = n;
-  badge.style.display = n > 0 ? '' : 'none';
 }

@@ -105,10 +105,6 @@
       <div class="nav-item" onclick="showPage('equipos')">
         <span class="nav-icon">🔬</span> Inventario
       </div>
-      <div class="nav-item" onclick="showPage('ubicar-equipos')">
-        <span class="nav-icon">📍</span> Ubicar equipos
-        <span class="nav-badge" id="badge-ubicar-equipos" style="display:none">0</span>
-      </div>
       <div class="nav-item" onclick="showPage('incidencias')">
         <span class="nav-icon">⚠️</span> Incidencias
         <span class="nav-badge" id="badge-incidencias" style="display:none">0</span>
@@ -396,6 +392,7 @@
 
       <!-- EQUIPOS -->
       <div class="page" id="page-equipos">
+        <div id="aviso-propuestas-ubicacion"></div>
         <div class="card card-equipment-table">
           <div class="card-header">
             <div class="card-title">Inventario de equipos</div>
@@ -424,6 +421,7 @@
                 <input type="text" placeholder="Filtrar por módulo..." oninput="filtrarEquiposModulo(this.value)" list="equipos-modulos-datalist" id="filter-equipos-modulo">
               </div>
               <datalist id="equipos-modulos-datalist"></datalist>
+              <button class="btn btn-secondary" onclick="showPage('ubicar-equipos')">📍 Ubicar equipos</button>
               <button class="btn btn-primary" onclick="openModalEquipo()">+ Nuevo equipo</button>
             </div>
           </div>
