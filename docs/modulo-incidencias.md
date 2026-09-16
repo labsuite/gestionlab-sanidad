@@ -41,9 +41,37 @@ calcularEstadoIntervencion(resultadoAgregado, tipoEjec):
   resto (Resuelto interno, o Descartado)     → 'Cerrada'
 ```
 
-La incidencia vinculada se sincroniza tras cada tarea: `Cerrada` → `Resuelta` (o `Descartada`
-si el resultado agregado es `Descartado`); `Pendiente factura`/`En gestión` → la incidencia
-sigue `En gestión`.
+La incidencia vinculada **no** se cierra sola con las tareas: mientras siga abierta se
+mantiene en `En gestión`, aunque la intervención llegue a `Cerrada`. Pasar a `Resuelta` o
+`Descartada` es siempre un acto explícito en el hilo (ver abajo).
+
+## Cierre explícito de la incidencia (desde 2026-09-16)
+
+Antes, al marcar la última tarea como Resuelto la Edge Function cerraba la incidencia y
+ponía el equipo en `Operativo` de golpe, y el modal se cerraba dejando a la usuaria en la
+pantalla de fondo: parecía que la app decidía por su cuenta que el equipo ya funcionaba.
+Ahora:
+
+- `guardar_tarea` (`gestionar-intervencion`) solo **degrada** el estado del equipo
+  (`No operativo` cuando la tarea dice que no quedó operativo). Nunca lo sube a `Operativo`.
+  Y deja la incidencia en `En gestión`, sin cerrarla.
+- `guardarFactura` cierra la **intervención** (`Cerrada`) y adjunta la factura, pero ya no
+  toca la incidencia ni sube el equipo a `Operativo`.
+- El cierre vive en el pie del hilo (`_renderCierreHilo` → `cerrarIncidenciaDesdeHilo`):
+  un `select` con el estado operativo con el que queda el equipo (preseleccionado `Operativo`
+  si todas las tareas de la actuación activa están resueltas/descartadas, y si no el estado
+  actual) + botones **✅ Marcar resuelta** y **🚫 Descartar**, con confirmación. Llama a la
+  acción `cerrar` de `gestionar-incidencia` (`requireStaff`), que actualiza incidencia y
+  equipo en la misma llamada.
+- Una incidencia ya cerrada muestra en el hilo **↩︎ Reabrir incidencia**
+  (`reabrirIncidenciaDesdeHilo` → misma acción con `estado: 'En gestión'`); reabrir no toca
+  el estado del equipo.
+- **No se sale de la pantalla**: los modales que se abren desde el hilo (ejecutar/editar
+  actuación, ficha, factura, programar otra actuación) vuelven a él al cerrarse o al guardar
+  (`_hiloIncidenciaActiva` + `volverAlHilo` / `cerrarYVolverAlHilo`). Esos botones del hilo
+  abren el nuevo modal **antes** de cerrarse a sí mismos, porque `_marcarOrigenHilo()` decide
+  si hay hilo al que volver mirando si `modal-hilo-incidencia` sigue abierto. El botón
+  Cerrar/✕ del propio hilo usa `cerrarHiloIncidencia()`, que borra ese retorno.
 
 ## Flujo end-to-end
 
@@ -58,7 +86,8 @@ sigue `En gestión`.
    - Botón **"Guardar y finalizar visita"** (pie del modal): si hay una descripción sin guardar la añade primero; si no hay nada nuevo, simplemente cierra — no exige escribir algo para poder finalizar.
 4. **Nueva visita** (`programarOtraVisita` → reutiliza `abrirPlanificacion` con un tercer argumento `origenIntId`) — para cuando hace falta volver otro día (pieza pendiente, otro técnico...). Crea una intervención encadenada (`Origen: 'Seguimiento de <ID>'`), reconstruible con `getChainIntervencion`. Distinto de añadir una tarea: eso es la misma visita, esto es una visita nueva.
    - Al abrir la planificación de esa nueva visita, las tareas sin resolver (`Pendiente`/`Resuelto parcialmente`/`No resuelto`) de la visita anterior aparecen como una lista de casillas ("Pendiente de la visita anterior") — se marcan solo las que correspondan a esta visita concreta (p.ej. si hay tareas para especialistas distintos, cada una se lleva a su propia visita programada). Al guardar, las marcadas + lo escrito a mano en "Otras tareas ya previstas" se crean como tareas `Pendiente` en la nueva intervención, ya listas para marcar su resultado desde "Ejecutar".
-5. **Factura** (`guardarFactura`, solo si `Estado='Pendiente factura'`) → cierra la intervención y la incidencia (`Resuelta`).
+5. **Factura** (`guardarFactura`, solo si `Estado='Pendiente factura'`) → cierra la intervención (`Cerrada`) y adjunta la factura. La incidencia sigue `En gestión` hasta cerrarla a mano en el hilo.
+5 bis. **Cerrar la incidencia** (pie del hilo, `cerrarIncidenciaDesdeHilo`) → `Resuelta`/`Descartada` + estado operativo del equipo elegido a propósito. Es el único sitio donde una incidencia se cierra y donde un equipo vuelve a `Operativo` tras una avería.
 6. **Modo directo** (`openModalRegistrarActuacionDirecta`, botón 🔧 en la tabla de equipos) — crea una intervención sin pasar por una incidencia, con su primera tarea.
 
 ## UI
@@ -102,6 +131,33 @@ sigue `En gestión`.
   `programarOtraVisita`, que pasa un tercer argumento `origenIntId`) — mismo modal y misma
   operación de datos, pero framing distinto para no confundir "estoy respondiendo a algo
   recién abierto" con "ya llevo un rato gestionando este caso".
+
+## Equipo retirado por el SAT (fuera del centro)
+
+Una actuación puede hacerse **en el centro** (el técnico viene) o acabar con el **equipo
+retirado** a su taller — el caso real que lo motivó: revisan WAT-001 aquí, ven que no pueden
+arreglarlo y se lo llevan.
+
+- **Dónde se anota**: modal de actuación, campo "¿Dónde se hace?" (`act-lugar`). Al elegir
+  "Equipo retirado" aparecen "Fecha de retirada" (obligatoria) y "Fecha de devolución"
+  (vacía mientras siga fuera). Se guardan en `intervenciones.lugar_intervencion` /
+  `fecha_retirada` / `fecha_devolucion`.
+- **Estado derivado, no duplicado**: `intervencionEquipoFuera(equipoId)` devuelve la
+  intervención con `Lugar_Intervencion='Equipo retirado'` y sin `Fecha_Devolucion`;
+  `badgeEquipoFuera(equipoId, mini)` genera el cartel. No se escribe nada en
+  `Estado_Operativo` — si se hiciera, `guardar_tarea` lo pisaría al recalcular el estado del
+  equipo desde las tareas, y habría dos fuentes que pueden contradecirse.
+- **Dónde aparece el cartel** `📦 Fuera del centro`: tabla de equipos (junto al estado),
+  tarjetas de incidencias reportadas, "Próximas visitas", registro de intervenciones, ficha de
+  intervención (campo "Dónde se hace"), hilo de la incidencia, banner del dashboard, aviso con
+  botón al desplegar el equipo, y columna F del Excel de inventario.
+- **Devolución**: `registrarDevolucionEquipo(intId)` (botón "📦 Registrar devolución" en la
+  ficha, el hilo y el equipo desplegado) pide la fecha y rellena `fecha_devolucion`; con eso
+  el cartel desaparece en todas partes. También se puede corregir la fecha reabriendo el modal
+  de la actuación.
+- Si hace falta una actuación **nueva** mientras el equipo está fuera (p.ej. la reparación en
+  el taller), se programa como actuación encadenada normal: el cartel lo aporta la actuación
+  que registró la retirada, no hace falta repetirlo.
 
 ## Antes de usar este flujo en producción
 

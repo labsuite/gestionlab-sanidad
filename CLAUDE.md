@@ -232,7 +232,18 @@ id_intervencion, id_equipo, tipo, origen, fecha_planificada, fecha_realizacion,
 realizado_por, tecnico_externo, proveedor, descripcion_actuacion, resultado,
 equipo_operativo_tras_intervencion, url_adjunto, factura_asociada,
 actualiza_proximo_preventivo, observaciones, nombre_adjunto, estado,
-fecha_estimada_resolucion, coste_intervencion, actuacion_finalizada.
+fecha_estimada_resolucion, coste_intervencion, actuacion_finalizada,
+lugar_intervencion, fecha_retirada, fecha_devolucion.
+
+`lugar_intervencion` / `fecha_retirada` / `fecha_devolucion` (añadidos 2026-09-16): el SAT
+puede actuar en el propio centro (`'En el centro'`, valor por defecto) o llevarse el equipo a
+su taller (`'Equipo retirado'`). Mientras haya una intervención retirada **sin**
+`fecha_devolucion`, el equipo se considera fuera del centro y toda la app lo señala con el
+cartel `📦 Fuera del centro` (`badgeEquipoFuera` / `intervencionEquipoFuera` en
+`js/equipos-render.js`). Ese dato **no** se duplica en `estado_operativo`: se deriva de las
+intervenciones, igual que el badge de impacto — si se copiara al estado del equipo,
+`guardar_tarea` lo pisaría al recalcular el estado a partir de las tareas. Ver
+`docs/modulo-incidencias.md`.
 
 Una **Intervención** es una actuación/visita; cada `tareas_intervencion` es una acción
 concreta dentro de ella. `resultado` y `estado` son **derivados** de las tareas por la Edge
