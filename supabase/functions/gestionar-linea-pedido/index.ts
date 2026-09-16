@@ -5,6 +5,7 @@
 // js/pedidos-acciones.js (stock, movimiento, estado del pedido y de la
 // solicitud origen) como una sola operación atómica.
 import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { resolverIdMaterial } from "../_shared/material.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -59,7 +60,8 @@ async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: nu
     await supabaseAdmin.from("material").update(datosMat).eq("id_material", mat.id_material);
   }
   await supabaseAdmin.from("movimientos").insert({
-    id_movimiento: genId("MOV"), material: mat.nombre, tipo: "Entrada", cantidad: cantRec,
+    id_movimiento: genId("MOV"), material: mat.nombre, id_material: mat.id_material,
+    tipo: "Entrada", cantidad: cantRec,
     usuario, motivo: `Recepción pedido ${pedidoId}`,
   });
 }
@@ -160,7 +162,9 @@ Deno.serve(async (req) => {
     if (!cantidadPedida || cantidadPedida <= 0) return jsonError("Indica la cantidad", 400);
 
     const datos = {
-      id_linea: genId("LIN"), pedido: pedidoId, material, cantidad_pedida: cantidadPedida,
+      id_linea: genId("LIN"), pedido: pedidoId, material,
+      id_material: await resolverIdMaterial(supabaseAdmin, material),
+      cantidad_pedida: cantidadPedida,
       cantidad_recibida: 0, estado_linea: "Pendiente", observaciones,
       precio_unitario: body.precio_unitario ? Number(body.precio_unitario) : null,
       id_equipo: strField(body.id_equipo),
@@ -276,7 +280,9 @@ Deno.serve(async (req) => {
       const { data: linea, error } = await supabaseAdmin.from("lineas_pedido").update({ precio_unitario: Number(precio) }).eq("id_linea", idLinea).select().single();
       if (error || !linea) continue;
       const hist = {
-        id_historico: genId("HP"), nombre_material: linea.material, id_pedido: pedidoId,
+        id_historico: genId("HP"), nombre_material: linea.material,
+        id_material: linea.id_material ?? await resolverIdMaterial(supabaseAdmin, linea.material),
+        id_pedido: pedidoId,
         proveedor, fecha: hoy(), precio_unitario: Number(precio),
       };
       await supabaseAdmin.from("historico_precio").insert(hist);

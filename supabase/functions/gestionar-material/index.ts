@@ -38,10 +38,31 @@ async function sincronizarStockMaterial(supabaseAdmin: any, idMaterial: string) 
   await supabaseAdmin.from("material").update({ stock_actual: total }).eq("id_material", idMaterial);
 }
 
-async function registrarMovimiento(supabaseAdmin: any, nombreMaterial: string, tipo: string, cantidad: number, usuario: string, motivo: string, observaciones = "") {
+// Al renombrar un material hay que arrastrar el nombre a las tablas que lo guardan
+// como texto (movimientos, historico_precio, lineas_pedido, solicitudes). Desde la
+// migración `migrar_id_material.py` esas filas llevan también `id_material`, que es
+// el enlace de verdad: la columna de texto se mantiene solo para que los listados
+// sigan mostrando el nombre actual, y para el material NO catalogado, que no tiene id.
+async function propagarRenombrado(supabaseAdmin: any, idMaterial: string, nuevoNombre: string) {
+  const destinos: [string, string][] = [
+    ["movimientos", "material"],
+    ["historico_precio", "nombre_material"],
+    ["lineas_pedido", "material"],
+    ["solicitudes", "material"],
+  ];
+  for (const [tabla, columna] of destinos) {
+    await supabaseAdmin.from(tabla)
+      .update({ [columna]: nuevoNombre })
+      .eq("id_material", idMaterial);
+  }
+}
+
+// Recibe la fila del material (no solo el nombre) para guardar también
+// `id_material`: es lo que mantiene el historial enganchado si se renombra.
+async function registrarMovimiento(supabaseAdmin: any, mat: any, tipo: string, cantidad: number, usuario: string, motivo: string, observaciones = "") {
   const datos = {
-    id_movimiento: genId("MOV"), material: nombreMaterial, tipo, cantidad,
-    usuario, motivo, observaciones,
+    id_movimiento: genId("MOV"), material: mat?.nombre || "", id_material: mat?.id_material || null,
+    tipo, cantidad, usuario, motivo, observaciones,
   };
   await supabaseAdmin.from("movimientos").insert(datos);
 }
@@ -91,7 +112,7 @@ Deno.serve(async (req) => {
       const lotes = await getLotes(supabaseAdmin, idMaterial);
       let loteElegido = loteId ? lotes.find((l: any) => l.id === loteId) : null;
       if (lotes.length > 0 && !loteElegido) return jsonError("Selecciona una ubicación", 400);
-      await registrarMovimiento(supabaseAdmin, mat.nombre, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || ""));
+      await registrarMovimiento(supabaseAdmin, mat, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || ""));
       if (loteElegido) {
         const nuevoLocal = Math.max(0, (Number(loteElegido.stock_local) || 0) - cantidad);
         await supabaseAdmin.from("material_ubicaciones").update({ stock_local: nuevoLocal }).eq("id", loteElegido.id);
@@ -129,7 +150,7 @@ Deno.serve(async (req) => {
         const nuevo = { id: genId("LU"), id_material: idMaterial, id_ubicacion: idDestinoUbicacion, stock_local: cantidad, stock_minimo_local: 0, stock_optimo_local: 0 };
         await supabaseAdmin.from("material_ubicaciones").insert(nuevo);
       }
-      await registrarMovimiento(supabaseAdmin, mat.nombre, "Traslado", cantidad, usuarioNombre, String(body.motivo || "Traslado"));
+      await registrarMovimiento(supabaseAdmin, mat, "Traslado", cantidad, usuarioNombre, String(body.motivo || "Traslado"));
       const lotesFinal = await getLotes(supabaseAdmin, idMaterial);
       return jsonOk({ lotes: lotesFinal });
     }
@@ -188,9 +209,14 @@ Deno.serve(async (req) => {
         }
         matFinal = data;
       } else {
+        const { data: previo } = await supabaseAdmin.from("material")
+          .select("nombre").eq("id_material", idMaterial).maybeSingle();
         const { data, error } = await supabaseAdmin.from("material").update(datos).eq("id_material", idMaterial).select().single();
         if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
         if (!data) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
+        if (previo && previo.nombre !== nombre) {
+          await propagarRenombrado(supabaseAdmin, idMaterial, nombre);
+        }
         matFinal = data;
       }
 
@@ -237,7 +263,7 @@ Deno.serve(async (req) => {
       const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
       if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
       const loteId = strField(body.lote_id);
-      await registrarMovimiento(supabaseAdmin, mat.nombre, "Entrada", cantidad, String(body.usuario || "Usuario"), String(body.motivo || "Entrada"), String(body.observaciones || ""));
+      await registrarMovimiento(supabaseAdmin, mat, "Entrada", cantidad, String(body.usuario || "Usuario"), String(body.motivo || "Entrada"), String(body.observaciones || ""));
       if (loteId) {
         const { data: lote } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id", loteId).maybeSingle();
         if (!lote) return jsonError("Lote no encontrado", 404);
@@ -299,7 +325,7 @@ Deno.serve(async (req) => {
         const { data, error } = await supabaseAdmin.from("material_ubicaciones").insert(nuevo).select().single();
         if (error) return jsonError(`No se pudo subdividir: ${error.message}`, 400);
         creados.push(data);
-        await registrarMovimiento(supabaseAdmin, mat.nombre, "Subdivisión", cant, String(body.usuario || "Usuario"), `Subdividido de bote ${loteOrigenId} a ${f.id_ubicacion}`);
+        await registrarMovimiento(supabaseAdmin, mat, "Subdivisión", cant, String(body.usuario || "Usuario"), `Subdividido de bote ${loteOrigenId} a ${f.id_ubicacion}`);
       }
       return jsonOk({ creados });
     }
@@ -346,7 +372,7 @@ Deno.serve(async (req) => {
         } else {
           await supabaseAdmin.from("material_ubicaciones").insert({ id: genId("LU"), id_material: idMaterial, id_ubicacion: idDestino, stock_local: cant, stock_minimo_local: 0, stock_optimo_local: 0 });
         }
-        await registrarMovimiento(supabaseAdmin, mat.nombre, "Traslado", cant, String(body.usuario || "Usuario"), `NFC · De: ${idOrigen} → ${idDestino}`);
+        await registrarMovimiento(supabaseAdmin, mat, "Traslado", cant, String(body.usuario || "Usuario"), `NFC · De: ${idOrigen} → ${idDestino}`);
         procesados++;
       }
       return jsonOk({ procesados });
@@ -394,7 +420,7 @@ Deno.serve(async (req) => {
     } else {
       await supabaseAdmin.from("material").update({ stock_actual: stockRealNum }).eq("id_material", rev.id_material);
     }
-    await registrarMovimiento(supabaseAdmin, mat.nombre, "Ajuste", Math.abs(Number(rev.diferencia) || 0), String(body.usuario || "Usuario"), `Ajuste por revisión de inventario (alumno: ${rev.usuario})`);
+    await registrarMovimiento(supabaseAdmin, mat, "Ajuste", Math.abs(Number(rev.diferencia) || 0), String(body.usuario || "Usuario"), `Ajuste por revisión de inventario (alumno: ${rev.usuario})`);
     await supabaseAdmin.from("revisiones_inventario").delete().eq("id_revision", idRevision);
     const { data: matFinal } = await supabaseAdmin.from("material").select("*").eq("id_material", rev.id_material).single();
     return jsonOk({ material: matFinal, aplicada: idRevision });

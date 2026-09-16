@@ -25,7 +25,7 @@ function abrirModalPrecios(pedidoId) {
 
   const tbody = document.getElementById('precios-tabla-body');
   tbody.innerHTML = lineas.map((l, i) => {
-    const hist       = getHistoricoMaterial(l.Material, p.Proveedor);
+    const hist       = getHistoricoMaterial(l.Material, p.Proveedor, l.ID_Material);
     const precioAct  = parseFloat(l.Precio_Unitario) || 0;
     const cantNum    = parseFloat(l.Cantidad_Pedida)  || 0;
     const hint = hist.count > 0
@@ -119,9 +119,17 @@ async function guardarPrecios() {
  * Devuelve {count, ultimoPrecio, media, ultimaFecha} para un material.
  * Si se pasa proveedor, filtra por él (con fallback a todos).
  */
-function getHistoricoMaterial(nombre, proveedor) {
+/**
+ * Histórico de precios de un material. Casa primero por ID (el enlace estable:
+ * sobrevive a los renombrados, ver supabase/functions/_shared/material.ts) y solo
+ * si no hay nada cae al nombre, para las filas anteriores a la migración y para
+ * el material no catalogado, que no tiene ID.
+ */
+function getHistoricoMaterial(nombre, proveedor, idMaterial) {
   const norm = s => (s || '').normalize('NFC').trim().toLowerCase();
-  let hist = (DATA.historicoPrecio || []).filter(h => norm(h.Nombre_Material) === norm(nombre));
+  const id = idMaterial || (DATA.material.find(m => norm(m.Nombre) === norm(nombre))?.ID_Material || '');
+  let hist = id ? (DATA.historicoPrecio || []).filter(h => h.ID_Material === id) : [];
+  if (!hist.length) hist = (DATA.historicoPrecio || []).filter(h => norm(h.Nombre_Material) === norm(nombre));
   // Preferir entradas del mismo proveedor, pero si no hay usar todas
   const histProv = proveedor ? hist.filter(h => norm(h.Proveedor) === norm(proveedor)) : [];
   if (histProv.length) hist = histProv;

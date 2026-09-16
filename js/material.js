@@ -10,7 +10,7 @@ let _filtroMaterial = '', _filtroMaterialCat = '', _filtroMaterialStock = '', _f
  */
 function _precioMedioLabel(m) {
   if (typeof getHistoricoMaterial !== 'function') return '—';
-  const hist = getHistoricoMaterial(m.Nombre, '');  // sin filtro de proveedor → media global
+  const hist = getHistoricoMaterial(m.Nombre, '', m.ID_Material);  // sin filtro de proveedor → media global
   if (!hist.count) return '<span style="color:var(--text-muted)">Sin datos</span>';
   const conIVA = hist.media * 1.21;
   return `${conIVA.toFixed(2)} € <span style="font-size:10px;color:var(--text-muted)">(n=${hist.count})</span>`;
@@ -309,6 +309,16 @@ function renderFilaMaterial(m) {
     </tr>`;
   }
 
+  // Antigüedad del stock: se despliega con la fila, junto a las ubicaciones.
+  html += `<tr class="mat-ubic-row" id="mat-antig-${safeId}" style="display:none">
+    <td></td>
+    <td colspan="7" style="padding:6px 12px 8px;font-size:12px;color:var(--text-soft)">
+      🗓 <span style="color:var(--text-muted)">Antigüedad:</span> ${_resumenAntiguedad(m)}
+      <button class="btn-link" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:11px;text-decoration:underline;padding:0;margin-left:8px"
+              onclick="event.stopPropagation();openModalHistorialMaterial('${m.ID_Material}')">ver historial</button>
+    </td>
+  </tr>`;
+
   // Fila de detalle (solo visible en móvil): categoría/precio — la ubicación ya está en la sub-fila
   const labelStyle = 'display:block;font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px';
   html += `<tr class="mat-detail-row" id="mat-detail-${safeId}">
@@ -339,6 +349,8 @@ function toggleMatUbics(idMaterial) {
     const row = document.getElementById(`mat-ubic-${safeId}-${i}`);
     if (row) row.style.display = isOpen ? 'none' : '';
   }
+  const antigRow = document.getElementById(`mat-antig-${safeId}`);
+  if (antigRow) antigRow.style.display = isOpen ? 'none' : '';
   // Cerrar movimientos si estaban abiertos
   const movRow = document.getElementById(`mat-mov-${safeId}`);
   if (movRow && !isOpen === false) movRow.style.display = 'none';
@@ -357,20 +369,105 @@ function toggleMatDetail(idMaterial, skipIcon = false) {
   }
 }
 
+
+// ============================================================
+// ANTIGÜEDAD DEL STOCK
+// ============================================================
+// "¿De cuándo son estas 8 cajas?" se responde con el historial de entradas, que
+// ya se graba solo en cada recepción de pedido — no hay que pedirle la fecha a
+// nadie. El stock sigue siendo UN número: no se le pone fecha, se reparte contra
+// las entradas conocidas.
+//
+// Reparto: lo más viejo sale primero (FIFO). Es una suposición, no un hecho —
+// sin etiquetar bote a bote es imposible saber cuál de las 8 cajas es de cuándo.
+// La pantalla lo dice así de claro. Para lo que importa ("lo más antiguo que
+// tengo entró hace dos años") la aproximación vale.
+
+/** Movimientos de un material, por ID (estable ante renombrados) o por nombre si es antiguo. */
+function getMovimientosMaterial(mat) {
+  if (!mat) return [];
+  const porId = DATA.movimientos.filter(mv => mv.ID_Material && mv.ID_Material === mat.ID_Material);
+  const porNombre = DATA.movimientos.filter(mv => !mv.ID_Material && mv.Material === mat.Nombre);
+  return [...porId, ...porNombre].sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+}
+
+/**
+ * Desglose del stock actual por tanda de entrada, de la más reciente a la más
+ * antigua, recortado al stock que queda. Devuelve también cuántas unidades no
+ * se pueden atribuir a ninguna entrada (stock anterior a GestionLab).
+ */
+function getAntiguedadStock(mat) {
+  const stock = getStockTotal(mat);
+  const entradas = getMovimientosMaterial(mat)
+    .filter(mv => mv.Tipo === 'Entrada')
+    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));   // más reciente primero
+
+  const tandas = [];
+  let restante = stock;
+  for (const e of entradas) {
+    if (restante <= 0) break;
+    const cant = Math.min(restante, parseFloat(e.Cantidad) || 0);
+    if (cant <= 0) continue;
+    tandas.push({ cantidad: cant, fecha: e.Fecha, motivo: e.Motivo || '' });
+    restante -= cant;
+  }
+  return { stock, tandas, sinAtribuir: Math.max(0, restante), hayEntradas: entradas.length > 0 };
+}
+
+/** "sept 2026" a partir de una fecha ISO. */
+function _mesAnyoStock(fechaIso) {
+  if (!fechaIso) return '—';
+  const d = new Date(fechaIso);
+  if (isNaN(d.getTime())) return fechaIso;
+  return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
+}
+
+/** Resumen de una línea para la fila desplegada del material. */
+function _resumenAntiguedad(mat) {
+  const { tandas, sinAtribuir, hayEntradas } = getAntiguedadStock(mat);
+  const unidad = mat.Unidad || '';
+  const partes = tandas.map(t => `<strong>${t.cantidad}</strong> de ${_mesAnyoStock(t.fecha)}`);
+  if (sinAtribuir > 0) {
+    partes.push(hayEntradas
+      ? `<strong>${sinAtribuir}</strong> sin datos de entrada`
+      : `<strong>${sinAtribuir}</strong> ${unidad} anteriores a GestionLab`.trim());
+  }
+  if (!partes.length) return '<span style="color:var(--text-muted)">Sin stock</span>';
+  return partes.join(' · ');
+}
+
 function openModalHistorialMaterial(idMaterial) {
   const mat = DATA.material.find(m => m.ID_Material === idMaterial);
   const nombre = mat?.Nombre || idMaterial;
-  const movs = DATA.movimientos
-    .filter(m => m.Material === nombre)
-    .sort((a, b) => new Date(b.Fecha) - new Date(a.Fecha));
+  const movs = getMovimientosMaterial(mat);
 
   document.getElementById('historial-mat-titulo').textContent = `Historial — ${nombre}`;
 
+  const { tandas, sinAtribuir, hayEntradas, stock } = getAntiguedadStock(mat || {});
+  const unidad = mat?.Unidad || '';
+  const bloqueAntiguedad = mat ? `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;margin-bottom:8px">🗓 Antigüedad del stock — ${stock} ${unidad}</div>
+      ${tandas.length ? `<div style="display:flex;flex-direction:column;gap:4px">
+        ${tandas.map(t => `<div style="display:flex;justify-content:space-between;gap:10px;font-size:12px">
+          <span><strong>${t.cantidad}</strong> ${unidad} · ${_mesAnyoStock(t.fecha)}</span>
+          <span style="color:var(--text-muted)">${t.motivo}</span>
+        </div>`).join('')}
+      </div>` : ''}
+      ${sinAtribuir > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:${tandas.length ? '6px' : '0'}">
+        <strong>${sinAtribuir}</strong> ${unidad} ${hayEntradas ? 'sin entrada registrada' : 'anteriores a GestionLab (nunca pasaron por un pedido)'}
+      </div>` : ''}
+      ${tandas.length > 1 ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">
+        Repartido suponiendo que se gasta primero lo más antiguo. Sin etiquetar bote a bote no se
+        puede saber cuál es cuál, pero sí desde cuándo tienes lo más viejo.
+      </div>` : ''}
+    </div>` : '';
+
   const contenido = document.getElementById('historial-mat-contenido');
   if (!movs.length) {
-    contenido.innerHTML = `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Sin movimientos registrados para este ítem.</div>`;
+    contenido.innerHTML = bloqueAntiguedad + `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Sin movimientos registrados para este ítem.</div>`;
   } else {
-    contenido.innerHTML = movs.map(m => `
+    contenido.innerHTML = bloqueAntiguedad + movs.map(m => `
       <div style="display:grid;grid-template-columns:90px 110px 48px 1fr;gap:8px;align-items:center;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border-light,#f0f0f0)">
         <span style="color:var(--text-muted)">${formatDate(m.Fecha)||'—'}</span>
         <span>${m.Tipo === 'Entrada' ? '<span class="badge badge-green" style="font-size:10px">📥 Entrada</span>' : '<span class="badge badge-orange" style="font-size:10px">📦 Salida</span>'}</span>

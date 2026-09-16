@@ -291,6 +291,7 @@ function _lineaPedidoSbToObj(l) {
     ID_Linea: l.id_linea || '',
     Pedido: l.pedido || '',
     Material: l.material || '',
+    ID_Material: l.id_material || '',
     Cantidad_Pedida: l.cantidad_pedida != null ? String(l.cantidad_pedida) : '',
     Cantidad_Recibida: l.cantidad_recibida != null ? String(l.cantidad_recibida) : '0',
     Estado_Linea: l.estado_linea || '',
@@ -305,6 +306,7 @@ function _solicitudSbToObj(s) {
   return {
     ID_Solicitud: s.id_solicitud || '',
     Material: s.material || '',
+    ID_Material: s.id_material || '',
     Cantidad_Solicitada: s.cantidad_solicitada != null ? String(s.cantidad_solicitada) : '',
     Solicitante: s.solicitante || '',
     Fecha: (s.fecha || '').slice(0, 10),
@@ -321,6 +323,7 @@ function _historicoPrecioSbToObj(h) {
   return {
     ID_Historico: h.id_historico || '',
     Nombre_Material: h.nombre_material || '',
+    ID_Material: h.id_material || '',
     ID_Pedido: h.id_pedido || '',
     Proveedor: h.proveedor || '',
     Fecha: h.fecha || '',
@@ -332,6 +335,7 @@ function _movimientoSbToObj(m) {
   return {
     ID_Movimiento: m.id_movimiento || '',
     Material: m.material || '',
+    ID_Material: m.id_material || '',
     Tipo: m.tipo || '',
     Cantidad: m.cantidad != null ? String(m.cantidad) : '',
     Usuario: m.usuario || '',

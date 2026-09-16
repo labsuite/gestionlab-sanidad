@@ -649,3 +649,26 @@ create index if not exists idx_propuestas_ubic_equipo on propuestas_ubicacion_eq
 
 alter table propuestas_ubicacion_equipo enable row level security;
 create policy "propuestas_ubicacion_equipo_select_anon" on propuestas_ubicacion_equipo for select to anon, authenticated using (true);
+
+-- ============================================================
+-- 10. ENLACE ESTABLE DE LOS HISTORIALES DEL FUNGIBLE (2026-09-16)
+-- ============================================================
+-- `movimientos`, `historico_precio`, `lineas_pedido` y `solicitudes` guardan el
+-- material por NOMBRE en texto libre, y eso no se puede quitar: es lo que permite
+-- pedir material no catalogado (ver docs/modulo-pedidos.md). El problema es que
+-- renombrar un material dejaba su historial huérfano en silencio, porque
+-- gestionar-material nunca propagaba el cambio.
+--
+-- `id_material` es ahora el enlace de verdad, porque sobrevive al renombrado. La
+-- columna de texto se conserva para mostrar el nombre en los listados y para el
+-- material sin catalogar, que por definición no tiene ID (de ahí el nullable).
+-- Backfill inicial: scripts/migrar_id_material.py
+alter table movimientos      add column if not exists id_material text references material(id_material) on update cascade on delete set null;
+alter table historico_precio add column if not exists id_material text references material(id_material) on update cascade on delete set null;
+alter table lineas_pedido    add column if not exists id_material text references material(id_material) on update cascade on delete set null;
+alter table solicitudes      add column if not exists id_material text references material(id_material) on update cascade on delete set null;
+
+create index if not exists idx_movimientos_id_material      on movimientos (id_material);
+create index if not exists idx_historico_precio_id_material on historico_precio (id_material);
+create index if not exists idx_lineas_pedido_id_material    on lineas_pedido (id_material);
+create index if not exists idx_solicitudes_id_material      on solicitudes (id_material);

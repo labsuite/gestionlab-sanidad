@@ -5,6 +5,7 @@
 // para todo salvo "rechazar", reservado a quien gestiona pedidos
 // (Admin/Gestor, `gestionarPedidos` en PERMISOS).
 import { requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { resolverIdMaterial } from "../_shared/material.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -46,7 +47,9 @@ Deno.serve(async (req) => {
     if (!material) return jsonError("Indica el material", 400);
     if (!cantidad || cantidad <= 0) return jsonError("Indica la cantidad", 400);
     const datos = {
-      id_solicitud: genId("SOL"), material, cantidad_solicitada: cantidad,
+      id_solicitud: genId("SOL"), material,
+      id_material: await resolverIdMaterial(supabaseAdmin, material),
+      cantidad_solicitada: cantidad,
       solicitante: String(body.solicitante || "Usuario"),
       motivo: strField(body.motivo), proveedor_requerido: strField(body.proveedor_requerido),
       estado: "Pendiente", observaciones: strField(body.observaciones),
