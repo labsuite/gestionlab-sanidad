@@ -44,10 +44,21 @@ function _ubicLabDeEquipo(eq) {
   return _ubicNumLab(eq.Ubicacion);
 }
 
+/** Clave de agrupación del equipo: su laboratorio, o SIN_LAB si no se puede deducir. */
+const UBIC_SIN_LAB = 'SIN';
+function _ubicClaveLab(eq) { return _ubicLabDeEquipo(eq) || UBIC_SIN_LAB; }
+function _ubicEtiquetaLab(clave) { return clave === UBIC_SIN_LAB ? 'Sin laboratorio' : `Lab ${clave}`; }
+
 /** Laboratorios en los que puede trabajar el usuario actual. Staff: todos. */
 function _ubicLabsUsuario() {
   const todos = [...new Set(DATA.ubicaciones.map(u => _ubicNumLab(u.Laboratorio_Aula)).filter(Boolean))].sort();
-  if (getUserRole() !== 'Alumno') return todos;
+  if (getUserRole() !== 'Alumno') {
+    // Staff ve también los laboratorios que solo existen en `equipos` y no en el
+    // catálogo de ubicaciones (el 209 hoy), y los equipos sin ubicación ninguna.
+    // Si no, esos equipos quedarían invisibles aquí y nadie sabría que faltan.
+    const deEquipos = DATA.equipos.map(_ubicClaveLab);
+    return [...new Set([...todos, ...deEquipos])].sort();
+  }
   const misUbic = getUbicacionesAlumno();
   const mios = [...new Set(misUbic
     .map(id => DATA.ubicaciones.find(u => u.ID_Ubicacion === id))
@@ -107,7 +118,7 @@ function renderUbicarEquipos() {
 
 /** Barra de progreso del curso: cuántos equipos tienen ya ubicación concreta. */
 function _ubicRenderProgreso(labs) {
-  const delAlcance = DATA.equipos.filter(e => labs.includes(_ubicLabDeEquipo(e)));
+  const delAlcance = DATA.equipos.filter(e => labs.includes(_ubicClaveLab(e)));
   const ubicados = delAlcance.filter(_ubicEsConcreta).length;
   const total = delAlcance.length;
   const pct = total ? Math.round(ubicados / total * 100) : 0;
@@ -148,7 +159,7 @@ function _ubicRenderHerramienta(labs, esStaff) {
 
   const filtro = _ubicFiltro.toLowerCase();
   const equiposLab = DATA.equipos
-    .filter(e => _ubicLabDeEquipo(e) === _ubicLabActivo)
+    .filter(e => _ubicClaveLab(e) === _ubicLabActivo)
     .filter(e => _ubicVerUbicados || !_ubicEsConcreta(e))
     .filter(e => !filtro || (e.ID_Activo + ' ' + _ubicNombreEquipo(e)).toLowerCase().includes(filtro))
     .sort((a, b) => (a.Tipo_Equipo || '').localeCompare(b.Tipo_Equipo || '') || a.ID_Activo.localeCompare(b.ID_Activo));
@@ -162,15 +173,23 @@ function _ubicRenderHerramienta(labs, esStaff) {
         <div style="font-size:15px;font-weight:600">🔎 Ubicar equipos</div>
         ${labs.length > 1 ? `
           <select onchange="_ubicCambiarLab(this.value)" style="max-width:160px">
-            ${labs.map(l => `<option value="${l}" ${l === _ubicLabActivo ? 'selected' : ''}>Lab ${l}</option>`).join('')}
+            ${labs.map(l => `<option value="${l}" ${l === _ubicLabActivo ? 'selected' : ''}>${_esc(_ubicEtiquetaLab(l))}</option>`).join('')}
           </select>` : ''}
       </div>
 
       ${sinUbicaciones ? `
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;font-size:13px;line-height:1.6;color:var(--text-muted)">
-          El laboratorio ${_ubicLabActivo} todavía no tiene ubicaciones concretas en el catálogo
-          (zonas y subzonas). Hay que darlas de alta en <strong>Catálogo → Ubicaciones</strong>
-          antes de poder ubicar sus equipos aquí.
+          ${_ubicLabActivo === UBIC_SIN_LAB
+            ? `Estos <strong>${equiposLab.length} equipo(s)</strong> no tienen ninguna ubicación puesta, ni siquiera
+               el laboratorio, así que no se sabe dónde buscarlos. Hay que asignarles un laboratorio desde
+               <strong>Inventario</strong> antes de poder ubicarlos aquí.`
+            : `El laboratorio ${_ubicLabActivo} todavía no tiene ubicaciones concretas en el catálogo
+               (zonas y subzonas). Hay que darlas de alta en <strong>Catálogo → Ubicaciones</strong>
+               antes de poder ubicar sus equipos aquí.`}
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:4px">
+            ${equiposLab.slice(0, 20).map(e => `<div style="font-size:12px">· ${_esc(_ubicNombreEquipo(e))} <span style="opacity:.7">(${_esc(e.ID_Activo)})</span></div>`).join('')}
+            ${equiposLab.length > 20 ? `<div style="font-size:12px;opacity:.7">…y ${equiposLab.length - 20} más</div>` : ''}
+          </div>
         </div>` : `
         <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
           <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">1 · ¿Dónde estás ahora?</label>
