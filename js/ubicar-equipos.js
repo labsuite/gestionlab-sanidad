@@ -421,8 +421,8 @@ function _ubicRenderAviso() {
   const n = getUserRole() === 'Alumno' ? 0 : _ubicPendientes().length;
   if (!n) { cont.innerHTML = ''; return; }
   cont.innerHTML = `
-    <div class="alert" style="margin-bottom:16px;cursor:pointer" onclick="showPage('ubicar-equipos')">
-      <span class="alert-icon">📍</span>
+    <div class="alert-banner" style="cursor:pointer" onclick="showPage('ubicar-equipos')">
+      <div class="alert-icon">📍</div>
       <div class="alert-content">
         <div class="alert-title">${n} propuesta(s) de ubicación esperando tu visto bueno</div>
         <div class="alert-text">Del alumnado que está inventariando. Pulsa aquí para revisarlas.</div>
