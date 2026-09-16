@@ -251,13 +251,15 @@ function getPlanStatusParaEquipo(equipoId) {
 }
 
 function labelPeriodo(periodo) {
+  if (!periodo) return '—';
   if (periodo.startsWith('pretemporada')) return 'Pre-temporada';
   if (periodo.startsWith('posttemporada')) return 'Post-temporada';
   const [y, m] = periodo.split('-');
-  try {
-    return new Date(parseInt(y), parseInt(m) - 1, 1)
-      .toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
-  } catch { return periodo; }
+  // Ojo: con una fecha inválida toLocaleDateString NO lanza, devuelve la cadena
+  // "Invalid Date" — el try/catch no basta, hay que comprobar el valor.
+  const d = new Date(parseInt(y), parseInt(m) - 1, 1);
+  if (isNaN(d.getTime())) return periodo;
+  return d.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
 }
 
 // ============================================================
