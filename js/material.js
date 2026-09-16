@@ -609,6 +609,26 @@ document.addEventListener('click', e => {
 let _lotesTemp = [];
 let _loteEditandoIdx = null;
 
+/**
+ * Unidades sugeridas para un bote: primero las que declara el propio material
+ * (su Unidad y sus Unidades_Extra), después todas las que ya se usan en el resto
+ * del catálogo y en otros botes.
+ *
+ * Antes esto era un <select> cerrado para que no aparecieran variantes tipo
+ * "gotero"/"goteros" que luego no casan con nada. El problema es que dejaba fuera
+ * cualquier unidad nueva: para alicuotar en "turulos" había que ir antes a
+ * "Unidades adicionales" del material. Ahora es un combo (input + datalist): las
+ * conocidas están a un toque —que es lo que de verdad evita la deriva— pero se
+ * puede escribir cualquier cosa.
+ */
+function _unidadesSugeridas(unidadBase, unidadesExtra) {
+  const delMaterial = [unidadBase, ...(unidadesExtra || [])].filter(Boolean);
+  const delCatalogo = DATA.material.flatMap(m =>
+    [m.Unidad, ...String(m.Unidades_Extra || '').split(',')].map(u => (u || '').trim()));
+  const deLotes = DATA.materialUbicaciones.map(l => (l.Unidad_Lote || '').trim());
+  return [...new Set([...delMaterial, ...delCatalogo, ...deLotes].filter(Boolean))];
+}
+
 function renderLotesModal() {
   const container = document.getElementById('mat-lotes-container');
   if (!container) return;
@@ -616,15 +636,15 @@ function renderLotesModal() {
     container.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding:8px 0">Sin ubicaciones asignadas. Usa el campo de abajo para añadir.</div>`;
     return;
   }
-  // Unidad por lote: selector cerrado a Unidad + Unidades_Extra del propio
-  // material (en vez de texto libre) para que no puedan aparecer variantes
-  // como "gotero"/"goteros" que luego no casan con nada. Solo tiene sentido
-  // mostrarlo si el material declara más de un tipo de unidad — con uno
-  // solo, todos los lotes usan implícitamente la Unidad del material.
+  // Unidad por lote: combo con sugerencias, ver _unidadesSugeridas(). Se muestra
+  // siempre, también cuando el material declara una sola unidad — si no, no habría
+  // forma de estrenar una unidad nueva (p. ej. alicuotar cajas en "turulos").
   const unidadBase = v('mat-unidad');
   const unidadesExtra = v('mat-unidades-extra').split(',').map(u => u.trim()).filter(Boolean);
-  const opcionesUnidad = [...new Set([unidadBase, ...unidadesExtra].filter(Boolean))];
-  container.innerHTML = _lotesTemp.map((l, i) => {
+  const opcionesUnidad = _unidadesSugeridas(unidadBase, unidadesExtra);
+  const datalistUnidades = `<datalist id="lotes-unidades-list">${
+    opcionesUnidad.map(u => `<option value="${_escAttr(u)}"></option>`).join('')}</datalist>`;
+  container.innerHTML = datalistUnidades + _lotesTemp.map((l, i) => {
     const nombre   = getNombreUbicacion(l.ID_Ubicacion);
     const gestionOn = l.Gestion_Auto !== false && l.Gestion_Auto !== 'false';
     const checkId   = `lote-auto-${i}`;
@@ -639,14 +659,11 @@ function renderLotesModal() {
     // suelto de antes de tener este selector), se añade igualmente como
     // opción para no cambiarlo en silencio al reabrir el material.
     const valorActual = (l.Unidad_Lote || '').trim();
-    const opciones = valorActual && !opcionesUnidad.includes(valorActual) ? [...opcionesUnidad, valorActual] : opcionesUnidad;
-    const selectorUnidad = opciones.length > 1
-      ? `<label style="font-size:12px;color:var(--text-muted)">Unidad</label>
-        <select style="width:160px" onchange="_lotesTemp[${i}].Unidad_Lote=this.value">
-          <option value=""${valorActual ? '' : ' selected'}>(la del material)</option>
-          ${opciones.map(u => `<option value="${u}"${u === valorActual ? ' selected' : ''}>${u}</option>`).join('')}
-        </select>`
-      : '';
+    const selectorUnidad = `<label style="font-size:12px;color:var(--text-muted)">Unidad</label>
+        <input list="lotes-unidades-list" style="width:160px" value="${_escAttr(valorActual)}"
+          placeholder="${_escAttr(unidadBase ? '(la del material: ' + unidadBase + ')' : '(la del material)')}"
+          onchange="_lotesTemp[${i}].Unidad_Lote=this.value.trim()"
+          oninput="_lotesTemp[${i}].Unidad_Lote=this.value.trim()">`;
     return `<div class="lote-row" style="background:var(--surface2);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden">
       <!-- Cabecera del lote -->
       <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;flex-wrap:wrap">
@@ -1425,14 +1442,15 @@ function openModalSubdividirLote(loteId) {
 
 function renderSubdivModal() {
   const cont = document.getElementById('subdiv-filas');
-  // Mismo criterio que el selector de unidad por lote: si el material ya
-  // declara Unidades_Extra, la unidad del bote de uso se elige de esa lista
-  // en vez de escribirse a mano — así "goteros" nunca queda como variante
-  // suelta de un "gotero" ya declarado en el catálogo. Sin Unidades_Extra
-  // todavía, se mantiene el texto libre de siempre.
+  // Mismo combo que el selector de unidad por lote (ver _unidadesSugeridas):
+  // sugerencias a un toque para no acabar con "gotero" y "goteros" como dos
+  // unidades distintas, pero sin cerrar la puerta a una unidad nueva.
   const mat = DATA.material.find(m => m.ID_Material === v('subdiv-mat-id'));
-  const opcionesUnidad = [...new Set([mat?.Unidad, ...(mat?.Unidades_Extra || '').split(',').map(u => u.trim())].filter(Boolean))];
-  cont.innerHTML = _subdivTemp.map((f, i) => `
+  const opcionesUnidad = _unidadesSugeridas(
+    mat?.Unidad, (mat?.Unidades_Extra || '').split(',').map(u => u.trim()).filter(Boolean));
+  const datalistUnidades = `<datalist id="subdiv-unidades-list">${
+    opcionesUnidad.map(u => `<option value="${_escAttr(u)}"></option>`).join('')}</datalist>`;
+  cont.innerHTML = datalistUnidades + _subdivTemp.map((f, i) => `
     <div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-bottom:8px">
       <div style="margin-bottom:8px">
         ${f.idUbicacion ? `
@@ -1450,15 +1468,10 @@ function renderSubdivModal() {
         <input type="number" min="0" step="0.01" placeholder="Cantidad" value="${f.cantidad}"
           style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
           oninput="_subdivTemp[${i}].cantidad=this.value">
-        ${opcionesUnidad.length > 1 ? `
-        <select style="width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
-          onchange="_subdivTemp[${i}].unidad=this.value">
-          <option value=""${f.unidad ? '' : ' selected'}>Unidad...</option>
-          ${opcionesUnidad.map(u => `<option value="${u}"${u === f.unidad ? ' selected' : ''}>${u}</option>`).join('')}
-        </select>` : `
-        <input type="text" placeholder="Unidad (goteros...)" value="${f.unidad}"
+        <input list="subdiv-unidades-list" placeholder="Unidad (turulos...)" value="${_escAttr(f.unidad)}"
           style="width:120px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
-          oninput="_subdivTemp[${i}].unidad=this.value">`}
+          onchange="_subdivTemp[${i}].unidad=this.value.trim()"
+          oninput="_subdivTemp[${i}].unidad=this.value.trim()">
         <input type="number" min="0" step="0.01" placeholder="Mínimo" value="${f.stockMin}"
           style="width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm)"
           oninput="_subdivTemp[${i}].stockMin=this.value">
