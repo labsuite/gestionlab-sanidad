@@ -691,3 +691,33 @@ create index if not exists idx_movimientos_id_material      on movimientos (id_m
 create index if not exists idx_historico_precio_id_material on historico_precio (id_material);
 create index if not exists idx_lineas_pedido_id_material    on lineas_pedido (id_material);
 create index if not exists idx_solicitudes_id_material      on solicitudes (id_material);
+
+-- ============================================================
+-- 11. INVENTARIO COLABORATIVO — FICHA DE ATRIBUTOS (fase B, 2026-09-16)
+-- ============================================================
+-- Quien propone un material NO escribe su nombre: rellena los atributos que
+-- importan de ese tipo de producto y el nombre se compone a partir de ellos.
+-- Así no entra el nombre comercial, y se acaban las variantes del mismo material
+-- ("Cristalizador 180mm" frente a "Cristalizador, 100 mm").
+--
+-- La ficha es DATO, no código: se retoca desde la app sin tocar el JS.
+-- Semilla inicial: scripts/migrar_atributos_material.py
+create table if not exists atributos_material (
+  id_ficha     text primary key,
+  categoria    text not null,   -- prefijo de material.categoria, antes del " — "
+  tipo_base    text not null,   -- "Pipetas serológicas": elige QUÉ atributos aplican
+  nombre_base  text,            -- con qué empieza el nombre; null = lo elige quien propone
+  orden        integer not null default 0,
+  atributos    jsonb not null default '[]'::jsonb,
+  activa       boolean not null default true,
+  unique (categoria, tipo_base)
+);
+
+-- Valores concretos de cada material. jsonb y no columnas porque los atributos
+-- dependen del tipo de producto y la ficha cambia con el tiempo.
+alter table material add column if not exists atributos jsonb not null default '{}'::jsonb;
+
+create index if not exists idx_atributos_material_categoria on atributos_material (categoria);
+
+alter table atributos_material enable row level security;
+create policy "atributos_material_select_anon" on atributos_material for select to anon, authenticated using (true);
