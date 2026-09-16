@@ -60,9 +60,11 @@ const _regConfig = {
   },
   vitrina: {
     key: 'registrosVitrina', sheet: 'Registros_Vitrina', lastCol: 'L',
-    // El inventario arrastra tres nombres distintos para lo mismo (vitrina / cabina de
-    // extracción de gases); la pestaña recoge todos para no dejar equipos fuera.
-    tiposEquipo: ['Vitrina de extracción de gases', 'Cabina de extracción de gases'], prefix: 'RV',
+    // El inventario arrastra tres nombres distintos para el mismo tipo de aparato
+    // (los tres son Indelab Flow lan sv); la pestaña los recoge todos para no dejar
+    // equipos fuera. "Campana de seguridadd" (CAB-04, con errata en el dato) es una
+    // vitrina de gases de recirculación con filtro de carbono — confirmado por la usuaria.
+    tiposEquipo: ['Vitrina de extracción de gases', 'Cabina de extracción de gases', 'Campana de seguridadd'], prefix: 'RV',
     label: 'Vitrina de extracción de gases', tabLabel: '🌫️ Vitrina de gases',
     // Como la cabina: presencia continua mientras se trabaja dentro de la vitrina.
     permiteSesionAbierta: true,

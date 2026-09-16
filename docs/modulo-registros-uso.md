@@ -36,12 +36,14 @@ los nombres de columna solo se escriben una vez.
 Filtrado dinámico por `Tipo_Equipo` en `DATA.equipos` — nada hardcodeado:
 - **Autoclave**: `AUTC-001`, `AUTC-002` (dos equipos → selector)
 - **Cabina de bioseguridad**: `CAB-03` (uno solo → se autoselecciona, sin selector visible)
-- **Vitrina de extracción de gases**: `CAB-01` (`Vitrina de extracción de gases`) y `CAB-02`
-  (`Cabina de extracción de gases`) — el inventario arrastra dos nombres para lo mismo, por eso
-  `tiposEquipo` es un array y la pestaña recoge los dos. ⚠ `CAB-04` (`Campana de seguridadd`,
-  Indelab Flow lan sv, Lab 207) está fuera a propósito: el nombre tiene una errata y no está
-  confirmado si es vitrina de gases o cabina de bioseguridad — si lo es, basta añadir ese
-  `Tipo_Equipo` al array correspondiente (o corregir el dato en el inventario).
+- **Vitrina de extracción de gases**: `CAB-01`, `CAB-02` y `CAB-04` — los tres son Indelab
+  Flow lan sv, pero el inventario arrastra tres `Tipo_Equipo` distintos para ellos
+  (`Vitrina de extracción de gases`, `Cabina de extracción de gases` y `Campana de seguridadd`,
+  este último con errata). Por eso `tiposEquipo` es un array con los tres nombres. La usuaria
+  confirmó (2026-09-16) que **CAB-04 es también vitrina de gases**, de recirculación con filtro
+  de carbono en vez de expulsión al exterior — un matiz que importa al mantenimiento (sustituir
+  el filtro), no al registro de uso. Queda pendiente unificar los tres nombres en el inventario;
+  mientras tanto el array los cubre.
 
 ## Cabina y vitrina: sesión abierta/cerrada — Autoclave: ciclo único
 `_regConfig[tipo].permiteSesionAbierta` marca la diferencia (`true` en cabina y vitrina):
