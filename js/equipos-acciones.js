@@ -417,6 +417,9 @@ function abrirHiloIncidencia(incId) {
   const cont = document.getElementById('hilo-lista');
   if (!cont) return;
 
+  const pieCierre = document.getElementById('hilo-cierre');
+  if (pieCierre) pieCierre.innerHTML = '';
+
   if (!inc.Intervencion_Generada) {
     cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin planificar</div><div class="empty-state-text">Pulsa "Responder" en la incidencia para crear la primera actuación.</div></div>`;
     openModal('modal-hilo-incidencia');
@@ -691,6 +694,7 @@ async function guardarPlanificacion(finalizar) {
       closeModal('modal-planificar-intervencion');
       showToast('Intervención planificada guardada', 'success');
       renderAll();
+      volverAlHilo();
     } else {
       showToast('Guardado. Puedes seguir añadiendo tareas previstas o cerrar cuando quieras.', 'success');
       renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
@@ -941,7 +945,11 @@ async function marcarResultadoTarea(tareaId, resultado) {
   try {
     const { estadoAgg } = await _guardarTareaIntervencion(tarea.ID_Intervencion, tarea.Descripcion, resultado, operativo, tarea.Observaciones, tareaId);
     _renderTareasEnModal(tarea.ID_Intervencion);
-    showToast(`Tarea → ${resultado}. Actuación → ${estadoAgg}`, 'success');
+    // La incidencia NO se cierra sola al resolverse las tareas: hay que darla por
+    // resuelta en su hilo, eligiendo ahí el estado operativo del equipo.
+    showToast(estadoAgg === 'Cerrada'
+      ? `Tarea → ${resultado}. Actuación → Cerrada. Da la incidencia por resuelta desde su hilo cuando proceda.`
+      : `Tarea → ${resultado}. Actuación → ${estadoAgg}`, 'success');
     renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
   } catch(e) { showToast('Error actualizando la tarea', 'error'); console.error(e); }
   hideLoading();
