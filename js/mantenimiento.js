@@ -120,6 +120,16 @@ function getEjecucionMant(idPlan, cursoAcademico, periodo) {
   );
 }
 
+// Registrado por alumnado y a la espera de que un docente lo firme. Ya está HECHO
+// (nadie tiene que repetirlo), pero no cuenta como finalizado: el Excel del modelo de
+// calidad solo vuelca 'finalizado', porque ahí la firma del supervisor es lo que vale.
+function getRegistroPendienteVb(idPlan, cursoAcademico, periodo) {
+  return DATA.registroMantenimientos.find(r =>
+    r.ID_Plan === idPlan && r.Curso_Academico === cursoAcademico &&
+    r.Periodo === periodo && r.Estado === 'pendiente_vb'
+  );
+}
+
 // Marcador "no aplica" / "aplazado" de un periodo concreto (no es un registro
 // realizado: solo deja constancia con motivo de por qué no se hizo o se pospuso).
 function getMarcadorMant(idPlan, cursoAcademico, periodo) {
@@ -138,13 +148,15 @@ function _aplazamientoVencido(marcador) {
 }
 
 // Estado consolidado de un periodo programado:
-//  'finalizado' | 'en_curso' | 'no_aplica'
+//  'finalizado' | 'pendiente_vb' | 'en_curso' | 'no_aplica'
 //  | 'aplazado_futuro'  (oculto hasta que llegue su mes destino)
 //  | 'aplazado_vencido' (el mes destino ya llegó → vuelve a pendiente)
 //  | 'pendiente'
 function estadoPeriodoMant(idPlan, curso, periodo) {
   const reg = getRegistroMant(idPlan, curso, periodo);
   if (reg) return { tipo: 'finalizado', registro: reg };
+  const regVb = getRegistroPendienteVb(idPlan, curso, periodo);
+  if (regVb) return { tipo: 'pendiente_vb', registro: regVb };
   const marc = getMarcadorMant(idPlan, curso, periodo);
   if (marc) {
     if (marc.Estado === 'no_aplica') return { tipo: 'no_aplica', marcador: marc };
@@ -175,6 +187,34 @@ function _pasosDesdePlan(plan) {
   return textos.map(t => ({ texto: t, hecho: false }));
 }
 
+// ============================================================
+// QUIÉN PUEDE EJECUTAR UN MANTENIMIENTO
+// ============================================================
+// El alumnado solo puede con planes marcados Con_Alumnado y dentro del curso lectivo
+// (octubre–mayo). El servidor vuelve a comprobar el Con_Alumnado — esto es solo la UI.
+
+/** Meses en los que hay alumnado en el laboratorio. */
+function _enPeriodoAlumno() {
+  const mes = new Date().getMonth() + 1;
+  return mes >= 10 || mes <= 5;
+}
+
+/** ¿Puede el alumnado ejecutar este plan concreto? */
+function puedeAlumnoEjecutarPlan(plan) {
+  return _esConAlumnado(plan) && _enPeriodoAlumno();
+}
+
+/** ¿Puede el usuario actual abrir el modal de ejecución de este plan? */
+function puedeEjecutarPlanMant(plan) {
+  if (getUserRole() === 'Alumno') return puedeAlumnoEjecutarPlan(plan);
+  return puedeHacer('registrarMantenimiento');
+}
+
+/** Marcar "no aplica" / aplazar / revertir es decisión de gestión: nunca del alumnado. */
+function puedeMarcarPeriodoMant() {
+  return puedeHacer('crearIntervenciones');
+}
+
 function _upsertRegistroMant(obj) {
   const i = DATA.registroMantenimientos.findIndex(r => r.ID_Registro === obj.ID_Registro);
   if (i >= 0) DATA.registroMantenimientos[i] = obj;
@@ -197,7 +237,10 @@ function getPlanStatusParaEquipo(equipoId) {
       if (est.tipo === 'no_aplica' || est.tipo === 'aplazado_futuro') continue;
       resultado.push({
         plan, periodo, curso,
-        hecho: est.tipo === 'finalizado',
+        // Lo registrado por alumnado a la espera de firma ya está hecho: no vuelve a
+        // pedirse ni cuenta como pendiente (ver estadoPeriodoMant).
+        hecho: est.tipo === 'finalizado' || est.tipo === 'pendiente_vb',
+        esperaVb: est.tipo === 'pendiente_vb',
         registro: est.registro || null,
         marcador: est.marcador || null,
         aplazadoVencido: est.tipo === 'aplazado_vencido',
@@ -226,8 +269,11 @@ function buildMantenimientoEquipo(equipoId) {
 
   // La configuración de planes (alta/edición/borrado) vive ahora solo en la
   // sección Mantenimiento; aquí la tarjeta es informativa + ejecutar.
-  const canLog  = puedeHacer('crearIntervenciones') ||
+  // canMarcar: no aplica / aplazar / revertir — gestión, nunca alumnado.
+  // canEjecutar se decide por plan más abajo (el alumnado solo en los Con_Alumnado).
+  const canMarcar = puedeHacer('crearIntervenciones') ||
     (getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo));
+  const canLog = canMarcar;
 
   const secciones = [];
 
@@ -283,6 +329,8 @@ function buildMantenimientoEquipo(equipoId) {
               const est = estadoPeriodoMant(plan.ID_Plan, curso, periodo);
               const reg = est.registro || null;
               const hecho = est.tipo === 'finalizado';
+              const esperaVb = est.tipo === 'pendiente_vb';
+              const canEjecutar = canMarcar || puedeEjecutarPlanMant(plan);
               const marc = est.marcador || null;
               const eje = est.ejecucion || null;
               const ejeN = eje && Array.isArray(eje.Pasos) ? eje.Pasos.filter(p => p.hecho).length : 0;
@@ -290,29 +338,32 @@ function buildMantenimientoEquipo(equipoId) {
               const argsMarc = `'${plan.ID_Plan}','${equipoId.replace(/'/g,"\\'")}','${periodo}','${curso}'`;
               const abrirEjec = `event.stopPropagation();openModalRegistrarMant(${argsMarc})`;
               const abrirMarc = `event.stopPropagation();openModalMarcarMant(${argsMarc})`;
-              const btnMarc = canLog
+              const btnMarc = canMarcar
                 ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="No aplica / aplazar" onclick="${abrirMarc}">⋯</button>`
                 : '';
-              const btnRevert = canLog && marc
+              const btnRevert = canMarcar && marc
                 ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="Revertir: volver a pendiente" onclick="event.stopPropagation();revertirMarcadorMant('${marc.ID_Registro}')">↩</button>`
                 : '';
               let badge;
               if (hecho) {
                 badge = `<span class="badge badge-green" style="font-size:10px">✓ ${formatDate(reg.Fecha_Realizacion)||'Hecho'}</span>`;
+              } else if (esperaVb) {
+                badge = `<span class="badge badge-orange" style="font-size:10px" title="Hecho por ${reg.Realizado_Por||'alumnado'} — falta el visto bueno del profesorado">⏳ Espera visto bueno</span>`
+                  + (canMarcar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="event.stopPropagation();darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>` : '');
               } else if (est.tipo === 'no_aplica') {
                 badge = `<span class="badge badge-gray" style="font-size:10px" title="${marc.Observaciones||''}">🚫 No aplica</span>${btnRevert}`;
               } else if (est.tipo === 'aplazado_futuro') {
                 badge = `<span class="badge badge-gray" style="font-size:10px" title="${marc.Observaciones||''}">📅 Aplazado a ${labelMesAnyo(marc.Aplazado_A)}</span>${btnRevert}`;
               } else if (eje) {
-                badge = canLog
+                badge = canEjecutar
                   ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="${abrirEjec}">Continuar <span style="opacity:.65">${ejeN}/${ejeTot}</span></button>${btnMarc}`
                   : `<span class="badge badge-orange" style="font-size:10px">En curso ${ejeN}/${ejeTot}</span>`;
               } else if (est.tipo === 'aplazado_vencido') {
-                badge = canLog
+                badge = canEjecutar
                   ? `<span class="badge badge-orange" style="font-size:10px" title="${marc.Observaciones||''}">📅 Aplazado (previsto ${labelMesAnyo(marc.Aplazado_A)})</span><button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="${abrirEjec}">Registrar</button>${btnMarc}`
                   : `<span class="badge badge-orange" style="font-size:10px">Pendiente (aplazado)</span>`;
               } else {
-                badge = canLog
+                badge = canEjecutar
                   ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;white-space:nowrap" onclick="${abrirEjec}">Registrar</button>${btnMarc}`
                   : `<span class="badge badge-orange" style="font-size:10px">Pendiente</span>`;
               }
@@ -421,7 +472,14 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
   }
   const rpHint = document.getElementById('mant-realizado-hint');
   if (rpHint) rpHint.textContent = esExterno ? '(empresa)' : '';
-  document.getElementById('mant-supervisado-por').value = '';
+  // El alumnado no firma la supervisión: la pone el docente al dar el visto bueno.
+  const supEl = document.getElementById('mant-supervisado-por');
+  supEl.value = '';
+  const supGrupo = supEl.closest('.form-group');
+  const esAlumnoMant = getUserRole() === 'Alumno';
+  if (supGrupo) supGrupo.style.display = esAlumnoMant ? 'none' : '';
+  const avisoVb = document.getElementById('mant-aviso-vb');
+  if (avisoVb) avisoVb.style.display = esAlumnoMant ? '' : 'none';
   document.getElementById('mant-observaciones').value   = enCurso?.Observaciones || '';
 
   openModal('modal-registrar-mant');
@@ -463,6 +521,7 @@ function _nombreUsuarioActual() {
 function _refrescarTrasMant() {
   renderEquipos();
   if (document.getElementById('page-mantenimiento')?.classList.contains('active')) renderMantenimiento();
+  if (typeof _updateBadgeMantenimiento === 'function') _updateBadgeMantenimiento();
 }
 
 async function guardarProgresoMant() {
@@ -536,7 +595,9 @@ async function finalizarMant() {
         (r.Estado === 'no_aplica' || r.Estado === 'aplazado')));
     _upsertRegistroMant(_registroMantSbToObj(registro));
     closeModal('modal-registrar-mant');
-    showToast('Mantenimiento finalizado', 'success');
+    showToast(registro.estado === 'pendiente_vb'
+      ? 'Registrado. Queda a la espera del visto bueno del profesorado.'
+      : 'Mantenimiento finalizado', 'success');
     _refrescarTrasMant();
   } catch (e) {
     showToast('Error al finalizar el registro', 'error');
@@ -886,6 +947,7 @@ async function eliminarPlan(idPlan) {
 // ============================================================
 let _pendientesCache = []; // para que filtrarPendientes() pueda acceder sin re-calcular
 let _realizadosCache = []; // ídem para filtrarRealizados()
+let _vistoBuenoCache = []; // registros del alumnado a la espera de firma
 
 function _detectarLabEquipo(eq) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === eq.Ubicacion);
@@ -918,10 +980,14 @@ function renderMantenimiento() {
   const esGestorAdmin = puedeHacer('editarEquipos');   // Admin/Gestor
   const esProfesor    = getUserRole() === 'Profesor';
   const esAlumno      = getUserRole() === 'Alumno';
-  const canLog  = puedeHacer('crearIntervenciones');
+  // canLog: abrir la ejecución. El alumnado también, porque su lista ya viene filtrada
+  // a los planes Con_Alumnado. canMarcar (no aplica / aplazar) sigue siendo gestión.
+  const canLog  = puedeHacer('registrarMantenimiento');
+  const canMarcar = puedeMarcarPeriodoMant();
   const puedeExportar   = esGestorAdmin;
   const puedePlanes     = esGestorAdmin || esProfesor;   // Profesor: acotado a sus equipos
   const puedeRealizados = esGestorAdmin;                 // editar finalizados: solo Admin/Gestor
+  const puedeFirmar     = esGestorAdmin || esProfesor;   // visto bueno a lo del alumnado
 
   // El Profesor solo ve/gestiona lo de los equipos de los que es responsable.
   const equiposScope = esProfesor
@@ -947,7 +1013,10 @@ function renderMantenimiento() {
         if (est.tipo === 'no_aplica' || est.tipo === 'aplazado_futuro') return;
         todoStatus.push({
           equipo: eq, plan, periodo, curso,
-          hecho: est.tipo === 'finalizado',
+          // 'pendiente_vb' ya está hecho: sale de la lista de pendientes para que
+          // nadie lo repita, pero se cuenta aparte hasta que lo firme un docente.
+          hecho: est.tipo === 'finalizado' || est.tipo === 'pendiente_vb',
+          esperaVb: est.tipo === 'pendiente_vb',
           registro: est.registro || null,
           ejecucion: est.ejecucion || null,
           marcador: est.marcador || null,
@@ -967,6 +1036,20 @@ function renderMantenimiento() {
       plan:   DATA.planesMantenimiento.find(p => p.ID_Plan === r.ID_Plan) || null,
     }))
     .sort((a, b) => (a.reg.Periodo || '').localeCompare(b.reg.Periodo || ''));
+
+  // Registros del curso a la espera de firma, dentro del alcance visible.
+  _vistoBuenoCache = puedeFirmar
+    ? DATA.registroMantenimientos
+        .filter(r => r.Curso_Academico === curso && r.Estado === 'pendiente_vb')
+        .filter(r => esScopeCompleto || equiposScope.some(e => e.ID_Activo === r.ID_Equipo))
+        .map(r => ({
+          reg: r,
+          equipo: DATA.equipos.find(e => e.ID_Activo === r.ID_Equipo) || null,
+          plan:   DATA.planesMantenimiento.find(p => p.ID_Plan === r.ID_Plan) || null,
+        }))
+        .sort((a, b) => (a.reg.Fecha_Realizacion || '').localeCompare(b.reg.Fecha_Realizacion || ''))
+    : [];
+  const vistoBuenoList = _vistoBuenoCache;
 
   const total     = todoStatus.length;
   const hechos    = todoStatus.filter(s => s.hecho).length;
@@ -1001,6 +1084,8 @@ function renderMantenimiento() {
       <div class="stat-card"><div class="stat-value">${pct}%</div><div class="stat-label">Completado curso ${curso}</div></div>
       <div class="stat-card"><div class="stat-value">${hechos}</div><div class="stat-label">Realizados</div></div>
       <div class="stat-card"><div class="stat-value" style="color:${pendientes>0?'var(--danger)':'var(--success)'}">${pendientes}</div><div class="stat-label">Pendientes${enCurso>0?` <span style="color:var(--accent);font-weight:600">(${enCurso} en curso)</span>`:''}</div></div>
+      ${vistoBuenoList.length ? `
+      <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${vistoBuenoList.length}</div><div class="stat-label">Esperan tu visto bueno</div></div>` : ''}
       <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total esperados</div></div>
     </div>
 
@@ -1017,6 +1102,10 @@ function renderMantenimiento() {
         style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid var(--accent);margin-bottom:-2px;color:var(--accent)">
         Pendientes <span style="font-size:11px;background:var(--danger);color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${pendientes}</span>
       </button>
+      ${vistoBuenoList.length ? `<button id="tab-btn-vistobueno" onclick="switchMantTab('vistobueno')"
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted)">
+        Visto bueno <span style="font-size:11px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px">${vistoBuenoList.length}</span>
+      </button>` : ''}
       ${puedeRealizados ? `<button id="tab-btn-realizados" onclick="switchMantTab('realizados')"
         style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted)">
         Realizados <span style="font-size:11px;background:var(--border);color:var(--text-muted);border-radius:99px;padding:1px 7px;margin-left:4px">${realizadosList.length}</span>
@@ -1050,11 +1139,11 @@ function renderMantenimiento() {
           <thead><tr>
             <th>Equipo</th><th>Tipo</th><th>Periodicidad</th><th>Período</th><th>Operación</th><th></th>
           </tr></thead>
-          <tbody id="tbody-pendientes">${_renderFilasPendientes(pendientesList, canLog)}</tbody>
+          <tbody id="tbody-pendientes">${_renderFilasPendientes(pendientesList, canLog, canMarcar)}</tbody>
         </table>
         <div id="pend-empty" style="display:none;padding:20px;text-align:center;color:var(--text-muted)">✅ Sin mantenimientos pendientes con estos filtros.</div>
       </div>
-      ${canLog && marcadoresList.length ? `
+      ${canMarcar && marcadoresList.length ? `
       <details class="card" style="margin-top:16px">
         <summary style="cursor:pointer;font-weight:600;font-size:13px">
           No aplica / aplazados — Curso ${curso}
@@ -1066,6 +1155,30 @@ function renderMantenimiento() {
         </table>
       </details>` : ''}
     </div>
+
+    <!-- Tab: Visto bueno — lo que ha registrado el alumnado y falta firmar -->
+    ${vistoBuenoList.length ? `
+    <div id="tab-vistobueno" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Registrados por alumnado — pendientes de tu visto bueno</div>
+          <div class="card-actions">
+            <button class="btn btn-primary" style="font-size:12px;padding:5px 12px"
+                    onclick="darVistoBuenoTodos()">✓ Firmar los ${vistoBuenoList.length}</button>
+          </div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>Equipo</th><th>Operación</th><th>Período</th><th>Fecha</th><th>Realizado por</th><th>Pasos</th><th></th>
+          </tr></thead>
+          <tbody>${_renderFilasVistoBueno(vistoBuenoList)}</tbody>
+        </table>
+        <div style="padding:12px 20px;font-size:11px;color:var(--text-muted);line-height:1.6;border-top:1px solid var(--border)">
+          Al firmar, tu nombre entra automáticamente como <strong>Supervisado por</strong> y el
+          mantenimiento pasa a contar en el documento de calidad. Hasta entonces no se exporta.
+        </div>
+      </div>
+    </div>` : ''}
 
     <!-- Tab: Realizados (solo Admin/Gestor) -->
     ${puedeRealizados ? `
@@ -1173,7 +1286,7 @@ function _renderFilasRealizados(lista) {
   }).join('');
 }
 
-function _renderFilasPendientes(lista, canLog) {
+function _renderFilasPendientes(lista, canLog, canMarcar) {
   if (!lista.length) return '';
   return lista.map(s => {
     const tipoBadge = s.plan.Tipo_Intervencion === 'Externo' ? 'badge-blue' : 'badge-gray';
@@ -1205,11 +1318,95 @@ function _renderFilasPendientes(lista, canLog) {
       <td style="white-space:nowrap">
         ${comoTexto ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
         ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
-            onclick="openModalRegistrarMant(${args})">${eje ? `Continuar ${ejeN}/${ejeTot}` : 'Registrar'}</button>
-          <button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="No aplica / aplazar" onclick="openModalMarcarMant(${args})">⋯</button>` : ''}
+            onclick="openModalRegistrarMant(${args})">${eje ? `Continuar ${ejeN}/${ejeTot}` : 'Registrar'}</button>` : ''}
+        ${canMarcar ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="No aplica / aplazar" onclick="openModalMarcarMant(${args})">⋯</button>` : ''}
       </td>
     </tr>${instrRow}`;
   }).join('');
+}
+
+function _renderFilasVistoBueno(lista) {
+  if (!lista.length) return '';
+  return lista.map(({ reg, equipo, plan }) => {
+    const eqTxt = equipo
+      ? `<strong>${equipo.ID_Activo}</strong><br><span style="font-size:11px;color:var(--text-muted)">${equipo.Tipo_Equipo||''} ${equipo.Marca||''}</span>`
+      : `<strong>${reg.ID_Equipo}</strong>`;
+    const pasos = Array.isArray(reg.Pasos) ? reg.Pasos : [];
+    const hechos = pasos.filter(p => p.hecho).length;
+    const pasosTxt = pasos.length
+      ? `<span class="badge ${hechos === pasos.length ? 'badge-green' : 'badge-orange'}" style="font-size:10px">${hechos}/${pasos.length}</span>`
+      : '<span style="color:var(--text-muted)">—</span>';
+    const obs = reg.Observaciones
+      ? `<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px;white-space:pre-line">${reg.Observaciones}</div>`
+      : '';
+    return `<tr>
+      <td>${eqTxt}</td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(plan&&plan.Operacion)||''}">${(plan&&plan.Operacion)||'—'}</td>
+      <td>${labelPeriodo(reg.Periodo)}</td>
+      <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
+      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${obs}</td>
+      <td style="text-align:center">${pasosTxt}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-primary" style="padding:2px 10px;font-size:11px" onclick="darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" title="Devolver para rehacer" onclick="devolverMant('${reg.ID_Registro}')">↩ Devolver</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/** Firma un mantenimiento registrado por alumnado. El nombre del supervisor lo pone
+ *  el servidor con el del docente que valida — nunca se teclea. */
+async function darVistoBuenoMant(idRegistro) {
+  showLoading('Firmando...');
+  try {
+    const { supervisado_por } = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'visto_bueno', id_registro: idRegistro, aceptar: true,
+    });
+    await loadAllData();
+    showToast(`Visto bueno dado — supervisa: ${supervisado_por}`, 'success');
+    _refrescarTrasMant();
+  } catch (e) {
+    showToast(e.message || 'No se pudo firmar', 'error');
+    console.error(e);
+  }
+  hideLoading();
+}
+
+/** Devuelve el mantenimiento al alumnado: vuelve a quedar en curso, con el motivo. */
+async function devolverMant(idRegistro) {
+  const motivo = prompt('¿Qué hay que corregir? (lo verá quien lo registró)', '');
+  if (motivo === null) return;
+  showLoading('Devolviendo...');
+  try {
+    await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'visto_bueno', id_registro: idRegistro, aceptar: false, motivo,
+    });
+    await loadAllData();
+    showToast('Devuelto: vuelve a quedar pendiente', 'success');
+    _refrescarTrasMant();
+  } catch (e) {
+    showToast(e.message || 'No se pudo devolver', 'error');
+    console.error(e);
+  }
+  hideLoading();
+}
+
+/** Firma de una tacada todo lo que espera visto bueno en pantalla. */
+async function darVistoBuenoTodos() {
+  const ids = _vistoBuenoCache.map(v => v.reg.ID_Registro);
+  if (!ids.length) return;
+  if (!confirm(`Vas a firmar ${ids.length} mantenimiento(s) como supervisora. Entrarán en el documento de calidad con tu nombre. ¿Seguir?`)) return;
+  showLoading(`Firmando ${ids.length}...`);
+  let fallos = 0;
+  for (const id of ids) {
+    try {
+      await callEdgeFunction('gestionar-mantenimiento', { accion: 'visto_bueno', id_registro: id, aceptar: true });
+    } catch (e) { fallos++; console.error(id, e); }
+  }
+  await loadAllData();
+  hideLoading();
+  showToast(fallos ? `${fallos} no se pudieron firmar` : `${ids.length} mantenimiento(s) firmados`, fallos ? 'error' : 'success');
+  _refrescarTrasMant();
 }
 
 function _renderFilasMarcadores(lista) {
@@ -1239,7 +1436,8 @@ function _renderFilasMarcadores(lista) {
 function filtrarPendientes() {
   const lab    = document.getElementById('filter-pend-lab')?.value || '';
   const periodo= document.getElementById('filter-pend-periodo')?.value || '';
-  const canLog = puedeHacer('crearIntervenciones');
+  const canLog = puedeHacer('registrarMantenimiento');
+  const canMarcar = puedeMarcarPeriodoMant();
 
   let lista = _pendientesCache;
   if (lab)     lista = lista.filter(s => s.lab === lab);
@@ -1247,7 +1445,7 @@ function filtrarPendientes() {
 
   const tbody = document.getElementById('tbody-pendientes');
   const empty = document.getElementById('pend-empty');
-  if (tbody) tbody.innerHTML = _renderFilasPendientes(lista, canLog);
+  if (tbody) tbody.innerHTML = _renderFilasPendientes(lista, canLog, canMarcar);
   if (empty) empty.style.display = lista.length ? 'none' : '';
 }
 
@@ -1269,7 +1467,7 @@ function filtrarRealizados() {
 }
 
 function switchMantTab(tab) {
-  const tabs = ['pendientes', 'realizados', 'planes'];
+  const tabs = ['pendientes', 'vistobueno', 'realizados', 'planes'];
   tabs.forEach(t => {
     const panel = document.getElementById(`tab-${t}`);
     const btn   = document.getElementById(`tab-btn-${t}`);

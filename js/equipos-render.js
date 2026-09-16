@@ -22,7 +22,12 @@ function renderDashboard() {
   let pendientesMant = 0;
   misEquipos.forEach(eq => {
     DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
-      getPeriodosEsperados(plan, eq, curso).forEach(p => { if (!getRegistroMant(plan.ID_Plan, curso, p)) pendientesMant++; });
+      // estadoPeriodoMant y no getRegistroMant: lo que ha registrado el alumnado y espera
+      // el visto bueno ya está hecho, no debe volver a contarse como pendiente.
+      getPeriodosEsperados(plan, eq, curso).forEach(p => {
+        const est = estadoPeriodoMant(plan.ID_Plan, curso, p);
+        if (est.tipo === 'pendiente' || est.tipo === 'en_curso' || est.tipo === 'aplazado_vencido') pendientesMant++;
+      });
     });
   });
   setText('stat-preventivos', pendientesMant);
@@ -124,7 +129,10 @@ function renderDashboard() {
   misEquipos.forEach(eq => {
     DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
       getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
-        if (!getRegistroMant(plan.ID_Plan, curso, periodo)) pendientesList.push({ eq, plan, periodo });
+        const est = estadoPeriodoMant(plan.ID_Plan, curso, periodo);
+        if (est.tipo === 'pendiente' || est.tipo === 'en_curso' || est.tipo === 'aplazado_vencido') {
+          pendientesList.push({ eq, plan, periodo });
+        }
       });
     });
   });
@@ -222,7 +230,10 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
       planes.forEach(plan => {
         const periodos = getPeriodosEsperados(plan, e, curso);
         total += periodos.length;
-        periodos.forEach(p => { if (!getRegistroMant(plan.ID_Plan, curso, p)) pendientes++; });
+        periodos.forEach(p => {
+          const est = estadoPeriodoMant(plan.ID_Plan, curso, p);
+          if (est.tipo === 'pendiente' || est.tipo === 'en_curso' || est.tipo === 'aplazado_vencido') pendientes++;
+        });
       });
       if (total === 0) return '<span class="text-muted">Sin periodos aún</span>';
       if (pendientes === 0) return `<span class="badge badge-green">✓ Al día</span>`;

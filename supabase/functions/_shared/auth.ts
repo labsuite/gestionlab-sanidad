@@ -76,6 +76,24 @@ export async function requireStaff(req: Request) {
   return requireRoles(req, ROLES_STAFF, "Admin/Gestor/Profesor");
 }
 
+export const ES_STAFF = (rol: string) => ROLES_STAFF.includes(rol);
+
+/**
+ * Nombre y rol de quien llama, para acciones abiertas a cualquier rol
+ * (requireValidSession) que luego necesitan saber si es alumnado o profesorado.
+ * Busca primero en `users` (cuentas con login real) y cae al catálogo `usuarios`.
+ * Quien no aparezca en ninguna se trata como Alumno: el permiso más bajo.
+ */
+export async function identificarUsuario(supabaseAdmin: any, email: string) {
+  const { data: u } = await supabaseAdmin
+    .from("users").select("nombre, rol, activo").eq("email", email).maybeSingle();
+  if (u && u.activo) return { nombre: u.nombre || email, rol: u.rol || "Alumno" };
+  const { data: c } = await supabaseAdmin
+    .from("usuarios").select("nombre, rol, activo").ilike("email", email).maybeSingle();
+  if (c && c.activo) return { nombre: c.nombre || email, rol: c.rol || "Alumno" };
+  return { nombre: email, rol: "Alumno" };
+}
+
 // Las Edge Functions de Supabase no añaden cabeceras CORS por defecto: sin
 // esto, el navegador bloquea la respuesta al preflight (OPTIONS) con
 // "Failed to fetch" aunque la función funcione perfectamente por curl/Python

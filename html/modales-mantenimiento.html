@@ -41,6 +41,14 @@
           <label>Observaciones</label>
           <textarea id="mant-observaciones" rows="3" placeholder="Incidencias, estado observado, notas..."></textarea>
         </div>
+        <!-- Solo para alumnado: lo que registran espera la firma de un docente -->
+        <div class="form-group full" id="mant-aviso-vb" style="display:none">
+          <div style="background:var(--warning-light);border:1px solid #e8c98a;border-radius:var(--radius-sm);padding:10px 14px;font-size:12px;line-height:1.6">
+            ⏳ Al finalizar, el mantenimiento queda <strong>a la espera del visto bueno</strong> de un
+            docente. Lo verás como hecho y nadie lo repetirá, pero no entra en el documento de
+            calidad hasta que lo firme el profesorado.
+          </div>
+        </div>
       </div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-registrar-mant')">Cancelar</button>

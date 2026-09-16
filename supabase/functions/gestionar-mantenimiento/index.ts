@@ -4,7 +4,7 @@
 // "crear_plan"/"actualizar_plan"/"eliminar_plan": Admin/Gestor cualquier equipo,
 // Profesor solo los equipos de los que es responsable (campo `responsable`).
 // "editar_registro" (corregir un mantenimiento ya finalizado): solo Admin/Gestor.
-import { requireStaff, requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // Parsea el checklist [{texto, hecho}] recibido en el cuerpo.
 function parsePasos(v: unknown): { texto: string; hecho: boolean }[] | null {
@@ -42,13 +42,33 @@ Deno.serve(async (req) => {
   const accion = String(body.accion || "");
 
   // Ejecución de un mantenimiento: "guardar_progreso" deja/actualiza una fila 'en_curso'
-  // con el checklist a medias (compartida entre todo el personal, para retomarla en otra
-  // sesión); "finalizar" (alias antiguo: "registrar") la cierra fijando la fecha. Todo lo
-  // puede hacer también el Profesor responsable (requireStaff, igual que antes).
+  // con el checklist a medias (compartida, para retomarla en otra sesión); "finalizar"
+  // (alias antiguo: "registrar") la cierra fijando la fecha.
+  //
+  // Abierto también al ALUMNADO, pero solo en planes marcados `con_alumnado`, y lo que
+  // finalizan NO entra como 'finalizado': queda en 'pendiente_vb' hasta que un docente le
+  // da el visto bueno (acción "visto_bueno"). Importa porque `registro_mantenimientos`
+  // alimenta el Excel del modelo de calidad, donde la firma del supervisor es lo que da
+  // validez al documento — ahí no puede entrar nada sin revisar.
   if (accion === "registrar" || accion === "finalizar" ||
       accion === "guardar_progreso" || accion === "descartar_ejecucion") {
-    const { error: authError, supabaseAdmin } = await requireStaff(req);
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
+    const { nombre: nombreUsuario, rol } = await identificarUsuario(supabaseAdmin, email);
+    const esStaff = ES_STAFF(rol);
+
+    if (!esStaff) {
+      // Descartar la ejecución a medias de otra persona es decisión de gestión.
+      if (accion === "descartar_ejecucion") {
+        return jsonError("Solo el profesorado puede descartar una ejecución empezada", 403);
+      }
+      const idPlanAlum = String(body.id_plan || "").trim();
+      const { data: planAlum } = await supabaseAdmin
+        .from("planes_mantenimiento").select("con_alumnado, activo").eq("id_plan", idPlanAlum).maybeSingle();
+      if (!planAlum || planAlum.activo === false || !planAlum.con_alumnado) {
+        return jsonError("Este mantenimiento no está habilitado para realizarse con alumnado", 403);
+      }
+    }
 
     if (accion === "descartar_ejecucion") {
       const idRegistro = String(body.id_registro || "").trim();
@@ -105,7 +125,7 @@ Deno.serve(async (req) => {
         curso_academico: curso, periodo,
         estado: "en_curso", pasos,
         fecha_inicio: ahora.slice(0, 10),
-        iniciado_por: body.iniciado_por ? String(body.iniciado_por) : null,
+        iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : nombreUsuario,
         actualizado_en: ahora,
       };
       const { data, error } = await supabaseAdmin.from("registro_mantenimientos").insert(datos).select().single();
@@ -119,12 +139,15 @@ Deno.serve(async (req) => {
     if (!fecha || !realizadoPor) {
       return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
+    // Un alumno firma siempre con su propio nombre (no el que venga del cliente) y deja
+    // el registro esperando visto bueno, sin supervisor: lo pone quien lo valide.
     const comun: Record<string, unknown> = {
       id_equipo: idEquipo, curso_academico: curso, periodo,
-      fecha_realizacion: fecha, realizado_por: realizadoPor,
-      supervisado_por: body.supervisado_por ? String(body.supervisado_por) : null,
+      fecha_realizacion: fecha,
+      realizado_por: esStaff ? realizadoPor : nombreUsuario,
+      supervisado_por: esStaff && body.supervisado_por ? String(body.supervisado_por) : null,
       observaciones: body.observaciones ? String(body.observaciones) : null,
-      estado: "finalizado",
+      estado: esStaff ? "finalizado" : "pendiente_vb",
       actualizado_en: new Date().toISOString(),
     };
     if (pasos) comun.pasos = pasos;
@@ -149,6 +172,46 @@ Deno.serve(async (req) => {
       .insert({ id_registro: generarIdRegistro(), id_plan: idPlan, ...comun }).select().single();
     if (error) return jsonError(`No se pudo registrar: ${error.message}`, 400);
     return jsonOk({ registro: data });
+  }
+
+  // ── Visto bueno a un mantenimiento registrado por alumnado ────────────
+  // `supervisado_por` lo escribe el SERVIDOR con el nombre de quien valida; nunca
+  // llega del cliente. Es la firma del supervisor en el documento de calidad, así que
+  // no puede ser un campo que alguien teclee a mano.
+  if (accion === "visto_bueno") {
+    const { error: authError, user, supabaseAdmin } = await requireStaff(req);
+    if (authError) return authError;
+    const idRegistro = String(body.id_registro || "").trim();
+    if (!idRegistro) return jsonError("id_registro es obligatorio", 400);
+
+    const { data: reg } = await supabaseAdmin.from("registro_mantenimientos")
+      .select("*").eq("id_registro", idRegistro).maybeSingle();
+    if (!reg) return jsonError("Registro no encontrado", 404);
+    if (reg.estado !== "pendiente_vb") {
+      return jsonError("Este registro no está esperando visto bueno", 400);
+    }
+
+    const ahora = new Date().toISOString();
+    const revisor = user.nombre || user.email;
+
+    if (body.aceptar === false) {
+      // Devolver: vuelve a 'en_curso' con el checklist intacto, para rehacerlo.
+      const motivo = String(body.motivo || "").trim();
+      const obs = [reg.observaciones, `↩ Devuelto por ${revisor}${motivo ? ": " + motivo : ""}`]
+        .filter(Boolean).join("\n");
+      const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+        .update({ estado: "en_curso", fecha_realizacion: null, supervisado_por: null,
+                  observaciones: obs, actualizado_en: ahora })
+        .eq("id_registro", idRegistro).select().single();
+      if (error) return jsonError(`No se pudo devolver: ${error.message}`, 400);
+      return jsonOk({ registro: data, devuelto: true, revisado_por: revisor });
+    }
+
+    const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+      .update({ estado: "finalizado", supervisado_por: revisor, actualizado_en: ahora })
+      .eq("id_registro", idRegistro).select().single();
+    if (error) return jsonError(`No se pudo dar el visto bueno: ${error.message}`, 400);
+    return jsonOk({ registro: data, supervisado_por: revisor });
   }
 
   // ── Marcar un periodo programado como 'no_aplica' o 'aplazado' ────────

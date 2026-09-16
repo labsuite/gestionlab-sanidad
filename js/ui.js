@@ -123,12 +123,19 @@ function _updateBadgeMantenimiento() {
       })
       .forEach(plan => {
         getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
-          if (!getRegistroMant(plan.ID_Plan, curso, periodo)) pendientes++;
+          // estadoPeriodoMant, no getRegistroMant: lo registrado por alumnado a la
+          // espera de firma ya está hecho y no debe volver a pedirse.
+          const est = estadoPeriodoMant(plan.ID_Plan, curso, periodo);
+          if (est.tipo === 'pendiente' || est.tipo === 'en_curso' || est.tipo === 'aplazado_vencido') pendientes++;
         });
       });
   });
-  badgeMant.textContent = pendientes;
-  badgeMant.style.display = pendientes > 0 ? '' : 'none';
+  // Al profesorado le cuentan además los mantenimientos que esperan su visto bueno.
+  const porFirmar = esAlumno ? 0 : DATA.registroMantenimientos
+    .filter(r => r.Curso_Academico === curso && r.Estado === 'pendiente_vb').length;
+  const n = pendientes + porFirmar;
+  badgeMant.textContent = n;
+  badgeMant.style.display = n > 0 ? '' : 'none';
 }
 
 // ============================================================
@@ -138,6 +145,10 @@ const PERMISOS = {
   Alumno: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
+    // Ejecutar mantenimientos preventivos marcados Con_Alumnado. NO incluye marcar
+    // "no aplica"/aplazar (eso es crearIntervenciones), y lo que finalizan queda en
+    // 'pendiente_vb' hasta que un docente lo firma — ver gestionar-mantenimiento.
+    registrarMantenimiento: true,
     crearIncidencias: false,
     gestionarIncidencias: false, configuracion: false, usuarios: false, dashboard: true,
     verProveedores: false, verUbicaciones: true, crearProveedores: false,
@@ -153,6 +164,7 @@ const PERMISOS = {
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
+    registrarMantenimiento: true,
     crearIncidencias: true,
     verIntervenciones: true,
     // Incidencias: solo ve y crea las suyas (filtrado en renderIncidencias)
@@ -170,6 +182,7 @@ const PERMISOS = {
   Gestor: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
+    registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
     verMaterial: true, editarMaterial: true, registrarConsumo: true,
@@ -180,6 +193,7 @@ const PERMISOS = {
   Administrador: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
+    registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
     verProveedores: true, verUbicaciones: true, crearProveedores: true,
     verMaterial: true, editarMaterial: true, registrarConsumo: true,
