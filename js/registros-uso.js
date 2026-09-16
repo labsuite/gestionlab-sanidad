@@ -322,6 +322,8 @@ function _renderHistorialReg(tipo) {
 
 function _idCampoSesion(c) { return `reg-campo-${c.api}`; }
 
+function _attrCampoSesion(valor) { return String(valor || '').replace(/"/g, '&quot;'); }
+
 function _renderUnCampoSesion(c, valores) {
   const label = c.labelForm || c.label;
   const etiqueta = `<label>${label}${c.requerido ? ' *' : ''}</label>`;
@@ -334,7 +336,7 @@ function _renderUnCampoSesion(c, valores) {
     const esPreset = c.opciones.includes(valor);
     const selValue = (c.permiteOtro && valor && !esPreset) ? 'Otro' : valor;
     const otro = c.permiteOtro
-      ? `<input type="text" id="${id}-otro" placeholder="Especifica el valor" value="${esPreset ? '' : valor}" style="margin-top:6px;${selValue === 'Otro' ? '' : 'display:none'}">`
+      ? `<input type="text" id="${id}-otro" placeholder="Especifica el valor" value="${esPreset ? '' : _attrCampoSesion(valor)}" style="margin-top:6px;${selValue === 'Otro' ? '' : 'display:none'}">`
       : '';
     return `<div class="${clase}">
       ${etiqueta}
@@ -347,7 +349,7 @@ function _renderUnCampoSesion(c, valores) {
 
   return `<div class="${clase}">
     ${etiqueta}
-    <input type="text" id="${id}" value="${valor.replace(/"/g, '&quot;')}" placeholder="${c.placeholder || ''}">
+    <input type="text" id="${id}" value="${_attrCampoSesion(valor)}" placeholder="${c.placeholder || ''}">
   </div>`;
 }
 
