@@ -9,7 +9,7 @@
 // catálogo/pedidos, Admin/Gestor. "actuacion" va con crearIntervenciones,
 // que también tiene Profesor (ver PERMISOS en js/ui.js) — restringirlo a
 // Admin/Gestor le impediría adjuntar el PDF de sus propias actuaciones.
-import { requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdminOrGestor, requireStaff, requireValidSession, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const TIPOS_MIME_PERMITIDOS = [
   "application/pdf", "image/jpeg", "image/png",
@@ -21,8 +21,13 @@ const CARPETAS: Record<string, string> = {
   factura: "facturas",      // sin uso actual desde el cliente, se deja por compatibilidad
   actuacion: "actuaciones", // adjunto/factura de una intervención (id = ID_Intervencion)
   documento: "documentos-generados", // Word de pedido generado desde la app (id = ID_Pedido)
+  etiqueta: "etiquetas-material",    // foto de la etiqueta de un bote al proponer material (fase B)
 };
 const TIPOS_STAFF = ["actuacion"];
+// "etiqueta": la sube el alumnado al proponer un material, así que va abierto a
+// cualquier sesión válida. Solo imagen — es una foto hecha con el móvil.
+const TIPOS_CUALQUIER_SESION = ["etiqueta"];
+const MIME_SOLO_IMAGEN = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -48,16 +53,19 @@ Deno.serve(async (req) => {
     return jsonError(`tipo debe ser uno de: ${Object.keys(CARPETAS).join(", ")}`, 400);
   }
 
-  const { error: authError, supabaseAdmin } = TIPOS_STAFF.includes(tipo)
-    ? await requireStaff(req)
-    : await requireAdminOrGestor(req);
+  const { error: authError, supabaseAdmin } = TIPOS_CUALQUIER_SESION.includes(tipo)
+    ? await requireValidSession(req)
+    : TIPOS_STAFF.includes(tipo)
+      ? await requireStaff(req)
+      : await requireAdminOrGestor(req);
   if (authError) return authError;
 
   if (!id || !nombre_archivo || !tipo_mime || !contenido_base64) {
     return jsonError("Faltan campos: id, nombre_archivo, tipo_mime, contenido_base64", 400);
   }
-  if (!TIPOS_MIME_PERMITIDOS.includes(tipo_mime)) {
-    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (solo PDF, JPEG, PNG o Word .docx)`, 400);
+  const mimesPermitidos = TIPOS_CUALQUIER_SESION.includes(tipo) ? MIME_SOLO_IMAGEN : TIPOS_MIME_PERMITIDOS;
+  if (!mimesPermitidos.includes(tipo_mime)) {
+    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (${TIPOS_CUALQUIER_SESION.includes(tipo) ? "solo imagen" : "solo PDF, JPEG, PNG o Word .docx"})`, 400);
   }
 
   let bytes: Uint8Array;

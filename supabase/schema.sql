@@ -721,3 +721,38 @@ create index if not exists idx_atributos_material_categoria on atributos_materia
 
 alter table atributos_material enable row level security;
 create policy "atributos_material_select_anon" on atributos_material for select to anon, authenticated using (true);
+
+-- Cuarentena del material propuesto por el alumnado. No hay columna "nombre":
+-- ese es justo el campo que no se le pide a nadie (se compone de nombre_base +
+-- atributos). `texto_etiqueta` es lo que pone literalmente en el bote — ahí
+-- acaba "FUCH-BZD-500" o "Trizol", que es útil pero no es el nombre.
+-- Ver scripts/migrar_propuestas_material.py
+create table if not exists propuestas_material (
+  id_propuesta          text primary key,
+  categoria             text not null,
+  tipo_base             text,
+  nombre_base           text,
+  atributos             jsonb not null default '{}'::jsonb,
+  texto_etiqueta        text,
+  nombre_generado       text,
+  unidad                text,
+  cantidad              numeric,
+  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null,
+  foto_path             text,
+  id_material_sugerido  text references material(id_material) on delete set null,
+  ia_extraido           jsonb,
+  ia_avisos             text,
+  propuesto_por         text,
+  email_propuesto_por   text,
+  observaciones         text,
+  fecha                 timestamptz not null default now(),
+  estado                text not null default 'pendiente',  -- pendiente|aceptada|fusionada|rechazada
+  revisado_por          text,
+  fecha_revision        timestamptz,
+  notas_revision        text,
+  id_material_creado    text references material(id_material) on delete set null
+);
+
+create index if not exists idx_propuestas_material_estado on propuestas_material (estado);
+alter table propuestas_material enable row level security;
+create policy "propuestas_material_select_anon" on propuestas_material for select to anon, authenticated using (true);
