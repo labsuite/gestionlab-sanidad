@@ -68,12 +68,21 @@ function _ubicLabsUsuario() {
   return mios.length ? mios : todos;
 }
 
-/** Etiqueta legible de una ubicación concreta: "Derecha · 3º cajón encimera" */
+// El ID de ubicación SIEMPRE se muestra. Zona+subzona no identifican el sitio:
+// el lab 201 tiene siete "Izquierda / Encimera" distintas (201-1.1, 201-1.3…) y
+// sin el código serían siete opciones idénticas en el desplegable.
+/** Etiqueta legible de una ubicación concreta: "Derecha · 3º cajón encimera · 203-3.7.3" */
 function _ubicEtiqueta(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '—';
   const partes = [u.Zona, u.Subzona].filter(Boolean);
-  return partes.length ? partes.join(' · ') : (u.Descripcion_Completa || u.ID_Ubicacion);
+  if (!partes.length) partes.push(u.Descripcion_Completa || '');
+  return [...partes.filter(Boolean), u.ID_Ubicacion].join(' · ');
+}
+
+/** Etiqueta corta para el desplegable, ya agrupado por zona: "Encimera · 201-1.1" */
+function _ubicEtiquetaCorta(u) {
+  return [u.Subzona || u.Descripcion_Completa || '', u.ID_Ubicacion].filter(Boolean).join(' · ');
 }
 
 function _ubicNombreEquipo(eq) {
@@ -149,7 +158,7 @@ function _ubicRenderHerramienta(labs, esStaff) {
     <optgroup label="${_escAttr(z)}">
       ${ubicacionesLab.filter(u => (u.Zona || 'Sin zona') === z).map(u => `
         <option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === _ubicUbicacionActual ? 'selected' : ''}>
-          ${_esc(u.Subzona || u.Descripcion_Completa || u.ID_Ubicacion)}
+          ${_esc(_ubicEtiquetaCorta(u))}
         </option>`).join('')}
     </optgroup>`).join('');
 
