@@ -422,11 +422,20 @@ function _mesAnyoStock(fechaIso) {
   return d.toLocaleDateString('es-ES', { month: 'short', year: 'numeric' });
 }
 
-/** Resumen de una línea para la fila desplegada del material. */
+/** Resumen de una línea para la fila desplegada del material.
+ *  Agrupa por mes: dos recepciones del mismo mes se leen como una sola tanda
+ *  ("10 de jul 2026"), que es la granularidad útil de un vistazo. El desglose
+ *  entrada a entrada está en el modal de historial. */
 function _resumenAntiguedad(mat) {
   const { tandas, sinAtribuir, hayEntradas } = getAntiguedadStock(mat);
   const unidad = mat.Unidad || '';
-  const partes = tandas.map(t => `<strong>${t.cantidad}</strong> de ${_mesAnyoStock(t.fecha)}`);
+  const porMes = [];
+  tandas.forEach(t => {
+    const mes = _mesAnyoStock(t.fecha);
+    const ya = porMes.find(x => x.mes === mes);
+    if (ya) ya.cantidad += t.cantidad; else porMes.push({ mes, cantidad: t.cantidad });
+  });
+  const partes = porMes.map(t => `<strong>${t.cantidad}</strong> de ${t.mes}`);
   if (sinAtribuir > 0) {
     partes.push(hayEntradas
       ? `<strong>${sinAtribuir}</strong> sin datos de entrada`
