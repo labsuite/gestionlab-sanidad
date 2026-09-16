@@ -8,3 +8,6 @@ scripts/__pycache__/
 *.pyc
 exports/
 .playwright-mcp/
+
+# Capturas de verificación (Playwright las deja en la raíz)
+/*.png
