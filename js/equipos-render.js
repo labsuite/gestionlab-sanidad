@@ -534,7 +534,17 @@ function filtrarIntervencionesTipo(val) { renderIntervenciones(val); }
 // ============================================================
 // INCIDENCIAS — RENDER
 // ============================================================
-function renderIncidencias(filtroEstado = '') {
+// Filtro elegido en la cabecera. Se recuerda entre renders porque casi todo
+// (cerrar una incidencia, guardar una actuación...) acaba llamando a
+// renderIncidencias() sin argumento: sin esto, la lista saltaba a "Pendientes"
+// en cuanto se tocaba algo y parecía que la incidencia se había perdido.
+let _filtroIncidencias = '';
+
+// filtroEstado: '' = solo las pendientes (por defecto) · 'todas' = también las
+// cerradas · un estado concreto = solo ese.
+function renderIncidencias(filtroEstado) {
+  if (filtroEstado !== undefined) _filtroIncidencias = filtroEstado;
+  filtroEstado = _filtroIncidencias;
   const container = document.getElementById('lista-incidencias');
   const rol = getUserRole();
   let items = DATA.incidencias;
@@ -546,11 +556,16 @@ function renderIncidencias(filtroEstado = '') {
       return equipo ? esResponsableDeEquipo(equipo) : false;
     });
   }
-  if (filtroEstado) items = items.filter(i => i.Estado === filtroEstado);
+  if (filtroEstado === 'todas') { /* sin filtro: incluye Resuelta y Descartada */ }
+  else if (filtroEstado) items = items.filter(i => i.Estado === filtroEstado);
   else items = items.filter(i => !['Resuelta','Descartada'].includes(i.Estado));
   items = [...items].sort((a,b) => new Date(b.Fecha_Hora) - new Date(a.Fecha_Hora));
   if (!items.length) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">Sin incidencias pendientes</div></div>`;
+    const vacio = filtroEstado === 'todas' ? 'Aún no hay incidencias'
+      : filtroEstado ? `Ninguna incidencia en estado «${filtroEstado}»`
+      : 'Sin incidencias pendientes';
+    const pista = filtroEstado ? '' : '<div class="empty-state-text">Las resueltas y descartadas se archivan: búscalas en el desplegable de arriba.</div>';
+    container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">✅</div><div class="empty-state-title">${vacio}</div>${pista}</div>`;
     return;
   }
   const estadoBadge  = {'Abierta':'badge-red','En gestión':'badge-orange','Resuelta':'badge-green','Descartada':'badge-gray'};

@@ -57,10 +57,15 @@ Ahora:
   Y deja la incidencia en `En gestión`, sin cerrarla.
 - `guardarFactura` cierra la **intervención** (`Cerrada`) y adjunta la factura, pero ya no
   toca la incidencia ni sube el equipo a `Operativo`.
+- El pie de cierre **solo aparece cuando todas las actuaciones del hilo están `Cerrada`**
+  (`getChainIntervencion`). Si queda alguna `Planificada`, `En gestión` o `Pendiente factura`,
+  en su lugar se lista cuáles faltan ("Para poder cerrar la incidencia queda una actuación sin
+  cerrar: INT-XXX · En gestión"). Cerrar la incidencia con trabajo vivo por delante no tiene
+  sentido, y así se ve de un vistazo qué falta.
 - El cierre vive en el pie del hilo (`_renderCierreHilo` → `cerrarIncidenciaDesdeHilo`):
-  un `select` con el estado operativo con el que queda el equipo (preseleccionado `Operativo`
-  si todas las tareas de la actuación activa están resueltas/descartadas, y si no el estado
-  actual) + botones **✅ Marcar resuelta** y **🚫 Descartar**, con confirmación. Llama a la
+  un `select` con el estado operativo con el que queda el equipo (preseleccionado `Operativo`,
+  salvo que alguna tarea del hilo dejara `Operativo='No'`, en cuyo caso se propone el estado
+  actual del equipo) + botones **✅ Marcar resuelta** y **🚫 Descartar**, con confirmación. Llama a la
   acción `cerrar` de `gestionar-incidencia` (`requireStaff`), que actualiza incidencia y
   equipo en la misma llamada.
 - Una incidencia ya cerrada muestra en el hilo **↩︎ Reabrir incidencia**
@@ -72,6 +77,20 @@ Ahora:
   abren el nuevo modal **antes** de cerrarse a sí mismos, porque `_marcarOrigenHilo()` decide
   si hay hilo al que volver mirando si `modal-hilo-incidencia` sigue abierto. El botón
   Cerrar/✕ del propio hilo usa `cerrarHiloIncidencia()`, que borra ese retorno.
+
+## Lista de incidencias: qué pasa con las cerradas
+
+Una incidencia `Resuelta`/`Descartada` **se archiva sola**: `renderIncidencias` la saca de la
+lista por defecto y `updateBadges` (`js/ui.js`) no la cuenta. No se borra nada — sigue en la
+tabla, en el historial del equipo y en la columna J del Excel del plan de calidad.
+
+El desplegable de la cabecera (`index.html`, `filtrarIncidenciasEstado`) tiene desde
+2026-09-17: **Pendientes** (`''`, el valor por defecto: oculta Resuelta y Descartada),
+**Todas (incluye cerradas)** (`'todas'`) y cada estado suelto. Antes la primera opción se
+llamaba "Todos los estados" y era justo la que escondía las cerradas, lo que hacía pensar que
+se habían perdido. El filtro elegido se recuerda en `_filtroIncidencias`, porque casi
+cualquier acción acaba llamando a `renderIncidencias()` sin argumento y la lista saltaba a
+"Pendientes" en cuanto se tocaba algo.
 
 ## Flujo end-to-end
 

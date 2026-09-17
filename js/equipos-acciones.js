@@ -512,12 +512,25 @@ function _renderCierreHilo(inc) {
     return;
   }
 
-  // Estado propuesto para el equipo: "Operativo" si la actuación activa acabó con
-  // todas sus tareas resueltas; si no, el que ya tiene.
-  const intActiva = DATA.intervenciones.find(x => x.ID_Intervencion === inc.Intervencion_Generada);
-  const tareas    = intActiva ? getTareasIntervencion(intActiva.ID_Intervencion) : [];
-  const todoHecho = tareas.length && tareas.every(t => ['Resuelto', 'Descartado'].includes(t.Resultado));
-  const propuesto = todoHecho ? 'Operativo' : (estadoEq !== '—' ? estadoEq : 'Operativo');
+  // Cerrar la incidencia solo tiene sentido cuando ya no queda trabajo vivo: si
+  // alguna actuación del hilo sigue planificada, en gestión o esperando factura,
+  // en vez de los botones se explica qué falta.
+  const chain     = inc.Intervencion_Generada ? getChainIntervencion(inc.Intervencion_Generada) : [];
+  const sinCerrar = chain.filter(c => c.Estado !== 'Cerrada');
+  if (sinCerrar.length) {
+    const detalle = sinCerrar.map(c => `${c.ID_Intervencion} · ${c.Estado || 'sin estado'}`).join(', ');
+    cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px;font-size:12px;color:var(--text-soft)">
+      Para poder cerrar la incidencia ${sinCerrar.length === 1 ? 'queda' : 'quedan'}
+      ${sinCerrar.length === 1 ? 'una actuación' : sinCerrar.length + ' actuaciones'} sin cerrar: <strong>${detalle}</strong>.
+    </div>`;
+    return;
+  }
+
+  // Todas las actuaciones cerradas: se propone "Operativo", salvo que alguna
+  // tarea del hilo dejara constancia de que el equipo NO quedó operativo.
+  const tareas    = chain.flatMap(c => getTareasIntervencion(c.ID_Intervencion));
+  const algunaNo  = tareas.some(t => t.Operativo === 'No');
+  const propuesto = (!algunaNo || estadoEq === '—') ? 'Operativo' : estadoEq;
   const ESTADOS   = ['Operativo', 'Operativo con fallos', 'En revisión', 'Revisión planificada', 'No operativo', 'Averiado', 'Fuera de servicio'];
 
   cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
