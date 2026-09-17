@@ -102,6 +102,16 @@ function _invMatNombreGenerado() {
   return componerNombreMaterial(base, ficha?.Atributos || [], _invMat?.atributos || {});
 }
 
+/** Qué impide enviar la propuesta, en una frase. Vacío = se puede enviar. */
+function _invMatQueFalta() {
+  const falta = [];
+  if (!_invMat?.fotoPath) falta.push('la foto de la etiqueta');
+  if (!_invMat?.categoria) falta.push('la categoría');
+  if (!_invMat?.tipoBase) falta.push('el tipo de producto');
+  if (!falta.length) return '';
+  return falta.length === 1 ? falta[0] : falta.slice(0, -1).join(', ') + ' y ' + falta[falta.length - 1];
+}
+
 function _invMatPendientes() {
   return DATA.propuestasMaterial.filter(p => p.Estado === 'pendiente');
 }
@@ -193,8 +203,13 @@ function _invMatRenderFormulario() {
           </div>` : ''}
 
         <!-- 3 · DATOS ────────────────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">3 · Datos del producto</label>
+        ${!_invMat.tipoBase ? `
+          <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:14px">
+            Elige arriba la categoría y el tipo de producto: según lo que sea, aquí aparecerán
+            los datos que hay que anotar (volumen, diámetro, talla…).
+          </div>` : ''}
         ${_invMat.tipoBase ? `
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">3 · Datos del producto</label>
           ${necesitaBase ? `
             <div class="form-group" style="margin-bottom:10px">
               <label style="font-size:11px;color:var(--text-muted)">¿Cómo se llama? (nombre común, no el comercial)</label>
@@ -210,22 +225,20 @@ function _invMatRenderFormulario() {
           </div>
         ` : ''}
 
-        <!-- 4 · LO QUE PONE EN EL BOTE ───────────────────────── -->
-        ${_invMat.tipoBase ? `
-          <div class="form-group" style="margin-bottom:14px">
+        <!-- LO QUE PONE EN EL BOTE — no depende del tipo ────── -->
+        <div class="form-group" style="margin-bottom:14px">
             <label style="font-size:12px;font-weight:600">Lo que pone en la etiqueta</label>
             <input value="${_escAttr(_invMat.textoEtiqueta)}" placeholder="Copia el nombre comercial y la referencia tal cual"
                    oninput="_invMat.textoEtiqueta=this.value">
-            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.5">
-              Aquí sí va el nombre de marca y el código del proveedor. No es el nombre del material,
-              pero ayuda a identificarlo y a volver a pedirlo.
-            </div>
-          </div>` : ''}
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px;line-height:1.5">
+            Aquí sí va el nombre de marca y el código del proveedor. No es el nombre del material,
+            pero ayuda a identificarlo y a volver a pedirlo.
+          </div>
+        </div>
 
-        <!-- 5 · CUÁNTO Y DÓNDE ──────────────────────────────── -->
-        ${_invMat.tipoBase ? `
-          <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay y dónde?</label>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+        <!-- 4 · CUÁNTO Y DÓNDE ──────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay y dónde?</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
             <input type="number" min="0" step="0.01" value="${_escAttr(_invMat.cantidad)}" placeholder="Cantidad"
                    oninput="_invMat.cantidad=this.value">
             <input list="invmat-unidades" value="${_escAttr(_invMat.unidad)}" placeholder="Unidad (caja, bote…)"
@@ -238,10 +251,9 @@ function _invMatRenderFormulario() {
               ${_invMatOpcionesUbicacion()}
             </select>
           </div>
-          <div class="form-group" style="margin-bottom:14px">
-            <textarea rows="2" placeholder="Observaciones (opcional)" oninput="_invMat.observaciones=this.value">${_esc(_invMat.observaciones)}</textarea>
-          </div>
-        ` : ''}
+        <div class="form-group" style="margin-bottom:14px">
+          <textarea rows="2" placeholder="Observaciones (opcional)" oninput="_invMat.observaciones=this.value">${_esc(_invMat.observaciones)}</textarea>
+        </div>
 
         <!-- VISTA PREVIA + ENVIAR ───────────────────────────── -->
         ${nombre ? `
@@ -251,8 +263,11 @@ function _invMatRenderFormulario() {
             ${_invMatAvisoDuplicado(nombre)}
           </div>` : ''}
 
+        ${_invMatQueFalta() ? `<div style="font-size:12px;color:var(--warning);margin-bottom:8px">
+          Falta ${_esc(_invMatQueFalta())} para poder enviarlo.
+        </div>` : ''}
         <button class="btn btn-primary" onclick="enviarPropuestaMaterial()"
-                ${(_invMat.fotoPath && _invMat.tipoBase) ? '' : 'disabled style="opacity:.5;cursor:not-allowed"'}>
+                ${_invMatQueFalta() ? 'disabled style="opacity:.5;cursor:not-allowed"' : ''}>
           📨 Enviar propuesta
         </button>
       </div>
