@@ -376,7 +376,7 @@ function buildIntervencionesEquipo(equipoId) {
         (getUserRole() !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(eq => eq.ID_Activo === equipoId) || {}));
       const puedeRegistrar   = _puedeAct && (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
       const pendienteFactura = _puedeAct && i.Estado === 'Pendiente factura';
-      const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea';
+      const btnLabel = i.Estado === 'Planificada' ? '🔧 Ejecutar' : '✏️ Tareas';
       const quien = i.Realizado_Por || i.Tecnico_Externo || i.Proveedor || '—';
       const resumen = _resumenIntervencion(i);
       return `<div class="intervencion-mini-row">
@@ -523,7 +523,7 @@ function renderIntervenciones(filtroTipo = '') {
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
         ${pdfLink}
-        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">${actFinalizada ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>` : ''}
+        ${puedeRegistrar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" title="${actFinalizada ? 'Editar la actuación' : 'Añadir tareas nuevas o corregir las ya registradas'}" onclick="openModalActuacionDerivada(${intIdx})">${actFinalizada ? '✏️ Editar actuación' : '✏️ Tareas'}</button>` : ''}
         ${pendienteFactura ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalAdjuntarFactura(${intIdx})">📎 Factura</button>` : ''}
       </div></td>
     </tr>`;
@@ -779,12 +779,17 @@ function openFichaIntervencion(intIdx) {
   // Tareas de esta visita (o descripción legada si es una intervención previa a este cambio)
   const elTareas = document.getElementById('ficha-int-tareas');
   if (elTareas) {
-    elTareas.innerHTML = tareas.length
+    // Esta lista es de solo lectura; sin esta pista no se ve que las tareas se
+    // corrigen desde el botón de abajo (que abre el modal de la actuación).
+    const pistaEdicion = (tareas.length && puedeHacer('crearIntervenciones'))
+      ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Para corregir el texto o el resultado de una tarea, usa «✏️ Añadir o editar tareas» abajo.</div>`
+      : '';
+    elTareas.innerHTML = pistaEdicion + (tareas.length
       ? tareas.map(t => `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
           <span style="flex:1">${t.Descripcion}${t.Observaciones ? `<div style="color:var(--text-muted);font-size:11px;margin-top:2px">${t.Observaciones}</div>` : ''}</span>
           <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px;white-space:nowrap">${t.Resultado}</span>
         </div>`).join('')
-      : `<span style="color:var(--text-muted)">${i.Descripcion_Actuacion || i.Observaciones || 'Sin tareas registradas'}</span>`;
+      : `<span style="color:var(--text-muted)">${i.Descripcion_Actuacion || i.Observaciones || 'Sin tareas registradas'}</span>`);
   }
 
   // Coste total de la incidencia, sumando todas las visitas del hilo
@@ -810,7 +815,10 @@ function openFichaIntervencion(intIdx) {
   // Por eso también se puede programar otra visita en ese estado, no solo desde "En gestión".
   const puedeNuevaVisita = puedeHacer('crearIntervenciones') && (i.Estado !== 'Cerrada' || actFinalizada);
   const equipoIdFicha = (i.Equipo || '').split(' – ')[0].trim();
-  const btnLabel = actFinalizada ? '✏️ Editar actuación' : (i.Estado === 'Planificada' ? '🔧 Ejecutar' : '📋 Añadir tarea');
+  // "Añadir tarea" escondía que ahí dentro también se corrigen las tareas ya
+  // registradas (texto y resultado) y los datos de la actuación — la usuaria lo
+  // encontró por casualidad. La etiqueta lo dice ahora explícitamente.
+  const btnLabel = actFinalizada ? '✏️ Editar actuación' : (i.Estado === 'Planificada' ? '🔧 Ejecutar' : '✏️ Añadir o editar tareas');
   const acciones = document.getElementById('ficha-int-acciones');
   let btns = '';
   if (puedeRegistrar || puedeEditarFinalizada)

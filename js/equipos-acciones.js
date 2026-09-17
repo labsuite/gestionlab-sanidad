@@ -466,7 +466,7 @@ function abrirHiloIncidencia(incId) {
       if (c.Estado === 'Planificada')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
       else if (c.Estado === 'En gestión')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '✏️ Añadir o editar tareas'}</button>`;
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalAdjuntarFactura(${cIdx});closeModal('modal-hilo-incidencia')">📎 Factura</button>`;
       // Otra actuación del mismo caso: registrarla ya (se hizo sin avisar) o
@@ -883,7 +883,7 @@ function _aplicarModoModalActuacion(i) {
         bEditar.style.background = 'var(--accent-light)';
         bEditar.style.border     = 'none';
         bEditar.style.color      = 'var(--accent)';
-        bEditar.innerHTML = `Estás <strong>añadiendo a la actuación ${i.ID_Intervencion}</strong>${fechaTxt}, ya registrada. Puedes sumar tareas o corregir sus datos; no se crea una actuación nueva.`;
+        bEditar.innerHTML = `Estás <strong>añadiendo a la actuación ${i.ID_Intervencion}</strong>${fechaTxt}, ya registrada. Puedes sumar tareas, corregir las ya registradas o cambiar sus datos; no se crea una actuación nueva.`;
       }
     }
   } else {
