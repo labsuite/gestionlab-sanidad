@@ -769,19 +769,25 @@ function _renderTareasEnModal(intId) {
     cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta actuación.</div>';
     return;
   }
+  // Toda tarea es editable, esté como esté: marcar un resultado no es una decisión
+  // irreversible (se registra sobre la marcha y a veces hay que corregirla), y el
+  // texto tampoco — antes, en cuanto una tarea dejaba de estar Pendiente, la fila
+  // se quedaba en una etiqueta muerta sin forma de tocarla.
+  const _OPCIONES_RESULTADO = ['Resuelto', 'Resuelto parcialmente', 'No resuelto', 'Descartado', 'Pendiente'];
   cont.innerHTML = tareas.map(t => {
     const sinResolver = !t.Resultado || t.Resultado === 'Pendiente';
-    const controles = sinResolver
-      ? `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          <button type="button" class="btn btn-secondary" style="padding:3px 8px;font-size:11px" onclick="marcarResultadoTarea('${t.ID_Tarea}','Resuelto')">✓ Resuelto</button>
-          <select style="font-size:11px;padding:3px 6px" onchange="if(this.value) marcarResultadoTarea('${t.ID_Tarea}', this.value); this.value=''">
-            <option value="">Otro resultado…</option>
-            <option value="Resuelto parcialmente">Resuelto parcialmente</option>
-            <option value="No resuelto">No resuelto</option>
-            <option value="Descartado">Descartado</option>
-          </select>
-        </div>`
-      : `<span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>`;
+    const otras = _OPCIONES_RESULTADO.filter(r => r !== (t.Resultado || 'Pendiente'));
+    const selectResultado = `<select style="font-size:11px;padding:3px 6px" onchange="if(this.value) marcarResultadoTarea('${t.ID_Tarea}', this.value); this.value=''">
+            <option value="">${sinResolver ? 'Otro resultado…' : 'Cambiar resultado…'}</option>
+            ${otras.map(r => `<option value="${r}">${r}</option>`).join('')}
+          </select>`;
+    const controles = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          <button type="button" class="icon-btn" style="font-size:11px" title="Editar el texto de la tarea" onclick="editarDescripcionTarea('${t.ID_Tarea}')">✏️</button>
+          ${sinResolver
+            ? `<button type="button" class="btn btn-secondary" style="padding:3px 8px;font-size:11px" onclick="marcarResultadoTarea('${t.ID_Tarea}','Resuelto')">✓ Resuelto</button>`
+            : `<span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>`}
+          ${selectResultado}
+        </div>`;
     return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
       <span style="flex:1;min-width:120px">${t.Descripcion}</span>
       ${controles}
@@ -966,6 +972,27 @@ const _OPERATIVO_POR_DEFECTO = { 'Resuelto': 'Sí', 'Descartado': 'Sí', 'No res
 // Marca el resultado de una tarea YA guardada, desde su botón en la lista.
 // La sincronización (Resultado/Estado agregados, equipo, incidencia) ahora
 // la hace la Edge Function dentro de _guardarTareaIntervencion.
+// Corrige el texto de una tarea ya guardada sin tocar su resultado. Se reenvían
+// resultado, operativo y observaciones tal cual estaban: la Edge Function reescribe
+// la fila entera, así que omitirlos los borraría.
+async function editarDescripcionTarea(tareaId) {
+  const tarea = DATA.tareasIntervencion.find(t => t.ID_Tarea === tareaId);
+  if (!tarea) { showToast('Tarea no encontrada', 'error'); return; }
+  const nueva = prompt('Descripción de la tarea:', tarea.Descripcion || '');
+  if (nueva === null) return;
+  const desc = nueva.trim();
+  if (!desc) { showToast('La descripción no puede quedar vacía', 'error'); return; }
+  if (desc === tarea.Descripcion) return;
+  showLoading('Guardando...');
+  try {
+    await _guardarTareaIntervencion(tarea.ID_Intervencion, desc, tarea.Resultado || 'Pendiente', tarea.Operativo, tarea.Observaciones, tareaId);
+    _renderTareasEnModal(tarea.ID_Intervencion);
+    showToast('Tarea actualizada', 'success');
+    renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
+  } catch(e) { showToast('Error al guardar la tarea', 'error'); console.error(e); }
+  hideLoading();
+}
+
 async function marcarResultadoTarea(tareaId, resultado) {
   const tarea = DATA.tareasIntervencion.find(t => t.ID_Tarea === tareaId);
   if (!tarea) return;
