@@ -124,10 +124,19 @@ async function leerEtiquetaConGemini(geminiKey: string, base64: string, mimeType
   return JSON.parse(texto);
 }
 
-/** Compara lo que escribió la persona con lo que se lee en la etiqueta. */
+/**
+ * Compara lo que escribió la persona con lo que se lee en la etiqueta.
+ * Se saltan las claves de `atributos_no_visibles`: el esquema de respuesta obliga
+ * a Gemini a devolver un valor de cada tipo, así que ahí vienen ceros y "no" que
+ * no están en la etiqueta. Compararlos daría discrepancias fantasma.
+ */
 function avisosDiscrepancia(ficha: any, escritos: Record<string, unknown>, leidos: Record<string, unknown>) {
   const avisos: string[] = [];
+  const noVisibles = new Set(
+    Array.isArray(leidos?.atributos_no_visibles) ? leidos.atributos_no_visibles.map(String) : [],
+  );
   for (const a of (ficha?.atributos || [])) {
+    if (noVisibles.has(a.clave)) continue;
     const mio = escritos?.[a.clave];
     const suyo = leidos?.[a.clave];
     if (mio === null || mio === undefined || mio === "") continue;

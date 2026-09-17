@@ -344,6 +344,24 @@ function _invMatRenderMisPropuestas() {
     </div>`;
 }
 
+/**
+ * Materiales del catálogo que comparten nombre base con la propuesta.
+ * El antiduplicados del servidor es estricto a propósito (prefiere un alta de
+ * más a fusionar dos cosas distintas), así que "Placas Petri estériles, 90 mm"
+ * NO casa con "Placas Petri". Pero quien valida sí quiere verlo: puede ser el
+ * mismo producto al que nunca se le anotó el diámetro.
+ */
+function _invMatMismaBase(p) {
+  const clave = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]/g, '');
+  const base = clave(p.Nombre_Base);
+  if (!base) return [];
+  return DATA.material
+    .filter(m => clave(String(m.Nombre).split(',')[0]) === base)
+    .filter(m => m.ID_Material !== p.ID_Material_Sugerido)
+    .slice(0, 4);
+}
+
 /** Panel de validación (Profesor / Gestor / Administrador). */
 function _invMatRenderPanelValidacion() {
   const pendientes = _invMatPendientes();
@@ -372,6 +390,7 @@ function _invMatFilaValidacion(p) {
     ? DATA.material.find(m => m.ID_Material === p.ID_Material_Sugerido) : null;
   const ficha = DATA.fichasAtributos.find(f =>
     f.Categoria === _invMatPrefijoCat(p.Categoria) && f.Tipo_Base === p.Tipo_Base);
+  const mismaBase = _invMatMismaBase(p);
   const attrs = Object.entries(p.Atributos || {})
     .filter(([, v]) => v !== '' && v !== null && v !== false)
     .map(([k, v]) => {
@@ -400,6 +419,11 @@ function _invMatFilaValidacion(p) {
           ${p.IA_Avisos ? `<div style="font-size:11px;color:var(--warning);margin-top:6px">⚠️ ${_esc(p.IA_Avisos)}</div>` : ''}
           ${yaExiste ? `<div style="font-size:12px;color:var(--warning);margin-top:6px">
             ⚠️ Se parece a <strong>${_esc(yaExiste.Nombre)}</strong> — ¿es el mismo?</div>` : ''}
+          ${mismaBase.length ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.7">
+            Ya hay material que empieza igual — ¿es alguno de estos?<br>
+            ${mismaBase.map(m => `<button class="btn btn-secondary" style="font-size:11px;padding:2px 8px;margin:2px 4px 0 0"
+                onclick="fusionarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}','${_escAttr(m.ID_Material)}')">${_esc(m.Nombre)}</button>`).join('')}
+          </div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           ${p.Foto_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="abrirDocumento('${_escAttr(p.Foto_Path)}')">🔍 Ver foto</button>` : ''}
@@ -505,7 +529,12 @@ async function _invMatLeerEtiqueta() {
       _invMat.iaNoVisibles = Array.isArray(leido.atributos_no_visibles) ? leido.atributos_no_visibles : [];
       if (leido.texto_etiqueta && !_invMat.textoEtiqueta) _invMat.textoEtiqueta = leido.texto_etiqueta;
       // Solo se rellena lo que esté vacío: nunca se pisa lo que ya escribió la persona.
+      // Y nunca lo que la propia IA marcó como no visible: el esquema de respuesta
+      // obliga a devolver un valor de cada tipo, así que ahí cuela un 0 o un "no"
+      // que no está en la etiqueta. `atributos_no_visibles` es la señal que manda.
+      const noVisibles = new Set(_invMat.iaNoVisibles);
       for (const a of (_invMatFichaActual()?.Atributos || [])) {
+        if (noVisibles.has(a.clave)) continue;
         const v = leido[a.clave];
         if (v === null || v === undefined || v === '') continue;
         const actual = _invMat.atributos[a.clave];
