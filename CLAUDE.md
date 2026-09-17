@@ -256,11 +256,15 @@ seguir "En gestión" si quedan tareas Pendiente). La escribe/borra la acción `a
 Edge Function; `guardar_tarea` no la toca. Uso en cliente (`Actuacion_Finalizada` tras
 `_intervencionSbToObj`, valor `'Sí'`/`'No'`):
 - Al abrir el modal de actuación sobre una intervención finalizada → título "✏️ Editar
-  actuación INT-XXX", banner ámbar de aviso ("no se crea una actuación nueva") y botón
+  intervención INT-XXX", banner ámbar de aviso ("no se crea una actuación nueva") y botón
   "↩︎ Reabrir actuación" (`reabrirActuacion`, pone la columna a `false`). Si está solo
   registrada (tiene `fecha_realizacion`) pero no finalizada → mismo título con banner azul.
-- Los botones de entrada (tabla Intervenciones, ficha, hilo) pasan de
-  "📋 Añadir tarea" a "✏️ Editar actuación" cuando está finalizada.
+- Los botones de entrada al modal se llaman siempre "✏️ Editar intervención"
+  (ficha e hilo; "✏️ Editar" en las tablas, que la celda de acciones no da para más),
+  esté la actuación finalizada o no — es la misma operación, y el modal edita la
+  intervención entera (datos + tareas + resultado de cada tarea), no solo añade
+  tareas. La excepción es una intervención aún `Planificada` sin finalizar:
+  ahí el botón es "🔧 Ejecutar". El título del modal repite el nombre del botón.
 - **Excepción — lista de Incidencias reportadas** (`renderIncidencias`): con la actuación
   finalizada NO se muestra botón de edición en la tarjeta (solo "🔗 Hilo" y "Eliminar"). Una
   incidencia puede acumular varias actuaciones, así que un "Editar actuación" ahí sería

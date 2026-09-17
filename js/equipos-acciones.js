@@ -466,7 +466,7 @@ function abrirHiloIncidencia(incId) {
       if (c.Estado === 'Planificada')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
       else if (c.Estado === 'En gestión')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '✏️ Añadir o editar tareas'}</button>`;
+        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">✏️ Editar intervención</button>`;
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalAdjuntarFactura(${cIdx});closeModal('modal-hilo-incidencia')">📎 Factura</button>`;
       // Otra actuación del mismo caso: registrarla ya (se hizo sin avisar) o
@@ -870,7 +870,9 @@ function _aplicarModoModalActuacion(i) {
   if (btnFin)  btnFin.textContent = finalizada ? 'Guardar cambios' : 'Guardar y finalizar actuación';
 
   if (finalizada || yaRegistrada) {
-    if (titulo) titulo.textContent = `✏️ Editar actuación ${i.ID_Intervencion}`;
+    // Mismo nombre que el botón que abre este modal ("✏️ Editar intervención"),
+    // para que no parezca que se ha llegado a otra pantalla.
+    if (titulo) titulo.textContent = `✏️ Editar intervención ${i.ID_Intervencion}`;
     if (bNueva) bNueva.style.display = 'none';
     if (bEditar) {
       bEditar.style.display = '';
