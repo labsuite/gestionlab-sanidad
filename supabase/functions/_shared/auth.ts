@@ -134,3 +134,16 @@ export function generarPasswordTemporal(): string {
   crypto.getRandomValues(bytes);
   return btoa(String.fromCharCode(...bytes)).replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
 }
+
+/**
+ * Contraseña del alumnado: la parte del email anterior a "@", en minúsculas — la misma
+ * convención que usa TRebello, para que no tengan que aprenderse dos contraseñas distintas.
+ * Es la que reparte el import de alumnado y a la que vuelve "Restablecer contraseña".
+ * Supabase Auth exige 6 caracteres mínimo, así que los correos con parte local más corta
+ * se completan con dígitos (p.ej. "ana" -> "ana123").
+ */
+export function passwordDesdeEmail(email: string): string {
+  const local = String(email || "").split("@")[0].trim().toLowerCase();
+  if (!local) return generarPasswordTemporal();
+  return local.length >= 6 ? local : (local + "123456").slice(0, 6);
+}

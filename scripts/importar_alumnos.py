@@ -12,10 +12,11 @@ Formato esperado del Excel (una fila por alumno, con cabecera):
   - Labs: números de lab separados por coma (ej: "201,203")
 
 Además de la fila en el catálogo `usuarios`, crea una cuenta real de
-Supabase Auth con contraseña temporal para cada alumno nuevo (igual que
+Supabase Auth para cada alumno nuevo (igual que
 scripts/onboardear_auth_supabase.py) — sin esto el alumno no podría
-iniciar sesión. Las contraseñas se muestran al final para repartirlas;
-no se guardan en ningún fichero.
+iniciar sesión. La contraseña es la parte del email anterior a "@" (misma
+convención que TRebello); se muestran al final para repartirlas y se pueden
+volver a dejar así desde la app con 🔑 Restablecer contraseña.
 
 Uso: ! python scripts/importar_alumnos.py
 """
@@ -55,9 +56,16 @@ HEADERS_AUTH = {
 }
 
 
-def generar_password():
-    alfabeto = string.ascii_letters + string.digits
-    return ''.join(secrets.choice(alfabeto) for _ in range(12))
+def generar_password(email):
+    """Contraseña del alumnado: la parte del email anterior a "@", igual que en
+    TRebello y que el botón "Importar alumnado" de la app (ver passwordDesdeEmail en
+    supabase/functions/_shared/auth.ts). Supabase Auth exige 6 caracteres mínimo, así
+    que las partes locales más cortas se completan con dígitos ("ana" -> "ana123")."""
+    local = (email or '').split('@')[0].strip().lower()
+    if not local:
+        alfabeto = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alfabeto) for _ in range(12))
+    return local if len(local) >= 6 else (local + '123456')[:6]
 
 
 wb = openpyxl.load_workbook(ARCHIVO_EXCEL)
@@ -130,7 +138,7 @@ for fila in filas_excel[1:]:
 
     password = None
     if not ya_tiene_auth:
-        password = generar_password()
+        password = generar_password(email)
         r = requests.post(f'{SUPABASE_URL}/auth/v1/admin/users', headers=HEADERS_AUTH,
                            json={'email': email, 'password': password, 'email_confirm': True})
         if not r.ok:
@@ -161,7 +169,7 @@ print(f"\n✅ {len(resultados)} alumno(s) importado(s) con cuenta nueva. "
 
 if resultados:
     print("\n" + "=" * 70)
-    print("CONTRASEÑAS TEMPORALES — distribuir y no guardar este listado")
+    print("CONTRASEÑAS (parte del email anterior a @) — distribuir y no guardar este listado")
     print("=" * 70)
     for nombre, email, password in resultados:
         print(f"{nombre:35s} {email:40s} {password}")

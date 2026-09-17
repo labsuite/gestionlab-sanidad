@@ -413,28 +413,46 @@ function _renderSeccionAlumnos(lista, rolActual) {
 
   const filtroOpts = todosModulos.map(m => `<option value="${m}">${m}</option>`).join('');
 
-  const gruposHtml = ciclosOrdenados.map(ciclo => {
+  const gruposHtml = ciclosOrdenados.map((ciclo, gi) => {
     const usrs = grupos[ciclo];
     const filas = usrs.map(u => {
       const idx = DATA.usuarios.indexOf(u);
       const modNombres = (u.Modulo||'').split(',').map(m => _moduloNombre(m.trim())).filter(Boolean);
       const modBadges = _badgesModulos(u.Modulo);
       const labBadges = _badgesLabs(u.Ubicaciones_Asignadas);
-      return `<tr data-modulos="${modNombres.join(',')}">
+      // Los _sbOnly no tienen fila en el catálogo: ni el permiso ni la contraseña se tocan aquí
+      const gestionable = puedeEditar && !u._sbOnly && !!u.ID_Usuario;
+      const revisa = u.Puede_Revisar_Inventario === 'TRUE';
+      return `<tr data-modulos="${modNombres.join(',')}" data-idusuario="${_escAttr(gestionable ? u.ID_Usuario : '')}">
         <td><strong>${u.Nombre||'—'}</strong></td>
         <td>${u.Email||'—'}</td>
         <td>${modBadges}</td>
         <td>${labBadges}</td>
+        <td style="text-align:center">
+          <input type="checkbox" class="alumno-revisa-check" data-id="${_escAttr(u.ID_Usuario||'')}"
+            ${revisa ? 'checked' : ''} ${gestionable ? '' : 'disabled'}
+            onchange="toggleRevisarInventario(this)"
+            title="Puede revisar inventario de material fungible" style="cursor:pointer">
+        </td>
         <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-        <td><div class="row-actions">${puedeEditar && !u._sbOnly ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
+        <td><div class="row-actions">${gestionable ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button><button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
       </tr>`;
     }).join('');
-    return `<div class="card" style="margin-bottom:16px">
-      <div class="card-header">
+    // Acciones de grupo: aplican a las filas visibles del grupo (o sea, respetan el
+    // buscador y el filtro por módulo), para no tener que abrir alumno por alumno.
+    const accionesGrupo = puedeEditar ? `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text-muted)">Revisar inventario:</span>
+      <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="setRevisarInventarioGrupo(${gi}, true)">✅ Todos</button>
+      <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="setRevisarInventarioGrupo(${gi}, false)">⬜ Ninguno</button>
+      <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="resetearPasswordsGrupo(${gi})">🔑 Restablecer contraseñas</button>
+    </div>` : '';
+    return `<div class="card" id="usr-grupo-alumnos-${gi}" style="margin-bottom:16px">
+      <div class="card-header" style="flex-wrap:wrap">
         <div class="card-title">${ciclo} <span style="font-weight:400;color:var(--text-muted)">(${usrs.length})</span></div>
+        ${accionesGrupo}
       </div>
       <table>
-        <thead><tr><th>Nombre</th><th>Email</th><th>Módulo(s)</th><th>Labs</th><th>Activo</th><th></th></tr></thead>
+        <thead><tr><th>Nombre</th><th>Email</th><th>Módulo(s)</th><th>Labs</th><th style="text-align:center" title="Puede revisar inventario de material fungible">Inventario</th><th>Activo</th><th></th></tr></thead>
         <tbody class="tabla-alumnos-grupo">${filas}</tbody>
       </table>
     </div>`;
@@ -450,6 +468,115 @@ function _renderSeccionAlumnos(lista, rolActual) {
     </div>` : ''}
     ${gruposHtml}
   `;
+}
+
+// ── Permiso de revisar inventario y contraseñas, desde la propia tabla ──────────
+// La casilla individual del modal de usuario sigue estando; esto es el mismo dato sin
+// abrir el modal, más botones para aplicarlo a un grupo entero de una vez.
+
+function _aplicarRevisarInventarioLocal(ids, valor) {
+  const set = new Set(ids);
+  DATA.usuarios.forEach(u => {
+    if (set.has(u.ID_Usuario)) u.Puede_Revisar_Inventario = valor ? 'TRUE' : '';
+  });
+}
+
+// Filas del grupo que están a la vista (el buscador y el filtro por módulo ocultan con
+// display:none), que es lo que se considera "el grupo" al actuar en bloque.
+function _filasVisiblesGrupoAlumnos(gi) {
+  return Array.from(document.querySelectorAll(`#usr-grupo-alumnos-${gi} tbody tr`))
+    .filter(tr => tr.style.display !== 'none' && tr.dataset.idusuario);
+}
+
+async function toggleRevisarInventario(cb) {
+  const id = cb.dataset.id;
+  const valor = cb.checked;
+  if (!id) return;
+  cb.disabled = true;
+  try {
+    await callEdgeFunction('gestionar-usuario', { accion: 'revisar_inventario', ids: [id], valor });
+    _aplicarRevisarInventarioLocal([id], valor);
+    showToast(valor ? 'Ya puede revisar inventario' : 'Permiso de revisión retirado', 'success');
+  } catch (e) {
+    cb.checked = !valor;
+    showToast('Error: ' + e.message, 'error');
+  }
+  cb.disabled = false;
+}
+
+async function setRevisarInventarioGrupo(gi, valor) {
+  const checks = _filasVisiblesGrupoAlumnos(gi)
+    .map(tr => tr.querySelector('.alumno-revisa-check'))
+    .filter(cb => cb && !cb.disabled && cb.checked !== valor);
+  if (!checks.length) { showToast('No hay cambios que aplicar en este grupo', 'success'); return; }
+
+  const ids = checks.map(cb => cb.dataset.id);
+  if (!confirm(
+    `${valor ? '¿Dar' : '¿Quitar'} el permiso de revisar inventario a ${ids.length} alumno(s) de este grupo?\n\n` +
+    `Se aplica solo a los que se ven ahora mismo (el buscador y el filtro por módulo cuentan).`
+  )) return;
+
+  showLoading('Aplicando...');
+  try {
+    await callEdgeFunction('gestionar-usuario', { accion: 'revisar_inventario', ids, valor });
+    _aplicarRevisarInventarioLocal(ids, valor);
+    checks.forEach(cb => { cb.checked = valor; });
+    showToast(`Permiso ${valor ? 'concedido' : 'retirado'} a ${ids.length} alumno(s)`, 'success');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+// La contraseña vuelve a ser la parte del email anterior a "@" (igual que en TRebello):
+// no se manda ningún correo, se dicta en clase. Por eso se enseña en un alert y no en un
+// toast, que desaparece a los 3 segundos.
+async function resetearPasswordUsuario(idx) {
+  const u = DATA.usuarios[idx];
+  if (!u) return;
+  if (!confirm(
+    `¿Restablecer la contraseña de ${u.Nombre}?\n\n` +
+    `Volverá a ser la parte de su email anterior a «@». La que tuviera dejará de valer.`
+  )) return;
+
+  showLoading('Restableciendo...');
+  let resultados;
+  try {
+    ({ resultados } = await callEdgeFunction('gestionar-usuario', { accion: 'resetear_password', ids: [u.ID_Usuario] }));
+  } catch (e) {
+    hideLoading(); showToast('Error: ' + e.message, 'error'); return;
+  }
+  hideLoading();
+  const r = (resultados || [])[0];
+  if (r?.ok) alert(`Contraseña de ${u.Nombre} restablecida:\n\n${r.password}`);
+  else showToast(`No se pudo restablecer: ${r?.motivo || 'error desconocido'}`, 'error');
+}
+
+async function resetearPasswordsGrupo(gi) {
+  const ids = _filasVisiblesGrupoAlumnos(gi).map(tr => tr.dataset.idusuario);
+  if (!ids.length) { showToast('No hay alumnado a la vista en este grupo', 'error'); return; }
+  if (!confirm(
+    `¿Restablecer la contraseña de ${ids.length} alumno(s) de este grupo?\n\n` +
+    `Cada uno pasará a tener como contraseña la parte de su email anterior a «@», y la que ` +
+    `tuviera dejará de valer. Se aplica solo a los que se ven ahora mismo.`
+  )) return;
+
+  showLoading('Restableciendo contraseñas...');
+  let resultados;
+  try {
+    ({ resultados } = await callEdgeFunction('gestionar-usuario', { accion: 'resetear_password', ids }));
+  } catch (e) {
+    hideLoading(); showToast('Error: ' + e.message, 'error'); return;
+  }
+  hideLoading();
+  const ok = (resultados || []).filter(r => r.ok);
+  const fallidos = (resultados || []).filter(r => !r.ok);
+  alert(
+    `${ok.length} contraseña(s) restablecida(s) a la parte del email anterior a «@».` +
+    (fallidos.length
+      ? `\n\n${fallidos.length} sin restablecer:\n` + fallidos.map(r => `· ${r.nombre || r.email}: ${r.motivo}`).join('\n')
+      : '')
+  );
 }
 
 function filtrarAlumnos(modulo) {
@@ -543,6 +670,30 @@ function _normCiclo(s) {
     .replace(/ñ/g,'n').replace(/\s+/g,' ');
 }
 
+// Módulos transversales / no técnicos (FOL, EIE, FCT, Proxecto, idiomas, itinerario de
+// empregabilidade, sostenibilidade, dixitalización...): no se dan en laboratorio ni tocan
+// equipamiento, así que no pintan nada en GestionLab — ni se ofrecen en el checklist de
+// módulos del modal de usuario ni se importan como matrícula desde Sanidad CMA. Comparación
+// por subcadena normalizada (_normCiclo): "Proxecto" cubre "Proxecto integrado de ...", etc.
+// Los nombres van como los devuelve Sanidad CMA (en gallego) — ver docs/modulo-usuarios.md.
+const MODULOS_AJENOS_A_GESTIONLAB = [
+  'Afondamento nas Competencias Profesionais',
+  'Formación en Centros de Traballo',
+  'Proxecto',
+  'Formación e Orientación Laboral',
+  'Empresa e Iniciativa Emprendedora',
+  'Itinerario Persoal para a Empregabilidade',
+  'Dixitalización Aplicada aos Sectores Produtivos',
+  'Sostenibilidade Aplicada ao Sistema Produtivo',
+  'Inglés Profesional',
+  'Habilidades Comunicativas en Lingua Estranxeira',
+];
+
+function _moduloInteresaEnGestionLab(modulo) {
+  const m = _normCiclo(modulo || '');
+  return !!m && !MODULOS_AJENOS_A_GESTIONLAB.some(x => m.includes(_normCiclo(x)));
+}
+
 function _refreshModuloCheckboxes(preselectedStr, cicloPrincipal, rol) {
   // Source of truth: plain module names (no ciclo prefix)
   _selectedModulosArray = (preselectedStr || '').split(',')
@@ -595,7 +746,12 @@ function _renderModuloCheckboxesDocente() {
   // Modulos ya guardados que no esten en el catalogo: no se pierden de vista
   _selectedModulosArray.forEach(m => { if (!porModulo.has(m)) porModulo.set(m, new Set()); });
 
-  const modulos = [...porModulo.keys()].sort((a, b) => a.localeCompare(b, 'es'));
+  // Los transversales (FOL, idiomas, itinerario...) no se ofrecen: no hay nada que
+  // gestionar en GestionLab por impartirlos. Si alguien ya los tenia guardados siguen
+  // visibles para poder quitarlos.
+  const modulos = [...porModulo.keys()]
+    .filter(m => _moduloInteresaEnGestionLab(m) || _selectedModulosArray.includes(m))
+    .sort((a, b) => a.localeCompare(b, 'es'));
   if (!modulos.length) {
     cont.innerHTML = '<span style="font-size:12px;color:var(--text-muted)">Sin modulos registrados.</span>';
     _syncChipsModulos();
@@ -632,9 +788,12 @@ function _renderModuloCheckboxesPorCiclo(ciclo) {
     return;
   }
 
+  // Mismo criterio que en el checklist docente: fuera los transversales, salvo que la
+  // persona ya los tuviera marcados de antes.
   const modulos = DATA.ciclosModulos
     .filter(cm => cm.Ciclo === ciclo && cm.Modulo)
     .map(cm => cm.Modulo)
+    .filter(m => _moduloInteresaEnGestionLab(m) || _selectedModulosArray.includes(m))
     .sort((a,b) => a.localeCompare(b,'es'));
 
   if (!modulos.length) {
@@ -940,9 +1099,11 @@ async function guardarUsuario() {
 // IMPORTAR ALUMNOS DESDE SANIDAD CMA
 // ============================================================
 let _previewAlumnosCMA = [];
+let _matriculasAjenasDescartadas = 0;
 
 function abrirModalImportarAlumnos() {
   _previewAlumnosCMA = [];
+  _matriculasAjenasDescartadas = 0;
   document.getElementById('importar-alumnos-contenido').innerHTML = `
     <div class="empty-state" style="padding:40px 0">
       <div class="empty-state-icon">⏳</div>
@@ -957,7 +1118,12 @@ async function _cargarPreviewImportarAlumnos() {
   const cont = document.getElementById('importar-alumnos-contenido');
   try {
     const { alumnos } = await callEdgeFunction('importar-alumnos', { accion: 'preview' });
-    _previewAlumnosCMA = alumnos || [];
+    // Sanidad CMA devuelve TODAS las matrículas, incluidas las de módulos transversales
+    // (FOL, idiomas, itinerario de empregabilidade, sostenibilidade...). En GestionLab no
+    // sirven de nada: se descartan aquí y se avisa de cuántas eran.
+    const todas = alumnos || [];
+    _previewAlumnosCMA = todas.filter(a => _moduloInteresaEnGestionLab(a.modulo));
+    _matriculasAjenasDescartadas = todas.length - _previewAlumnosCMA.length;
     _renderPreviewImportarAlumnos();
   } catch (e) {
     cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
@@ -1033,7 +1199,7 @@ function _renderPreviewImportarAlumnos() {
 
   cont.innerHTML = `
     <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <span>${nuevos.length} matrícula(s) nueva(s) de ${_previewAlumnosCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.</span>
+      <span>${nuevos.length} matrícula(s) nueva(s) de ${_previewAlumnosCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.${_matriculasAjenasDescartadas ? ` <span style="color:var(--text-muted)">(${_matriculasAjenasDescartadas} matrícula(s) de módulos transversales —FOL, idiomas, itinerario de empregabilidade...— no se muestran.)</span>` : ''}</span>
       <span style="white-space:nowrap">
         <button type="button" onclick="_toggleSeleccionarTodosImportar(true)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
         <button type="button" onclick="_toggleSeleccionarTodosImportar(false)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Nada</button>
@@ -1107,10 +1273,10 @@ function _renderResultadosImportarAlumnos(resultados) {
   cont.innerHTML = `
     ${ok.length ? `
       <div class="empty-state-title" style="text-align:left;margin-bottom:8px">✅ ${ok.length} alumno(s) importado(s)</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Contraseñas temporales — reparte y no guardes este listado.</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">La contraseña es la parte del email anterior a «@», igual que en TRebello. Se puede volver a dejar así con 🔑 Restablecer contraseña.</div>
       <div class="card" style="margin-bottom:16px">
         <table>
-          <thead><tr><th>Email</th><th>Contraseña temporal</th></tr></thead>
+          <thead><tr><th>Email</th><th>Contraseña</th></tr></thead>
           <tbody>${filasOk}</tbody>
         </table>
       </div>` : ''}
@@ -1127,29 +1293,12 @@ let _previewProfesoresCMA = [];
 let _profesoresSinLabDescartados = 0;
 let _profesoresAImportar = [];
 
-// Módulos transversales / no técnicos: nunca conllevan responsabilidad de equipos, así que se
-// descartan del import de profesorado sea cual sea el aula del horario (p.ej. Afondamento se da
-// en "Lab 201", que sí tiene equipos, pero no procede marcar responsable por ello). Comparación
-// por subcadena normalizada (_normCiclo) — "Proxecto" cubre "Proxecto integrado de ...", etc.
-// Ampliar aquí si aparecen más.
+// Para el import de PROFESORADO la lista es la de módulos ajenos a GestionLab más
+// Necropsias: es un módulo de laboratorio de verdad (y su alumnado sí se importa), pero no
+// usa equipamiento inventariado, así que no conlleva responsabilidad de equipos (confirmado
+// por la usuaria, 2026-09-14). Ampliar aquí o en MODULOS_AJENOS_A_GESTIONLAB según el caso.
 const MODULOS_SIN_RESPONSABILIDAD_EQUIPOS = [
-  'Afondamento nas Competencias Profesionais',
-  'Formación en Centros de Traballo',
-  'Proxecto',
-  'Formación e Orientación Laboral',
-  'Empresa e Iniciativa Emprendedora',
-  // Ojo: los dos siguientes estaban escritos con el nombre castellanizado
-  // ('Itinerario Personal', 'Sustentabilidade') y no casaban con lo que devuelve
-  // Sanidad CMA ('Itinerario Persoal', 'Sostenibilidade'), así que no excluían nada.
-  'Itinerario Persoal para a Empregabilidade',
-  'Dixitalización Aplicada aos Sectores Produtivos',
-  'Sostenibilidade Aplicada ao Sistema Produtivo',
-  // Transversales de idioma: caen en labs con equipos (201, 207, 209) pero no
-  // tienen nada que ver con el equipamiento de esos laboratorios.
-  'Inglés Profesional',
-  'Habilidades Comunicativas en Lingua Estranxeira',
-  // Módulo de especialidad que no usa equipamiento inventariado (confirmado por
-  // la usuaria, 2026-09-14): sus clases son de sala de necropsias, no de equipos.
+  ...MODULOS_AJENOS_A_GESTIONLAB,
   'Necropsias',
 ];
 function _moduloDaResponsabilidadEquipos(modulo) {

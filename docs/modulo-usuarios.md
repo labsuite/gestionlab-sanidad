@@ -134,6 +134,60 @@ aquí — este repositorio es público. Igual que en `scripts/importar_alumnos.p
 vez para repartirlas y nunca se guardan en un fichero. Ojo con el mínimo de 6 caracteres de
 Supabase Auth: algún correo corto no llega y necesita otra contraseña.
 
+## Módulos que no interesan en GestionLab (2026-09-17)
+
+`MODULOS_AJENOS_A_GESTIONLAB` en `js/ubicaciones.js`: los transversales que no se dan en
+laboratorio ni tocan equipamiento — Afondamento nas Competencias Profesionais, FCT, Proxecto,
+FOL, EIE, Itinerario Persoal para a Empregabilidade, Dixitalización Aplicada aos Sectores
+Produtivos, Sostenibilidade Aplicada ao Sistema Produtivo, Inglés Profesional y Habilidades
+Comunicativas en Lingua Estranxeira. Se comparan por subcadena normalizada
+(`_moduloInteresaEnGestionLab` → `_normCiclo`), así que **los nombres van en gallego, como los
+devuelve Sanidad CMA** (una entrada castellanizada no excluye nada y no da ningún error).
+
+Dónde se aplica:
+- **Import de alumnado** (`_cargarPreviewImportarAlumnos`): las matrículas de esos módulos se
+  descartan antes de pintar el checklist y se avisa de cuántas eran. Un alumno cuyo único
+  módulo sea transversal deja de aparecer en el import; es lo buscado (no tiene laboratorio).
+- **Checklist de módulos del modal de usuario** (`_renderModuloCheckboxesPorCiclo` y
+  `_renderModuloCheckboxesDocente`): no se ofrecen. Excepción: si una persona ya los tenía
+  guardados siguen visibles y marcados, para poder quitárselos.
+
+`MODULOS_SIN_RESPONSABILIDAD_EQUIPOS` (import de profesorado) es ahora esta lista **más
+`Necropsias`**: Necropsias sí es un módulo de laboratorio —su alumnado se importa— pero no usa
+equipamiento inventariado, así que no genera responsabilidad de equipos. Al ampliar, pensar en
+cuál de las dos listas toca.
+
+## Permiso de revisar inventario en bloque (2026-09-17)
+
+La casilla "Puede revisar inventario de material fungible" del modal de usuario sigue igual;
+además, la pestaña **Alumnos** tiene ahora una columna **Inventario** con la misma casilla por
+fila y, en la cabecera de cada tarjeta de ciclo, **✅ Todos / ⬜ Ninguno**.
+
+- Las acciones de grupo actúan sobre las **filas visibles** de ese grupo, así que el buscador y
+  el filtro por módulo acotan a quién se aplica (p.ej. "todo el alumnado de Microbioloxía
+  Clínica de 1º"). Piden confirmación con el número de personas afectadas.
+- Backend: acción `revisar_inventario` de `gestionar-usuario` (`{ids:[...], valor}`), que
+  actualiza `usuarios` y replica en `public.users` por lo mismo que `actualizar`. `requireStaff`
+  + un Profesor solo puede tocar filas con `Rol = Alumno`.
+- Los usuarios `_sbOnly` salen con la casilla deshabilitada (no tienen fila en el catálogo).
+
+## Contraseña del alumnado y "Restablecer contraseña" (2026-09-17)
+
+La contraseña de una cuenta de alumnado es **la parte del email anterior a `@`**, en minúsculas
+— la misma convención que TRebello, para no obligarles a recordar dos. Se genera con
+`passwordDesdeEmail()` (`supabase/functions/_shared/auth.ts`); las partes locales de menos de 6
+caracteres se completan con dígitos (`ana` → `ana123`) porque Supabase Auth exige ese mínimo.
+La usa el import de alumnado de la app (`importar-alumnos`) y `scripts/importar_alumnos.py`.
+El profesorado sigue con contraseña aleatoria: su import no se ha tocado.
+
+**Restablecer:** botón 🔑 en cada fila de alumnado y **🔑 Restablecer contraseñas** por grupo
+(mismas reglas de "filas visibles" que arriba). Acción `resetear_password` de
+`gestionar-usuario`: busca la cuenta de Auth por `public.users` —y solo si no está ahí pide el
+listado completo de Auth, una vez— y hace `auth.admin.updateUserById`. **No manda ningún
+correo**: devuelve la contraseña para dictarla en clase (el alumnado no siempre puede abrir su
+buzón de la Xunta desde el aula). Por eso el resultado se enseña en un `alert`, no en un toast.
+Permisos: `requireStaff`, y un Profesor solo puede restablecer contraseñas de alumnado.
+
 ## Ciclos_Modulos — estructura crítica
 Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laboratorio" aparece en CS Lab Clínico, ZS Lab Clínico y CS Anatomía). Por eso el ciclo se guarda explícitamente en col H y **NO se infiere de los módulos**.
 

@@ -7,7 +7,7 @@
 //   haya marcado en el checklist por ciclo/módulo): fila en `usuarios` (catálogo) + cuenta real
 //   de Supabase Auth con contraseña temporal + fila en `public.users` (login/rol server-side).
 // Mismo patrón que scripts/importar_alumnos.py — sin esto el alumno no podría iniciar sesión.
-import { requireAdminOrGestor, jsonError, jsonOk, generarPasswordTemporal, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdminOrGestor, jsonError, jsonOk, passwordDesdeEmail, handleCorsPreflight } from "../_shared/auth.ts";
 
 interface AlumnoCMA {
   nombre: string;
@@ -121,8 +121,11 @@ Deno.serve(async (req) => {
         continue;
       }
 
-      // 2. Cuenta real de Supabase Auth (sin esto el alumno no puede acceder a la app)
-      const password = generarPasswordTemporal();
+      // 2. Cuenta real de Supabase Auth (sin esto el alumno no puede acceder a la app).
+      // La contraseña es la parte del email anterior a "@" (misma convención que TRebello),
+      // no una cadena al azar: así el alumnado no tiene que aprenderse dos contraseñas y
+      // "Restablecer contraseña" en la pestaña Alumnos devuelve siempre a este mismo valor.
+      const password = passwordDesdeEmail(email);
       const { data: authUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
         email,
         password,
