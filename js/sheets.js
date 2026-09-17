@@ -218,6 +218,7 @@ function _tareaSbToObj(t) {
 
 function _materialSbToObj(m) {
   return {
+    Atributos: m.atributos || {},
     ID_Material: m.id_material || '',
     Nombre: m.nombre || '',
     Categoria: m.categoria || '',
@@ -377,6 +378,46 @@ function _propuestaUbicacionSbToObj(p) {
     Revisado_Por: p.revisado_por || '',
     Fecha_Revision: (p.fecha_revision || '').slice(0, 10),
     Notas_Revision: p.notas_revision || '',
+  };
+}
+
+function _propuestaMaterialSbToObj(p) {
+  return {
+    ID_Propuesta: p.id_propuesta || '',
+    Categoria: p.categoria || '',
+    Tipo_Base: p.tipo_base || '',
+    Nombre_Base: p.nombre_base || '',
+    Atributos: p.atributos || {},
+    Texto_Etiqueta: p.texto_etiqueta || '',
+    Nombre_Generado: p.nombre_generado || '',
+    Unidad: p.unidad || '',
+    Cantidad: p.cantidad != null ? String(p.cantidad) : '',
+    ID_Ubicacion: p.id_ubicacion || '',
+    Foto_Path: p.foto_path || '',
+    ID_Material_Sugerido: p.id_material_sugerido || '',
+    IA_Extraido: p.ia_extraido || null,
+    IA_Avisos: p.ia_avisos || '',
+    Propuesto_Por: p.propuesto_por || '',
+    Email_Propuesto_Por: p.email_propuesto_por || '',
+    Observaciones: p.observaciones || '',
+    Fecha: (p.fecha || '').slice(0, 10),
+    Estado: p.estado || 'pendiente',
+    Revisado_Por: p.revisado_por || '',
+    Fecha_Revision: (p.fecha_revision || '').slice(0, 10),
+    Notas_Revision: p.notas_revision || '',
+    ID_Material_Creado: p.id_material_creado || '',
+  };
+}
+
+function _fichaAtributosSbToObj(f) {
+  return {
+    ID_Ficha: f.id_ficha || '',
+    Categoria: f.categoria || '',
+    Tipo_Base: f.tipo_base || '',
+    Nombre_Base: f.nombre_base || '',
+    Orden: f.orden != null ? Number(f.orden) : 0,
+    Atributos: Array.isArray(f.atributos) ? f.atributos : [],
+    Activa: f.activa !== false,
   };
 }
 
@@ -565,7 +606,7 @@ async function loadAllData() {
            sbRegistrosCabinaRes, sbRegistrosAutoclaveRes, sbRegistrosVitrinaRes, sbUsuariosCatalogoRes,
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
-           sbPropuestasUbicacionRes,
+           sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
            sbTareasPersonalesRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
@@ -607,6 +648,8 @@ async function loadAllData() {
       _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('excepciones_residuo_ia').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('propuestas_ubicacion_equipo').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('propuestas_material').select('*').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('atributos_material').select('*').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
@@ -636,6 +679,9 @@ async function loadAllData() {
     DATA.consultasResiduo        = (sbConsultasResiduoRes?.data || []).map(_consultaResiduoSbToObj);
     DATA.excepcionesResiduoIa    = (sbExcepcionesResiduoIaRes?.data || []).map(_excepcionResiduoIaSbToObj);
     DATA.propuestasUbicacion     = (sbPropuestasUbicacionRes?.data || []).map(_propuestaUbicacionSbToObj);
+    DATA.propuestasMaterial      = (sbPropuestasMaterialRes?.data || []).map(_propuestaMaterialSbToObj);
+    DATA.fichasAtributos         = (sbFichasAtributosRes?.data || []).map(_fichaAtributosSbToObj)
+                                     .sort((a, b) => a.Orden - b.Orden);
     DATA.configReservas          = (sbConfigReservasRes?.data || []).map(_configReservaSbToObj);
     DATA.reservas                = (sbReservasRes?.data || []).map(_reservaSbToObj);
     DATA.registrosCabina         = (sbRegistrosCabinaRes?.data || []).map(_registroCabinaSbToObj);

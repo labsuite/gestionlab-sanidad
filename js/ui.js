@@ -143,7 +143,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     // Ejecutar mantenimientos preventivos marcados Con_Alumnado. NO incluye marcar
     // "no aplica"/aplazar (eso es crearIntervenciones), y lo que finalizan queda en
@@ -158,7 +158,7 @@ const PERMISOS = {
   },
   Profesor: {
     // Páginas visibles
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'intervenciones', 'incidencias',
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias',
           'mantenimiento', 'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
           'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
@@ -180,7 +180,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: false, configurarReservas: false,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -191,7 +191,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -307,7 +307,8 @@ function showPage(page) {
   document.querySelector(`[onclick="showPage('${page}')"]`)?.classList.add('active');
   const titles = {
     dashboard: 'Panel principal', equipos: 'Inventario de equipos', 'equipo-detalle': 'Ficha de equipo',
-    'ubicar-equipos': 'Ubicar equipos', intervenciones: 'Intervenciones',
+    'ubicar-equipos': 'Ubicar equipos', 'inventariar-material': 'Inventariar material nuevo',
+    intervenciones: 'Intervenciones',
     incidencias: 'Incidencias', material: 'Material fungible', movimientos: 'Movimientos de material',
     solicitudes: 'Solicitudes de material', pedidos: 'Pedidos', 'pedido-detalle': 'Detalle del pedido',
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
@@ -436,6 +437,8 @@ function renderAll() {
   _updateBadgeRegistrosUso();
   renderUbicarEquipos();
   _ubicRenderAviso();
+  renderInventariarMaterial();
+  _invMatRenderAviso();
   renderPerfil();
   _avisarSesionesAbiertasAntiguas();
 }

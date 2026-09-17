@@ -315,6 +315,7 @@
 
       <!-- MATERIAL FUNGIBLE -->
       <div class="page" id="page-material">
+        <div id="aviso-propuestas-material"></div>
         <div id="panel-revisiones-inventario" style="display:none"></div>
         <div class="card">
           <div class="card-header">
@@ -337,6 +338,7 @@
                 <input type="text" placeholder="Filtrar por ubicación..." oninput="filtrarMaterialUbicacion(this.value);this.setAttribute('list',this.value.length>0?'ubicaciones-datalist':'')" id="filter-material-ubicacion">
               </div>
               <datalist id="ubicaciones-datalist"></datalist>
+              <button class="btn btn-secondary" onclick="showPage('inventariar-material')">🧴 Inventariar material nuevo</button>
               <button class="btn btn-primary" onclick="openModalMaterial()">+ Nuevo material</button>
             </div>
           </div>
@@ -584,6 +586,7 @@
 
       <!-- RESIDUOS -->
       <div class="page" id="page-ubicar-equipos"></div>
+      <div class="page" id="page-inventariar-material"></div>
       <div class="page" id="page-residuos-guia"></div>
       <div class="page" id="page-residuos-contenedores"></div>
 
@@ -629,6 +632,7 @@
 <script src="js/reservas.js"></script>
 <script src="js/registros-uso.js"></script>
 <script src="js/ubicar-equipos.js"></script>
+<script src="js/inventariar-material.js"></script>
 <script>
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional
