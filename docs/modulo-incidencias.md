@@ -45,6 +45,26 @@ La incidencia vinculada **no** se cierra sola con las tareas: mientras siga abie
 mantiene en `En gestión`, aunque la intervención llegue a `Cerrada`. Pasar a `Resuelta` o
 `Descartada` es siempre un acto explícito en el hilo (ver abajo).
 
+## Planificar ya no es obligatorio (desde 2026-09-17)
+
+Una actuación a veces se planifica y otras simplemente **ocurre** (el técnico aparece sin
+avisar, o se arregla en el momento). Antes, el único camino desde el hilo era el modal de
+Planificar: pulsar "📅 Otra actuación" abría `abrirPlanificacion` sí o sí, aunque lo que
+tocara fuera registrar algo ya hecho. Ahora el hilo ofrece los dos caminos:
+
+- **🔧 Registrar otra** → `openModalRegistrarActuacionDirecta(equipoId, ctx)` con
+  `ctx = { incId, origenIntId }`. Abre el modal de actuación en modo directo, pero con el
+  contexto del hilo en dos hidden (`act-inc-id`, `act-origen-int`): al guardar, `guardarActuacion`
+  crea la intervención con `origen: 'Seguimiento de <ID>'` (o `'Incidencia reportada'` si es la
+  primera) e `incidencia_id`, así que queda enganchada a la cadena y pasa a ser la actuación
+  activa de la incidencia. La intervención **no se crea hasta guardar**: cancelar no deja nada.
+  `openModalRegistrarActuacion` (modo vinculado) limpia esos hidden para no arrastrar contexto.
+- **📅 Planificar otra** → el camino de siempre (`programarOtraVisita`).
+
+Un hilo sin actuaciones todavía muestra los mismos dos botones en el hueco vacío
+("Aún sin actuaciones"), en vez del antiguo texto "Pulsa Responder". El botón **Responder**
+de la card de incidencias sigue yendo a planificar, sin cambios.
+
 ## Cierre explícito de la incidencia (desde 2026-09-16)
 
 Antes, al marcar la última tarea como Resuelto la Edge Function cerraba la incidencia y

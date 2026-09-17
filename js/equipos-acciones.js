@@ -421,7 +421,16 @@ function abrirHiloIncidencia(incId) {
   if (pieCierre) pieCierre.innerHTML = '';
 
   if (!inc.Intervencion_Generada) {
-    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin planificar</div><div class="empty-state-text">Pulsa "Responder" en la incidencia para crear la primera actuación.</div></div>`;
+    // Dos caminos, nunca uno impuesto: la actuación puede registrarse tal cual se
+    // hizo, o planificarse para más adelante.
+    const eqId = (inc.Equipo || '').split(' – ')[0].trim();
+    const botones = puedeHacer('crearIntervenciones')
+      ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}'});closeModal('modal-hilo-incidencia')">🔧 Registrar actuación</button>
+          <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="abrirPlanificacion('${inc.ID_Incidencia}','${inc.Equipo}');closeModal('modal-hilo-incidencia')">📅 Planificar actuación</button>
+        </div>`
+      : '';
+    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin actuaciones</div><div class="empty-state-text">Regístrala si ya se ha hecho algo, o planíficala si toca más adelante.</div>${botones}</div>`;
     openModal('modal-hilo-incidencia');
     return;
   }
@@ -460,8 +469,13 @@ function abrirHiloIncidencia(incId) {
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">${c.Actuacion_Finalizada === 'Sí' ? '✏️ Editar actuación' : '📋 Añadir tarea'}</button>`;
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalAdjuntarFactura(${cIdx});closeModal('modal-hilo-incidencia')">📎 Factura</button>`;
-      if (c.Estado !== 'Cerrada')
-        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Otra actuación</button>`;
+      // Otra actuación del mismo caso: registrarla ya (se hizo sin avisar) o
+      // planificarla. Antes solo existía el camino de planificar.
+      if (c.Estado !== 'Cerrada') {
+        const eqId = (inc.Equipo || '').split(' – ')[0].trim();
+        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}', origenIntId:'${c.ID_Intervencion}'});closeModal('modal-hilo-incidencia')">🔧 Registrar otra</button>`;
+        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Planificar otra</button>`;
+      }
     }
 
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -783,6 +797,8 @@ function openModalRegistrarActuacion(intIdx) {
   _pendingActFileBase64 = null;
   removeActFile();
   sv('act-equipo-directo', '');
+  sv('act-inc-id', '');
+  sv('act-origen-int', '');
   const tipoGrp = document.getElementById('act-tipo-int-group');
   if (tipoGrp) tipoGrp.style.display = 'none';
   const i = DATA.intervenciones[intIdx];
@@ -990,7 +1006,7 @@ async function guardarActuacion(finalizar) {
   // Aquí sí hace falta una tarea: sin ella no hay nada que crear todavía.
   if (equipoDirecto) {
     if (!desc) {
-      if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); }
+      if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); volverAlHilo(); }
       return;
     }
     const fechaReal = v('act-fecha-real');
@@ -1002,16 +1018,30 @@ async function guardarActuacion(finalizar) {
     const tipoInt = v('act-tipo-int') || 'Correctivo';
     const lugarDatos = _datosLugarActuacion();
     if (!lugarDatos) return;
+    // Contexto del hilo, si la actuación se registró sin planificarla antes: se
+    // engancha a la incidencia (pasa a ser su actuación activa) y a la cadena.
+    const incVinc = v('act-inc-id');
+    const origenIntVinc = v('act-origen-int');
+    const origenAct = origenIntVinc ? ('Seguimiento de ' + origenIntVinc)
+      : (incVinc ? 'Incidencia reportada' : 'Manual');
     showLoading('Guardando intervención...');
     let intervencion;
     try {
-      ({ intervencion } = await callEdgeFunction('gestionar-intervencion', {
-        accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: 'Manual',
+      let incidenciaVinculada;
+      ({ intervencion, incidencia: incidenciaVinculada } = await callEdgeFunction('gestionar-intervencion', {
+        accion: 'crear', id_equipo: equipoDirecto, tipo: tipoInt, origen: origenAct,
+        ...(incVinc ? { incidencia_id: incVinc } : {}),
         fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
         coste_intervencion: coste, estado: 'Planificada',
         actuacion_finalizada: !!finalizar, ...lugarDatos,
       }));
       DATA.intervenciones.push(_intervencionSbToObj(intervencion));
+      // Al vincularla, la incidencia apunta ya a esta actuación como la activa:
+      // sin refrescarla en DATA, el hilo seguiría señalando a la anterior.
+      if (incidenciaVinculada) {
+        const idxInc = DATA.incidencias.findIndex(x => x.ID_Incidencia === incidenciaVinculada.id_incidencia);
+        if (idxInc !== -1) DATA.incidencias[idxInc] = _incidenciaSbToObj(incidenciaVinculada);
+      }
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
 
     // El adjunto se sube DESPUÉS de crear la intervención: la ruta de Storage
@@ -1035,6 +1065,7 @@ async function guardarActuacion(finalizar) {
       closeModal('modal-registrar-actuacion');
       showToast(`Intervención ${intervencion.id_intervencion} registrada. Tarea → Pendiente`, 'success');
       renderAll();
+      volverAlHilo();
     } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
     hideLoading();
     return;
@@ -1340,9 +1371,15 @@ async function eliminarIncidencia(incId) {
 // ============================================================
 function openModalActuacionDerivada(intIdx) { openModalRegistrarActuacion(intIdx); }
 
-function openModalRegistrarActuacionDirecta(equipoId) {
+// ctx (opcional): { incId, origenIntId } — cuando la actuación se registra desde el
+// hilo de una incidencia sin haberla planificado antes. La intervención no se crea
+// hasta guardar, así que cancelar no deja nada a medias.
+function openModalRegistrarActuacionDirecta(equipoId, ctx) {
+  _marcarOrigenHilo();
   _pendingActFileBase64 = null;
   removeActFile();
+  sv('act-inc-id', (ctx && ctx.incId) || '');
+  sv('act-origen-int', (ctx && ctx.origenIntId) || '');
 
   const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
   const eqLabel = e ? [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ') : equipoId;
