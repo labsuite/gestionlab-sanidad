@@ -59,11 +59,11 @@
   </div>
 </div>
 
-<!-- Modal Marcar periodo: No aplica / Aplazar -->
+<!-- Modal Opciones de un mantenimiento: quién lo realiza / No aplica / Aplazar -->
 <div class="modal-overlay" id="modal-marcar-mant">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
-      <div class="modal-title">No aplica / aplazar mantenimiento</div>
+      <div class="modal-title">Opciones del mantenimiento</div>
       <button class="modal-close" onclick="closeModal('modal-marcar-mant')">✕</button>
     </div>
     <div class="modal-body">
@@ -72,6 +72,25 @@
       <input type="hidden" id="marcar-id-equipo">
       <input type="hidden" id="marcar-periodo">
       <input type="hidden" id="marcar-curso">
+
+      <!-- Quién puede realizarlo: es propiedad del PLAN (vale para todos sus
+           periodos), así que se guarda sola al marcarla y no depende del botón
+           de abajo, que solo marca este periodo. -->
+      <div class="form-group full" id="marcar-alumnado-wrap" style="margin-bottom:14px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
+          <input type="checkbox" id="marcar-con-alumnado" style="width:16px;height:16px;accent-color:var(--accent)" onchange="guardarAlumnadoMarcarMant()">
+          Puede realizarse con el alumnado
+        </label>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+          Vale para todos los periodos de este plan y se guarda al momento. Si lo marcas,
+          este mantenimiento aparece en el panel de pendientes del alumnado (oct–may).
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);margin-bottom:12px"></div>
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">
+        Solo este periodo
+      </div>
 
       <div class="form-group full" style="margin-bottom:12px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
@@ -96,8 +115,8 @@
       </div>
 
       <div class="form-footer">
-        <button class="btn btn-secondary" onclick="closeModal('modal-marcar-mant')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarMarcarMant()">Guardar</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-marcar-mant')">Cerrar</button>
+        <button class="btn btn-primary" id="marcar-btn-guardar" onclick="guardarMarcarMant()">Guardar «no aplica»</button>
       </div>
     </div>
   </div>

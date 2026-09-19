@@ -331,6 +331,26 @@ Deno.serve(async (req) => {
       .split(",").map((r) => r.trim()).includes(miNombre);
   }
 
+  // ── Solo el interruptor "puede realizarse con el alumnado" ───────────
+  // Atajo desde el modal "⋯" de un periodo: toca esa única columna sin arrastrar
+  // el resto del plan (actualizar_plan reescribe todos los campos, y desde ahí no
+  // se editan operación ni instrucciones).
+  if (accion === "alumnado_plan") {
+    const idPlan = String(body.id_plan || "").trim();
+    if (!idPlan) return jsonError("id_plan es obligatorio", 400);
+    const { data: planExistente } = await supabaseAdmin.from("planes_mantenimiento")
+      .select("id_equipo").eq("id_plan", idPlan).maybeSingle();
+    if (!planExistente) return jsonError(`No se encontró el plan "${idPlan}"`, 404);
+    if (!(await profesorAutorizado(String(planExistente.id_equipo)))) {
+      return jsonError("Solo puedes editar planes de equipos de los que eres responsable", 403);
+    }
+    const { data, error } = await supabaseAdmin.from("planes_mantenimiento")
+      .update({ con_alumnado: body.con_alumnado === true || body.con_alumnado === "Sí" })
+      .eq("id_plan", idPlan).select().single();
+    if (error) return jsonError(`No se pudo actualizar el plan: ${error.message}`, 400);
+    return jsonOk({ plan: data });
+  }
+
   if (accion === "crear_plan" || accion === "actualizar_plan") {
     const operacion = String(body.operacion || "").trim();
     if (!operacion) return jsonError("El título de la operación es obligatorio", 400);
@@ -398,5 +418,5 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idPlan });
   }
 
-  return jsonError("accion debe ser 'guardar_progreso', 'finalizar', 'registrar', 'descartar_ejecucion', 'marcar_periodo', 'revertir_periodo', 'editar_registro', 'crear_plan', 'actualizar_plan' o 'eliminar_plan'", 400);
+  return jsonError("accion debe ser 'guardar_progreso', 'finalizar', 'registrar', 'descartar_ejecucion', 'marcar_periodo', 'revertir_periodo', 'editar_registro', 'crear_plan', 'actualizar_plan', 'alumnado_plan' o 'eliminar_plan'", 400);
 });

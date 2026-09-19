@@ -34,6 +34,7 @@ del equipo es solo lectura + ejecutar.
 | **Ejecutar** un mantenimiento (checklist) | Tarjeta del equipo o `Mantenimiento → Pendientes` (mismo modal `modal-registrar-mant`). |
 | **Corregir un mantenimiento ya finalizado** | `Mantenimiento → Realizados` (pestaña solo Admin/Gestor) → ✏️ Editar → `modal-registrar-mant` en modo edición (título "✏️ Editar mantenimiento", sin "Guardar progreso"). Acción `editar_registro` en `gestionar-mantenimiento`. |
 | **Marcar un periodo "no aplica" o aplazarlo** | Botón `⋯` en la fila de Pendientes y en la tarjeta del equipo → `modal-marcar-mant`. Bloque desplegable "No aplica / aplazados" bajo la tabla de Pendientes (revertir / editar). Acciones `marcar_periodo` / `revertir_periodo`. |
+| **¿Lo puede realizar el alumnado?** (`con_alumnado`) | Dos sitios, mismo campo del plan: casilla "Puede realizarse con el alumnado" en el modal del plan (`plan-con-alumnado`) y **atajo** en el modal `⋯` de cualquier periodo (`marcar-con-alumnado`). En el atajo se guarda **sola al marcarla** (acción `alumnado_plan`, que toca solo esa columna) — no pasa por el botón Guardar, que es del periodo y exige motivo. Visible para Admin/Gestor en cualquier equipo y para el Profesor en los suyos; el servidor revalida con `profesorAutorizado`. |
 
 ## "Realizado por" en mantenimientos externos
 
@@ -41,6 +42,17 @@ En los planes con `Tipo_Intervencion = 'Externo'`, el campo **"Realizado por"** 
 de ejecución es la **empresa** que hizo el trabajo: se precarga con
 `equipos.proveedor_servicio_tecnico` (Proveedor SAT), es editable, y el label muestra
 "(empresa)". En los internos sigue precargándose con el nombre de quien registra.
+
+## Modal del botón `⋯` (`modal-marcar-mant`)
+
+Titulado **"Opciones del mantenimiento"**, mezcla dos ámbitos distintos y por eso están
+separados visualmente:
+
+1. **Del plan** (arriba): "Puede realizarse con el alumnado" — vale para todos los periodos
+   y se guarda al instante (`alumnado_plan`).
+2. **Solo este periodo** (abajo, tras la línea): no aplica / aplazar + motivo, que es lo que
+   guarda el botón del pie — etiquetado "Guardar «no aplica»" / "Guardar aplazamiento" según
+   el radio elegido, para que no se confunda con el interruptor de arriba.
 
 ## "No aplica" / aplazar un periodo programado (2026-09-06)
 

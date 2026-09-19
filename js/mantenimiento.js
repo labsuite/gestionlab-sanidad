@@ -341,7 +341,7 @@ function buildMantenimientoEquipo(equipoId) {
               const abrirEjec = `event.stopPropagation();openModalRegistrarMant(${argsMarc})`;
               const abrirMarc = `event.stopPropagation();openModalMarcarMant(${argsMarc})`;
               const btnMarc = canMarcar
-                ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="No aplica / aplazar" onclick="${abrirMarc}">⋯</button>`
+                ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="Opciones: alumnado, no aplica, aplazar" onclick="${abrirMarc}">⋯</button>`
                 : '';
               const btnRevert = canMarcar && marc
                 ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px;white-space:nowrap" title="Revertir: volver a pendiente" onclick="event.stopPropagation();revertirMarcadorMant('${marc.ID_Registro}')">↩</button>`
@@ -681,7 +681,10 @@ async function guardarEdicionMant() {
 }
 
 // ============================================================
-// MODAL "NO APLICA / APLAZAR" un periodo programado
+// MODAL DE OPCIONES DE UN MANTENIMIENTO (botón "⋯")
+// Dos cosas distintas en el mismo sitio: si lo puede realizar el alumnado
+// (propiedad del PLAN, se guarda sola) y marcar este periodo como
+// "no aplica"/aplazado (propiedad del PERIODO, va con el botón Guardar).
 // ============================================================
 let _marcarMantActual = null; // { idPlan, idEquipo, periodo, curso }
 
@@ -689,6 +692,8 @@ function _toggleMarcarMant() {
   const tipo = document.querySelector('input[name="marcar-tipo"]:checked')?.value;
   const wrap = document.getElementById('marcar-mes-wrap');
   if (wrap) wrap.style.display = tipo === 'aplazado' ? '' : 'none';
+  const btn = document.getElementById('marcar-btn-guardar');
+  if (btn) btn.textContent = tipo === 'aplazado' ? 'Guardar aplazamiento' : 'Guardar «no aplica»';
 }
 
 function openModalMarcarMant(idPlan, idEquipo, periodo, curso) {
@@ -710,6 +715,15 @@ function openModalMarcarMant(idPlan, idEquipo, periodo, curso) {
   document.getElementById('marcar-periodo').value   = periodo;
   document.getElementById('marcar-curso').value     = curso;
 
+  // ¿Puede realizarlo el alumnado? Es editar el plan: Admin/Gestor en cualquier
+  // equipo, Profesor solo en los suyos (lo revalida la Edge Function).
+  const puedeAlumnado = puedeHacer('editarEquipos') ||
+    (getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo));
+  const wrapAlum = document.getElementById('marcar-alumnado-wrap');
+  if (wrapAlum) wrapAlum.style.display = puedeAlumnado ? '' : 'none';
+  const chkAlum = document.getElementById('marcar-con-alumnado');
+  if (chkAlum) { chkAlum.checked = _esConAlumnado(plan); chkAlum.disabled = false; }
+
   const tipo = marc?.Estado === 'aplazado' ? 'aplazado' : 'no_aplica';
   document.querySelectorAll('input[name="marcar-tipo"]').forEach(r => { r.checked = r.value === tipo; });
   document.getElementById('marcar-mes').value = marc?.Aplazado_A ? String(marc.Aplazado_A).slice(0, 7) : '';
@@ -717,6 +731,33 @@ function openModalMarcarMant(idPlan, idEquipo, periodo, curso) {
   _toggleMarcarMant();
 
   openModal('modal-marcar-mant');
+}
+
+// El interruptor "con alumnado" no espera al botón Guardar: es del plan (no de
+// este periodo) y confundir las dos cosas haría que marcar quién lo realiza
+// exigiera además un motivo de "no aplica".
+async function guardarAlumnadoMarcarMant() {
+  const chk = document.getElementById('marcar-con-alumnado');
+  if (!_marcarMantActual || !chk) return;
+  const { idPlan } = _marcarMantActual;
+  const valor = chk.checked;
+  chk.disabled = true;
+  try {
+    const { plan } = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'alumnado_plan', id_plan: idPlan, con_alumnado: valor ? 'Sí' : 'No',
+    });
+    const idx = DATA.planesMantenimiento.findIndex(p => p.ID_Plan === idPlan);
+    if (idx !== -1) DATA.planesMantenimiento[idx] = _planMantenimientoSbToObj(plan);
+    showToast(valor
+      ? 'El alumnado ya puede realizar este mantenimiento'
+      : 'Este mantenimiento ya no lo puede realizar el alumnado', 'success');
+    _refrescarTrasMant();
+  } catch (e) {
+    chk.checked = !valor;   // deja el interruptor como estaba
+    showToast('No se pudo guardar quién puede realizarlo', 'error');
+    console.error(e);
+  }
+  chk.disabled = false;
 }
 
 async function guardarMarcarMant() {
@@ -1321,7 +1362,7 @@ function _renderFilasPendientes(lista, canLog, canMarcar) {
         ${comoTexto ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" onclick="toggleMantInstr('${instrKey}')">▸ Cómo</button>` : ''}
         ${canLog ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px"
             onclick="openModalRegistrarMant(${args})">${eje ? `Continuar ${ejeN}/${ejeTot}` : 'Registrar'}</button>` : ''}
-        ${canMarcar ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="No aplica / aplazar" onclick="openModalMarcarMant(${args})">⋯</button>` : ''}
+        ${canMarcar ? `<button class="btn btn-secondary" style="padding:2px 6px;font-size:11px" title="Opciones: alumnado, no aplica, aplazar" onclick="openModalMarcarMant(${args})">⋯</button>` : ''}
       </td>
     </tr>${instrRow}`;
   }).join('');
