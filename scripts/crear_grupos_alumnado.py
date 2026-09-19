@@ -37,6 +37,10 @@ from base import conectar, generar_id
 # El ciclo tiene que coincidir con `ciclos.nombre` / `usuarios.ciclo_principal`
 # (están en gallego, como el catálogo de Sanidad CMA — ver docs/modulo-usuarios.md).
 #
+# Los grupos se crean con "puede revisar inventario" activado, que es como estaba
+# el alumnado personal — sin eso el inventario colaborativo no les funciona. Se
+# quita por grupo desde la página Usuarios si no interesa.
+#
 # `labs` son los números de laboratorio separados por coma ("201,205"); vacío
 # significa que ese grupo solo ve la zona común. Se puede dejar vacío aquí y
 # asignarlos después desde la app, que es más cómodo.
@@ -122,7 +126,7 @@ def main():
             """insert into usuarios
                  (id_usuario, nombre, email, rol, activo,
                   ubicaciones_asignadas, modulo, ciclo_principal, puede_revisar_inventario)
-               values (%s, %s, %s, 'Alumno', true, %s, '', %s, false)""",
+               values (%s, %s, %s, 'Alumno', true, %s, '', %s, true)""",
             (id_usuario, nombre, email, labs, ciclo),
         )
 
@@ -150,7 +154,7 @@ def main():
             """insert into users
                  (id, gestionlab_id, nombre, email, rol, activo,
                   ciclo_principal_id, puede_revisar_inventario)
-               values (%s, %s, %s, %s, 'Alumno', true, %s, false)""",
+               values (%s, %s, %s, %s, 'Alumno', true, %s, true)""",
             (user_id, id_usuario, nombre, email, ciclo_id),
         )
         conn.commit()
