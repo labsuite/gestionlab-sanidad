@@ -21,6 +21,14 @@ volver a dejar así desde la app con 🔑 Restablecer contraseña.
 Uso: ! python scripts/importar_alumnos.py
 """
 import sys
+
+# ── RETIRADO (2026-09-19) ────────────────────────────────────────────────
+# El alumnado entra con una cuenta por grupo, no con cuentas personales.
+# Aborta antes de leer el Excel o tocar nada.
+print("ABORTADO: importar_alumnos.py está retirado.")
+print("El alumnado entra con una cuenta por grupo, no con cuentas personales.")
+print("Usa:  python scripts/crear_grupos_alumnado.py --aplicar")
+sys.exit(1)
 sys.path.insert(0, 'scripts')
 from base import conectar, leer, buscar, insertar, generar_id
 

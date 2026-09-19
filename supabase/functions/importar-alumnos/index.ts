@@ -47,6 +47,26 @@ Deno.serve(async (req) => {
   if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
+  // ── RETIRADA (2026-09-19) ──────────────────────────────────────────────
+  // El alumnado ya no tiene cuenta personal: cada grupo comparte una cuenta
+  // (`1cslcb@gestionlab.cma` = "1º CS LCB"), creada una sola vez con
+  // scripts/crear_grupos_alumnado.py. Esta función creaba una cuenta de Auth y
+  // una fila de catálogo con el NOMBRE y el EMAIL de cada alumno, que es justo
+  // lo que se ha eliminado de la base de datos por minimización de datos.
+  //
+  // Se deja desplegada respondiendo 410 en vez de borrarla para que una llamada
+  // antigua (una pestaña sin recargar, un script) falle con un motivo legible en
+  // lugar de un 404 sin explicación. El código de abajo se conserva como
+  // referencia del patrón de alta (catálogo + Auth + public.users), que es el
+  // que replica crear_grupos_alumnado.py.
+  // Ver docs/modulo-usuarios.md y docs/proteccion-datos.md.
+  return jsonError(
+    "El import de alumnado está retirado: el alumnado entra con una cuenta por grupo " +
+    "(@gestionlab.cma), no con cuentas personales. Las cuentas de grupo se crean con " +
+    "scripts/crear_grupos_alumnado.py.",
+    410,
+  );
+
   const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
   if (authError) return authError;
 

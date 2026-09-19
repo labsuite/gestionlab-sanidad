@@ -5,98 +5,144 @@ cuánto tiempo. No es un dictamen jurídico: es la documentación técnica que r
 las decisiones tomadas, para poder justificarlas ante quien las pregunte.
 
 **Principio de partida (minimización):** la app solo guarda quién hizo algo cuando
-la seguridad del laboratorio lo exige. En todo lo demás el alumnado firma con la
-etiqueta genérica `Alumnado`.
+la seguridad del laboratorio lo exige. Y desde el curso 2026-27 el alumnado ni
+siquiera tiene cuenta personal, así que en la práctica **no hay ningún dato
+personal de alumnado en la base de datos**.
 
 ---
 
-## 1. Dónde SÍ se identifica a la persona, y por qué
+## 1. El alumnado entra por cuentas de grupo
+
+Cada grupo comparte una única cuenta, con su propia contraseña:
+
+| Grupo | Cuenta |
+|---|---|
+| 1º CS LCB | `1cslcb@gestionlab.cma` |
+| 2º CS APC | `2csapc@gestionlab.cma` |
+| … | `<curso><ciclo><especialidad>@gestionlab.cma` |
+
+Consecuencias, todas buscadas:
+
+- En `usuarios` y en `public.users` la fila de un grupo tiene `nombre = "1º CS LCB"`.
+  No hay nombres ni emails de menores en ninguna tabla.
+- Todo lo que firma el alumnado queda a nombre del grupo. Eso **no identifica a
+  nadie** y además es más útil que un genérico: sabes qué grupo hizo el
+  mantenimiento o dejó el residuo.
+- El rol `Alumno` y todos los permisos siguen funcionando igual.
+- La contraseña **no** puede derivarse del email (la parte local es el propio
+  nombre del grupo, `1cslcb`): se genera aleatoria y dictable
+  (`passwordDeGrupo()`, tipo `monte-auga-698`).
+
+Alta de cuentas: `scripts/crear_grupos_alumnado.py`. Se hace una vez, no cada
+curso — los grupos no cambian. El import de alumnado desde Trebello está
+retirado (ver punto 6).
+
+---
+
+## 2. Dónde se identifica a una persona concreta
+
+Solo profesorado, gestión y administración, que firman con su nombre en los
+registros que gestionan. Es personal del centro actuando en su puesto de trabajo.
 
 | Tabla | Dato | Justificación |
 |---|---|---|
-| `registros_cabina` | `usuario` (email) | Registro de calidad del uso de cabina de bioseguridad: nivel de riesgo de la práctica, verificación previa y descontaminación posterior. Ante una contaminación o exposición hay que poder reconstruir quién estuvo y en qué condiciones. |
-| `registros_autoclave` | `usuario` (email) | Validación de ciclos de esterilización: si un control falla hay que localizar la carga y a quien la procesó. |
-| `registros_vitrina` | `usuario` (email) | Manipulación de productos químicos en vitrina de extracción: verificación previa, productos usados y limpieza posterior. |
-| `reservas_equipos` | `usuario` (email) | Gestión operativa de la franja reservada: hay que saber a quién corresponde y con quién hablar si hay solape. |
-| `usuarios` (catálogo) | nombre, email, ciclo, módulos, laboratorios | Base del servicio: sin esto no hay login, ni permisos, ni asignación de laboratorios. |
+| `usuarios` / `public.users` (profesorado) | nombre, email, módulos, labs | Base del servicio: login, permisos, responsabilidad sobre equipos. |
+| `registro_mantenimientos.supervisado_por` | nombre del docente | Es la firma que da validez al mantenimiento hecho por alumnado. |
+| `intervenciones.realizado_por`, `incidencias.reportado_por` (staff) | nombre | Trazabilidad de la gestión del equipo. |
 | Supabase Auth | email, contraseña (hash) | Autenticación. |
-
-En los cuatro registros de uso el valor lo escribe **el servidor** a partir del email
-de la sesión (`requireValidSession`), nunca el navegador: no es falsificable y no
-depende de que el cliente se porte bien.
 
 ---
 
-## 2. Dónde NO se identifica: firma genérica `Alumnado`
+## 3. Registros de uso y reservas: ahora son del grupo
 
-Estos registros existen y son auditables, pero no señalan a nadie. Lo que los hace
-válidos es el equipo, la fecha y —cuando procede— el docente que los supervisa.
-
-| Tabla · columna | Antes | Ahora |
+| Tabla | Dato | Qué significa ahora |
 |---|---|---|
-| `incidencias.reportado_por` | Nombre del alumno que dio el aviso | `Alumnado` |
-| `adiciones_residuo.usuario` | Nombre de quien depositó el residuo | `Alumnado` |
-| `contenedores_residuo.actualizado_por` | Nombre | `Alumnado` (si el cambio de nivel viene de una adición) |
-| `consultas_residuo.usuario` | Nombre de quien consulta | `Alumnado` — para atender la consulta basta `ubicacion_dejado` |
-| `excepciones_residuo_ia.usuario` | Nombre de quien pulsó "registrar igualmente" | `Alumnado` — la auditoría sigue sirviendo sin señalar a nadie |
-| `registro_mantenimientos.realizado_por` / `iniciado_por` | Nombre del alumno | `Alumnado` — la validez la da `supervisado_por` (el docente que firma el visto bueno) |
-| `movimientos.usuario` | Nombre de quien consumió stock | `Alumnado` |
-| `revisiones_inventario.usuario` | Nombre de quien recontó | `Alumnado` |
-| `propuestas_*.propuesto_por` | Nombre | `Alumnado` (ver punto 3) |
+| `registros_cabina` / `registros_autoclave` / `registros_vitrina` | `usuario` (email de grupo) | Identifica **al grupo**, no a la persona. |
+| `reservas_equipos` | `usuario` (email de grupo) | Igual. |
 
-### Cómo está garantizado
+⚠ **Esto hay que asumirlo conscientemente.** Estos registros se justificaban por
+la trazabilidad de bioseguridad: ante una contaminación o un ciclo de
+esterilización fallido había que poder reconstruir quién estuvo. Con cuentas de
+grupo se reconstruye **el grupo, la fecha, la franja y el docente presente**, no
+la persona. Es una decisión tomada a favor de la protección de datos; si el
+sistema de calidad del centro exigiese trazabilidad individual en alguno de esos
+tres equipos, habría que registrarlo en papel o volver a cuentas personales solo
+para ese registro.
 
-La decisión se toma en el servidor, en `autorRegistro()` (`supabase/functions/_shared/auth.ts`):
-mira el rol del email de la sesión y, si no es profesorado, devuelve `"Alumnado"`
-**ignorando cualquier nombre que venga en el cuerpo de la petición**. El nombre de un
-alumno no puede acabar en la base de datos ni por un fallo del cliente ni por una
-llamada manual a la Edge Function.
+El valor lo sigue escribiendo el servidor a partir del email de la sesión
+(`requireValidSession`), nunca el navegador.
+
+---
+
+## 4. La firma del alumnado: cómo está garantizada
+
+La decisión se toma en el servidor, en `autorRegistro()` / `firmaAlumnado()`
+(`supabase/functions/_shared/auth.ts`): mira el rol del email de la sesión y,
+si no es profesorado, firma con el nombre del grupo **ignorando cualquier nombre
+que venga en el cuerpo de la petición**. Si apareciese una cuenta de alumnado
+fuera del dominio `@gestionlab.cma`, firma `"Alumnado"` a secas: nunca un nombre
+propio.
+
+Tablas afectadas: `incidencias.reportado_por`, `adiciones_residuo.usuario`,
+`contenedores_residuo.actualizado_por`, `consultas_residuo.usuario`,
+`excepciones_residuo_ia.usuario`, `registro_mantenimientos.realizado_por` e
+`iniciado_por`, `movimientos.usuario`, `revisiones_inventario.usuario` y
+`propuestas_*.propuesto_por`.
 
 Funciones que lo aplican: `gestionar-incidencia`, `gestionar-residuo`,
 `gestionar-mantenimiento`, `gestionar-material`, `gestionar-propuesta-ubicacion`,
 `gestionar-propuesta-material`.
 
----
+### Propuestas del inventario colaborativo
 
-## 3. La excepción: propuestas del inventario colaborativo
+`propuestas_*.email_propuesto_por` guarda ahora el email **del grupo**, que ya no
+es un dato personal. Sigue siendo funcional (dedupe, doble verificación y "mis
+propuestas") y `scripts/anonimizar_propuestas.py` sigue disponible para limpiarlo.
 
-`propuestas_ubicacion_equipo` y `propuestas_material` guardan
-`email_propuesto_por` mientras la propuesta vive, porque el email cumple tres
-funciones que no se pueden hacer sin él:
+Dos cosas cambiaron al pasar a cuentas compartidas:
 
-1. **Repropuesta** — sustituir la propuesta pendiente anterior de esa misma persona
-   para ese mismo equipo, en vez de acumular dos versiones de lo mismo.
-2. **Doble verificación** — comprobar que las dos propuestas coincidentes vienen de
-   personas *distintas* antes de aplicar el cambio automáticamente.
-3. **"Mis propuestas"** — devolverle a cada quien el resultado de lo que propuso.
-
-El nombre (`propuesto_por`) sí se ha quitado: en la cola de validación consta
-`Alumnado`. Y cuando la propuesta se resuelve y el alumnado ha visto el resultado,
-las tres funciones se agotan y el email deja de tener finalidad:
-
-```
-python scripts/anonimizar_propuestas.py            # informa, no toca nada
-python scripts/anonimizar_propuestas.py --aplicar  # borra los emails
-```
-
-Borra `email_propuesto_por` de las propuestas resueltas hace más de 60 días. **Hay
-que ejecutarlo al cerrar cada curso académico.**
+- **Dedupe.** Antes se borraba toda propuesta pendiente del mismo email para el
+  mismo equipo. Con cuenta compartida eso hacía que la propuesta de un alumno
+  borrase la de su compañero, así que ahora solo se sustituye si es **exactamente
+  la misma ubicación**. Si dos personas del grupo dicen sitios distintos, se
+  guardan las dos y la cola las muestra en conflicto.
+- **Doble verificación.** Exige dos cuentas distintas, o sea **dos grupos
+  distintos**. Dos alumnos del mismo grupo ya no se validan entre sí, que es lo
+  correcto: la confirmación debe ser independiente.
 
 ---
 
-## 4. Conservación
+## 5. Conservación
 
 | Dato | Plazo |
 |---|---|
-| Registros de uso (cabina / autoclave / vitrina) | Los del curso en vigor, más los cursos que exija el sistema de calidad del centro. **Plazo a fijar con la dirección**; hoy no se borra nada automáticamente. |
-| Reservas | Sin valor una vez pasada la franja; se pueden purgar al cierre de curso. |
-| Email en propuestas resueltas | 60 días desde la resolución (`scripts/anonimizar_propuestas.py`). |
-| Catálogo `usuarios` y cuentas de Auth | Mientras la persona esté activa en el centro. Al causar baja, dar de baja también la cuenta. |
-| Todo lo demás | No contiene datos personales de alumnado. |
+| Registros de uso (cabina / autoclave / vitrina) | Ya no contienen datos personales (identifican al grupo). Conservar lo que pida el sistema de calidad del centro. |
+| Reservas | Sin valor pasada la franja; purgables al cierre de curso. |
+| Email de grupo en propuestas resueltas | 60 días (`scripts/anonimizar_propuestas.py`). No es dato personal, pero la limpieza sigue siendo buena higiene. |
+| Catálogo `usuarios` y cuentas de Auth del **profesorado** | Mientras la persona esté activa en el centro. Al causar baja, dar de baja también la cuenta. |
+| Cuentas de grupo | Permanentes. Cambiar la contraseña al inicio de cada curso con el botón 🔑. |
 
 ---
 
-## 5. Terceros
+## 6. Cuentas personales de alumnado: retiradas
+
+Las 36 cuentas personales del curso anterior se eliminan con
+`scripts/borrar_alumnado_personal.py` (catálogo + rol + login + recordatorios).
+
+Los tres caminos que creaban cuentas personales están cerrados:
+
+| Camino | Estado |
+|---|---|
+| Botón "📥 Importar alumnado" en la página Usuarios | Eliminado (botón, modal y funciones JS) |
+| Edge Function `importar-alumnos` | Responde **410** con el motivo |
+| `scripts/importar_alumnos.py` | Aborta al arrancar |
+
+El import de **profesorado** sigue activo y no cambia: son adultos, personal del
+centro, y su nombre es necesario para la responsabilidad sobre equipos.
+
+---
+
+## 7. Terceros
 
 - **Gemini** (consultorio de residuos y validación de compatibilidad): recibe la
   descripción del residuo, el laboratorio y los contenedores activos. **No recibe
@@ -108,14 +154,14 @@ que ejecutarlo al cerrar cada curso académico.**
 
 ---
 
-## 6. Al añadir un campo nuevo
+## 8. Al añadir un campo nuevo
 
 Antes de guardar cualquier "quién hizo esto", responder: **¿la seguridad del
 laboratorio exige saber quién fue?**
 
 - **Sí** → escribirlo en el servidor desde el email de la sesión (patrón de
-  `gestionar-registro-uso`), añadirlo a la tabla del punto 1 con su justificación,
-  y fijarle un plazo de conservación en el punto 4.
+  `gestionar-registro-uso`), añadirlo a la tabla del punto 2 con su justificación,
+  y fijarle un plazo de conservación en el punto 5.
 - **No** → usar `autorRegistro()` y no tocar nada más.
 
 Ante la duda, la respuesta es **no**: un registro sin nombre sigue sirviendo para

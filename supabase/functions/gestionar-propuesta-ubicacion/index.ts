@@ -13,7 +13,7 @@
 //       ese mismo equipo y sigue pendiente.
 // - aceptar / aceptar_varias / rechazar: staff (requireStaff). `revisado_por`
 //   lo pone el servidor con el nombre de quien valida — nunca llega del cliente.
-import { requireStaff, requireValidSession, AUTOR_ALUMNADO, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireValidSession, firmaAlumnado, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const ROLES_STAFF = ["Administrador", "Gestor", "Profesor"];
 
@@ -78,19 +78,28 @@ Deno.serve(async (req) => {
     }
 
     const { nombre, rol } = await identificar(supabaseAdmin, email);
-    // En la cola de validación consta "Alumnado", no el nombre: para decidir si
-    // la ubicación es correcta no hace falta saber quién la propuso. El email sí
-    // se guarda porque es funcional (repropuesta, doble verificación y "mis
-    // propuestas"), y se borra al cerrar el curso — ver docs/proteccion-datos.md.
-    const firma = ROLES_STAFF.includes(rol) ? nombre : AUTOR_ALUMNADO;
+    // En la cola de validación consta el grupo ("1º CS LCB"), no una persona.
+    const firma = ROLES_STAFF.includes(rol) ? nombre : firmaAlumnado(email, nombre);
 
-    // Repropuesta: sustituye la pendiente anterior de esta misma persona para
-    // este mismo equipo, en vez de acumular dos versiones de lo mismo.
-    await supabaseAdmin.from("propuestas_ubicacion_equipo")
+    // Repetición: si esta misma cuenta ya propuso EXACTAMENTE esto mismo para este
+    // equipo y sigue pendiente, se sustituye en vez de acumular duplicados.
+    //
+    // Ojo: la condición incluye la ubicación propuesta a propósito. El alumnado
+    // entra con una cuenta compartida por todo su grupo, así que borrar "todo lo
+    // pendiente de este email para este equipo" haría que la propuesta de un
+    // alumno borrase la de su compañero. Si dos personas del mismo grupo dicen
+    // sitios distintos, las dos propuestas se guardan y la cola de validación las
+    // muestra en conflicto, que es justo lo que hay que revisar a mano.
+    let repetidas = supabaseAdmin.from("propuestas_ubicacion_equipo")
       .delete()
       .eq("id_equipo", idEquipo)
       .eq("estado", "pendiente")
+      .eq("no_encontrado", noEncontrado)
       .ilike("email_propuesto_por", email);
+    repetidas = noEncontrado
+      ? repetidas.is("id_ubicacion", null)
+      : repetidas.eq("id_ubicacion", idUbicacion);
+    await repetidas;
 
     const datos = {
       id_propuesta: genId("PUB"),
@@ -127,7 +136,9 @@ Deno.serve(async (req) => {
     const otra = (coincidencias || []).find((c: any) =>
       (c.email_propuesto_por || "").toLowerCase() !== email);
     if (otra) {
-      const revisadoPor = "Doble verificación (2 personas)";
+      // Ya no hay nombres propios en `propuesto_por` (grupo o docente), así que
+      // se puede decir quién coincidió: "1º CS LCB + 2º CS LCB".
+      const revisadoPor = `Doble verificación (${otra.propuesto_por} + ${firma})`;
       await aplicarUbicacion(supabaseAdmin, propuesta, revisadoPor,
         (coincidencias || []).map((c: any) => c.id_propuesta));
       return jsonOk({

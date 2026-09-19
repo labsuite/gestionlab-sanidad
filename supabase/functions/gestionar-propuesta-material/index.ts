@@ -18,7 +18,7 @@
 // (alumnado incluido); aceptar/fusionar/rechazar es staff, y `revisado_por` lo
 // escribe el servidor con el nombre de quien valida.
 import {
-  requireStaff, requireValidSession, identificarUsuario, ES_STAFF, AUTOR_ALUMNADO,
+  requireStaff, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado,
   jsonError, jsonOk, handleCorsPreflight,
 } from "../_shared/auth.ts";
 import { componerNombreMaterial, buscarMaterialParecido, claveNombre } from "../_shared/material.ts";
@@ -196,9 +196,9 @@ Deno.serve(async (req) => {
     const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
     const { nombre, rol } = await identificarUsuario(supabaseAdmin, email);
-    // Igual que en propuestas de ubicación: en la cola consta "Alumnado".
-    // Ver docs/proteccion-datos.md.
-    const firma = ES_STAFF(rol) ? nombre : AUTOR_ALUMNADO;
+    // Igual que en propuestas de ubicación: en la cola consta el grupo
+    // ("1º CS LCB"), no una persona. Ver docs/proteccion-datos.md.
+    const firma = ES_STAFF(rol) ? nombre : firmaAlumnado(email, nombre);
 
     const categoria = String(body.categoria || "").trim();
     if (!categoria) return jsonError("La categoría es obligatoria", 400);

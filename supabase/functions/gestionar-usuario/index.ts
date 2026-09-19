@@ -7,7 +7,7 @@
 // (ver la página) pero solo editar filas con Rol=Alumno, y no puede
 // cambiarles el rol — antes esto solo se comprobaba en el cliente
 // (js/ubicaciones.js `guardarUsuario`), aquí se fuerza también server-side.
-import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, passwordDeGrupo, esCuentaDeGrupo, handleCorsPreflight } from "../_shared/auth.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -186,7 +186,9 @@ Deno.serve(async (req) => {
         resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: "No tiene cuenta de acceso" });
         continue;
       }
-      const password = passwordDesdeEmail(emailU);
+      // Las cuentas de grupo llevan contraseña aleatoria: derivarla del email
+      // sería publicarla (la parte local es el nombre del grupo).
+      const password = esCuentaDeGrupo(emailU) ? passwordDeGrupo() : passwordDesdeEmail(emailU);
       const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(authId, { password });
       if (updErr) resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: updErr.message });
       else resultados.push({ nombre: nombreU, email: emailU, ok: true, password });

@@ -4,7 +4,7 @@
 // "crear_plan"/"actualizar_plan"/"eliminar_plan": Admin/Gestor cualquier equipo,
 // Profesor solo los equipos de los que es responsable (campo `responsable`).
 // "editar_registro" (corregir un mantenimiento ya finalizado): solo Admin/Gestor.
-import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, AUTOR_ALUMNADO, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // Parsea el checklist [{texto, hecho}] recibido en el cuerpo.
 function parsePasos(v: unknown): { texto: string; hecho: boolean }[] | null {
@@ -55,10 +55,10 @@ Deno.serve(async (req) => {
     const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
     const { nombre: nombreUsuario, rol } = await identificarUsuario(supabaseAdmin, email);
-    // El alumnado firma los mantenimientos como "Alumnado", no con su nombre:
-    // quien da validez al registro es el docente que pone el visto bueno
-    // (supervisado_por). Ver docs/proteccion-datos.md.
-    const firmaAlumnado = AUTOR_ALUMNADO;
+    // El alumnado firma los mantenimientos con el nombre de su grupo ("1º CS LCB"),
+    // nunca con un nombre propio: quien da validez al registro es el docente que
+    // pone el visto bueno (supervisado_por). Ver docs/proteccion-datos.md.
+    const firmaGrupo = firmaAlumnado(email, nombreUsuario);
     const esStaff = ES_STAFF(rol);
 
     if (!esStaff) {
@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
         curso_academico: curso, periodo,
         estado: "en_curso", pasos,
         fecha_inicio: ahora.slice(0, 10),
-        iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : firmaAlumnado,
+        iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : firmaGrupo,
         actualizado_en: ahora,
       };
       const { data, error } = await supabaseAdmin.from("registro_mantenimientos").insert(datos).select().single();
@@ -143,13 +143,13 @@ Deno.serve(async (req) => {
     if (!fecha || !realizadoPor) {
       return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
-    // Un alumno firma siempre como "Alumnado" (nunca con el nombre que venga del
+    // El alumnado firma siempre con su grupo (nunca con el nombre que venga del
     // cliente) y deja el registro esperando visto bueno, sin supervisor: lo pone
     // quien lo valide, que es de quien depende la validez del registro.
     const comun: Record<string, unknown> = {
       id_equipo: idEquipo, curso_academico: curso, periodo,
       fecha_realizacion: fecha,
-      realizado_por: esStaff ? realizadoPor : firmaAlumnado,
+      realizado_por: esStaff ? realizadoPor : firmaGrupo,
       supervisado_por: esStaff && body.supervisado_por ? String(body.supervisado_por) : null,
       observaciones: body.observaciones ? String(body.observaciones) : null,
       estado: esStaff ? "finalizado" : "pendiente_vb",

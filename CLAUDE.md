@@ -24,7 +24,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
 - `docs/patrones-ui.md` — autocomplete incidencias, tablas/líneas responsive, alertas stock dashboard
-- `docs/proteccion-datos.md` — **qué datos personales guarda la app y por qué**; el alumnado solo queda identificado en registros de uso y reservas, en todo lo demás firma `Alumnado` (lo impone el servidor con `autorRegistro()`). Leerlo antes de añadir cualquier campo de "quién hizo esto".
+- `docs/proteccion-datos.md` — **qué datos personales guarda la app y por qué**; el alumnado entra por cuentas de grupo y firma con el nombre del grupo (lo impone el servidor con `autorRegistro()`). Leerlo antes de añadir cualquier campo de "quién hizo esto".
 
 ---
 
@@ -49,7 +49,10 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `actualizar_equipos.py` — UPDATE en `equipos` (protocolos, temporadas, ubicaciones...)
 - `limpiar_hoja.py` — DELETE en cualquier tabla con filtro; `DRY_RUN = True` por defecto
 - `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 tablas del módulo de fungibles; `DRY_RUN = True` por defecto
-- `importar_alumnos.py` — INSERT masivo en `usuarios` desde Excel (inicio de curso) — además da de alta una cuenta real de Supabase Auth con contraseña temporal para cada alumno nuevo (sin email no puede acceder, así que el email es obligatorio); las contraseñas se imprimen al final para repartirlas, nunca se guardan en fichero
+- `crear_grupos_alumnado.py` — alta de las cuentas de GRUPO del alumnado (`1cslcb@gestionlab.cma`…); `DRY_RUN` por defecto, idempotente, se ejecuta una sola vez
+- `borrar_alumnado_personal.py` — elimina las cuentas personales de alumnado (catálogo + rol + login + recordatorios); `DRY_RUN` por defecto
+- `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
+- `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
 - `onboardear_auth_supabase.py` — alta en bloque de cuentas reales de Supabase Auth para todo el profesorado/alumnado activo del catálogo `usuarios` que aún no la tenga (mismo patrón que la Edge Function `crear-usuario`, en bloque)
 - `rellenar_mantenimientos.py` — INSERT en `registro_mantenimientos` de todos los periodos de un curso como realizados (solo Internos); `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
 - `quitar_externos_excel.py` — elimina filas de Tipo_Intervencion=Externo de un XLSX ya exportado; busca automáticamente el más reciente en Descargas o acepta ruta como argumento. Genera `*_sin_externos.xlsx` sin tocar el original. (No toca Supabase — manipula el XLSX directamente.)
@@ -154,17 +157,29 @@ Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `
 
 ---
 
-## Guardar "quién hizo esto" — minimización de datos
+## El alumnado entra por cuentas de GRUPO — minimización de datos
 
-⚠ Antes de guardar el nombre o el email de una persona en cualquier tabla, preguntarse
-si la **seguridad del laboratorio** exige saber quién fue. Si no, usar
-`autorRegistro()` de `supabase/functions/_shared/auth.ts`: devuelve el nombre del
-profesorado y la etiqueta `"Alumnado"` para todo lo demás, decidiéndolo en el servidor
-a partir del rol del email de la sesión e **ignorando lo que mande el navegador**.
+⚠ Desde 2026-09-19 **no hay cuentas personales de alumnado**. Cada grupo comparte una
+cuenta (`1cslcb@gestionlab.cma` = "1º CS LCB", `nombre` del grupo en `usuarios`,
+`rol = 'Alumno'`). No hay nombres ni emails de menores en ninguna tabla. Los permisos
+no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una persona.
 
-Solo se identifica al alumnado en `registros_cabina` / `registros_autoclave` /
-`registros_vitrina` (trazabilidad de bioseguridad) y en `reservas_equipos` (gestión de
-la franja). Detalle completo y justificación de cada caso en `docs/proteccion-datos.md`.
+- Alta de cuentas: `scripts/crear_grupos_alumnado.py` (una sola vez, no cada curso).
+- Contraseña: aleatoria y dictable (`passwordDeGrupo()`). **Nunca** `passwordDesdeEmail()`
+  en una cuenta de grupo — la parte local es el nombre del grupo.
+- El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
+  aborta). El de profesorado sigue vivo.
+
+Antes de guardar el nombre o el email de una persona en cualquier tabla, preguntarse si
+la **seguridad del laboratorio** exige saber quién fue. Si no, usar `autorRegistro()` de
+`supabase/functions/_shared/auth.ts`: devuelve el nombre del profesorado y el **nombre del
+grupo** para el alumnado, decidiéndolo en el servidor a partir del rol del email de la
+sesión e **ignorando lo que mande el navegador**.
+
+Los registros de uso (`registros_cabina` / `registros_autoclave` / `registros_vitrina`) y
+`reservas_equipos` guardan el email de la sesión, que ahora identifica **al grupo, no a la
+persona** — decisión consciente, con su coste en trazabilidad. Detalle y justificación de
+cada caso en `docs/proteccion-datos.md`.
 
 ---
 

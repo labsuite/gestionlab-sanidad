@@ -95,15 +95,31 @@ export async function identificarUsuario(supabaseAdmin: any, email: string) {
 }
 
 /**
- * Etiqueta genérica con la que firma el alumnado cualquier registro que NO
- * tenga una justificación de seguridad para identificar a la persona.
+ * Dominio de las cuentas de grupo del alumnado (una cuenta por grupo, compartida
+ * por todo el grupo: `1cslcb@gestionlab.cma` = "1º CS LCB"). No existe ninguna
+ * cuenta personal de alumnado — ver docs/modulo-usuarios.md.
+ */
+export const DOMINIO_GRUPOS_ALUMNADO = "@gestionlab.cma";
+
+/**
+ * Etiqueta de reserva para alumnado que NO entra por una cuenta de grupo.
+ * No debería darse, pero si apareciese una cuenta personal, firma genérico
+ * antes que con un nombre propio.
  */
 export const AUTOR_ALUMNADO = "Alumnado";
 
 /**
+ * Con qué firma el alumnado un registro. Con cuenta de grupo firma el grupo
+ * ("1º CS LCB"): no identifica a nadie y dice mucho más que "Alumnado".
+ */
+export function firmaAlumnado(email: string, nombre: string): string {
+  return esCuentaDeGrupo(email) && nombre ? nombre : AUTOR_ALUMNADO;
+}
+
+/**
  * Quién consta como autor de un registro, aplicando minimización de datos
- * (RGPD): el profesorado firma con su nombre, el alumnado con la etiqueta
- * genérica `AUTOR_ALUMNADO`.
+ * (RGPD): el profesorado firma con su nombre y el alumnado con el nombre de su
+ * grupo ("1º CS LCB"), que no identifica a ninguna persona.
  *
  * La decisión se toma AQUÍ, en el servidor, a partir del rol del email de la
  * sesión — nunca a partir de lo que mande el navegador. Así el nombre de un
@@ -118,7 +134,7 @@ export const AUTOR_ALUMNADO = "Alumnado";
  */
 export async function autorRegistro(supabaseAdmin: any, email: string, nombrePropuesto?: unknown) {
   const { nombre, rol } = await identificarUsuario(supabaseAdmin, email);
-  if (!ES_STAFF(rol)) return { autor: AUTOR_ALUMNADO, rol, esStaff: false };
+  if (!ES_STAFF(rol)) return { autor: firmaAlumnado(email, nombre), rol, esStaff: false };
   const propuesto = typeof nombrePropuesto === "string" ? nombrePropuesto.trim() : "";
   return { autor: propuesto || nombre, rol, esStaff: true };
 }
@@ -171,6 +187,35 @@ export function generarPasswordTemporal(): string {
  * Supabase Auth exige 6 caracteres mínimo, así que los correos con parte local más corta
  * se completan con dígitos (p.ej. "ana" -> "ana123").
  */
+/**
+ * Contraseña de una cuenta de grupo. NO puede derivarse del email como la del
+ * alumnado individual: la parte local es el propio nombre del grupo
+ * (`1cslcb`), así que cualquiera de otro grupo la adivinaría a la primera.
+ *
+ * Dos palabras y tres dígitos: aleatoria de verdad, pero se dicta en clase sin
+ * deletrear ("praza-verde-482").
+ */
+const PALABRAS_PASSWORD = [
+  "auga", "praia", "vento", "ceo", "pedra", "faro", "ponte", "horta",
+  "verde", "azul", "roxo", "dourado", "prata", "ámbar", "coral", "malva",
+  "lúa", "sol", "raio", "brisa", "monte", "río", "campo", "illa",
+];
+
+export function passwordDeGrupo(): string {
+  const bytes = new Uint8Array(3);
+  crypto.getRandomValues(bytes);
+  const a = PALABRAS_PASSWORD[bytes[0] % PALABRAS_PASSWORD.length];
+  let b = PALABRAS_PASSWORD[bytes[1] % PALABRAS_PASSWORD.length];
+  if (b === a) b = PALABRAS_PASSWORD[(bytes[1] + 1) % PALABRAS_PASSWORD.length];
+  const n = 100 + (bytes[2] % 100) * 9 % 900;
+  return `${a}-${b}-${n}`;
+}
+
+/** true si el email es el de una cuenta de grupo del alumnado. */
+export function esCuentaDeGrupo(email: string): boolean {
+  return String(email || "").toLowerCase().trim().endsWith(DOMINIO_GRUPOS_ALUMNADO);
+}
+
 export function passwordDesdeEmail(email: string): string {
   const local = String(email || "").split("@")[0].trim().toLowerCase();
   if (!local) return generarPasswordTemporal();

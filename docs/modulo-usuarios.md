@@ -171,7 +171,67 @@ fila y, en la cabecera de cada tarjeta de ciclo, **✅ Todos / ⬜ Ninguno**.
   + un Profesor solo puede tocar filas con `Rol = Alumno`.
 - Los usuarios `_sbOnly` salen con la casilla deshabilitada (no tienen fila en el catálogo).
 
+## Cuentas de grupo del alumnado (2026-09-19)
+
+⚠ **El alumnado ya no tiene cuenta personal.** Cada grupo comparte una única cuenta:
+
+| Grupo | Cuenta | Contraseña |
+|---|---|---|
+| 1º CS LCB | `1cslcb@gestionlab.cma` | propia del grupo, aleatoria |
+| 2º CS APC | `2csapc@gestionlab.cma` | … |
+
+Formato del email: `<curso><ciclo><especialidad>@gestionlab.cma`, todo junto y en
+minúsculas (`1cslcb`, `2zsapc`). El dominio es inventado y **no existe**: no se manda
+ni se recibe correo en esas cuentas, solo sirven para el login (comprobado: Supabase Auth
+acepta el dominio y admite varias sesiones simultáneas con la misma cuenta, cada una con
+su token).
+
+En el catálogo `usuarios` la fila del grupo tiene `nombre = "1º CS LCB"` y `rol = 'Alumno'`,
+así que **toda la lógica de permisos sigue igual**: `getUserRole()`, `PERMISOS.Alumno`,
+`getUbicacionesAlumno()`, la pestaña Alumnos agrupada por `Ciclo_Principal`… nada de eso
+hubo que tocarlo. Lo único que cambia es que detrás de esa fila hay un grupo y no una persona.
+
+**Alta:** `scripts/crear_grupos_alumnado.py` (lista de grupos en la sección `CONFIGURACIÓN`,
+`DRY_RUN` por defecto). Es idempotente y se ejecuta **una sola vez**, no cada curso: los
+grupos no cambian de un año a otro. Para quitar un grupo que no exista, bórralo desde la
+página Usuarios con el botón 🗑️ (borra catálogo + rol + login).
+
+**Contraseña:** aleatoria y dictable, tipo `monte-auga-698` (`passwordDeGrupo()` en
+`_shared/auth.ts`). **No** se deriva del email como la del alumnado individual: la parte
+local es el propio nombre del grupo, así que `passwordDesdeEmail()` la dejaría a la vista de
+cualquiera. El botón 🔑 de la página Usuarios detecta las cuentas de grupo
+(`esCuentaDeGrupo()`) y genera una nueva de ese tipo. Conviene cambiarlas al inicio de cada
+curso.
+
+**Por qué:** protección de datos — así no hay nombres ni emails de menores en la base de
+datos. Ver `docs/proteccion-datos.md` para el detalle, incluido el efecto sobre los registros
+de uso (pasan a identificar al grupo, no a la persona).
+
+## Import de alumnado: RETIRADO (2026-09-19)
+
+Los tres caminos que creaban cuentas personales de alumnado están cerrados:
+
+| Camino | Estado |
+|---|---|
+| Botón "📥 Importar alumnado" | Eliminado: botón, modal `modal-importar-alumnos` y funciones `abrirModalImportarAlumnos` / `_cargarPreviewImportarAlumnos` / `_renderPreviewImportarAlumnos` / `confirmarImportarAlumnos` |
+| Edge Function `importar-alumnos` | Desplegada pero responde **410** con el motivo (mejor que un 404 mudo para una pestaña sin recargar) |
+| `scripts/importar_alumnos.py` | Aborta nada más arrancar |
+
+**Trebello no servía para esto de todos modos.** `/api/bioDesk/alumnos` devuelve
+`{nombre, email, ciclo, modulo, laboratorio}` — una fila por matrícula alumno×módulo — y
+**no expone el curso (1º/2º)** ni ningún endpoint de grupos (`/grupos`, `/cursos`, `/ciclos`
+dan 404). Tampoco devuelve los ciclos **ZS**: solo CS. Por eso la lista de grupos vive en
+`scripts/crear_grupos_alumnado.py` y no se importa.
+
+El import de **profesorado** no se toca: son adultos, personal del centro, y su nombre hace
+falta para la responsabilidad sobre equipos.
+
 ## Contraseña del alumnado y "Restablecer contraseña" (2026-09-17)
+
+> ⚠ Lo de abajo describe el sistema de **cuentas personales**, ya retirado. Se conserva
+> porque el botón 🔑 y `passwordDesdeEmail()` siguen existiendo para el profesorado y para
+> cualquier cuenta que no sea de grupo.
+
 
 La contraseña de una cuenta de alumnado es **la parte del email anterior a `@`**, en minúsculas
 — la misma convención que TRebello, para no obligarles a recordar dos. Se genera con

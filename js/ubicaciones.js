@@ -241,7 +241,6 @@ function renderUsuarios() {
         oninput="buscarUsuario(this.value)"
         style="flex:1;min-width:200px;max-width:360px;padding:8px 12px;border-radius:8px;border:1px solid var(--border);font-size:13px">
       <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-        ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarAlumnos()">📥 Importar alumnado</button>` : ''}
         ${puedeCrear ? `<button class="btn btn-secondary" onclick="abrirModalImportarProfesores()">📥 Importar profesorado</button>` : ''}
         ${puedeCrear ? `<button class="btn btn-primary" onclick="openModalUsuario()">+ Nuevo usuario</button>` : ''}
       </div>
@@ -1096,195 +1095,17 @@ async function guardarUsuario() {
 }
 
 // ============================================================
-// IMPORTAR ALUMNOS DESDE SANIDAD CMA
+// IMPORTAR ALUMNOS DESDE SANIDAD CMA — RETIRADO (2026-09-19)
 // ============================================================
-let _previewAlumnosCMA = [];
-let _matriculasAjenasDescartadas = 0;
-
-function abrirModalImportarAlumnos() {
-  _previewAlumnosCMA = [];
-  _matriculasAjenasDescartadas = 0;
-  document.getElementById('importar-alumnos-contenido').innerHTML = `
-    <div class="empty-state" style="padding:40px 0">
-      <div class="empty-state-icon">⏳</div>
-      <div class="empty-state-title">Consultando Sanidad CMA...</div>
-    </div>`;
-  document.getElementById('btn-confirmar-importar-alumnos').style.display = 'none';
-  openModal('modal-importar-alumnos');
-  _cargarPreviewImportarAlumnos();
-}
-
-async function _cargarPreviewImportarAlumnos() {
-  const cont = document.getElementById('importar-alumnos-contenido');
-  try {
-    const { alumnos } = await callEdgeFunction('importar-alumnos', { accion: 'preview' });
-    // Sanidad CMA devuelve TODAS las matrículas, incluidas las de módulos transversales
-    // (FOL, idiomas, itinerario de empregabilidade, sostenibilidade...). En GestionLab no
-    // sirven de nada: se descartan aquí y se avisa de cuántas eran.
-    const todas = alumnos || [];
-    _previewAlumnosCMA = todas.filter(a => _moduloInteresaEnGestionLab(a.modulo));
-    _matriculasAjenasDescartadas = todas.length - _previewAlumnosCMA.length;
-    _renderPreviewImportarAlumnos();
-  } catch (e) {
-    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
-      <div class="empty-state-icon">⚠️</div>
-      <div class="empty-state-title">No se pudo consultar Sanidad CMA</div>
-      <div style="color:var(--text-muted);font-size:13px;margin-top:6px">${e.message}</div>
-    </div>`;
-  }
-}
-
-// Cada fila de Sanidad CMA es una matrícula (alumno × módulo), no un alumno único —
-// un mismo alumno puede aparecer varias veces con módulo/lab distintos. Se agrupa por
-// Ciclo → Módulo para poder seleccionar en bloque, y al importar se fusionan por email.
-function _renderPreviewImportarAlumnos() {
-  const cont = document.getElementById('importar-alumnos-contenido');
-  const btnImportar = document.getElementById('btn-confirmar-importar-alumnos');
-  const nuevos = _previewAlumnosCMA.filter(a => !a.existe);
-
-  if (!_previewAlumnosCMA.length) {
-    cont.innerHTML = `<div class="empty-state" style="padding:40px 0">
-      <div class="empty-state-icon">🎓</div>
-      <div class="empty-state-title">Sanidad CMA no tiene alumnado disponible ahora mismo</div>
-    </div>`;
-    btnImportar.style.display = 'none';
-    return;
-  }
-
-  const grupos = {};
-  _previewAlumnosCMA.forEach((a, i) => {
-    const ciclo = a.ciclo || 'Sin ciclo';
-    const modulo = a.modulo || 'Sin módulo';
-    (grupos[ciclo] ??= {});
-    (grupos[ciclo][modulo] ??= []).push(i);
-  });
-
-  const ciclosHtml = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es')).map(ciclo => {
-    const modulos = grupos[ciclo];
-    const idsCiclo = Object.values(modulos).flat();
-    const habilesCiclo = idsCiclo.some(i => !_previewAlumnosCMA[i].existe);
-
-    const modulosHtml = Object.keys(modulos).sort((a, b) => a.localeCompare(b, 'es')).map(modulo => {
-      const ids = modulos[modulo];
-      const habilesModulo = ids.some(i => !_previewAlumnosCMA[i].existe);
-      const filas = ids.map(i => {
-        const a = _previewAlumnosCMA[i];
-        return `<tr style="${a.existe ? 'opacity:0.5' : ''}">
-          <td><input type="checkbox" class="importar-alumno-check" data-ciclo="${_escAttr(ciclo)}" data-modulo="${_escAttr(modulo)}" value="${i}" ${a.existe ? 'disabled' : 'checked'}></td>
-          <td>${a.nombre || '—'}</td>
-          <td>${a.email || '—'}</td>
-          <td>${a.laboratorio || '—'}</td>
-          <td>${a.existe ? '<span class="badge badge-gray">Ya existe</span>' : '<span class="badge badge-green">Nuevo</span>'}</td>
-        </tr>`;
-      }).join('');
-      return `<div style="margin:10px 0">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;cursor:${habilesModulo ? 'pointer' : 'default'}">
-          <input type="checkbox" ${habilesModulo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportar('modulo','${_escAttr(ciclo)}','${_escAttr(modulo)}',this.checked)">
-          ${modulo} <span style="font-weight:400;color:var(--text-muted)">(${ids.length})</span>
-        </label>
-        <table style="margin-top:4px"><tbody>${filas}</tbody></table>
-      </div>`;
-    }).join('');
-
-    return `<div class="card" style="margin-bottom:12px">
-      <div class="card-header">
-        <label style="display:flex;align-items:center;gap:8px;cursor:${habilesCiclo ? 'pointer' : 'default'}">
-          <input type="checkbox" ${habilesCiclo ? 'checked' : 'disabled'} onchange="_toggleGrupoImportar('ciclo','${_escAttr(ciclo)}',null,this.checked)">
-          <span class="card-title" style="margin:0">${ciclo} <span style="font-weight:400;color:var(--text-muted)">(${idsCiclo.length})</span></span>
-        </label>
-      </div>
-      <div style="padding:4px 16px 12px">${modulosHtml}</div>
-    </div>`;
-  }).join('');
-
-  cont.innerHTML = `
-    <div style="margin-bottom:10px;font-size:13px;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <span>${nuevos.length} matrícula(s) nueva(s) de ${_previewAlumnosCMA.length} en Sanidad CMA. Marca ciclo y/o módulo para seleccionar en bloque.${_matriculasAjenasDescartadas ? ` <span style="color:var(--text-muted)">(${_matriculasAjenasDescartadas} matrícula(s) de módulos transversales —FOL, idiomas, itinerario de empregabilidade...— no se muestran.)</span>` : ''}</span>
-      <span style="white-space:nowrap">
-        <button type="button" onclick="_toggleSeleccionarTodosImportar(true)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Todo</button> ·
-        <button type="button" onclick="_toggleSeleccionarTodosImportar(false)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:12px;padding:0">Nada</button>
-      </span>
-    </div>
-    ${ciclosHtml}`;
-  btnImportar.style.display = nuevos.length ? '' : 'none';
-}
-
-function _escAttr(s) {
-  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function _toggleGrupoImportar(nivel, ciclo, modulo, checked) {
-  document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => {
-    const coincideCiclo = cb.dataset.ciclo === ciclo;
-    const coincide = nivel === 'ciclo' ? coincideCiclo : (coincideCiclo && cb.dataset.modulo === modulo);
-    if (coincide) cb.checked = checked;
-  });
-}
-
-function _toggleSeleccionarTodosImportar(checked) {
-  document.querySelectorAll('.importar-alumno-check:not(:disabled)').forEach(cb => { cb.checked = checked; });
-  document.querySelectorAll('#importar-alumnos-contenido input[type=checkbox]:not(.importar-alumno-check):not(:disabled)').forEach(cb => { cb.checked = checked; });
-}
-
-async function confirmarImportarAlumnos() {
-  const seleccionadas = Array.from(document.querySelectorAll('.importar-alumno-check:checked'))
-    .map(cb => _previewAlumnosCMA[Number(cb.value)]);
-  if (!seleccionadas.length) { showToast('Selecciona al menos un alumno', 'error'); return; }
-
-  // Un alumno puede tener varias matrículas seleccionadas (módulo+lab distintos) — se fusionan por email
-  const porEmail = {};
-  seleccionadas.forEach(a => {
-    const email = (a.email || '').toLowerCase().trim();
-    if (!email) return;
-    (porEmail[email] ??= { nombre: a.nombre, email, ciclo: a.ciclo, modulos: new Set(), labs: new Set() });
-    if (a.modulo) porEmail[email].modulos.add(a.modulo);
-    if (a.laboratorio) porEmail[email].labs.add(a.laboratorio);
-  });
-  const alumnos = Object.values(porEmail).map(a => ({
-    nombre: a.nombre, email: a.email, ciclo: a.ciclo,
-    modulo: [...a.modulos].join(','), laboratorio: [...a.labs].join(','),
-  }));
-
-  showLoading('Importando alumnado...');
-  try {
-    const { resultados } = await callEdgeFunction('importar-alumnos', { accion: 'importar', alumnos });
-    _renderResultadosImportarAlumnos(resultados);
-    await loadAllData();
-  } catch (e) {
-    showToast('Error importando: ' + e.message, 'error');
-  }
-  hideLoading();
-}
-
-function _renderResultadosImportarAlumnos(resultados) {
-  const cont = document.getElementById('importar-alumnos-contenido');
-  document.getElementById('btn-confirmar-importar-alumnos').style.display = 'none';
-  const ok = resultados.filter(r => r.ok);
-  const fallidos = resultados.filter(r => !r.ok);
-
-  const filasOk = ok.map(r => `
-    <tr>
-      <td>${r.email}</td>
-      <td><code style="font-size:12px">${r.password_temporal}</code></td>
-    </tr>`).join('');
-
-  const filasError = fallidos.map(r => `<li>${r.email}: ${r.motivo || 'error desconocido'}</li>`).join('');
-
-  cont.innerHTML = `
-    ${ok.length ? `
-      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">✅ ${ok.length} alumno(s) importado(s)</div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">La contraseña es la parte del email anterior a «@», igual que en TRebello. Se puede volver a dejar así con 🔑 Restablecer contraseña.</div>
-      <div class="card" style="margin-bottom:16px">
-        <table>
-          <thead><tr><th>Email</th><th>Contraseña</th></tr></thead>
-          <tbody>${filasOk}</tbody>
-        </table>
-      </div>` : ''}
-    ${fallidos.length ? `
-      <div class="empty-state-title" style="text-align:left;margin-bottom:8px">⚠️ ${fallidos.length} omitido(s)</div>
-      <ul style="font-size:13px;color:var(--text-muted)">${filasError}</ul>` : ''}
-  `;
-}
+// El alumnado ya no tiene cuenta personal: cada grupo comparte una cuenta
+// (`1cslcb@gestionlab.cma` = "1º CS LCB"), y esas cuentas se crean una sola vez
+// con scripts/crear_grupos_alumnado.py — no hay nada que importar cada curso.
+// Se quitaron el botón, el modal `modal-importar-alumnos` y las funciones
+// `abrirModalImportarAlumnos` / `_cargarPreviewImportarAlumnos` /
+// `_renderPreviewImportarAlumnos` / `confirmarImportarAlumnos`. La Edge Function
+// `importar-alumnos` responde 410 por si alguien la llama a mano.
+// Ver docs/modulo-usuarios.md y docs/proteccion-datos.md.
+// El import de PROFESORADO sigue vivo, aquí debajo.
 
 // ============================================================
 // IMPORTAR PROFESORADO DESDE SANIDAD CMA (2 pasos: módulos → equipos)
