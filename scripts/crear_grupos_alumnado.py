@@ -54,7 +54,7 @@ GRUPOS = [
     ("2º CS LCB", "2cslcb", "CS Laboratorio Clínico e Biomédico", ""),
     ("1º CS QSA", "1csqsa", "CS Química e Saúde Ambiental", ""),
     ("2º CS QSA", "2csqsa", "CS Química e Saúde Ambiental", ""),
-    ("1º ZS APC", "1zsapc", "ZS Anatomía Patolóxica e Citodiagnóstico", ""),
+    # 1º ZS APC no existe (confirmado por la usuaria, 2026-09-19)
     ("2º ZS APC", "2zsapc", "ZS Anatomía Patolóxica e Citodiagnóstico", ""),
     ("1º ZS LCB", "1zslcb", "ZS Laboratorio Clínico e Biomédico", ""),
     ("2º ZS LCB", "2zslcb", "ZS Laboratorio Clínico e Biomédico", ""),
