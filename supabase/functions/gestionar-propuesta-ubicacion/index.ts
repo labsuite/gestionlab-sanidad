@@ -13,7 +13,7 @@
 //       ese mismo equipo y sigue pendiente.
 // - aceptar / aceptar_varias / rechazar: staff (requireStaff). `revisado_por`
 //   lo pone el servidor con el nombre de quien valida — nunca llega del cliente.
-import { requireStaff, requireValidSession, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireValidSession, AUTOR_ALUMNADO, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const ROLES_STAFF = ["Administrador", "Gestor", "Profesor"];
 
@@ -78,6 +78,11 @@ Deno.serve(async (req) => {
     }
 
     const { nombre, rol } = await identificar(supabaseAdmin, email);
+    // En la cola de validación consta "Alumnado", no el nombre: para decidir si
+    // la ubicación es correcta no hace falta saber quién la propuso. El email sí
+    // se guarda porque es funcional (repropuesta, doble verificación y "mis
+    // propuestas"), y se borra al cerrar el curso — ver docs/proteccion-datos.md.
+    const firma = ROLES_STAFF.includes(rol) ? nombre : AUTOR_ALUMNADO;
 
     // Repropuesta: sustituye la pendiente anterior de esta misma persona para
     // este mismo equipo, en vez de acumular dos versiones de lo mismo.
@@ -93,7 +98,7 @@ Deno.serve(async (req) => {
       id_ubicacion: noEncontrado ? null : idUbicacion,
       no_encontrado: noEncontrado,
       ubicacion_anterior: equipo.ubicacion || null,
-      propuesto_por: nombre,
+      propuesto_por: firma,
       email_propuesto_por: email,
       observaciones: String(body.observaciones || "") || null,
       estado: "pendiente",
@@ -122,7 +127,7 @@ Deno.serve(async (req) => {
     const otra = (coincidencias || []).find((c: any) =>
       (c.email_propuesto_por || "").toLowerCase() !== email);
     if (otra) {
-      const revisadoPor = `Doble verificación (${otra.propuesto_por} + ${nombre})`;
+      const revisadoPor = "Doble verificación (2 personas)";
       await aplicarUbicacion(supabaseAdmin, propuesta, revisadoPor,
         (coincidencias || []).map((c: any) => c.id_propuesta));
       return jsonOk({

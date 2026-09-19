@@ -6,7 +6,7 @@
 // eliminar/recogida) también son Admin/Gestor (canEdit en
 // renderResiduosContenedores; el Profesor solo puede "+ Añadir residuo").
 // "resolver_consulta" es Admin/Gestor.
-import { requireValidSession, requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireValidSession, requireAdminOrGestor, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarId(prefijo: string): string {
   return prefijo + Date.now().toString(36).toUpperCase().slice(-6);
@@ -272,14 +272,16 @@ Deno.serve(async (req) => {
 
   // ── Añadir residuo a un contenedor (actualiza nivel del contenedor) ──
   if (accion === "añadir_adicion") {
-    const { error: authError, supabaseAdmin } = await requireValidSession(req);
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
 
     const idContenedor = String(body.id_contenedor || "").trim();
     const idResiduo = String(body.id_residuo || "").trim();
     const descripcionLibre = String(body.descripcion_libre || "").trim();
     const nivel = String(body.nivel || "").trim();
-    const usuario = String(body.usuario || "").trim();
+    // Quién firma la adición lo decide el servidor, no el navegador: el
+    // alumnado queda como "Alumnado" (RGPD, ver docs/proteccion-datos.md).
+    const { autor: usuario } = await autorRegistro(supabaseAdmin, email, body.usuario);
     // "registrar igualmente" tras un bloqueo de la IA: salta SOLO la capa IA,
     // nunca la validación determinista de Nivel 1/2 de abajo.
     const iaOverride = body.ia_override === true;
@@ -459,7 +461,7 @@ Deno.serve(async (req) => {
 
   // ── Consulta de residuo desconocido (cualquiera puede avisar) ──
   if (accion === "crear_consulta") {
-    const { error: authError, supabaseAdmin } = await requireValidSession(req);
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
 
     const descripcion = String(body.descripcion || "").trim();
@@ -468,9 +470,12 @@ Deno.serve(async (req) => {
       return jsonError("descripcion y ubicacion_dejado son obligatorios", 400);
     }
     const prioridad = String(body.prioridad || "Normal").trim();
+    // Igual que en las adiciones: el alumnado consulta como "Alumnado". La
+    // consulta ya lleva `ubicacion_dejado`, que es lo que Gestión necesita.
+    const { autor } = await autorRegistro(supabaseAdmin, email, body.usuario);
     const datos = {
       id_consulta: generarId("CR-"), fecha: hoy(),
-      usuario: body.usuario ? String(body.usuario) : null,
+      usuario: autor,
       descripcion, ubicacion_dejado: ubicacionDejado, estado: "Pendiente",
       categoria_ia: body.categoria_ia ? String(body.categoria_ia) : null,
       guia_provisional: body.guia_provisional ? String(body.guia_provisional) : null,

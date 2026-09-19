@@ -24,6 +24,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
 - `docs/patrones-ui.md` — autocomplete incidencias, tablas/líneas responsive, alertas stock dashboard
+- `docs/proteccion-datos.md` — **qué datos personales guarda la app y por qué**; el alumnado solo queda identificado en registros de uso y reservas, en todo lo demás firma `Alumnado` (lo impone el servidor con `autorRegistro()`). Leerlo antes de añadir cualquier campo de "quién hizo esto".
 
 ---
 
@@ -150,6 +151,20 @@ Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `
 
 - `generarTextoEmailPedido(pedidoId)` construye el texto: saludo (usa `Persona_Contacto` del proveedor si existe, si no genérico "Buenos días,"), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre sin firma — la firma la añade el cliente de correo de la usuaria.
 - Solo tiene botón **📋 Copiar texto** (`copiarTextoEmailPedido`, vía `navigator.clipboard`). No hay envío ni apertura directa del cliente de correo: la usuaria prefiere copiar, pegar y revisar antes de enviar.
+
+---
+
+## Guardar "quién hizo esto" — minimización de datos
+
+⚠ Antes de guardar el nombre o el email de una persona en cualquier tabla, preguntarse
+si la **seguridad del laboratorio** exige saber quién fue. Si no, usar
+`autorRegistro()` de `supabase/functions/_shared/auth.ts`: devuelve el nombre del
+profesorado y la etiqueta `"Alumnado"` para todo lo demás, decidiéndolo en el servidor
+a partir del rol del email de la sesión e **ignorando lo que mande el navegador**.
+
+Solo se identifica al alumnado en `registros_cabina` / `registros_autoclave` /
+`registros_vitrina` (trazabilidad de bioseguridad) y en `reservas_equipos` (gestión de
+la franja). Detalle completo y justificación de cada caso en `docs/proteccion-datos.md`.
 
 ---
 

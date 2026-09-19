@@ -12,7 +12,7 @@
 // - revisión de inventario: cualquiera puede *proponerla* (revision_crear,
 //   gated client-side por Puede_Revisar_Inventario, un flag de datos no de
 //   rol); aplicarla/descartarla es Admin/Gestor/Profesor (requireStaff).
-import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -85,7 +85,10 @@ Deno.serve(async (req) => {
   if (accion === "consumo" || accion === "traslado" || accion === "asegurar_lote_legacy" || accion === "revision_crear") {
     const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
-    const usuarioNombre = String(body.usuario || email || "Usuario");
+    // Consumo, traslado y recuento de inventario los puede hacer el alumnado:
+    // el servidor decide la firma según el rol y nunca guarda su nombre
+    // (RGPD, ver docs/proteccion-datos.md).
+    const { autor: usuarioNombre } = await autorRegistro(supabaseAdmin, email, body.usuario);
     const idMaterial = String(body.id_material || "").trim();
     if (!idMaterial) return jsonError("id_material es obligatorio", 400);
     const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
@@ -420,7 +423,7 @@ Deno.serve(async (req) => {
     } else {
       await supabaseAdmin.from("material").update({ stock_actual: stockRealNum }).eq("id_material", rev.id_material);
     }
-    await registrarMovimiento(supabaseAdmin, mat, "Ajuste", Math.abs(Number(rev.diferencia) || 0), String(body.usuario || "Usuario"), `Ajuste por revisión de inventario (alumno: ${rev.usuario})`);
+    await registrarMovimiento(supabaseAdmin, mat, "Ajuste", Math.abs(Number(rev.diferencia) || 0), String(body.usuario || "Usuario"), `Ajuste por revisión de inventario`);
     await supabaseAdmin.from("revisiones_inventario").delete().eq("id_revision", idRevision);
     const { data: matFinal } = await supabaseAdmin.from("material").select("*").eq("id_material", rev.id_material).single();
     return jsonOk({ material: matFinal, aplicada: idRevision });

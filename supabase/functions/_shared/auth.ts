@@ -94,6 +94,35 @@ export async function identificarUsuario(supabaseAdmin: any, email: string) {
   return { nombre: email, rol: "Alumno" };
 }
 
+/**
+ * Etiqueta genérica con la que firma el alumnado cualquier registro que NO
+ * tenga una justificación de seguridad para identificar a la persona.
+ */
+export const AUTOR_ALUMNADO = "Alumnado";
+
+/**
+ * Quién consta como autor de un registro, aplicando minimización de datos
+ * (RGPD): el profesorado firma con su nombre, el alumnado con la etiqueta
+ * genérica `AUTOR_ALUMNADO`.
+ *
+ * La decisión se toma AQUÍ, en el servidor, a partir del rol del email de la
+ * sesión — nunca a partir de lo que mande el navegador. Así el nombre de un
+ * alumno no puede acabar en la base de datos ni por error del cliente ni por
+ * una llamada manual a la función.
+ *
+ * Excepciones deliberadas, donde sí se guarda identidad porque la seguridad
+ * del laboratorio lo justifica y NO deben usar este helper:
+ *   - registros_cabina / registros_autoclave / registros_vitrina
+ *   - reservas_equipos
+ * Ver docs/proteccion-datos.md.
+ */
+export async function autorRegistro(supabaseAdmin: any, email: string, nombrePropuesto?: unknown) {
+  const { nombre, rol } = await identificarUsuario(supabaseAdmin, email);
+  if (!ES_STAFF(rol)) return { autor: AUTOR_ALUMNADO, rol, esStaff: false };
+  const propuesto = typeof nombrePropuesto === "string" ? nombrePropuesto.trim() : "";
+  return { autor: propuesto || nombre, rol, esStaff: true };
+}
+
 // Las Edge Functions de Supabase no añaden cabeceras CORS por defecto: sin
 // esto, el navegador bloquea la respuesta al preflight (OPTIONS) con
 // "Failed to fetch" aunque la función funcione perfectamente por curl/Python

@@ -2,7 +2,7 @@
 // tanto Profesor/Gestor/Admin (openModalIncidencia) como el propio Alumno
 // (aviso de problema con un equipo, openModalAvisoAlumno — ver equipos-render.js
 // getUserRole()==='Alumno'). "eliminar" queda restringido a Admin/Gestor.
-import { requireValidSession, requireAdminOrGestor, requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireValidSession, requireAdminOrGestor, requireStaff, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarIdIncidencia(): string {
   return "INC-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -23,17 +23,22 @@ Deno.serve(async (req) => {
   const accion = String(body.accion || "");
 
   if (accion === "crear") {
-    const { error: authError, supabaseAdmin } = await requireValidSession(req);
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
 
     const idEquipo = String(body.id_equipo || "").trim();
     const descripcionProblema = String(body.descripcion_problema || "").trim();
     if (!idEquipo || !descripcionProblema) return jsonError("id_equipo y descripcion_problema son obligatorios", 400);
 
+    // Un aviso de alumnado queda como "Alumnado": lo que hace falta para
+    // atenderlo es el equipo y la descripción, no quién lo vio (RGPD, ver
+    // docs/proteccion-datos.md). El profesorado sí firma con su nombre.
+    const { autor } = await autorRegistro(supabaseAdmin, email, body.reportado_por);
+
     const datos = {
       id_incidencia: generarIdIncidencia(),
       id_equipo: idEquipo,
-      reportado_por: body.reportado_por ? String(body.reportado_por) : null,
+      reportado_por: autor,
       descripcion_problema: descripcionProblema,
       impacto: body.impacto ? String(body.impacto) : null,
       urgencia: body.urgencia ? String(body.urgencia) : "Normal",

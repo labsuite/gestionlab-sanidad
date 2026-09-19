@@ -466,14 +466,18 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
   if (esExterno) {
     rp.value = enCurso?.Realizado_Por || equipo.Proveedor_Servicio_Tecnico || '';
     rp.placeholder = 'Empresa que realizó el mantenimiento';
+    rp.readOnly = false;
   } else {
-    const emailNorm = (currentUser?.email || '').toLowerCase().trim();
-    const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
-    rp.value = u?.Nombre || currentUser?.name || '';
+    rp.value = _nombreUsuarioActual();
     rp.placeholder = 'Nombre del responsable';
+    // El alumnado no puede firmar con su nombre: queda como "Alumnado".
+    rp.readOnly = getUserRole() === 'Alumno';
   }
   const rpHint = document.getElementById('mant-realizado-hint');
-  if (rpHint) rpHint.textContent = esExterno ? '(empresa)' : '';
+  if (rpHint) {
+    rpHint.textContent = esExterno ? '(empresa)'
+      : (getUserRole() === 'Alumno' ? '(no se guarda tu nombre)' : '');
+  }
   // El alumnado no firma la supervisión: la pone el docente al dar el visto bueno.
   const supEl = document.getElementById('mant-supervisado-por');
   supEl.value = '';
@@ -514,7 +518,11 @@ function _leerChecklist() {
   }));
 }
 
+// Quién firma el registro. El alumnado firma como "Alumnado": el servidor lo
+// impone igualmente (gestionar-mantenimiento), pero lo ponemos también aquí para
+// que en pantalla se vea lo que se va a guardar de verdad. Ver docs/proteccion-datos.md.
 function _nombreUsuarioActual() {
+  if (getUserRole() === 'Alumno') return 'Alumnado';
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const u = DATA.usuarios.find(x => (x.Email || '').toLowerCase().trim() === emailNorm);
   return u?.Nombre || currentUser?.name || '';
