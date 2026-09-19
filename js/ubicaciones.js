@@ -1,4 +1,14 @@
 // ============================================================
+// HELPERS COMPARTIDOS
+// ============================================================
+// Escapa un valor para meterlo dentro de un atributo HTML. Vive aquí arriba, y no
+// dentro de la sección que lo introdujo, porque lo usan equipos-render.js,
+// material.js, inventariar-material.js y ubicar-equipos.js además de este archivo.
+function _escAttr(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ============================================================
 // PROVEEDORES — RENDER
 // ============================================================
 function renderProveedores() {
