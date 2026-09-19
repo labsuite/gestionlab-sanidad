@@ -50,7 +50,8 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `limpiar_hoja.py` — DELETE en cualquier tabla con filtro; `DRY_RUN = True` por defecto
 - `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 tablas del módulo de fungibles; `DRY_RUN = True` por defecto
 - `crear_grupos_alumnado.py` — alta de las cuentas de GRUPO del alumnado (`1cslcb@gestionlab.cma`…); `DRY_RUN` por defecto, idempotente, se ejecuta una sola vez
-- `borrar_alumnado_personal.py` — elimina las cuentas personales de alumnado (catálogo + rol + login + recordatorios); `DRY_RUN` por defecto
+- `borrar_alumnado_personal.py` — elimina las cuentas personales de alumnado (catálogo + rol + login + recordatorios); `DRY_RUN` por defecto. ⚠ La baja del login falla con 504 muy a menudo: rematar siempre con `limpiar_logins_huerfanos.py`
+- `limpiar_logins_huerfanos.py` — borra de Supabase Auth los logins sin fila en `usuarios` ni en `public.users`; `DRY_RUN` por defecto
 - `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
 - `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
 - `onboardear_auth_supabase.py` — alta en bloque de cuentas reales de Supabase Auth para todo el profesorado/alumnado activo del catálogo `usuarios` que aún no la tenga (mismo patrón que la Edge Function `crear-usuario`, en bloque)

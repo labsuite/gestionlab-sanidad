@@ -129,6 +129,14 @@ Dos cosas cambiaron al pasar a cuentas compartidas:
 Las 36 cuentas personales del curso anterior se eliminan con
 `scripts/borrar_alumnado_personal.py` (catálogo + rol + login + recordatorios).
 
+⚠ **La baja del login falla a menudo.** En la ejecución real (2026-09-19) la API
+de Auth devolvió 504 en 34 de las 36: el catálogo y el rol quedaron borrados pero
+la cuenta de acceso siguió viva, y una cuenta sin fila en el catálogo se trata
+como **Alumno** en `getRealUserRole()` — o sea, podían seguir entrando. Rematar
+siempre con `scripts/limpiar_logins_huerfanos.py --aplicar`, que borra los logins
+sin fila en `usuarios` **ni** en `public.users` (ese doble filtro deja fuera al
+profesorado sin catálogo).
+
 Los tres caminos que creaban cuentas personales están cerrados:
 
 | Camino | Estado |

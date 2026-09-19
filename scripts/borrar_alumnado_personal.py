@@ -23,6 +23,15 @@ Uso
 
 Es irreversible. Ejecutar DESPUÉS de crear las cuentas de grupo y de comprobar
 que el alumnado puede entrar con ellas.
+
+⚠ La API de Auth es lenta y falla: en la ejecución real (2026-09-19) devolvió
+**504 upstream request timeout** en 34 de las 36 bajas de login, dejando el
+catálogo y el rol borrados pero la cuenta de acceso viva. Eso es peor que no
+borrar: sin fila en el catálogo, `getRealUserRole()` (js/ui.js) trata a esa
+persona como **Alumno** y sigue pudiendo entrar. El script lo avisa al final,
+pero **hay que rematar siempre con**:
+
+    python scripts/limpiar_logins_huerfanos.py --aplicar
 """
 import json
 import sys
