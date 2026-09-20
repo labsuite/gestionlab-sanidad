@@ -221,6 +221,18 @@ function esResponsableDeEquipo(equipo) {
 }
 
 /**
+ * Nombre y primer apellido, que es como consta el profesorado en los registros
+ * ("Paloma Fernández"). Se quita el último apellido en vez de coger las dos
+ * primeras palabras, porque hay nombres compuestos: "Ana Belén Silva Abuín" →
+ * "Ana Belén Silva", que con las dos primeras se quedaría sin apellido.
+ * Espejo de `nombreCorto()` en supabase/functions/_shared/auth.ts.
+ */
+function _nombreCorto(nombre) {
+  const partes = String(nombre || '').trim().split(/\s+/).filter(Boolean);
+  return partes.length < 3 ? partes.join(' ') : partes.slice(0, -1).join(' ');
+}
+
+/**
  * Devuelve los ID_Ubicacion accesibles para el Alumno actual.
  * Primero intenta derivar los labs desde los módulos asignados en Supabase (user_modulos).
  * Si no hay datos en Supabase (migración pendiente), usa el campo Ubicaciones_Asignadas de Sheets.

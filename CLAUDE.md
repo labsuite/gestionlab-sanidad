@@ -171,6 +171,18 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
 - El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
   aborta). El de profesorado sigue vivo.
 
+**Cómo figura el profesorado en los registros: nombre y primer apellido**
+("Paloma Fernández", no "Paloma Fernández López" ni "Paloma"). Lo aplica
+`nombreCorto()` (`_shared/auth.ts`) en el servidor y su espejo `_nombreCorto()`
+(`js/config.js`) en el cliente, para que en pantalla se vea lo que se va a
+guardar. La regla es **quitar el último apellido**, no coger las dos primeras
+palabras: "Ana Belén Silva Abuín" → "Ana Belén Silva" (con las dos primeras se
+quedaría sin apellido) y "Sabela Fernández de Sanmamed Girón" → "Sabela Fernández
+de Sanmamed". Con menos de tres palabras se deja igual ("Marta Alén"). ⚠ Nunca
+aplicarlo a una cuenta de grupo ("1º CS LCB" → "1º CS") ni a un nombre de empresa
+tecleado en "Realizado por" de un mantenimiento externo. Lo registrado antes de
+2026-09-20 se dejó como estaba, a propósito.
+
 Antes de guardar el nombre o el email de una persona en cualquier tabla, preguntarse si
 la **seguridad del laboratorio** exige saber quién fue. Si no, usar `autorRegistro()` de
 `supabase/functions/_shared/auth.ts`: devuelve el nombre del profesorado y el **nombre del

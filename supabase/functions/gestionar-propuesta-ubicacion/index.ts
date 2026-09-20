@@ -13,7 +13,7 @@
 //       ese mismo equipo y sigue pendiente.
 // - aceptar / aceptar_varias / rechazar: staff (requireStaff). `revisado_por`
 //   lo pone el servidor con el nombre de quien valida — nunca llega del cliente.
-import { requireStaff, requireValidSession, firmaAlumnado, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireValidSession, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const ROLES_STAFF = ["Administrador", "Gestor", "Profesor"];
 
@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
 
     const { nombre, rol } = await identificar(supabaseAdmin, email);
     // En la cola de validación consta el grupo ("1º CS LCB"), no una persona.
-    const firma = ROLES_STAFF.includes(rol) ? nombre : firmaAlumnado(email, nombre);
+    const firma = ROLES_STAFF.includes(rol) ? nombreCorto(nombre) : firmaAlumnado(email, nombre);
 
     // Repetición: si esta misma cuenta ya propuso EXACTAMENTE esto mismo para este
     // equipo y sigue pendiente, se sustituye en vez de acumular duplicados.
@@ -121,8 +121,8 @@ Deno.serve(async (req) => {
 
     // 1) Quien propone ya es quien validaría → se aplica directa.
     if (ROLES_STAFF.includes(rol)) {
-      await aplicarUbicacion(supabaseAdmin, propuesta, nombre);
-      return jsonOk({ propuesta: { ...propuesta, estado: "aceptada", revisado_por: nombre }, aplicada: true, motivo: "staff" });
+      await aplicarUbicacion(supabaseAdmin, propuesta, firma);
+      return jsonOk({ propuesta: { ...propuesta, estado: "aceptada", revisado_por: firma }, aplicada: true, motivo: "staff" });
     }
 
     // 2) Doble verificación: otra persona ya propuso lo mismo y sigue pendiente.
@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
   if (accion === "aceptar" || accion === "aceptar_varias" || accion === "rechazar") {
     const { error: authError, user, supabaseAdmin } = await requireStaff(req);
     if (authError) return authError;
-    const revisadoPor = user.nombre || user.email;
+    const revisadoPor = nombreCorto(user.nombre) || user.email;
 
     const ids: string[] = accion === "aceptar_varias"
       ? (Array.isArray(body.ids_propuesta) ? body.ids_propuesta.map(String) : [])

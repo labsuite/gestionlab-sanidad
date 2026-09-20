@@ -1358,7 +1358,9 @@ async function guardarIncidencia() {
   if (!equipo || !desc) { showToast('Equipo y descripción son obligatorios', 'error'); return; }
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const usuarioApp = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
-  const reportadoPor = usuarioApp?.Nombre || currentUser?.name || 'Usuario';
+  // Nombre y primer apellido, como consta el profesorado en los registros; el
+  // servidor lo recalcula igualmente (autorRegistro en _shared/auth.ts).
+  const reportadoPor = _nombreCorto(usuarioApp?.Nombre || currentUser?.name || 'Usuario');
   showLoading('Guardando...');
   try {
     const { incidencia } = await callEdgeFunction('gestionar-incidencia', {

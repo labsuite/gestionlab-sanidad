@@ -47,8 +47,12 @@ registros que gestionan. Es personal del centro actuando en su puesto de trabajo
 | Tabla | Dato | Justificación |
 |---|---|---|
 | `usuarios` / `public.users` (profesorado) | nombre, email, módulos, labs | Base del servicio: login, permisos, responsabilidad sobre equipos. |
-| `registro_mantenimientos.supervisado_por` | nombre del docente | Es la firma que da validez al mantenimiento hecho por alumnado. |
-| `intervenciones.realizado_por`, `incidencias.reportado_por` (staff) | nombre | Trazabilidad de la gestión del equipo. |
+| `registro_mantenimientos.supervisado_por` | nombre y primer apellido del docente | Es la firma que da validez al mantenimiento hecho por alumnado. |
+| `intervenciones.realizado_por`, `incidencias.reportado_por` (staff) | nombre y primer apellido | Trazabilidad de la gestión del equipo. |
+
+El profesorado consta como **nombre y primer apellido** ("Paloma Fernández"),
+nunca con el nombre completo: lo impone `nombreCorto()` en el servidor. Ver
+CLAUDE.md para la regla exacta y sus excepciones.
 | Supabase Auth | email, contraseña (hash) | Autenticación. |
 
 ---

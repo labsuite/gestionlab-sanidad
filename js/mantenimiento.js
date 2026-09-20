@@ -518,14 +518,16 @@ function _leerChecklist() {
   }));
 }
 
-// Quién firma el registro. El alumnado firma como "Alumnado": el servidor lo
-// impone igualmente (gestionar-mantenimiento), pero lo ponemos también aquí para
-// que en pantalla se vea lo que se va a guardar de verdad. Ver docs/proteccion-datos.md.
+// Quién firma el registro. El alumnado firma con el nombre de su grupo, que se
+// deja entero. El servidor lo impone igualmente (gestionar-mantenimiento), pero
+// lo ponemos aquí para que en pantalla se vea lo que se va a guardar de verdad.
+// Ver docs/proteccion-datos.md.
 function _nombreUsuarioActual() {
-  if (getUserRole() === 'Alumno') return 'Alumnado';
   const emailNorm = (currentUser?.email || '').toLowerCase().trim();
   const u = DATA.usuarios.find(x => (x.Email || '').toLowerCase().trim() === emailNorm);
-  return u?.Nombre || currentUser?.name || '';
+  const nombre = u?.Nombre || currentUser?.name || '';
+  if (getUserRole() === 'Alumno') return nombre || 'Alumnado';
+  return _nombreCorto(nombre);
 }
 
 function _refrescarTrasMant() {

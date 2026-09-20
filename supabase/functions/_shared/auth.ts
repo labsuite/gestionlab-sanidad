@@ -109,6 +109,26 @@ export const DOMINIO_GRUPOS_ALUMNADO = "@gestionlab.cma";
 export const AUTOR_ALUMNADO = "Alumnado";
 
 /**
+ * Cómo figura una persona del profesorado en los registros: **nombre y primer
+ * apellido** ("Paloma Fernández", no "Paloma Fernández López" ni "Paloma").
+ *
+ * La regla es quitar el último apellido, no quedarse con las dos primeras
+ * palabras: hay nombres compuestos ("Ana Belén Silva Abuín" → "Ana Belén Silva",
+ * que con las dos primeras se quedaría en "Ana Belén", sin apellido) y apellidos
+ * compuestos ("Sabela Fernández de Sanmamed Girón" → "Sabela Fernández de
+ * Sanmamed"). Con menos de tres palabras se deja tal cual ("Marta Alén").
+ *
+ * ⚠ Solo para personas. NUNCA aplicar a una cuenta de grupo ("1º CS LCB" se
+ * quedaría en "1º CS") ni a un nombre de empresa tecleado a mano en "Realizado
+ * por" de un mantenimiento externo.
+ */
+export function nombreCorto(nombre: string): string {
+  const partes = String(nombre || "").trim().split(/\s+/).filter(Boolean);
+  if (partes.length < 3) return partes.join(" ");
+  return partes.slice(0, -1).join(" ");
+}
+
+/**
  * Con qué firma el alumnado un registro. Con cuenta de grupo firma el grupo
  * ("1º CS LCB"): no identifica a nadie y dice mucho más que "Alumnado".
  */
@@ -135,8 +155,12 @@ export function firmaAlumnado(email: string, nombre: string): string {
 export async function autorRegistro(supabaseAdmin: any, email: string, nombrePropuesto?: unknown) {
   const { nombre, rol } = await identificarUsuario(supabaseAdmin, email);
   if (!ES_STAFF(rol)) return { autor: firmaAlumnado(email, nombre), rol, esStaff: false };
+  // El nombre que manda el navegador se ignora a propósito: en todos estos
+  // registros es siempre la propia persona, así que la fuente buena es el
+  // catálogo. `nombrePropuesto` se conserva solo como último recurso si el
+  // catálogo no tiene nombre.
   const propuesto = typeof nombrePropuesto === "string" ? nombrePropuesto.trim() : "";
-  return { autor: propuesto || nombre, rol, esStaff: true };
+  return { autor: nombreCorto(nombre) || propuesto, rol, esStaff: true };
 }
 
 // Las Edge Functions de Supabase no añaden cabeceras CORS por defecto: sin

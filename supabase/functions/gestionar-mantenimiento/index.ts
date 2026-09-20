@@ -4,7 +4,7 @@
 // "crear_plan"/"actualizar_plan"/"eliminar_plan": Admin/Gestor cualquier equipo,
 // Profesor solo los equipos de los que es responsable (campo `responsable`).
 // "editar_registro" (corregir un mantenimiento ya finalizado): solo Admin/Gestor.
-import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // Parsea el checklist [{texto, hecho}] recibido en el cuerpo.
 function parsePasos(v: unknown): { texto: string; hecho: boolean }[] | null {
@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     }
 
     const ahora = new Date().toISOString();
-    const revisor = user.nombre || user.email;
+    const revisor = nombreCorto(user.nombre) || user.email;
 
     if (body.aceptar === false) {
       // Devolver: vuelve a 'en_curso' con el checklist intacto, para rehacerlo.
@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
       curso_academico: curso, periodo,
       estado: tipo, observaciones: motivo, aplazado_a: aplazadoA,
       fecha_inicio: ahora.slice(0, 10),
-      iniciado_por: body.marcado_por ? String(body.marcado_por) : (user.nombre || null),
+      iniciado_por: body.marcado_por ? String(body.marcado_por) : (nombreCorto(user.nombre) || null),
       actualizado_en: ahora,
     };
     const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
