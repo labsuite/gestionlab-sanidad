@@ -145,6 +145,27 @@ Los tres caminos que creaban cuentas personales están cerrados:
 | Edge Function `importar-alumnos` | Responde **410** con el motivo |
 | `scripts/importar_alumnos.py` | Aborta al arrancar |
 
+### Barrido de comprobación (2026-09-20)
+
+Borrar las cuentas no basta: un nombre escrito **a mano** en un campo de texto
+sobrevive a la baja de la persona. Tras la migración se revisaron todas las
+columnas de texto de todas las tablas con tres criterios (email de alumnado,
+dos o más partes de un nombre en el mismo valor, y revisión una a una de las
+columnas de "quién hizo esto").
+
+Apareció **un** rastro: `movimientos.usuario = "nadia muñiz"`, tres filas del
+20/05/2026 anteriores a la firma automática. Cambiado a `Alumnado`, conservando
+el histórico de stock.
+
+⚠ Lección para futuras bajas: comparar por **nombre completo no sirve**. Ese
+valor estaba en minúsculas y sin el segundo apellido, así que no casaba con el
+"Nadia Muñiz González" del catálogo. Hay que buscar por nombres y apellidos
+sueltos, descartando después las coincidencias de palabra (saltaron "blanco" por
+*blanco de calcoflúor* y "conde" dentro de *condensador*).
+
+Estado tras el barrido: 0 emails de alumnado, 0 nombres de alumnado, 0 logins sin
+ficha. En las columnas de firma solo quedan profesorado y `Alumnado`.
+
 El import de **profesorado** sigue activo y no cambia: son adultos, personal del
 centro, y su nombre es necesario para la responsabilidad sobre equipos.
 
