@@ -39,6 +39,42 @@
 - Archivado: solo posible cuando Estado=Recepción completa Y los tres checks de documentación están marcados
 - "+ Añadir línea" (`puedeAddLinea` en `pedidos-render.js`): permitido en `Abierto` y `Presupuesto solicitado` — en la práctica se pueden seguir añadiendo artículos mientras se espera el presupuesto. A partir de `Presupuesto aprobado` el pedido se considera cerrado en firme.
 
+## Añadir artículos con el presupuesto ya solicitado (2026-09-21)
+
+Pedir presupuesto no cierra la lista: es normal acordarse de algo después, y a la
+casa comercial no le importa. Pero ese artículo **no va en el presupuesto que ya
+se pidió** — hay que solicitarlo por separado. La app lo refleja así:
+
+- `lineas_pedido.presupuesto_pendiente` (boolean not null default false). Lo pone
+  a `true` la acción `crear` de `gestionar-linea-pedido` **solo** cuando el pedido
+  destino está en `Presupuesto solicitado`. En `Abierto` todavía no se ha pedido
+  nada; de `Presupuesto aprobado` en adelante las únicas líneas que se añaden son
+  las de la excepción de la factura (`anadirLineaDesdeSinMatch`), que ya llegaron.
+- En el detalle (`verDetallePedido`) las líneas se parten en `lineasSolicitadas` y
+  `lineasPendientes`. Las pendientes van en un bloque ámbar aparte, "⏳ Pendientes
+  de pedir presupuesto (N)", con las mismas filas (`_filaLineaPedido`, extraída
+  para no duplicar el render) y dos botones propios:
+  - **✉️ Email de ampliación** → `abrirModalEmailPedido(pedidoId, 'pendientes')`.
+    `generarTextoEmailPedido` filtra por `Presupuesto_Pendiente` y cambia intro y
+    cierre ("ampliar el pedido que ya os había solicitado…"). El botón de email de
+    la cabecera sigue siendo el del presupuesto original: solo las solicitadas.
+  - **✅ Ya las he solicitado** → `marcarPresupuestoSolicitado(pedidoId)` →
+    acción `marcar_presupuesto_solicitado`, que pone el flag a `false` en todas las
+    pendientes de ese pedido. El estado del pedido **no** se toca (sigue en
+    `Presupuesto solicitado`). Es una marca explícita de la usuaria: la app no
+    puede saber cuándo ha escrito a la casa comercial.
+- Aprobar el presupuesto (o cualquier estado posterior) limpia los flags que
+  queden en `actualizar_estado` de `gestionar-pedido` — con el presupuesto
+  aprobado ya no tiene sentido el apartado aparte.
+- Los dos selectores de "añadir a un pedido existente" (`solicitudAPedido` desde
+  una solicitud y `solicitudStockAPedido` desde stock bajo mínimo) listaban solo
+  pedidos `Abierto` — **ahí estaba el bloqueo real** que impedía meter artículos en
+  un pedido con presupuesto solicitado, no en `puedeAddLinea`. Ahora usan
+  `_pedidosQueAdmitenLineas()` (`Abierto` + `Presupuesto solicitado`) y la opción
+  avisa en ámbar "presupuesto ya solicitado — irá aparte".
+
+Migración: `scripts/migrar_presupuesto_pendiente.py` (ya ejecutada).
+
 ## Recepción de líneas — lógica clave
 `_completarRecepcionLinea(idx, l, cantRec, ...)` dividido en 4 subfunciones:
 - `_persistirLinea` — actualiza la línea en Sheets (si falla, revierte memoria y aborta)

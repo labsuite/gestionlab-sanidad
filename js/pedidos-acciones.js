@@ -70,8 +70,24 @@ async function cancelarSolicitud(solId) {
   hideLoading();
 }
 
+// Pedidos a los que todavía se les puede añadir material. "Presupuesto
+// solicitado" también vale: en la práctica se siguen metiendo artículos
+// después de pedir el presupuesto, y a la casa comercial no le importa. Esas
+// líneas quedan marcadas por gestionar-linea-pedido y salen en un apartado
+// aparte del detalle, porque hay que solicitarlas por separado. A partir de
+// "Presupuesto aprobado" el pedido está cerrado en firme y ya no aparece aquí.
+function _pedidosQueAdmitenLineas() {
+  return DATA.pedidos.filter(p => p.Estado === 'Abierto' || p.Estado === 'Presupuesto solicitado');
+}
+
+function _avisoPedidoPresupuestoSolicitado(p) {
+  return p.Estado === 'Presupuesto solicitado'
+    ? ` · <span style="color:var(--warning)">presupuesto ya solicitado — irá aparte</span>`
+    : '';
+}
+
 async function solicitudAPedido(solId) {
-  const pedidosAbiertos = DATA.pedidos.filter(p => p.Estado === 'Abierto');
+  const pedidosAbiertos = _pedidosQueAdmitenLineas();
   if (!pedidosAbiertos.length) {
     const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
     if (sol) _pendingSolicitudParaPedido = { tipo: 'sol', solId, matNombre: sol.Material, cantidad: sol.Cantidad_Solicitada };
@@ -81,7 +97,7 @@ async function solicitudAPedido(solId) {
   const lista = document.getElementById('sel-ped-lista');
   lista.innerHTML = pedidosAbiertos.map(p => {
     const nLineas = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido).length;
-    return `<div class="pedido-opcion" onclick="confirmarSolicitudAPedido('${p.ID_Pedido}')"><div><div class="pedido-opcion-nombre">${p.Nombre_Lista}</div><div class="pedido-opcion-meta">${p.Proveedor||'Sin proveedor asignado'} · ${nLineas} línea(s)</div></div><span style="color:var(--accent);font-size:18px">→</span></div>`;
+    return `<div class="pedido-opcion" onclick="confirmarSolicitudAPedido('${p.ID_Pedido}')"><div><div class="pedido-opcion-nombre">${p.Nombre_Lista}</div><div class="pedido-opcion-meta">${p.Proveedor||'Sin proveedor asignado'} · ${nLineas} línea(s)${_avisoPedidoPresupuestoSolicitado(p)}</div></div><span style="color:var(--accent);font-size:18px">→</span></div>`;
   }).join('');
   openModal('modal-seleccionar-pedido');
 }
@@ -116,13 +132,13 @@ function solicitudStockAPedido(matId, cantidadPreset) {
     cantidad = prompt(`¿Cuántas unidades (${mat.Unidad||'uds'}) de "${mat.Nombre}" quieres pedir?`, mat.Stock_Optimo||'');
     if (!cantidad || parseFloat(cantidad) <= 0) return;
   }
-  const pedidosAbiertos = DATA.pedidos.filter(p => p.Estado === 'Abierto');
+  const pedidosAbiertos = _pedidosQueAdmitenLineas();
   if (!pedidosAbiertos.length) { _pendingSolicitudParaPedido = { tipo: 'stock', matNombre: mat.Nombre, cantidad }; openModalNuevoPedido(); return; }
   document.getElementById('sel-ped-sol-id').value = '__stock__' + matId + '__' + cantidad;
   const lista = document.getElementById('sel-ped-lista');
   lista.innerHTML = pedidosAbiertos.map(p => {
     const nLineas = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido).length;
-    return `<div class="pedido-opcion" onclick="confirmarStockAPedido('${p.ID_Pedido}','${mat.Nombre.replace(/'/g,"\\'")}','${cantidad}')"><div><div class="pedido-opcion-nombre">${p.Nombre_Lista}</div><div class="pedido-opcion-meta">${p.Proveedor||'Sin proveedor'} · ${nLineas} línea(s)</div></div><span style="color:var(--accent);font-size:18px">→</span></div>`;
+    return `<div class="pedido-opcion" onclick="confirmarStockAPedido('${p.ID_Pedido}','${mat.Nombre.replace(/'/g,"\\'")}','${cantidad}')"><div><div class="pedido-opcion-nombre">${p.Nombre_Lista}</div><div class="pedido-opcion-meta">${p.Proveedor||'Sin proveedor'} · ${nLineas} línea(s)${_avisoPedidoPresupuestoSolicitado(p)}</div></div><span style="color:var(--accent);font-size:18px">→</span></div>`;
   }).join('');
   openModal('modal-seleccionar-pedido');
 }
@@ -246,6 +262,24 @@ async function guardarLineaPedido() {
     showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
     console.error(e);
   }
+  hideLoading();
+}
+
+// La usuaria ya le ha pedido a la casa comercial el presupuesto de las líneas
+// que estaban en el apartado aparte: dejan de estar pendientes y se juntan con
+// el resto del pedido. Es un "ya está hecho" que marca ella, no algo que la app
+// pueda deducir sola.
+async function marcarPresupuestoSolicitado(pedidoId) {
+  const pendientes = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Presupuesto_Pendiente === 'Sí');
+  if (!pendientes.length) return;
+  if (!confirm(`¿Ya le has pedido presupuesto a la casa comercial de ${pendientes.length === 1 ? 'este artículo' : 'estos ' + pendientes.length + ' artículos'}? Se juntarán con el resto del pedido.`)) return;
+  showLoading('Actualizando...');
+  try {
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'marcar_presupuesto_solicitado', pedido: pedidoId });
+    pendientes.forEach(l => { l.Presupuesto_Pendiente = 'No'; });
+    showToast('Presupuesto marcado como solicitado', 'success');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast('Error', 'error'); console.error(e); }
   hideLoading();
 }
 

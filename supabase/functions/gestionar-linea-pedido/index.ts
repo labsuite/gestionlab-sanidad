@@ -161,6 +161,16 @@ Deno.serve(async (req) => {
     }
     if (!cantidadPedida || cantidadPedida <= 0) return jsonError("Indica la cantidad", 400);
 
+    // Una línea metida cuando el presupuesto YA está solicitado no va en ese
+    // presupuesto: hay que pedírsela aparte a la casa comercial. Se marca y la
+    // app la enseña en un apartado propio hasta que se solicita (entonces
+    // `marcar_presupuesto_solicitado` la junta con las demás). Solo aplica a
+    // ese estado: en "Abierto" todavía no se ha pedido nada, y de
+    // "Presupuesto aprobado" en adelante solo se añaden líneas por la
+    // excepción de la factura (anadirLineaDesdeSinMatch), que ya han llegado.
+    const { data: pedidoDestino } = await supabaseAdmin.from("pedidos").select("estado").eq("id_pedido", pedidoId).maybeSingle();
+    const presupuestoPendiente = pedidoDestino?.estado === "Presupuesto solicitado";
+
     const datos = {
       id_linea: genId("LIN"), pedido: pedidoId, material,
       id_material: await resolverIdMaterial(supabaseAdmin, material),
@@ -169,6 +179,7 @@ Deno.serve(async (req) => {
       precio_unitario: body.precio_unitario ? Number(body.precio_unitario) : null,
       id_equipo: strField(body.id_equipo),
       unidad: strField(body.unidad),
+      presupuesto_pendiente: presupuestoPendiente,
     };
     const { data, error } = await supabaseAdmin.from("lineas_pedido").insert(datos).select().single();
     if (error) return jsonError(`No se pudo añadir la línea: ${error.message}`, 400);
@@ -177,6 +188,20 @@ Deno.serve(async (req) => {
       await supabaseAdmin.from("solicitudes").update({ estado: "Añadida a pedido", lista_pedido: pedidoId }).eq("id_solicitud", idSolicitud);
     }
     return jsonOk({ linea: data });
+  }
+
+  if (accion === "marcar_presupuesto_solicitado") {
+    // La usuaria ya le ha pedido a la casa comercial el presupuesto de las
+    // líneas que estaban aparte: dejan de estar pendientes y se juntan con el
+    // resto del pedido. No se toca el estado del pedido (sigue en
+    // "Presupuesto solicitado", que es donde estaba).
+    const pedidoId = String(body.pedido || "").trim();
+    if (!pedidoId) return jsonError("pedido es obligatorio", 400);
+    const { data, error } = await supabaseAdmin.from("lineas_pedido")
+      .update({ presupuesto_pendiente: false })
+      .eq("pedido", pedidoId).eq("presupuesto_pendiente", true).select();
+    if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
+    return jsonOk({ lineas: data || [] });
   }
 
   if (accion === "eliminar") {

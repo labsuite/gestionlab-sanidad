@@ -303,6 +303,9 @@ function _lineaPedidoSbToObj(l) {
     Precio_Unitario: l.precio_unitario != null ? String(l.precio_unitario) : '',
     ID_Equipo: l.id_equipo || '',
     Unidad: l.unidad || '',
+    // 'Sí' = línea metida con el presupuesto ya solicitado; va en su propio
+    // apartado del detalle hasta que se le pida presupuesto a la casa comercial.
+    Presupuesto_Pendiente: l.presupuesto_pendiente ? 'Sí' : 'No',
   };
 }
 

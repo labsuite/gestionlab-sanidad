@@ -408,25 +408,37 @@ function _unidadLineaPedido(l) {
   return '';
 }
 
-function generarTextoEmailPedido(pedidoId) {
+// modo 'pendientes' = solo las líneas metidas después de pedir el presupuesto
+// (esas hay que solicitarlas aparte); si no, las que ya iban en el presupuesto
+// solicitado, que es el email de siempre.
+function generarTextoEmailPedido(pedidoId, modo) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return '';
-  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  const soloPendientes = modo === 'pendientes';
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && (l.Presupuesto_Pendiente === 'Sí') === soloPendientes);
   const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
   const saludo = prov?.Persona_Contacto ? `Hola ${prov.Persona_Contacto},` : 'Buenos días,';
   const cuerpoLineas = lineas.map(l => {
     const unidad = _unidadLineaPedido(l);
     return `- ${l.Material}: ${l.Cantidad_Pedida}${unidad ? ' ' + unidad : ''}`;
   }).join('\n');
-  return `${saludo}\n\nOs escribo para solicitar el siguiente pedido para el CIFP Manuel Antonio (departamento de Sanidade):\n\n${cuerpoLineas}\n\nQuedo a la espera de presupuesto/confirmación.`;
+  const intro = soloPendientes
+    ? 'Os escribo para ampliar el pedido que ya os había solicitado (CIFP Manuel Antonio, departamento de Sanidade) con estos artículos adicionales:'
+    : 'Os escribo para solicitar el siguiente pedido para el CIFP Manuel Antonio (departamento de Sanidade):';
+  const cierre = soloPendientes
+    ? 'Quedo a la espera de presupuesto/confirmación de estos artículos, que podéis sumar al pedido anterior.'
+    : 'Quedo a la espera de presupuesto/confirmación.';
+  return `${saludo}\n\n${intro}\n\n${cuerpoLineas}\n\n${cierre}`;
 }
 
-function abrirModalEmailPedido(pedidoId) {
+function abrirModalEmailPedido(pedidoId, modo) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
   sv('email-ped-id', pedidoId);
-  document.getElementById('email-ped-texto').value = generarTextoEmailPedido(pedidoId);
-  document.getElementById('email-ped-asunto').textContent = `Pedido — ${p.Nombre_Lista}`;
+  document.getElementById('email-ped-texto').value = generarTextoEmailPedido(pedidoId, modo);
+  document.getElementById('email-ped-asunto').textContent = modo === 'pendientes'
+    ? `Ampliación del pedido — ${p.Nombre_Lista}`
+    : `Pedido — ${p.Nombre_Lista}`;
   openModal('modal-email-pedido');
 }
 
@@ -586,6 +598,31 @@ function anadirLineaDesdeSinMatch(idx) {
   sv('linea-obs', `No estaba en el pedido — detectada en ${doc?.Nombre_Archivo || 'el documento'} leído con IA`);
 }
 
+// Una fila de línea del detalle. Se usa tanto para las líneas normales como
+// para las del apartado "Pendientes de pedir presupuesto" — son idénticas, lo
+// único que cambia es dónde se pintan.
+function _filaLineaPedido(l, p, puedeEditar) {
+  const pedidoId = p.ID_Pedido;
+  let unidadLinea = _unidadLineaPedido(l);
+  unidadLinea = unidadLinea ? ' ' + unidadLinea : '';
+  const estadoLinea = {'Pendiente':'badge-orange','Recibido parcialmente':'badge-blue','Recibido':'badge-green'}[l.Estado_Linea] || 'badge-gray';
+  const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
+  const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
+  return `<div class="linea-row">
+    <div class="linea-nombre">${l.Material}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
+    <div class="linea-meta">
+      <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
+      <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
+      <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
+    </div>
+    <div class="linea-actions">
+      ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
+      ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
+      ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
+    </div>
+  </div>`;
+}
+
 function verDetallePedido(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
@@ -593,6 +630,11 @@ function verDetallePedido(pedidoId) {
   const docsProv = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId);
   const puedeEditar  = getUserRole() === 'Administrador' || getUserRole() === 'Gestor';
   const puedeAddLinea = ['Abierto','Presupuesto solicitado'].includes(p.Estado) && puedeEditar;
+  // Líneas metidas cuando el presupuesto ya estaba solicitado: van en su propio
+  // apartado hasta que se les pide presupuesto aparte (ver el bloque
+  // "Pendientes de pedir presupuesto" más abajo y marcarPresupuestoSolicitado).
+  const lineasPendientes  = lineas.filter(l => l.Presupuesto_Pendiente === 'Sí');
+  const lineasSolicitadas = lineas.filter(l => l.Presupuesto_Pendiente !== 'Sí');
   const cont = document.getElementById('pedido-detalle-contenido');
   cont.innerHTML = `
     <div class="card" style="margin-bottom:16px">
@@ -664,33 +706,29 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
         <div style="display:flex;gap:8px">
-          ${puedeEditar && lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
+          ${puedeEditar && lineasSolicitadas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
           ${puedeAddLinea ? `<button class="btn btn-secondary" onclick="openModalNuevaLinea('${pedidoId}')">+ Añadir línea</button>` : ''}
         </div>
       </div>
       <div style="padding:12px 16px">
         ${!lineas.length ? `<div class="empty-state" style="padding:24px"><div class="empty-state-icon">📝</div><div class="empty-state-title">Sin líneas todavía</div></div>` :
-          lineas.map(l => {
-            let unidadLinea = _unidadLineaPedido(l);
-            unidadLinea = unidadLinea ? ' ' + unidadLinea : '';
-            const estadoLinea = {'Pendiente':'badge-orange','Recibido parcialmente':'badge-blue','Recibido':'badge-green'}[l.Estado_Linea] || 'badge-gray';
-            const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
-            const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
-            return `<div class="linea-row">
-              <div class="linea-nombre">${l.Material}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
-              <div class="linea-meta">
-                <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
-                <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
-                <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
-              </div>
-              <div class="linea-actions">
-                ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
-                ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
-                ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
+          lineasSolicitadas.map(l => _filaLineaPedido(l, p, puedeEditar)).join('')}
+        ${lineasPendientes.length ? `<div style="margin-top:${lineasSolicitadas.length ? '18px' : '0'};border:1px solid var(--warning);border-radius:var(--radius-sm);overflow:hidden">
+          <div style="padding:10px 14px;background:var(--warning-light);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--warning)">⏳ Pendientes de pedir presupuesto (${lineasPendientes.length})</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px;max-width:52ch">Se añadieron después de solicitar el presupuesto, así que no van en el que ya pediste: hay que solicitarlas aparte. Cuando lo hagas, márcalas y se juntan con el resto.</div>
+            </div>
+            ${puedeEditar ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px;white-space:nowrap" onclick="abrirModalEmailPedido('${pedidoId}','pendientes')">✉️ Email de ampliación</button>
+              <button class="btn btn-primary" style="font-size:12px;padding:4px 12px;white-space:nowrap" onclick="marcarPresupuestoSolicitado('${pedidoId}')">✅ Ya las he solicitado</button>
+            </div>` : ''}
+          </div>
+          <div style="padding:6px 14px 10px 14px">
+            ${lineasPendientes.map(l => _filaLineaPedido(l, p, puedeEditar)).join('')}
+          </div>
+        </div>` : ''}
       </div>
     </div>`;
   showPage('pedido-detalle');

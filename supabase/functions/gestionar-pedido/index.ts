@@ -88,6 +88,13 @@ Deno.serve(async (req) => {
     const { data, error } = await supabaseAdmin.from("pedidos").update(datos).eq("id_pedido", idPedido).select().single();
     if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
     await cascadaSolicitudes(supabaseAdmin, idPedido, nuevoEstado);
+    // Aprobar el presupuesto cierra el pedido en firme: si quedaba alguna
+    // línea marcada como "pendiente de solicitar aparte", con el presupuesto
+    // aprobado ya no tiene sentido tenerla en un apartado propio.
+    if (nuevoEstado !== "Abierto" && nuevoEstado !== "Presupuesto solicitado") {
+      await supabaseAdmin.from("lineas_pedido").update({ presupuesto_pendiente: false })
+        .eq("pedido", idPedido).eq("presupuesto_pendiente", true);
+    }
     return jsonOk({ pedido: data });
   }
 

@@ -503,7 +503,11 @@ create table lineas_pedido (
   observaciones        text,
   precio_unitario      numeric,
   id_equipo            text references equipos(id_activo) on update cascade,
-  unidad               text   -- unidad elegida al pedir esta línea (ej: "gotero" en vez de la "botella" por defecto del material); vacío = usa Material.Unidad
+  unidad               text,  -- unidad elegida al pedir esta línea (ej: "gotero" en vez de la "botella" por defecto del material); vacío = usa Material.Unidad
+  -- true = línea metida DESPUÉS de pedir el presupuesto: no va en el presupuesto
+  -- ya solicitado, hay que pedirla aparte. La app la muestra en un apartado
+  -- separado hasta que se marca como solicitada (entonces vuelve a false).
+  presupuesto_pendiente boolean not null default false
 );
 
 create table solicitudes (
