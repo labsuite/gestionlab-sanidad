@@ -219,10 +219,13 @@ export function generarPasswordTemporal(): string {
  * Dos palabras y tres dígitos: aleatoria de verdad, pero se dicta en clase sin
  * deletrear ("praza-verde-482").
  */
+// Sin tildes a propósito: la contraseña se dicta en clase y se teclea en
+// cualquier teclado, así que "rio" evita el "¿lleva acento?" de turno. Misma
+// lista que `PALABRAS` en scripts/crear_grupos_alumnado.py.
 const PALABRAS_PASSWORD = [
   "auga", "praia", "vento", "ceo", "pedra", "faro", "ponte", "horta",
-  "verde", "azul", "roxo", "dourado", "prata", "ámbar", "coral", "malva",
-  "lúa", "sol", "raio", "brisa", "monte", "río", "campo", "illa",
+  "verde", "azul", "roxo", "dourado", "prata", "ambar", "coral", "malva",
+  "lua", "sol", "raio", "brisa", "monte", "rio", "campo", "illa",
 ];
 
 export function passwordDeGrupo(): string {
