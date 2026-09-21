@@ -7,13 +7,71 @@
 // (ver la página) pero solo editar filas con Rol=Alumno, y no puede
 // cambiarles el rol — antes esto solo se comprobaba en el cliente
 // (js/ubicaciones.js `guardarUsuario`), aquí se fuerza también server-side.
-import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, passwordDeGrupo, esCuentaDeGrupo, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, passwordDeGrupo, esCuentaDeGrupo, nombreCorto, handleCorsPreflight } from "../_shared/auth.ts";
+import { cifrar, descifrar, hayClaveDeCifrado } from "../_shared/secretos.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
 }
 
 const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
+
+/** Mínimo que acepta Supabase Auth; es también el mínimo al escribir una a mano. */
+const MIN_PASSWORD = 6;
+
+/** id de Supabase Auth a partir del email: primero `users`, y si no está, el listado de Auth. */
+async function authIdDeEmail(supabaseAdmin: any, email: string): Promise<string | null> {
+  const { data: perfil } = await supabaseAdmin.from("users").select("id").eq("email", email).maybeSingle();
+  if (perfil?.id) return perfil.id;
+  const { data: lista } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  return lista?.users?.find((u: { email?: string }) =>
+    String(u.email || "").toLowerCase().trim() === email
+  )?.id ?? null;
+}
+
+/**
+ * Copia cifrada de la contraseña de una cuenta de GRUPO, para poder consultarla
+ * después (ver _shared/secretos.ts). Solo se llama con cuentas de grupo: la
+ * contraseña de una persona no se guarda nunca.
+ */
+async function guardarCopiaPassword(
+  supabaseAdmin: any, idUsuario: string, password: string, autor: string,
+): Promise<string | null> {
+  if (!hayClaveDeCifrado()) return "falta el secreto GRUPO_PASSWORD_KEY";
+  const { error } = await supabaseAdmin.from("credenciales_grupo").upsert({
+    id_usuario: idUsuario,
+    password_cifrada: await cifrar(password),
+    actualizado_en: new Date().toISOString(),
+    actualizado_por: autor,
+  });
+  return error?.message ?? null;
+}
+
+/**
+ * Comprueba que la fila existe y que es de verdad una cuenta de grupo. Quien
+ * pregunta ya viene filtrado por requireStaff: la contraseña de un grupo la
+ * pueden ver y cambiar Administrador, Gestor y Profesor (la usan en clase).
+ */
+async function grupoDelBody(supabaseAdmin: any, body: Record<string, unknown>) {
+  const idUsuario = String(body.id_usuario || "").trim();
+  if (!idUsuario) return { error: jsonError("id_usuario es obligatorio", 400) };
+
+  const { data: fila } = await supabaseAdmin.from("usuarios")
+    .select("id_usuario, nombre, email, rol").eq("id_usuario", idUsuario).maybeSingle();
+  if (!fila) return { error: jsonError(`No se encontró el usuario "${idUsuario}"`, 404) };
+
+  const email = String(fila.email || "").toLowerCase().trim();
+  if (!esCuentaDeGrupo(email)) {
+    return {
+      error: jsonError(
+        "Solo se puede consultar la contraseña de una cuenta de grupo. " +
+          "La de una persona no se guarda en ningún sitio: hay que restablecerla.",
+        400,
+      ),
+    };
+  }
+  return { fila, email };
+}
 
 // Acciones en bloque: aceptan `ids: [...]` o un único `id_usuario`.
 const _idsDelBody = (body: Record<string, unknown>): string[] =>
@@ -136,6 +194,75 @@ Deno.serve(async (req) => {
     return jsonOk({ actualizados: idsReales, valor });
   }
 
+  // ── Contraseña de una cuenta de GRUPO: consultarla ────────────────────────
+  // La cuenta de un grupo es compartida a propósito, así que su contraseña no es
+  // un secreto personal: el profesorado tiene que poder dictársela a su grupo.
+  // Como Auth solo guarda el hash, se guarda aparte una copia cifrada
+  // (`credenciales_grupo`, ver _shared/secretos.ts) que solo se descifra aquí.
+  if (accion === "ver_password_grupo") {
+    const { error: authError, supabaseAdmin } = await requireStaff(req);
+    if (authError) return authError;
+
+    const g = await grupoDelBody(supabaseAdmin, body);
+    if ("error" in g) return g.error;
+
+    if (!hayClaveDeCifrado()) {
+      return jsonError("Falta el secreto GRUPO_PASSWORD_KEY en las Edge Functions", 500);
+    }
+
+    const { data: cred } = await supabaseAdmin.from("credenciales_grupo")
+      .select("password_cifrada, actualizado_en, actualizado_por")
+      .eq("id_usuario", g.fila.id_usuario).maybeSingle();
+
+    // Los grupos creados antes de esto (scripts/crear_grupos_alumnado.py) no
+    // tienen copia guardada: no hay forma de recuperar la que tengan, solo poner
+    // una nueva.
+    if (!cred) return jsonOk({ sin_guardar: true });
+
+    try {
+      return jsonOk({
+        password: await descifrar(cred.password_cifrada),
+        actualizado_en: cred.actualizado_en,
+        actualizado_por: cred.actualizado_por,
+      });
+    } catch {
+      return jsonError("No se pudo descifrar la contraseña guardada", 500);
+    }
+  }
+
+  // ── Contraseña de una cuenta de GRUPO: cambiarla ──────────────────────────
+  // Sin `password` genera una nueva dictable ("praza-verde-482"); con `password`
+  // guarda la que haya escrito el profesorado.
+  if (accion === "cambiar_password_grupo") {
+    const { error: authError, user, supabaseAdmin } = await requireStaff(req);
+    if (authError) return authError;
+
+    const g = await grupoDelBody(supabaseAdmin, body);
+    if ("error" in g) return g.error;
+
+    if (!hayClaveDeCifrado()) {
+      return jsonError("Falta el secreto GRUPO_PASSWORD_KEY en las Edge Functions", 500);
+    }
+
+    const nueva = String(body.password || "").trim() || passwordDeGrupo();
+    if (nueva.length < MIN_PASSWORD) {
+      return jsonError(`La contraseña tiene que tener al menos ${MIN_PASSWORD} caracteres`, 400);
+    }
+
+    const authId = await authIdDeEmail(supabaseAdmin, g.email);
+    if (!authId) return jsonError(`${g.fila.nombre} no tiene cuenta de acceso`, 404);
+
+    const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(authId, { password: nueva });
+    if (updErr) return jsonError(`No se pudo cambiar la contraseña: ${updErr.message}`, 400);
+
+    // Si la copia falla, la contraseña YA cambió: hay que devolverla igualmente o
+    // el grupo se queda fuera sin que nadie sepa cuál es la nueva.
+    const aviso = await guardarCopiaPassword(
+      supabaseAdmin, g.fila.id_usuario, nueva, nombreCorto(String(user?.nombre || "")),
+    );
+    return jsonOk({ password: nueva, aviso });
+  }
+
   // ── Restablecer contraseña ────────────────────────────────────────────────
   // Deja la contraseña de Supabase Auth en la parte del email anterior a "@" (misma
   // convención que TRebello y que el import de alumnado), y la devuelve para poder
@@ -188,10 +315,19 @@ Deno.serve(async (req) => {
       }
       // Las cuentas de grupo llevan contraseña aleatoria: derivarla del email
       // sería publicarla (la parte local es el nombre del grupo).
-      const password = esCuentaDeGrupo(emailU) ? passwordDeGrupo() : passwordDesdeEmail(emailU);
+      const esGrupo = esCuentaDeGrupo(emailU);
+      const password = esGrupo ? passwordDeGrupo() : passwordDesdeEmail(emailU);
       const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(authId, { password });
-      if (updErr) resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: updErr.message });
-      else resultados.push({ nombre: nombreU, email: emailU, ok: true, password });
+      if (updErr) {
+        resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: updErr.message });
+        continue;
+      }
+      // La copia consultable de los grupos se actualiza también por aquí: si no,
+      // "Ver contraseña" seguiría enseñando la anterior, que ya no vale.
+      if (esGrupo && hayClaveDeCifrado()) {
+        await guardarCopiaPassword(supabaseAdmin, f.id_usuario, password, nombreCorto(String(user?.nombre || "")));
+      }
+      resultados.push({ nombre: nombreU, email: emailU, ok: true, password });
     }
 
     return jsonOk({ resultados });
@@ -257,5 +393,9 @@ Deno.serve(async (req) => {
     return jsonOk({ usuario: data });
   }
 
-  return jsonError("accion no reconocida (crear, actualizar, eliminar, revisar_inventario, resetear_password)", 400);
+  return jsonError(
+    "accion no reconocida (crear, actualizar, eliminar, revisar_inventario, resetear_password, " +
+      "ver_password_grupo, cambiar_password_grupo)",
+    400,
+  );
 });

@@ -32,6 +32,12 @@ Consecuencias, todas buscadas:
 - La contraseña **no** puede derivarse del email (la parte local es el propio
   nombre del grupo, `1cslcb`): se genera aleatoria y dictable
   (`passwordDeGrupo()`, tipo `monte-auga-698`).
+- De esa contraseña —y **solo** de la de un grupo— se guarda una copia cifrada
+  (`credenciales_grupo`, AES-256-GCM con un secreto que vive en las Edge
+  Functions, no en Postgres) para que el profesorado pueda consultarla desde la
+  app. No es un dato personal: identifica a un grupo, es compartida a propósito
+  y se rota desde el mismo sitio. La contraseña de una **persona** no se guarda
+  nunca, ni cifrada: si se olvida, se restablece. Ver `docs/modulo-usuarios.md`.
 
 Alta de cuentas: `scripts/crear_grupos_alumnado.py`. Se hace una vez, no cada
 curso — los grupos no cambian. El import de alumnado desde Trebello está
@@ -124,7 +130,7 @@ Dos cosas cambiaron al pasar a cuentas compartidas:
 | Reservas | Sin valor pasada la franja; purgables al cierre de curso. |
 | Email de grupo en propuestas resueltas | 60 días (`scripts/anonimizar_propuestas.py`). No es dato personal, pero la limpieza sigue siendo buena higiene. |
 | Catálogo `usuarios` y cuentas de Auth del **profesorado** | Mientras la persona esté activa en el centro. Al causar baja, dar de baja también la cuenta. |
-| Cuentas de grupo | Permanentes. Cambiar la contraseña al inicio de cada curso con el botón 🔑. |
+| Cuentas de grupo | Permanentes. Cambiar la contraseña al inicio de cada curso con el botón 🔑 (Usuarios → Alumnos). |
 
 ---
 

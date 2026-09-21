@@ -168,6 +168,11 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
 - Alta de cuentas: `scripts/crear_grupos_alumnado.py` (una sola vez, no cada curso).
 - Contraseña: aleatoria y dictable (`passwordDeGrupo()`). **Nunca** `passwordDesdeEmail()`
   en una cuenta de grupo — la parte local es el nombre del grupo.
+- El profesorado la consulta y la cambia desde la app (Usuarios → Alumnos → 🔑). Se puede
+  "ver" porque se guarda una copia **cifrada** en `credenciales_grupo`
+  (`_shared/secretos.ts`, clave en el secreto `GRUPO_PASSWORD_KEY` de las Edge Functions,
+  nunca en Postgres ni en el navegador). ⚠ Esto vale **solo** para cuentas de grupo: la
+  contraseña de una persona no se guarda en ningún sitio, ni cifrada.
 - El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
   aborta). El de profesorado sigue vivo.
 

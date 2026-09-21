@@ -184,3 +184,27 @@
   </div>
 </div>
 
+
+<!-- Modal Contraseña de una cuenta de grupo -->
+<!-- La cuenta de un grupo es compartida a propósito: su contraseña no es un
+     secreto personal, el profesorado tiene que poder dictársela a su grupo y
+     rotarla. Se guarda cifrada (tabla credenciales_grupo) y solo la sirve la
+     Edge Function gestionar-usuario. Ver js/ubicaciones.js. -->
+<div class="modal-overlay" id="modal-password-grupo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="pwg-titulo">Contraseña del grupo</div>
+      <button class="modal-close" onclick="cerrarPasswordGrupo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-item" style="margin-bottom:16px">
+        <div class="detail-label">Cuenta del grupo</div>
+        <div class="detail-value"><code id="pwg-email" style="font-size:13px"></code></div>
+      </div>
+      <div id="pwg-cuerpo"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="cerrarPasswordGrupo()">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

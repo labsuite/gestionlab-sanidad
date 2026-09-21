@@ -233,6 +233,18 @@ function _nombreCorto(nombre) {
 }
 
 /**
+ * Dominio de las cuentas de GRUPO del alumnado (`1cslcb@gestionlab.cma`).
+ * Espejo de `DOMINIO_GRUPOS_ALUMNADO` / `esCuentaDeGrupo()` en
+ * supabase/functions/_shared/auth.ts — aquí solo decide qué enseña la interfaz;
+ * quien manda es siempre el servidor.
+ */
+const DOMINIO_GRUPOS_ALUMNADO = '@gestionlab.cma';
+
+function _esCuentaDeGrupo(email) {
+  return String(email || '').toLowerCase().trim().endsWith(DOMINIO_GRUPOS_ALUMNADO);
+}
+
+/**
  * Devuelve los ID_Ubicacion accesibles para el Alumno actual.
  * Primero intenta derivar los labs desde los módulos asignados en Supabase (user_modulos).
  * Si no hay datos en Supabase (migración pendiente), usa el campo Ubicaciones_Asignadas de Sheets.

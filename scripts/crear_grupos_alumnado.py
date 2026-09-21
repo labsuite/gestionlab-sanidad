@@ -13,7 +13,10 @@ Crea, por cada grupo y exactamente igual que hacía el import de alumnado:
   3. fila en `public.users` (el rol que comprueban las Edge Functions)
 
 Las contraseñas se imprimen al final para repartirlas. **No se guardan en ningún
-fichero**: si se pierden, se regeneran con el botón 🔑 de la página Usuarios.
+fichero**, y este script tampoco guarda la copia consultable de la app (necesita la
+clave de cifrado, que vive en las Edge Functions): los grupos creados desde aquí salen
+como "sin guardar" en el modal 🔑 de la página Usuarios hasta que se les genere una
+contraseña nueva desde la propia app.
 
 Uso
 ---

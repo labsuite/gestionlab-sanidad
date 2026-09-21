@@ -444,7 +444,7 @@ function _renderSeccionAlumnos(lista, rolActual) {
             title="Puede revisar inventario de material fungible" style="cursor:pointer">
         </td>
         <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-        <td><div class="row-actions">${gestionable ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button><button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
+        <td><div class="row-actions">${gestionable ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>${_botonPasswordAlumnado(u, idx)}` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
       </tr>`;
     }).join('');
     // Acciones de grupo: aplican a las filas visibles del grupo (o sea, respetan el
@@ -453,7 +453,6 @@ function _renderSeccionAlumnos(lista, rolActual) {
       <span style="font-size:11px;color:var(--text-muted)">Revisar inventario:</span>
       <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="setRevisarInventarioGrupo(${gi}, true)">✅ Todos</button>
       <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="setRevisarInventarioGrupo(${gi}, false)">⬜ Ninguno</button>
-      <button class="btn btn-secondary" style="padding:3px 10px;font-size:11px" onclick="resetearPasswordsGrupo(${gi})">🔑 Restablecer contraseñas</button>
     </div>` : '';
     return `<div class="card" id="usr-grupo-alumnos-${gi}" style="margin-bottom:16px">
       <div class="card-header" style="flex-wrap:wrap">
@@ -537,9 +536,191 @@ async function setRevisarInventarioGrupo(gi, valor) {
   hideLoading();
 }
 
-// La contraseña vuelve a ser la parte del email anterior a "@" (igual que en TRebello):
-// no se manda ningún correo, se dicta en clase. Por eso se enseña en un alert y no en un
-// toast, que desaparece a los 3 segundos.
+// ── Contraseñas del alumnado ───────────────────────────────────────────────
+// El alumnado entra por cuentas de GRUPO, y la contraseña de un grupo es
+// compartida a propósito (como la clave del wifi del aula): el profesorado tiene
+// que poder consultarla para dictarla en clase y cambiarla cuando haga falta. Eso
+// es el modal 🔑, que la pide al servidor (se guarda cifrada, ver
+// supabase/functions/_shared/secretos.ts).
+//
+// La contraseña de una PERSONA no se guarda en ningún sitio, así que no se puede
+// consultar: si quedase alguna cuenta personal antigua de alumnado, su botón 🔑
+// sigue siendo el de restablecer de siempre.
+function _botonPasswordAlumnado(u, idx) {
+  return _esCuentaDeGrupo(u.Email)
+    ? `<button class="icon-btn" title="Contraseña del grupo" onclick="abrirPasswordGrupo(${idx})">🔑</button>`
+    : `<button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>`;
+}
+
+// Estado del modal de contraseña de grupo. La contraseña vive aquí solo mientras
+// el modal está abierto; al cerrarlo se olvida.
+let _pwGrupo = null;
+
+function abrirPasswordGrupo(idx) {
+  const u = DATA.usuarios[idx];
+  if (!u) return;
+  _pwGrupo = { idUsuario: u.ID_Usuario, nombre: u.Nombre, email: u.Email, password: null, sinGuardar: false, editando: false, info: '' };
+  setText('pwg-titulo', `🔑 Contraseña de ${u.Nombre}`);
+  setText('pwg-email', u.Email);
+  _pwgRender();
+  openModal('modal-password-grupo');
+}
+
+function cerrarPasswordGrupo() {
+  _pwGrupo = null;
+  const c = document.getElementById('pwg-cuerpo');
+  if (c) c.innerHTML = '';
+  closeModal('modal-password-grupo');
+}
+
+function _pwgRender() {
+  const c = document.getElementById('pwg-cuerpo');
+  if (!c || !_pwGrupo) return;
+  const st = _pwGrupo;
+
+  const botonesCambio = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+    <button class="btn btn-secondary" onclick="generarPasswordGrupo()">🔄 Generar una nueva</button>
+    ${st.editando ? '' : '<button class="btn btn-secondary" onclick="editarPasswordGrupo()">✏️ Escribirla yo</button>'}
+  </div>`;
+
+  if (st.editando) {
+    c.innerHTML = `
+      <div class="form-group">
+        <label>Contraseña nueva</label>
+        <input id="pwg-nueva" placeholder="Mínimo 6 caracteres" autocomplete="off"
+          style="font-family:monospace" onkeydown="if(event.key==='Enter')guardarPasswordGrupo()">
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="guardarPasswordGrupo()">Guardar contraseña</button>
+        <button class="btn btn-secondary" onclick="cancelarEdicionPasswordGrupo()">Cancelar</button>
+      </div>`;
+    document.getElementById('pwg-nueva')?.focus();
+    return;
+  }
+
+  if (st.password) {
+    c.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <code style="font-size:18px;letter-spacing:1px;background:var(--bg-alt,#f1f3f5);border-radius:8px;padding:8px 14px">${_escAttr(st.password)}</code>
+        <button class="btn btn-secondary" onclick="copiarPasswordGrupo()">📋 Copiar</button>
+        <button class="btn btn-secondary" onclick="ocultarPasswordGrupo()">🙈 Ocultar</button>
+      </div>
+      ${st.info ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px">${st.info}</div>` : ''}
+      ${botonesCambio}`;
+    return;
+  }
+
+  if (st.sinGuardar) {
+    c.innerHTML = `
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.5">
+        Esta cuenta se creó antes de que la app guardase la contraseña, así que no se
+        puede consultar (Supabase solo conserva un hash). Genera una nueva y dásela al grupo.
+      </div>
+      ${botonesCambio}`;
+    return;
+  }
+
+  c.innerHTML = `
+    <div style="font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:12px">
+      La cuenta es de todo el grupo, así que su contraseña se puede consultar y dictar en clase.
+    </div>
+    <button class="btn btn-secondary" onclick="mostrarPasswordGrupo()">👁️ Mostrar contraseña</button>`;
+}
+
+async function mostrarPasswordGrupo() {
+  if (!_pwGrupo) return;
+  showLoading('Consultando...');
+  try {
+    const r = await callEdgeFunction('gestionar-usuario', { accion: 'ver_password_grupo', id_usuario: _pwGrupo.idUsuario });
+    if (r?.sin_guardar) { _pwGrupo.sinGuardar = true; _pwGrupo.password = null; }
+    else {
+      _pwGrupo.password = r.password;
+      _pwGrupo.sinGuardar = false;
+      _pwGrupo.info = _pwgInfoCambio(r.actualizado_en, r.actualizado_por);
+    }
+    _pwgRender();
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function _pwgInfoCambio(iso, autor) {
+  if (!iso) return '';
+  const f = new Date(iso);
+  const fecha = isNaN(f) ? '' : f.toLocaleDateString('es-ES');
+  return `Cambiada${autor ? ` por ${autor}` : ''}${fecha ? ` el ${fecha}` : ''}`;
+}
+
+function ocultarPasswordGrupo() {
+  if (!_pwGrupo) return;
+  _pwGrupo.password = null;
+  _pwGrupo.sinGuardar = false;
+  _pwgRender();
+}
+
+function editarPasswordGrupo() {
+  if (!_pwGrupo) return;
+  _pwGrupo.editando = true;
+  _pwgRender();
+}
+
+function cancelarEdicionPasswordGrupo() {
+  if (!_pwGrupo) return;
+  _pwGrupo.editando = false;
+  _pwgRender();
+}
+
+async function copiarPasswordGrupo() {
+  if (!_pwGrupo?.password) return;
+  try {
+    await navigator.clipboard.writeText(_pwGrupo.password);
+    showToast('Contraseña copiada ✓', 'success');
+  } catch {
+    showToast('El navegador no dejó copiar. Selecciónala a mano.', 'error');
+  }
+}
+
+function generarPasswordGrupo() {
+  if (!_pwGrupo) return;
+  if (!confirm(
+    `¿Generar una contraseña nueva para ${_pwGrupo.nombre}?\n\n` +
+    `La que tenga dejará de funcionar: habrá que darle la nueva al grupo.`
+  )) return;
+  _cambiarPasswordGrupo(null, 'Contraseña nueva generada. Dásela al grupo.');
+}
+
+function guardarPasswordGrupo() {
+  if (!_pwGrupo) return;
+  const nueva = v('pwg-nueva');
+  if (nueva.length < 6) { showToast('La contraseña necesita al menos 6 caracteres', 'error'); return; }
+  _cambiarPasswordGrupo(nueva, 'Contraseña cambiada.');
+}
+
+async function _cambiarPasswordGrupo(password, mensajeOk) {
+  showLoading('Cambiando contraseña...');
+  try {
+    const r = await callEdgeFunction('gestionar-usuario', {
+      accion: 'cambiar_password_grupo', id_usuario: _pwGrupo.idUsuario, password: password || '',
+    });
+    _pwGrupo.password = r.password;
+    _pwGrupo.sinGuardar = false;
+    _pwGrupo.editando = false;
+    _pwGrupo.info = _pwgInfoCambio(new Date().toISOString(), _nombreCorto(currentUser?.name || ''));
+    _pwgRender();
+    // El cambio en Auth sí se hizo; lo que puede fallar es la copia consultable.
+    if (r.aviso) showToast(`Contraseña cambiada, pero no se guardó la copia para consultarla: ${r.aviso}`, 'error');
+    else showToast(mensajeOk, 'success');
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+// La contraseña de una cuenta PERSONAL no se guarda: solo se puede restablecer a la
+// parte del email anterior a "@" (igual que en TRebello). No se manda ningún correo,
+// se dicta en clase — por eso se enseña en un alert y no en un toast, que desaparece
+// a los 3 segundos.
 async function resetearPasswordUsuario(idx) {
   const u = DATA.usuarios[idx];
   if (!u) return;
@@ -559,33 +740,6 @@ async function resetearPasswordUsuario(idx) {
   const r = (resultados || [])[0];
   if (r?.ok) alert(`Contraseña de ${u.Nombre} restablecida:\n\n${r.password}`);
   else showToast(`No se pudo restablecer: ${r?.motivo || 'error desconocido'}`, 'error');
-}
-
-async function resetearPasswordsGrupo(gi) {
-  const ids = _filasVisiblesGrupoAlumnos(gi).map(tr => tr.dataset.idusuario);
-  if (!ids.length) { showToast('No hay alumnado a la vista en este grupo', 'error'); return; }
-  if (!confirm(
-    `¿Restablecer la contraseña de ${ids.length} alumno(s) de este grupo?\n\n` +
-    `Cada uno pasará a tener como contraseña la parte de su email anterior a «@», y la que ` +
-    `tuviera dejará de valer. Se aplica solo a los que se ven ahora mismo.`
-  )) return;
-
-  showLoading('Restableciendo contraseñas...');
-  let resultados;
-  try {
-    ({ resultados } = await callEdgeFunction('gestionar-usuario', { accion: 'resetear_password', ids }));
-  } catch (e) {
-    hideLoading(); showToast('Error: ' + e.message, 'error'); return;
-  }
-  hideLoading();
-  const ok = (resultados || []).filter(r => r.ok);
-  const fallidos = (resultados || []).filter(r => !r.ok);
-  alert(
-    `${ok.length} contraseña(s) restablecida(s) a la parte del email anterior a «@».` +
-    (fallidos.length
-      ? `\n\n${fallidos.length} sin restablecer:\n` + fallidos.map(r => `· ${r.nombre || r.email}: ${r.motivo}`).join('\n')
-      : '')
-  );
 }
 
 function filtrarAlumnos(modulo) {

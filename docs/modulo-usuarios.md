@@ -199,9 +199,41 @@ página Usuarios con el botón 🗑️ (borra catálogo + rol + login).
 **Contraseña:** aleatoria y dictable, tipo `monte-auga-698` (`passwordDeGrupo()` en
 `_shared/auth.ts`). **No** se deriva del email como la del alumnado individual: la parte
 local es el propio nombre del grupo, así que `passwordDesdeEmail()` la dejaría a la vista de
-cualquiera. El botón 🔑 de la página Usuarios detecta las cuentas de grupo
-(`esCuentaDeGrupo()`) y genera una nueva de ese tipo. Conviene cambiarlas al inicio de cada
-curso.
+cualquiera. Se consulta y se cambia desde la app — ver el apartado siguiente. Conviene
+cambiarlas al inicio de cada curso.
+
+## Contraseña de un grupo: consultarla y cambiarla (2026-09-21)
+
+La cuenta de un grupo es compartida a propósito: su contraseña no es un secreto personal,
+es más bien como la clave del wifi del aula. El profesorado tiene que poder decírsela a su
+grupo y rotarla sin llamar a nadie. Pero Supabase Auth solo guarda un **hash**: una
+contraseña no se puede "ver", solo sustituir.
+
+Por eso se guarda aparte una copia **cifrada** (AES-256-GCM,
+`supabase/functions/_shared/secretos.ts`) en la tabla `credenciales_grupo`
+(`id_usuario` → `password_cifrada`, `actualizado_en`, `actualizado_por`). La clave de
+cifrado es el secreto de servidor `GRUPO_PASSWORD_KEY` de las Edge Functions, que **nunca
+está en Postgres**: quien tenga una copia de la base de datos (o la contraseña del pooler de
+`scripts/`) no puede leer ninguna contraseña. La tabla tampoco la lee el navegador — RLS
+activa sin políticas y `revoke` a `anon`/`authenticated`, solo la toca el `service_role`.
+Mismo planteamiento que `grupo_credenciais` en Trebello.
+
+**Dónde:** Usuarios → pestaña Alumnos → botón 🔑 de la fila del grupo, que abre
+`modal-password-grupo` (`abrirPasswordGrupo` en `js/ubicaciones.js`). No enseña nada al
+abrirse: hay que pulsar **👁️ Mostrar contraseña**. Con ella a la vista hay **📋 Copiar**,
+**🙈 Ocultar**, **🔄 Generar una nueva** y **✏️ Escribirla yo** (mínimo 6 caracteres, el de
+Supabase Auth). La contraseña solo vive en memoria mientras el modal está abierto.
+
+**Acciones de `gestionar-usuario`:** `ver_password_grupo` y `cambiar_password_grupo`, ambas
+`requireStaff` — Administrador, Gestor y Profesor, que son quienes dan clase al grupo. Las
+dos comprueban en el servidor que la fila es de verdad una cuenta de grupo
+(`esCuentaDeGrupo()`): la contraseña de una **persona** no se guarda en ningún sitio, ni
+cifrada, y pedirla devuelve 400. `resetear_password` también refresca la copia cuando la
+cuenta es de grupo, para que "Mostrar contraseña" no enseñe una que ya no vale.
+
+**Grupos creados antes de esto** (los que dio de alta `crear_grupos_alumnado.py`) no tienen
+copia guardada: el modal lo dice y ofrece generar una nueva. Si algún día se pierde el
+secreto `GRUPO_PASSWORD_KEY`, pasa lo mismo — no se recupera nada, se rotan las contraseñas.
 
 **Por qué:** protección de datos — así no hay nombres ni emails de menores en la base de
 datos. Ver `docs/proteccion-datos.md` para el detalle, incluido el efecto sobre los registros
@@ -240,8 +272,9 @@ caracteres se completan con dígitos (`ana` → `ana123`) porque Supabase Auth e
 La usa el import de alumnado de la app (`importar-alumnos`) y `scripts/importar_alumnos.py`.
 El profesorado sigue con contraseña aleatoria: su import no se ha tocado.
 
-**Restablecer:** botón 🔑 en cada fila de alumnado y **🔑 Restablecer contraseñas** por grupo
-(mismas reglas de "filas visibles" que arriba). Acción `resetear_password` de
+**Restablecer:** botón 🔑 en cada fila de alumnado que **no** sea cuenta de grupo (las de
+grupo abren el modal de contraseña descrito arriba; el botón de restablecer en bloque se
+retiró al quedar un grupo por ciclo). Acción `resetear_password` de
 `gestionar-usuario`: busca la cuenta de Auth por `public.users` —y solo si no está ahí pide el
 listado completo de Auth, una vez— y hace `auth.admin.updateUserById`. **No manda ningún
 correo**: devuelve la contraseña para dictarla en clase (el alumnado no siempre puede abrir su

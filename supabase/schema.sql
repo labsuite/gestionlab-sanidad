@@ -100,6 +100,27 @@ create table usuarios (
   puede_revisar_inventario    boolean not null default false
 );
 
+-- Copia CIFRADA de la contraseña de cada cuenta de GRUPO del alumnado
+-- (`1cslcb@gestionlab.cma`…), para que el profesorado pueda consultarla en
+-- Usuarios → Alumnos → 🔑 y cambiarla sin salir de la app. Auth solo guarda el
+-- hash: sin esto no hay forma de "ver" la contraseña de un grupo.
+--
+-- ⚠ Solo cuentas de grupo, que son compartidas a propósito (como la clave del
+-- wifi del aula). La contraseña de una persona no se guarda nunca, ni cifrada:
+-- se restablece. Ver docs/proteccion-datos.md.
+--
+-- Sin políticas RLS y sin GRANT a anon/authenticated: esta tabla NO la lee el
+-- navegador, solo el service_role desde la Edge Function `gestionar-usuario`,
+-- que antes comprueba el rol de quien pregunta. La clave de cifrado
+-- (`GRUPO_PASSWORD_KEY`) vive en los secretos de las Edge Functions, nunca en
+-- Postgres — ver supabase/functions/_shared/secretos.ts.
+create table if not exists credenciales_grupo (
+  id_usuario        text primary key references usuarios(id_usuario) on delete cascade on update cascade,
+  password_cifrada  text not null,
+  actualizado_en    timestamptz not null default now(),
+  actualizado_por   text
+);
+
 create table ubicaciones (
   id_ubicacion            text primary key,
   laboratorio_aula        text,
@@ -588,6 +609,12 @@ grant select, insert, update, delete on all tables in schema public to authentic
 grant select on all tables in schema public to anon;
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
 alter default privileges in schema public grant select on tables to anon;
+
+-- Excepción: `credenciales_grupo` no la toca nunca el navegador (guarda las
+-- contraseñas cifradas de las cuentas de grupo). RLS sin políticas ya lo impide;
+-- el revoke lo deja explícito, para que añadir políticas genéricas más adelante
+-- no la abra por descuido.
+revoke all on credenciales_grupo from anon, authenticated;
 
 -- ============================================================
 -- 11. POLÍTICAS RLS — catálogos no sensibles, lectura pública
