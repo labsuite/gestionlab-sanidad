@@ -634,23 +634,17 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
 
-  // Selector de unidad: solo si el material catalogado tiene más de un tipo
-  // de unidad (Unidad + Unidades_Extra) — igual criterio que al añadir la
-  // línea (ver _mostrarSelectorUnidadLinea). Con un único tipo se mantiene
-  // el texto fijo de siempre, sin selector.
-  const grupo = document.getElementById('edlinea-unidad-group');
-  const sel = document.getElementById('edlinea-unidad');
+  // Unidad pedida: combo (input + datalist) siempre visible, mismo criterio que
+  // la unidad de un lote en el modal de material (ver _unidadesSugeridas). Antes
+  // era un <select> que solo aparecía si el material catalogado declaraba más de
+  // una unidad, así que en la mayoría de las líneas la unidad no se podía
+  // corregir — ni cuando la había heredado mal de la solicitud.
   const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
   const extra = (mat?.Unidades_Extra || '').split(',').map(u => u.trim()).filter(Boolean);
-  const opciones = [mat?.Unidad || '', ...extra].filter(Boolean);
-  if (opciones.length > 1) {
-    sel.innerHTML = opciones.map(u => `<option value="${u}"${u === unidad ? ' selected' : ''}>${u}</option>`).join('');
-    grupo.style.display = '';
-  } else {
-    grupo.style.display = 'none';
-    sel.innerHTML = '';
-    document.getElementById('edlinea-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
-  }
+  const sugerencias = _unidadesSugeridas(mat?.Unidad || '', extra);
+  const dl = document.getElementById('edlinea-unidades-list');
+  if (dl) dl.innerHTML = sugerencias.map(u => `<option value="${_escAttr(u)}"></option>`).join('');
+  sv('edlinea-unidad', unidad);
   openModal('modal-editar-linea-pedido');
 }
 
@@ -663,8 +657,7 @@ async function guardarEdicionLinea() {
   if (!cantidad || cantidad <= 0) { showToast('Indica una cantidad válida', 'error'); return; }
   const precio = v('edlinea-precio');
   const obs = v('edlinea-obs');
-  const grupoUnidad = document.getElementById('edlinea-unidad-group');
-  const unidad = grupoUnidad && grupoUnidad.style.display !== 'none' ? v('edlinea-unidad') : undefined;
+  const unidad = v('edlinea-unidad').trim();
   showLoading('Guardando...');
   try {
     const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
