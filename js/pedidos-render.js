@@ -393,11 +393,23 @@ function renderPedidos(filtroEstado = '') {
 }
 function filtrarPedidosEstado(v) { renderPedidos(v); }
 
+// Material catalogado de una línea: por ID_Material si lo tiene, y solo si no,
+// por nombre. Buscar solo por nombre fallaba en cuanto el texto de la línea se
+// separaba del catálogo por una coma ("Puntas micropipeta 5000uL" frente a
+// "Puntas micropipeta, 5000uL"), y con él se perdía la unidad del material.
+function _materialDeLinea(l) {
+  if (l.ID_Material) {
+    const porId = DATA.material.find(m => m.ID_Material === l.ID_Material);
+    if (porId) return porId;
+  }
+  return DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+}
+
 // Unidad de una línea: la elegida al pedirla (si el material tenía varios
 // tipos), si no la del catálogo de material, si no la solicitud vinculada
 function _unidadLineaPedido(l) {
   if (l.Unidad) return l.Unidad;
-  const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+  const mat = _materialDeLinea(l);
   if (mat?.Unidad) return mat.Unidad;
   const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
   if (solIdM) {

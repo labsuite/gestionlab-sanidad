@@ -639,7 +639,7 @@ function openModalEditarLinea(lineaId, pedidoId) {
   // era un <select> que solo aparecía si el material catalogado declaraba más de
   // una unidad, así que en la mayoría de las líneas la unidad no se podía
   // corregir — ni cuando la había heredado mal de la solicitud.
-  const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+  const mat = _materialDeLinea(l);
   const extra = (mat?.Unidades_Extra || '').split(',').map(u => u.trim()).filter(Boolean);
   const sugerencias = _unidadesSugeridas(mat?.Unidad || '', extra);
   const dl = document.getElementById('edlinea-unidades-list');
