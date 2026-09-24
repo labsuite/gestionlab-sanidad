@@ -75,6 +75,43 @@ async function gruposAsignadosLimpios(
 }
 
 /**
+ * Un Profesor solo puede ver y cambiar la contraseña de los grupos que tiene
+ * asignados en su ficha (`usuarios.grupos_asignados`). Administrador y Gestor
+ * llegan a todos: son quienes administran las cuentas y quienes reparten los
+ * grupos, y tienen que poder rescatar a un grupo cuyo docente no esté.
+ *
+ * Devuelve null si puede seguir, o la respuesta de error si no.
+ */
+async function requiereGrupoPropio(
+  supabaseAdmin: any, user: { email?: string; rol?: string } | undefined, idGrupo: string,
+): Promise<Response | null> {
+  if (user?.rol !== "Profesor") return null;
+
+  const email = String(user?.email || "").toLowerCase().trim();
+  const { data: ficha } = await supabaseAdmin.from("usuarios")
+    .select("grupos_asignados").eq("email", email).maybeSingle();
+
+  // Sin ficha en el catálogo no hay forma de saber qué grupos lleva. Pasa cuando
+  // el email del login no coincide con el del catálogo: mejor decirlo que dejar
+  // pasar a todos por no encontrar la fila.
+  if (!ficha) {
+    return jsonError(
+      "No encontramos tu ficha de usuario, así que no podemos saber qué grupos llevas. Avisa a un administrador.",
+      403,
+    );
+  }
+
+  const mios = String(ficha.grupos_asignados || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+  if (!mios.includes(idGrupo)) {
+    return jsonError(
+      "Solo puedes ver la contraseña de los grupos que tienes asignados. Si te falta alguno, pídeselo a un administrador.",
+      403,
+    );
+  }
+  return null;
+}
+
+/**
  * Comprueba que la fila existe y que es de verdad una cuenta de grupo. Quien
  * pregunta ya viene filtrado por requireStaff: la contraseña de un grupo la
  * pueden ver y cambiar Administrador, Gestor y Profesor (la usan en clase).
@@ -227,11 +264,14 @@ Deno.serve(async (req) => {
   // Como Auth solo guarda el hash, se guarda aparte una copia cifrada
   // (`credenciales_grupo`, ver _shared/secretos.ts) que solo se descifra aquí.
   if (accion === "ver_password_grupo") {
-    const { error: authError, supabaseAdmin } = await requireStaff(req);
+    const { error: authError, user, supabaseAdmin } = await requireStaff(req);
     if (authError) return authError;
 
     const g = await grupoDelBody(supabaseAdmin, body);
     if ("error" in g) return g.error;
+
+    const vetado = await requiereGrupoPropio(supabaseAdmin, user, g.fila.id_usuario);
+    if (vetado) return vetado;
 
     if (!hayClaveDeCifrado()) {
       return jsonError("Falta el secreto GRUPO_PASSWORD_KEY en las Edge Functions", 500);
@@ -266,6 +306,9 @@ Deno.serve(async (req) => {
 
     const g = await grupoDelBody(supabaseAdmin, body);
     if ("error" in g) return g.error;
+
+    const vetado = await requiereGrupoPropio(supabaseAdmin, user, g.fila.id_usuario);
+    if (vetado) return vetado;
 
     if (!hayClaveDeCifrado()) {
       return jsonError("Falta el secreto GRUPO_PASSWORD_KEY en las Edge Functions", 500);
@@ -306,6 +349,16 @@ Deno.serve(async (req) => {
     if (!filas?.length) return jsonError("No se encontró ningún usuario", 404);
     if (user?.rol === "Profesor" && filas.some((f: { rol: string }) => f.rol !== "Alumno")) {
       return jsonError("Solo puedes restablecer contraseñas de alumnado", 403);
+    }
+
+    // Restablecer una cuenta de grupo la deja con contraseña nueva y refresca la
+    // copia consultable: es la misma operación que cambiar_password_grupo por otra
+    // puerta, así que se restringe igual. Si no, un Profesor podría dejar fuera a
+    // un grupo que no lleva.
+    for (const f of filas) {
+      if (!esCuentaDeGrupo(String(f.email || ""))) continue;
+      const vetado = await requiereGrupoPropio(supabaseAdmin, user, f.id_usuario);
+      if (vetado) return vetado;
     }
 
     // Los ids de Auth se resuelven primero por public.users (una sola consulta);

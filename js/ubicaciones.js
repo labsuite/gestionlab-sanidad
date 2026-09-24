@@ -405,7 +405,18 @@ function _misGruposDelUsuario() {
 
 function _renderMisGrupos() {
   const mios = _misGruposDelUsuario();
-  if (!mios.length) return '';
+  if (!mios.length) {
+    // Un docente sin grupos no puede ver ninguna contraseña: decírselo, que si no
+    // parece que la app no lo hace.
+    if (getUserRole() !== 'Profesor') return '';
+    return `<div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-title">🎓 Mis grupos</div></div>
+      <div style="font-size:13px;color:var(--text-muted);line-height:1.5">
+        No tienes ningún grupo asignado, así que no puedes consultar contraseñas.
+        Pídele a un administrador que te asigne los tuyos en tu ficha de usuario.
+      </div>
+    </div>`;
+  }
   _pwInline = {};
   const filas = mios.map(g => {
     const idx = DATA.usuarios.indexOf(g);
@@ -641,9 +652,19 @@ async function setRevisarInventarioGrupo(gi, valor) {
 // consultar: si quedase alguna cuenta personal antigua de alumnado, su botón 🔑
 // sigue siendo el de restablecer de siempre.
 function _botonPasswordAlumnado(u, idx) {
-  return _esCuentaDeGrupo(u.Email)
-    ? `<button class="icon-btn" title="Contraseña del grupo" onclick="abrirPasswordGrupo(${idx})">🔑</button>`
-    : `<button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>`;
+  if (!_esCuentaDeGrupo(u.Email)) {
+    return `<button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>`;
+  }
+  // Un Profesor solo lleva sus grupos: el servidor rechaza los demás
+  // (`requiereGrupoPropio`), así que aquí no se ofrece el botón siquiera.
+  // Admin y Gestor administran las cuentas y llegan a todas.
+  if (getUserRole() === 'Profesor' && !_esGrupoPropio(u.ID_Usuario)) return '';
+  return `<button class="icon-btn" title="Contraseña del grupo" onclick="abrirPasswordGrupo(${idx})">🔑</button>`;
+}
+
+/** ¿Este grupo está asignado a quien mira? Respeta la vista previa de rol. */
+function _esGrupoPropio(idGrupo) {
+  return _misGruposDelUsuario().some(g => g.ID_Usuario === idGrupo);
 }
 
 // Estado del modal de contraseña de grupo. La contraseña vive aquí solo mientras

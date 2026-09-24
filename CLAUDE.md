@@ -178,8 +178,12 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
 - Arriba de esa pestaña, la tarjeta **🎓 Mis grupos** da la cuenta y la contraseña de los
   grupos de quien mira. Cuáles son los "suyos" sale de `usuarios.grupos_asignados`, que se
   marca a mano en la ficha del docente (Admin/Gestor); **no** se deduce de los módulos, que
-  da grupos de más y de menos. No es un permiso: cualquier docente sigue viendo las de
-  todos. Ver `docs/modulo-usuarios.md`.
+  da grupos de más y de menos.
+- ⚠ Eso **sí restringe**: un Profesor solo ve y cambia la contraseña de sus grupos. Lo impone
+  el servidor (`requiereGrupoPropio()`) en las tres puertas que tocan una contraseña de grupo:
+  `ver_password_grupo`, `cambiar_password_grupo` y `resetear_password`. Admin y Gestor llegan
+  a todos. Al añadir cualquier acción nueva que toque contraseñas de grupo, pasarla también
+  por ahí. Ver `docs/modulo-usuarios.md`.
 - El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
   aborta). El de profesorado sigue vivo.
 

@@ -225,7 +225,8 @@ abrirse: hay que pulsar **👁️ Mostrar contraseña**. Con ella a la vista hay
 Supabase Auth). La contraseña solo vive en memoria mientras el modal está abierto.
 
 **Acciones de `gestionar-usuario`:** `ver_password_grupo` y `cambiar_password_grupo`, ambas
-`requireStaff` — Administrador, Gestor y Profesor, que son quienes dan clase al grupo. Las
+`requireStaff` — Administrador, Gestor y Profesor, que son quienes dan clase al grupo; al
+Profesor se le limita además a sus grupos asignados (ver el apartado siguiente). Las
 dos comprueban en el servidor que la fila es de verdad una cuenta de grupo
 (`esCuentaDeGrupo()`): la contraseña de una **persona** no se guarda en ningún sitio, ni
 cifrada, y pedirla devuelve 400. `resetear_password` también refresca la copia cuando la
@@ -257,10 +258,19 @@ Alumno (`gestionar-usuario`, acción `actualizar`), así que no puede asignarse 
 mismo. El servidor además descarta IDs que no sean cuentas de grupo reales
 (`gruposAsignadosLimpios`) y guarda `null` en los roles que no dan clase.
 
-⚠ Esto **no es un permiso**: no restringe nada. Cualquier docente sigue pudiendo consultar la
-contraseña de cualquier grupo desde la pestaña Alumnos, igual que antes — "Mis grupos" es un
-atajo, no una barrera. Si algún día tuviera que serlo, habría que filtrar también en
-`ver_password_grupo`.
+**Y sí es un permiso** (2026-09-24, a petición de la usuaria): un **Profesor** solo puede ver
+y cambiar la contraseña de los grupos que tiene asignados. Lo impone el servidor en
+`requiereGrupoPropio()`, que se llama desde las **tres** puertas que tocan la contraseña de un
+grupo — `ver_password_grupo`, `cambiar_password_grupo` y `resetear_password` (esta última la
+deja con contraseña nueva y refresca la copia consultable: es lo mismo por otra puerta). El
+cliente además no le pinta el 🔑 en los grupos ajenos, pero eso es cortesía, no la barrera.
+
+**Administrador y Gestor llegan a todos los grupos**: son quienes administran las cuentas y
+quienes reparten los grupos, y tienen que poder rescatar a un grupo cuyo docente no esté.
+
+Un docente **sin ficha en el catálogo** `usuarios` (pasa si el email del login no coincide con
+el del catálogo) recibe 403 con ese motivo, en vez de pasar como si no tuviera restricción.
+Y si no tiene grupos asignados, la tarjeta se lo dice en vez de no aparecer.
 
 **Grupos creados antes de esto** (los que dio de alta `crear_grupos_alumnado.py`) no tienen
 copia guardada: el modal lo dice y ofrece generar una nueva. Si algún día se pierde el
