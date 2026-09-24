@@ -132,7 +132,9 @@ Deno.serve(async (req) => {
     numero_factura: pedido.numero_factura || null,
     data_factura: soloFecha(pedido.fecha_factura),
     data_pedido: soloFecha(pedido.fecha_pedido_enviado || pedido.fecha_aprobacion || pedido.fecha_creacion),
-    notas: pedido.observaciones || null,
+    // Las observaciones NO se mandan: en la hoja de pedido salen impresas en
+    // "OBSERVACIÓNS", que es un campo del documento oficial, no un cajón para
+    // las notas internas del pedido de laboratorio.
     items,
     cargo_extra: cargoExtra,
     facturas,

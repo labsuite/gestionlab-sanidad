@@ -266,8 +266,15 @@ El botón "📄 Generar hoja" se queda como borrador de trabajo interno.
 2. Botón **📤 Enviar a Trebello** (bloque "Documentación interna" de `verDetallePedido`).
 3. `enviarPedidoATrebello` (`js/pedidos-acciones.js`) → Edge Function `enviar-a-trebello`.
 4. La función valida, empaqueta y hace POST a `POST /api/gestionlab/pedidos` de Trebello.
-5. Trebello crea el pedido en Compras en estado `EN_REVISION` con las facturas dentro y avisa
-   a las ADMIN. La jefa revisa, saca el PDF, lo firma y lo tramita.
+5. Trebello crea el pedido en Compras en estado `INVOICE_RECEIVED` con las facturas dentro y
+   avisa a las ADMIN. La jefa revisa, saca el PDF, lo firma y lo tramita.
+
+⚠ **El estado importa.** `EN_REVISION` es la bandeja "Facturas por revisar" (`enRevisionPedidos`
+en `app/[locale]/(dashboard)/compras/page.tsx`), pensada para un pedido *a medias* que espera
+una factura que leer con IA: ahí la tarjeta no muestra las líneas ni el botón de la hoja. Un
+pedido de GestionLab llega completo, así que entra en la lista normal (`activePedidos`, todo lo
+que no es `PAID` ni `EN_REVISION`), que es donde `pedido-card.tsx` pone el botón "Folla .docx"
+con la descarga del PDF. Si un pedido del puente aparece en `EN_REVISION`, reenviarlo lo sube.
 
 ### Detalles que importan
 - **El secreto vive en el servidor.** `TREBELLO_INGEST_SECRET` + `TREBELLO_INGEST_URL` son
@@ -285,6 +292,15 @@ El botón "📄 Generar hoja" se queda como borrador de trabajo interno.
 - **`doc_enviada_jefatura` deja de marcarse a mano** en los pedidos que pasan por el puente:
   lo escribe el servidor y solo si el envío respondió OK. Los pedidos antiguos (marcados a
   mano, sin `trebello_pedido_id`) siguen mostrando el checkbox editable de siempre.
+- **Las observaciones NO viajan.** `pedido.observaciones` es la nota interna del pedido de
+  laboratorio; en la hoja saldría impresa en **OBSERVACIÓNS**, que es un campo del documento
+  oficial. El endpoint solo escribe `notes` si le llega algo, así que un reenvío tampoco pisa
+  lo que la jefa haya escrito ahí a mano.
+- **"Pagado por" va vacío.** Ese campo de la hoja (junto a "Pagar ao nº conta") es para
+  reingresarle a alguien lo que adelantó de su bolsillo, así que solo se rellena con
+  `reembolso = true`. Trebello lo ponía siempre con el nombre de la jefa; corregido el
+  2026-09-24 en `lib/utils/pedido-data.ts` — afecta también a los pedidos nativos de Trebello,
+  no solo a los del puente. Quien tramita ya figura en **PROFESOR/A** y en las firmas.
 - **IVA:** `iva_rate` viaja a `null` a propósito — el default de los generadores de Trebello
   es 0.21, que es el que aplica GestionLab. Si algún día hay tipos reducidos, se manda.
 - **Columnas nuevas en `pedidos`:** `trebello_pedido_id`, `fecha_envio_trebello`.
