@@ -483,7 +483,12 @@ create table pedidos (
   tipo                                text not null default 'Material',
   gasto_extra_concepto                text,
   gasto_extra_importe                 numeric,
-  token_publico                       text unique  -- link sin login para que el proveedor suba factura/presupuesto
+  token_publico                       text unique,  -- link sin login para que el proveedor suba factura/presupuesto
+  -- Puente con Trebello: la jefa tramita ahí TODOS los pedidos del departamento,
+  -- así que el pedido se deposita en su módulo Compras en vez de ir por correo.
+  -- doc_enviada_jefatura pasa a marcarlo el servidor cuando el envío responde OK.
+  trebello_pedido_id                  text,        -- uuid del pedido en Trebello (clave para reenviar sin duplicar)
+  fecha_envio_trebello                timestamptz
 );
 
 create table documentos_proveedor (

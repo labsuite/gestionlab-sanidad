@@ -15,6 +15,12 @@ window.__authRecoveryHash = window.location.hash || '';
 // que ya no existe. De ahí que esto sea una constante y no window.location.
 const APP_URL = 'https://labsuite.github.io/gestionlab-sanidad/';
 
+// Trebello — app del departamento donde la jefa tramita todos los pedidos.
+// GestionLab le deposita ahí los de laboratorio (ver enviarPedidoATrebello en
+// js/pedidos-acciones.js); esto es solo para enlazar al pedido desde la ficha,
+// el envío de verdad lo hace la Edge Function 'enviar-a-trebello'.
+const TREBELLO_URL = 'https://trebello.vercel.app';
+
 // Base para las URLs de etiquetas NFC/QR — siempre la de producción.
 function urlEtiqueta(params) {
   return APP_URL + '?' + new URLSearchParams(params).toString();

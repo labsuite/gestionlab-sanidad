@@ -274,6 +274,8 @@ function _pedidoSbToObj(p) {
     Gasto_Extra_Concepto: p.gasto_extra_concepto || '',
     Gasto_Extra_Importe: p.gasto_extra_importe != null ? String(p.gasto_extra_importe) : '',
     Token_Publico: p.token_publico || '',
+    Trebello_Pedido_Id: p.trebello_pedido_id || '',
+    Fecha_Envio_Trebello: p.fecha_envio_trebello || '',
   };
 }
 

@@ -244,3 +244,55 @@ Caso: al recibir un pedido, el material no siempre va al mismo sitio de siempre 
 1. `TIPOS_MIME_PERMITIDOS` en `supabase/functions/subir-documento/index.ts` (ya incluye `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
 2. `allowed_mime_types` del **bucket `documentos`** en Supabase Storage (config del bucket, no está en el repo). Si falta el tipo aquí, el upload falla con `mime type ... wordprocessingml.document is not supported` **aunque la Edge Function lo permita**.
 Corregido el 2026-09-03 añadiendo el tipo docx al bucket (`update storage.buckets set allowed_mime_types = array_append(...) where id='documentos'`). El bucket ahora acepta: pdf, jpeg, png, docx.
+
+---
+
+## Puente con Trebello — los pedidos ya no van por correo (2026-09-24)
+
+La jefa de departamento tramita **todos** los pedidos del departamento en el módulo
+**Compras** de Trebello (`labsuite/trebello`), donde el resto del profesorado sube sus
+facturas. Los de laboratorio llegaban aparte, por correo, con la hoja firmada y la factura
+adjuntas: dos sitios para lo mismo. Desde ahora GestionLab **deposita** el pedido allí.
+
+**Quién firma:** la jefa, no quien manda el pedido. Los pedidos que entran por el puente van
+siempre con `reembolso = false` y sin `numero_conta`, y así `pagado_por` de la hoja sale con
+el `full_name` de quien tenga `is_jefa_departamento` — igual que los pedidos nativos de
+Trebello (ver `app/api/compras/pedidos/[id]/pdf/route.ts` allí). Por eso GestionLab no genera
+ni sube ninguna hoja firmada: **la hoja oficial en PDF la produce y la firma Trebello.**
+El botón "📄 Generar hoja" se queda como borrador de trabajo interno.
+
+### Flujo
+1. Pedido normal en GestionLab: líneas → factura del proveedor → IA → precios.
+2. Botón **📤 Enviar a Trebello** (bloque "Documentación interna" de `verDetallePedido`).
+3. `enviarPedidoATrebello` (`js/pedidos-acciones.js`) → Edge Function `enviar-a-trebello`.
+4. La función valida, empaqueta y hace POST a `POST /api/gestionlab/pedidos` de Trebello.
+5. Trebello crea el pedido en Compras en estado `EN_REVISION` con las facturas dentro y avisa
+   a las ADMIN. La jefa revisa, saca el PDF, lo firma y lo tramita.
+
+### Detalles que importan
+- **El secreto vive en el servidor.** `TREBELLO_INGEST_SECRET` + `TREBELLO_INGEST_URL` son
+  secrets de las Edge Functions de GestionLab; al otro lado, `GESTIONLAB_INGEST_SECRET` es env
+  var del proyecto `trebello` en Vercel. Los dos valores son el mismo. Nunca en el navegador
+  ni en el repo — misma regla que la clave de Gemini. Copia local en
+  `scripts/supabase_credentials.json` (`trebello_ingest_secret`), fuera de git.
+- **Idempotente.** La clave es `papeleria_pedidos.gestionlab_pedido_id` = `ID_Pedido`.
+  Reenviar actualiza la misma fila; no duplica. Las facturas usan un path determinista
+  (`<pedido>/gestionlab/<nombre>`), así que reenviar las sobreescribe en vez de acumularlas.
+  Un pedido ya `PAID` en Trebello devuelve **409** y no se toca.
+- **Valida antes de enviar**, con el mismo criterio que Trebello exige para poder sacar el PDF
+  (nº de factura + todas las líneas con precio). Mejor fallar aquí que crear allí un pedido
+  del que no se puede sacar la hoja.
+- **`doc_enviada_jefatura` deja de marcarse a mano** en los pedidos que pasan por el puente:
+  lo escribe el servidor y solo si el envío respondió OK. Los pedidos antiguos (marcados a
+  mano, sin `trebello_pedido_id`) siguen mostrando el checkbox editable de siempre.
+- **IVA:** `iva_rate` viaja a `null` a propósito — el default de los generadores de Trebello
+  es 0.21, que es el que aplica GestionLab. Si algún día hay tipos reducidos, se manda.
+- **Columnas nuevas en `pedidos`:** `trebello_pedido_id`, `fecha_envio_trebello`.
+- **Facturas:** solo PDF/JPG/PNG y hasta 10 MB, como el resto de subidas de Trebello. Las que
+  no pasan el filtro no bloquean el envío: el pedido llega igual y se avisa en el toast.
+
+### ⚠ El puente viejo de Trebello sigue roto
+`lib/gestionlab/sheets.ts` en Trebello (que alimenta `/api/gestionlab/material` y
+`/api/gestionlab/stock`) lee **Google Sheets**, retirado en GestionLab el 2026-08-06. No tiene
+nada que ver con este puente, que va por HTTP contra Postgres, pero conviene reescribirlo o
+retirarlo cuando se toque ese módulo.

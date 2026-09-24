@@ -675,6 +675,7 @@ function verDetallePedido(pedidoId) {
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
+            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${p.Trebello_Pedido_Id ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -683,10 +684,16 @@ function verDetallePedido(pedidoId) {
             <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>
             ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir</button>` : ''}
           </div>
+          ${p.Trebello_Pedido_Id ? `
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap">
+            <input type="checkbox" checked disabled style="width:16px;height:16px">
+            <span style="color:var(--success);font-weight:500">📬 Enviado a Trebello${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
+            <a href="${TREBELLO_URL}/gl/compras?tab=pedidos" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:11px;padding:2px 10px;text-decoration:none">↗ Ver en Trebello</a>
+          </div>` : `
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Generada==='TRUE' ? 'pointer' : 'not-allowed'}">
             <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${p.Doc_Hoja_Generada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
             <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
-          </label>
+          </label>`}
         </div>
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;margin-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">

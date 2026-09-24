@@ -473,6 +473,50 @@ async function toggleDocPedido(pedidoId, campo, valor) {
   hideLoading();
 }
 
+// Deposita el pedido (datos + facturas del proveedor) en el módulo Compras de
+// Trebello, que es donde la jefa tramita todos los pedidos del departamento.
+// Ella genera allí la hoja en PDF, la firma y la tramita — aquí no se firma ni
+// se envía ningún correo. Ver docs/modulo-pedidos.md.
+async function enviarPedidoATrebello(pedidoId) {
+  const idx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
+  if (idx === -1) return;
+  const p = DATA.pedidos[idx];
+
+  // Reenviar actualiza el pedido que ya está en Trebello; se avisa porque si la
+  // jefa ya firmó la hoja con los datos viejos, esa firma deja de valer.
+  if (p.Trebello_Pedido_Id && !confirm(
+    'Este pedido ya se envió a Trebello.\n\n' +
+    'Volver a enviarlo actualiza el que hay allí con los datos actuales. ' +
+    'Si la jefa ya firmó la hoja, tendrá que volver a generarla y firmarla.\n\n' +
+    '¿Reenviar?'
+  )) return;
+
+  showLoading('Enviando a Trebello...');
+  try {
+    const r = await callEdgeFunction('enviar-a-trebello', { id_pedido: pedidoId });
+    p.Trebello_Pedido_Id   = r.trebello_pedido_id || p.Trebello_Pedido_Id || '';
+    p.Fecha_Envio_Trebello = new Date().toISOString();
+    p.Doc_Enviada_Jefatura = 'TRUE';
+
+    // Las que no viajaron no son un error del envío: el pedido ya está allí y
+    // la factura se puede subir a mano. Pero hay que decirlo, no tragárselo.
+    const problemas = [...(r.facturas_no_enviadas || []), ...(r.facturas_rechazadas || [])];
+    if (problemas.length) {
+      showToast(`Pedido enviado, pero ${problemas.length} archivo(s) no: ${problemas.join('; ')}`, 'warning');
+    } else {
+      const n = r.facturas_enviadas || 0;
+      showToast(r.nuevo
+        ? `Pedido enviado a Trebello${n ? ` con ${n} factura(s)` : ' (sin facturas)'}`
+        : 'Pedido actualizado en Trebello', 'success');
+    }
+    verDetallePedido(pedidoId);
+    if (typeof renderPedidos === 'function') renderPedidos();
+  } catch(e) {
+    showToast(e.message || 'Error enviando a Trebello', 'error');
+  }
+  hideLoading();
+}
+
 async function archivarPedido(pedidoId) {
   // Archivado directo sin confirmación
   const idx = DATA.pedidos.findIndex(p => p.ID_Pedido === pedidoId);
