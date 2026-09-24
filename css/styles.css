@@ -1709,3 +1709,11 @@
   .linea-nombre { flex: 0 0 100%; margin-bottom: 2px; }
   .linea-meta { flex: 1; }
 }
+
+/* Tarjeta "Mis grupos" (Usuarios → Alumnos). En pantalla ancha las acciones se
+   van a la derecha; en el móvil bajan a su propia línea, que si no el último
+   botón queda cortado contra el borde de la tarjeta. */
+.mis-grupos-acciones { margin-left: auto; }
+@media (max-width: 640px) {
+  .mis-grupos-acciones { margin-left: 0; width: 100%; }
+}

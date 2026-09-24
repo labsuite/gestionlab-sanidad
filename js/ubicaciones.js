@@ -423,7 +423,7 @@ function _renderMisGrupos() {
     return `<div class="mis-grupos-fila" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)">
       <strong style="min-width:110px">${g.Nombre || '—'}</strong>
       <code style="background:var(--bg-alt,#f1f3f5);border-radius:6px;padding:4px 8px;font-size:13px">${g.Email || '—'}</code>
-      <div id="pwi-${_escAttr(g.ID_Usuario)}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+      <div id="pwi-${_escAttr(g.ID_Usuario)}" class="mis-grupos-acciones" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px"
           onclick="verPasswordGrupoInline('${_escAttr(g.ID_Usuario)}')">👁️ Ver contraseña</button>
         <button class="icon-btn" title="Cambiar la contraseña" onclick="abrirPasswordGrupo(${idx})">🔑</button>
