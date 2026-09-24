@@ -97,7 +97,11 @@ create table usuarios (
   ubicaciones_asignadas       text,   -- números de lab separados por coma, no IDs de zona
   modulo                      text,   -- nombres de módulo separados por coma, sin prefijo de ciclo
   ciclo_principal             text,
-  puede_revisar_inventario    boolean not null default false
+  puede_revisar_inventario    boolean not null default false,
+  -- Qué grupo(s) de alumnado lleva un docente: IDs de las cuentas de GRUPO
+  -- separados por coma. Se asigna a mano desde el modal de usuario; de aquí
+  -- sale "Mis grupos" en Usuarios → Alumnos, con su cuenta y su contraseña.
+  grupos_asignados            text
 );
 
 -- Copia CIFRADA de la contraseña de cada cuenta de GRUPO del alumnado

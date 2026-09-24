@@ -48,6 +48,33 @@ async function guardarCopiaPassword(
 }
 
 /**
+ * Depura la lista de grupos asignados a un docente: se queda solo con IDs que
+ * existan de verdad y sean cuentas de GRUPO del alumnado. Que llegue basura del
+ * navegador no debe dejar la ficha apuntando a un grupo inventado, porque de esta
+ * lista sale qué contraseñas ve cada profe en "Mis grupos".
+ *
+ * Los roles sin grupos (Alumno, Administrador) se guardan siempre a null: el
+ * campo es solo para quien da clase.
+ */
+async function gruposAsignadosLimpios(
+  supabaseAdmin: any, raw: unknown, rol: string,
+): Promise<string | null> {
+  if (rol !== "Profesor" && rol !== "Gestor") return null;
+  const pedidos = String(raw || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (!pedidos.length) return null;
+
+  const { data: filas } = await supabaseAdmin.from("usuarios")
+    .select("id_usuario, email, rol").in("id_usuario", pedidos);
+  const validos = (filas ?? [])
+    .filter((f: { email?: string; rol?: string }) => f.rol === "Alumno" && esCuentaDeGrupo(String(f.email || "")))
+    .map((f: { id_usuario: string }) => f.id_usuario);
+
+  // Se respeta el orden en que llegaron, para que la ficha no baile al guardar.
+  const orden = pedidos.filter((id) => validos.includes(id));
+  return orden.length ? orden.join(",") : null;
+}
+
+/**
  * Comprueba que la fila existe y que es de verdad una cuenta de grupo. Quien
  * pregunta ya viene filtrado por requireStaff: la contraseña de un grupo la
  * pueden ver y cambiar Administrador, Gestor y Profesor (la usan en clase).
@@ -349,7 +376,10 @@ Deno.serve(async (req) => {
   if (accion === "crear") {
     const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
     if (authError) return authError;
-    const datos = { id_usuario: genId("USR-"), activo: true, ...datosBase };
+    const datos = {
+      id_usuario: genId("USR-"), activo: true, ...datosBase,
+      grupos_asignados: await gruposAsignadosLimpios(supabaseAdmin, body.grupos_asignados, datosBase.rol),
+    };
     const { data, error } = await supabaseAdmin.from("usuarios").insert(datos).select().single();
     if (error) return jsonError(`No se pudo crear: ${error.message}`, 400);
     return jsonOk({ usuario: data });
@@ -364,11 +394,16 @@ Deno.serve(async (req) => {
     const { data: existente } = await supabaseAdmin.from("usuarios").select("*").eq("id_usuario", idUsuario).maybeSingle();
     if (!existente) return jsonError(`No se encontró el usuario "${idUsuario}"`, 404);
 
-    const datos = { ...datosBase };
+    const datos = { ...datosBase, grupos_asignados: null as string | null };
     if (user?.rol === "Profesor") {
       if (existente.rol !== "Alumno") return jsonError("Solo puedes modificar usuarios con rol Alumno", 403);
       datos.rol = "Alumno"; // un Profesor no puede cambiarle el rol a nadie, aunque lo mande en el body
     }
+    // Repartir grupos entre el profesorado es de Admin/Gestor: un Profesor solo
+    // llega aquí editando filas de Alumno, que nunca llevan grupos asignados.
+    datos.grupos_asignados = await gruposAsignadosLimpios(
+      supabaseAdmin, body.grupos_asignados, datos.rol || String(existente.rol),
+    );
 
     const { data, error } = await supabaseAdmin.from("usuarios").update(datos).eq("id_usuario", idUsuario).select().single();
     if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);

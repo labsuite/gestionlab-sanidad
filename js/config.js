@@ -58,7 +58,7 @@ const COLS = {
   tareasIntervencion: ['ID_Tarea','ID_Intervencion','Descripcion','Resultado','Operativo','Observaciones'],
   proveedores:        ['ID_Proveedor','Nombre_Proveedor','Tipo_Proveedor','Persona_Contacto','Email_Contacto','Telefono','Web','Observaciones','Activo'],
   ubicaciones:        ['ID_Ubicacion','Laboratorio_Aula','Zona','Subzona','Descripcion_Completa','Activa'],
-  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas','Modulo','Ciclo_Principal','Puede_Revisar_Inventario'],
+  usuarios:           ['ID_Usuario','Nombre','Email','Rol','Activo','Ubicaciones_Asignadas','Modulo','Ciclo_Principal','Puede_Revisar_Inventario','Grupos_Asignados'],
   material:           ['ID_Material','Nombre','Atributos','Categoria','Referencia_Proveedor','Proveedor','Unidad','Ubicacion','Stock_Actual','Stock_Minimo','Stock_Optimo','Observaciones','Gestion_Automatica'],
   movimientos:        ['ID_Movimiento','Material','ID_Material','Tipo','Cantidad','Usuario','Fecha','Motivo','Observaciones'],
   solicitudes:        ['ID_Solicitud','Material','ID_Material','Cantidad_Solicitada','Solicitante','Fecha','Motivo','Proveedor_Requerido','Estado','Lista_Pedido','Observaciones','Snooze_Hasta'],

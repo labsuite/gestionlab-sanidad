@@ -231,6 +231,37 @@ dos comprueban en el servidor que la fila es de verdad una cuenta de grupo
 cifrada, y pedirla devuelve 400. `resetear_password` también refresca la copia cuando la
 cuenta es de grupo, para que "Mostrar contraseña" no enseñe una que ya no vale.
 
+## "Mis grupos": cada docente ve la cuenta de los suyos (2026-09-24)
+
+Buscar el grupo entre los nueve y abrir el modal 🔑 vale para gestionar, pero no para lo que
+un profe hace de verdad casi siempre: dictarle a su grupo el correo y la contraseña con los
+que entra. Arriba de la pestaña Alumnos hay ahora una tarjeta **🎓 Mis grupos** con una fila
+por grupo asignado: nombre, correo, **👁️ Ver contraseña** (que la pide al servidor en ese
+momento, con 📋 Copiar y 🙈 Ocultar) y el 🔑 de siempre para cambiarla.
+
+Sale de la columna **`usuarios.grupos_asignados`**: los IDs de las cuentas de grupo que lleva
+ese docente, separados por coma (mismo estilo de texto que `modulo` y
+`ubicaciones_asignadas`). Se marca a mano en la ficha del docente — Usuarios → ✏️ → **Grupos
+de alumnado**, un checkbox por cuenta de grupo, visible solo con rol Profesor o Gestor.
+
+**Se asigna a mano a propósito.** El primer intento fue deducirlo cruzando los módulos del
+docente con los del grupo, y falla en los dos sentidos: "Bioloxía Molecular e Citoxenética"
+la imparten grupos de tres ciclos distintos (daría grupos de más), y un docente puede dar
+clase fuera de su ciclo principal — Ana Liste, ciclo CS LCB, imparte "Control e Seguridade
+Alimentaria", que es de 2º CS QSA (daría grupos de menos). Ese cruce quedó solo como
+propuesta inicial en `scripts/asignar_grupos_profesorado.py`, que rellena la columna únicamente
+en quien aún no tenga nada.
+
+Quién puede repartir grupos: **Admin/Gestor**. Un Profesor solo puede editar filas de rol
+Alumno (`gestionar-usuario`, acción `actualizar`), así que no puede asignarse grupos a sí
+mismo. El servidor además descarta IDs que no sean cuentas de grupo reales
+(`gruposAsignadosLimpios`) y guarda `null` en los roles que no dan clase.
+
+⚠ Esto **no es un permiso**: no restringe nada. Cualquier docente sigue pudiendo consultar la
+contraseña de cualquier grupo desde la pestaña Alumnos, igual que antes — "Mis grupos" es un
+atajo, no una barrera. Si algún día tuviera que serlo, habría que filtrar también en
+`ver_password_grupo`.
+
 **Grupos creados antes de esto** (los que dio de alta `crear_grupos_alumnado.py`) no tienen
 copia guardada: el modal lo dice y ofrece generar una nueva. Si algún día se pierde el
 secreto `GRUPO_PASSWORD_KEY`, pasa lo mismo — no se recupera nada, se rotan las contraseñas.

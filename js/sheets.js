@@ -590,6 +590,8 @@ function _usuarioSbToObj(u) {
     Modulo: u.modulo || '',
     Ciclo_Principal: u.ciclo_principal || '',
     Puede_Revisar_Inventario: u.puede_revisar_inventario ? 'TRUE' : '',
+    // IDs de las cuentas de grupo que lleva este docente, separados por coma
+    Grupos_Asignados: u.grupos_asignados || '',
   };
 }
 

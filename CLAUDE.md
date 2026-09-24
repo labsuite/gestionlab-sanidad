@@ -51,6 +51,8 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `limpiar_inventario_fungible.py` — DELETE de todas las filas de las 8 tablas del módulo de fungibles; `DRY_RUN = True` por defecto
 - `crear_grupos_alumnado.py` — alta de las cuentas de GRUPO del alumnado (`1cslcb@gestionlab.cma`…); `DRY_RUN` por defecto, idempotente, se ejecuta una sola vez
 - `borrar_alumnado_personal.py` — elimina las cuentas personales de alumnado (catálogo + rol + login + recordatorios); `DRY_RUN` por defecto. ⚠ La baja del login falla con 504 muy a menudo: rematar siempre con `limpiar_logins_huerfanos.py`
+- `asignar_grupos_profesorado.py` — primera propuesta de `usuarios.grupos_asignados` (qué grupo lleva cada docente), deducida de los módulos; `DRY_RUN` por defecto y solo escribe en quien no tenga nada. A partir de ahí se asigna a mano desde la app.
+- `migrar_grupos_asignados.py` — crea la columna `usuarios.grupos_asignados`; ya ejecutado
 - `limpiar_logins_huerfanos.py` — borra de Supabase Auth los logins sin fila en `usuarios` ni en `public.users`; `DRY_RUN` por defecto
 - `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
 - `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
@@ -173,6 +175,11 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
   (`_shared/secretos.ts`, clave en el secreto `GRUPO_PASSWORD_KEY` de las Edge Functions,
   nunca en Postgres ni en el navegador). ⚠ Esto vale **solo** para cuentas de grupo: la
   contraseña de una persona no se guarda en ningún sitio, ni cifrada.
+- Arriba de esa pestaña, la tarjeta **🎓 Mis grupos** da la cuenta y la contraseña de los
+  grupos de quien mira. Cuáles son los "suyos" sale de `usuarios.grupos_asignados`, que se
+  marca a mano en la ficha del docente (Admin/Gestor); **no** se deduce de los módulos, que
+  da grupos de más y de menos. No es un permiso: cualquier docente sigue viendo las de
+  todos. Ver `docs/modulo-usuarios.md`.
 - El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
   aborta). El de profesorado sigue vivo.
 

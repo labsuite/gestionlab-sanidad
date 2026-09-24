@@ -384,10 +384,103 @@ function _badgesLabs(ubicStr) {
 function _moduloCiclo(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(0, i) : null; }
 function _moduloNombre(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(i + 1) : m; }
 
+// ── "Mis grupos": la cuenta y la contraseña de los grupos que lleva cada docente ──
+// Un profe entra aquí a por lo mismo casi siempre: dictarle a su grupo el correo y
+// la contraseña con los que se conecta. Sin esto tenía que buscarlos entre los nueve
+// grupos y abrir el modal 🔑 uno a uno. Los grupos salen de Grupos_Asignados (se
+// asignan en la ficha del docente), y la contraseña la sigue sirviendo el servidor
+// descifrada solo cuando se pide — aquí no se precarga ninguna.
+//
+// Respeta la vista previa de rol (getEffectiveUser): al simular ser otra profesora se
+// ven sus grupos, no los de quien simula.
+let _pwInline = {};
+
+function _misGruposDelUsuario() {
+  const emailNorm = getEffectiveUser().email;
+  const yo = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const ids = _parseGrupos(yo?.Grupos_Asignados);
+  if (!ids.length) return [];
+  return ids.map(id => DATA.usuarios.find(u => u.ID_Usuario === id)).filter(Boolean);
+}
+
+function _renderMisGrupos() {
+  const mios = _misGruposDelUsuario();
+  if (!mios.length) return '';
+  _pwInline = {};
+  const filas = mios.map(g => {
+    const idx = DATA.usuarios.indexOf(g);
+    return `<div class="mis-grupos-fila" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border)">
+      <strong style="min-width:110px">${g.Nombre || '—'}</strong>
+      <code style="background:var(--bg-alt,#f1f3f5);border-radius:6px;padding:4px 8px;font-size:13px">${g.Email || '—'}</code>
+      <div id="pwi-${_escAttr(g.ID_Usuario)}" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto">
+        <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px"
+          onclick="verPasswordGrupoInline('${_escAttr(g.ID_Usuario)}')">👁️ Ver contraseña</button>
+        <button class="icon-btn" title="Cambiar la contraseña" onclick="abrirPasswordGrupo(${idx})">🔑</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="card" style="margin-bottom:20px">
+    <div class="card-header"><div class="card-title">🎓 Mis grupos</div></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px">
+      La cuenta con la que entra cada grupo. La contraseña es compartida a propósito: se puede dictar en clase.
+    </div>
+    ${filas}
+  </div>`;
+}
+
+async function verPasswordGrupoInline(idUsuario) {
+  showLoading('Consultando...');
+  try {
+    const r = await callEdgeFunction('gestionar-usuario', { accion: 'ver_password_grupo', id_usuario: idUsuario });
+    if (r?.sin_guardar) {
+      showToast('Esta cuenta no tiene copia guardada: genera una nueva con 🔑', 'error');
+    } else {
+      _pwInline[idUsuario] = r.password;
+      _pintarPasswordInline(idUsuario);
+    }
+  } catch (e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  hideLoading();
+}
+
+function _pintarPasswordInline(idUsuario) {
+  const cont = document.getElementById(`pwi-${idUsuario}`);
+  const pw = _pwInline[idUsuario];
+  if (!cont || !pw) return;
+  cont.innerHTML = `
+    <code style="font-size:15px;letter-spacing:1px;background:var(--bg-alt,#f1f3f5);border-radius:6px;padding:4px 10px">${_escAttr(pw)}</code>
+    <button class="icon-btn" title="Copiar" onclick="copiarPasswordInline('${_escAttr(idUsuario)}')">📋</button>
+    <button class="icon-btn" title="Ocultar" onclick="ocultarPasswordInline('${_escAttr(idUsuario)}')">🙈</button>`;
+}
+
+async function copiarPasswordInline(idUsuario) {
+  const pw = _pwInline[idUsuario];
+  if (!pw) return;
+  try {
+    await navigator.clipboard.writeText(pw);
+    showToast('Contraseña copiada ✓', 'success');
+  } catch {
+    showToast('El navegador no dejó copiar. Selecciónala a mano.', 'error');
+  }
+}
+
+function ocultarPasswordInline(idUsuario) {
+  delete _pwInline[idUsuario];
+  const cont = document.getElementById(`pwi-${idUsuario}`);
+  const g = DATA.usuarios.find(u => u.ID_Usuario === idUsuario);
+  if (!cont || !g) return;
+  cont.innerHTML = `
+    <button class="btn btn-secondary" style="padding:4px 12px;font-size:12px"
+      onclick="verPasswordGrupoInline('${_escAttr(idUsuario)}')">👁️ Ver contraseña</button>
+    <button class="icon-btn" title="Cambiar la contraseña" onclick="abrirPasswordGrupo(${DATA.usuarios.indexOf(g)})">🔑</button>`;
+}
+
 function _renderSeccionAlumnos(lista, rolActual) {
   const puedeEditar = rolActual === 'Administrador' || rolActual === 'Gestor' || rolActual === 'Profesor';
   const puedeBorrar = rolActual === 'Administrador';  // igual que eliminarItems en PERMISOS
   if (!lista.length) return `<div class="empty-state" style="padding:40px 0"><div class="empty-state-icon">🎓</div><div class="empty-state-title">Sin alumnos registrados</div></div>`;
+  const misGrupos = _renderMisGrupos();
 
   // Agrupar por Ciclo_Principal (columna H). Fallback: prefijo embebido "Ciclo|Módulo" o lookup.
   const grupos = {};
@@ -467,6 +560,7 @@ function _renderSeccionAlumnos(lista, rolActual) {
   }).join('');
 
   return `
+    ${misGrupos}
     ${todosModulos.length > 0 ? `<div style="margin-bottom:16px">
       <select id="filtro-alumno-modulo" onchange="filtrarAlumnos(this.value)"
         style="padding:6px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px">
@@ -822,9 +916,46 @@ function _renderLabsChecks(labsSeleccionados) {
 const ROLES_CON_ASIGNACION = ['Alumno', 'Profesor', 'Gestor'];
 const _esRolDocente = rol => rol === 'Profesor' || rol === 'Gestor';
 
-function _populateModalUsuarioAsignacion(rol, modulosStr, ubicStr, cicloPrincipal) {
+function _populateModalUsuarioAsignacion(rol, modulosStr, ubicStr, cicloPrincipal, gruposStr) {
   _refreshModuloCheckboxes(modulosStr, cicloPrincipal, rol);
   _renderLabsChecks(_getLabsDeUbics(ubicStr));
+  _renderGruposChecks(gruposStr);
+}
+
+// ── Grupos de alumnado que lleva un docente ─────────────────────────────────
+// Se asigna a mano, no se deduce de los módulos: el mismo módulo lo imparten
+// grupos de ciclos distintos, y un profe puede dar clase fuera de su ciclo
+// principal, así que cruzarlo por módulo daba grupos de más y de menos. De esta
+// asignación sale el bloque "Mis grupos" de la pestaña Alumnos.
+function _cuentasDeGrupo() {
+  return DATA.usuarios
+    .filter(u => u.Rol === 'Alumno' && _esCuentaDeGrupo(u.Email) && u.ID_Usuario && !u._sbOnly)
+    .sort((a, b) => (a.Nombre || '').localeCompare(b.Nombre || '', 'es'));
+}
+
+function _parseGrupos(gruposStr) {
+  return String(gruposStr || '').split(',').map(g => g.trim()).filter(Boolean);
+}
+
+function _renderGruposChecks(gruposStr) {
+  const cont = document.getElementById('usr-grupos-checks');
+  if (!cont) return;
+  const marcados = _parseGrupos(gruposStr);
+  const grupos = _cuentasDeGrupo();
+  if (!grupos.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">No hay cuentas de grupo dadas de alta.</div>';
+    return;
+  }
+  cont.innerHTML = grupos.map(g => `
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+      <input type="checkbox" class="usr-grupo-check" value="${_escAttr(g.ID_Usuario)}"
+        ${marcados.includes(g.ID_Usuario) ? 'checked' : ''} style="width:15px;height:15px">
+      <span>${g.Nombre || g.Email}</span>
+    </label>`).join('');
+}
+
+function _getGruposSeleccionados() {
+  return Array.from(document.querySelectorAll('#usr-grupos-checks .usr-grupo-check:checked')).map(cb => cb.value);
 }
 
 function _normCiclo(s) {
@@ -1043,6 +1174,7 @@ function openModalUsuario() {
   const cicloSel = document.getElementById('usr-ciclo-principal');
   if (cicloSel) cicloSel.value = '';
   _selectedModulosArray = [];
+  _renderGruposChecks('');
   toggleUbicacionesAsignadasField('Profesor');
   const selRol = document.getElementById('usr-rol');
   if (selRol) selRol.disabled = false;
@@ -1058,6 +1190,8 @@ function _ajustarBloqueAsignacion(rol) {
   if (labelCiclo) labelCiclo.textContent = docente ? 'Ciclo principal (opcional)' : 'Ciclo formativo *';
   const grpRev = document.getElementById('usr-revisar-group');
   if (grpRev) grpRev.style.display = rol === 'Alumno' ? '' : 'none';
+  const grpGrupos = document.getElementById('usr-grupos-group');
+  if (grpGrupos) grpGrupos.style.display = docente ? '' : 'none';
   const buscar = document.getElementById('usr-modulos-buscar');
   if (buscar) {
     buscar.style.display = docente ? '' : 'none';
@@ -1077,7 +1211,8 @@ function toggleUbicacionesAsignadasField(rol) {
   // Cambiar de rol conserva lo ya marcado: solo cambia como se presenta
   _populateModalUsuarioAsignacion(rol, _selectedModulosArray.join(','),
     _getUbicacionesDeLabs(_getLabsSeleccionados()),
-    document.getElementById('usr-ciclo-principal')?.value || '');
+    document.getElementById('usr-ciclo-principal')?.value || '',
+    _getGruposSeleccionados().join(','));
   if (rol !== 'Alumno') {
     const cbRev = document.getElementById('usr-puede-revisar');
     if (cbRev) cbRev.checked = false;
@@ -1113,7 +1248,7 @@ function editUsuario(idx) {
   _selectedModulosArray = [];
   if (conAsignacion) {
     _ajustarBloqueAsignacion(u.Rol);
-    _populateModalUsuarioAsignacion(u.Rol, u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'');
+    _populateModalUsuarioAsignacion(u.Rol, u.Modulo||'', u.Ubicaciones_Asignadas||'', u.Ciclo_Principal||'', u.Grupos_Asignados||'');
     const cbRev = document.getElementById('usr-puede-revisar');
     if (cbRev) cbRev.checked = u.Rol === 'Alumno' && u.Puede_Revisar_Inventario === 'TRUE';
   }
@@ -1227,11 +1362,12 @@ async function guardarUsuario() {
 
   const existingU = editingRow ? DATA.usuarios[editingRow.rowIndex] : null;
   const rol = v('usr-rol') || 'Alumno';
-  let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = false;
+  let ubicAsignadas = '', modulo = '', cicloPrincipal = '', puedeRevisarInventario = false, gruposAsignados = '';
   if (ROLES_CON_ASIGNACION.includes(rol)) {
     ubicAsignadas = _getUbicacionesDeLabs(_getLabsSeleccionados());
     modulo = _getModulosSeleccionados().join(',');  // plain module names
     cicloPrincipal = (document.getElementById('usr-ciclo-principal')?.value || '').trim();
+    if (_esRolDocente(rol)) gruposAsignados = _getGruposSeleccionados().join(',');
     // El ciclo solo es obligatorio para alumnado: un docente puede impartir en varios
     if (rol === 'Alumno') {
       if (!cicloPrincipal) { showToast('Selecciona el ciclo formativo del alumno', 'error'); return; }
@@ -1241,6 +1377,7 @@ async function guardarUsuario() {
   const datos = {
     nombre, email, rol, ubicaciones_asignadas: ubicAsignadas, modulo,
     ciclo_principal: cicloPrincipal, puede_revisar_inventario: puedeRevisarInventario,
+    grupos_asignados: gruposAsignados,
   };
   showLoading('Guardando...');
   try {
