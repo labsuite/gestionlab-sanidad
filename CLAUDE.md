@@ -234,6 +234,22 @@ El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:h
 
 ---
 
+## Etiquetas NFC/QR — la URL sale de `APP_URL`, nunca de `window.location`
+
+⚠ Los tres generadores de etiqueta (`mostrarUrlNfc` en `js/ubicaciones.js`,
+`mostrarUrlNfcContenedor` en `js/residuos.js`, `openModalNfcRegistro` en
+`js/registros-uso.js`) llaman a `urlEtiqueta(params)` de `js/config.js`, que compone la URL
+sobre la constante `APP_URL`. No volver a usar `window.location.origin + pathname`: la URL se
+graba **físicamente en el chip** y se queda pegada a una puerta durante años, así que basta
+generar la etiqueta desde un host distinto para dejar un tag muerto para siempre.
+
+Ya pasó: las etiquetas escritas antes del traslado del repo a la organización `labsuite`
+(2026-08-23) apuntan a `palomafedez.github.io`, que devuelve 404. **Cambiar `APP_URL` no
+arregla los chips ya escritos** — si algún día se pone dominio propio u otro hosting, hay que
+regrabar todas las etiquetas a mano desde la app (botones 🔗).
+
+---
+
 ## Arquitectura general
 
 - `index.html` — página principal, carga todos los scripts y modales
