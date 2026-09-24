@@ -236,7 +236,11 @@ cuenta es de grupo, para que "Mostrar contraseña" no enseñe una que ya no vale
 
 Buscar el grupo entre los nueve y abrir el modal 🔑 vale para gestionar, pero no para lo que
 un profe hace de verdad casi siempre: dictarle a su grupo el correo y la contraseña con los
-que entra. Arriba de la pestaña Alumnos hay ahora una tarjeta **🎓 Mis grupos** con una fila
+que entra. Y en el **móvil no valía en absoluto**: la tabla de la pestaña Alumnos tiene siete
+columnas, así que la de acciones cae sobre los 825 px y en una pantalla de 390 hay que
+arrastrar ~490 px dentro de la tarjeta para llegar al 🔑. El profesorado lo dio por "no está"
+(comprobado el 2026-09-24 con una sesión real de Profesor a 390 px). La tarjeta va arriba y
+sin tabla justamente por eso. Arriba de la pestaña Alumnos hay ahora una tarjeta **🎓 Mis grupos** con una fila
 por grupo asignado: nombre, correo, **👁️ Ver contraseña** (que la pide al servidor en ese
 momento, con 📋 Copiar y 🙈 Ocultar) y el 🔑 de siempre para cambiarla.
 
