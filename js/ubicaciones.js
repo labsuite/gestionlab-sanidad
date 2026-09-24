@@ -91,8 +91,7 @@ function renderUbicaciones() {
 // Visible solo para Administrador (botón 🔗 en cada fila)
 // ============================================================
 function mostrarUrlNfc(ubicacionId) {
-  const base = window.location.origin + window.location.pathname;
-  const url  = `${base}?armario=${encodeURIComponent(ubicacionId)}&action=transfer`;
+  const url  = urlEtiqueta({ armario: ubicacionId, action: 'transfer' });
   document.getElementById('nfc-url-ubi-label').textContent = getNombreUbicacion(ubicacionId);
   document.getElementById('nfc-url-text').textContent      = url;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(url)}`;

@@ -967,8 +967,7 @@ async function _chatResEscalarAConsulta(guiaProvisional, categoriaIa, prioridad)
 // ── NFC: generar URL para etiqueta de contenedor ─────────────
 function mostrarUrlNfcContenedor(idx) {
   const c = DATA.contenedoresResiduo[idx];
-  const base = window.location.origin + window.location.pathname;
-  const url = `${base}?cont-cat=${encodeURIComponent(c.Categoria)}&cont-lab=${encodeURIComponent(c.Lab)}&action=adicion`;
+  const url = urlEtiqueta({ 'cont-cat': c.Categoria, 'cont-lab': c.Lab, action: 'adicion' });
   document.getElementById('nfc-cont-label').textContent =
     `${c.Categoria} · Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}${c.Formato ? ' · ' + c.Formato : ''}`;
   document.getElementById('nfc-cont-url-text').textContent = url;

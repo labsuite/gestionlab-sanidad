@@ -569,8 +569,7 @@ async function _deshacerInicioSesionReg(tipo, id) {
 function openModalNfcRegistro(tipo, idEquipo) {
   if (!idEquipo) { showToast('Selecciona un equipo primero', 'error'); return; }
   const cfg = _regConfig[tipo];
-  const base = window.location.origin + window.location.pathname;
-  const url = `${base}?action=registro-uso&tipo=${encodeURIComponent(tipo)}&equipo=${encodeURIComponent(idEquipo)}`;
+  const url = urlEtiqueta({ action: 'registro-uso', tipo: tipo, equipo: idEquipo });
   document.getElementById('reg-nfc-label').textContent = `${cfg.label} · ${_nombreEquipoReg(idEquipo)}`;
   document.getElementById('reg-nfc-url-text').textContent = url;
   document.getElementById('reg-nfc-desc').textContent = cfg.permiteSesionAbierta

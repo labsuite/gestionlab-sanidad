@@ -6,6 +6,20 @@
 // que leerlo antes de que nadie lo toque. Lo procesa initAuth() en auth.js.
 window.__authRecoveryHash = window.location.hash || '';
 
+// URL de la app en producción. Las etiquetas NFC/QR se graban una vez y se
+// quedan pegadas a una puerta durante años, así que su URL NO puede salir de
+// window.location: basta generar la etiqueta desde un host viejo (o desde un
+// index.html abierto en local) para grabar un tag que dará 404 para siempre.
+// Pasó de verdad: al transferir el repo a la organización labsuite (2026-08-23)
+// todas las etiquetas escritas antes quedaron apuntando a palomafedez.github.io,
+// que ya no existe. De ahí que esto sea una constante y no window.location.
+const APP_URL = 'https://labsuite.github.io/gestionlab-sanidad/';
+
+// Base para las URLs de etiquetas NFC/QR — siempre la de producción.
+function urlEtiqueta(params) {
+  return APP_URL + '?' + new URLSearchParams(params).toString();
+}
+
 // Proyecto Supabase compartido con la app de Vercel (ciclos, módulos, asignaciones usuario-módulo)
 const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
