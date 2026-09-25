@@ -292,6 +292,16 @@ con la descarga del PDF. Si un pedido del puente aparece en `EN_REVISION`, reenv
 - **`doc_enviada_jefatura` deja de marcarse a mano** en los pedidos que pasan por el puente:
   lo escribe el servidor y solo si el envío respondió OK. Los pedidos antiguos (marcados a
   mano, sin `trebello_pedido_id`) siguen mostrando el checkbox editable de siempre.
+- **Cada artículo necesita `id`.** Los `items` de `papeleria_pedidos` siguen el tipo
+  `PedidoItem` de `lib/actions/pedidos.ts` en Trebello: `id`, `concepto`, `cantidade`,
+  `unidade`, `prezo_sin_iva`, `iva_rate`, `received`, `solicitude_id`, `requester_name` (y
+  `tipo: 'cargo_extra'` + `importe` para portes/tasas). El `id` **no es opcional aunque el
+  tipo no lo grite**: el modal de la hoja indexa los precios por él (`prices[item.id]` en
+  `components/compras/docx-modal.tsx`), así que sin id todos los artículos caen en la misma
+  clave, el modal los muestra a `0,00` y no deja sacar el PDF. Se manda el `ID_Linea` de
+  GestionLab, no un UUID al azar, para que reenviar no le cambie la identidad a cada artículo.
+- **La unidad va solo en `unidade`**, nunca pegada al concepto: el generador ya la imprime
+  junto a la cantidad, y duplicarla descuadra la tabla del Word.
 - **Las observaciones NO viajan.** `pedido.observaciones` es la nota interna del pedido de
   laboratorio; en la hoja saldría impresa en **OBSERVACIÓNS**, que es un campo del documento
   oficial. El endpoint solo escribe `notes` si le llega algo, así que un reenvío tampoco pisa

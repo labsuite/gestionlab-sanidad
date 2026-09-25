@@ -86,22 +86,38 @@ Deno.serve(async (req) => {
   }
 
   // ── Líneas → items ────────────────────────────────────────────────────
-  // El concepto lleva la unidad pegada igual que en la hoja que genera
-  // GestionLab ("Guantes de nitrilo, caja 100 uds"), y además va aparte en
-  // `unidade` por si el generador de Trebello quiere usarla.
+  // Forma canónica de `PedidoItem` en Trebello (lib/actions/pedidos.ts). Dos
+  // cosas que no son opcionales aunque lo parezcan:
+  //   · `id` — el modal de la hoja indexa los precios por él
+  //     (`prices[item.id]`), así que sin id todos los artículos caen en la
+  //     misma clave y el modal los muestra a 0,00.
+  //   · la unidad va SOLO en `unidade`, nunca pegada al concepto: el
+  //     generador ya la imprime junto a la cantidad, y duplicarla descuadra
+  //     la tabla del Word.
+  // El id es el de la línea de GestionLab, no un UUID al azar: así reenviar
+  // el pedido no le cambia la identidad a cada artículo.
   const items = (lineas || []).map((l: any) => {
-    const unidad = String(l.unidad || "").trim();
+    const pedida   = parseFloat(l.cantidad_pedida)   || 0;
+    const recibida = parseFloat(l.cantidad_recibida) || 0;
     return {
-      concepto: unidad ? `${l.material}, ${unidad}` : String(l.material || ""),
-      cantidade: parseFloat(l.cantidad_pedida) || 0,
-      unidade: unidad || null,
+      id: String(l.id_linea),
+      concepto: String(l.material || ""),
+      cantidade: pedida,
+      unidade: String(l.unidad || "").trim() || null,
       prezo_sin_iva: parseFloat(l.precio_unitario) || 0,
+      received: pedida > 0 && recibida >= pedida,
+      solicitude_id: null,
+      requester_name: null,
     };
   });
 
   const gastoExtra = parseFloat(pedido.gasto_extra_importe) || 0;
   const cargoExtra = gastoExtra > 0
-    ? { concepto: pedido.gasto_extra_concepto || "Gasto extra", importe: gastoExtra }
+    ? {
+        id: `${idPedido}-cargo-extra`,
+        concepto: pedido.gasto_extra_concepto || "Gasto extra",
+        importe: gastoExtra,
+      }
     : null;
 
   // ── Facturas del proveedor ────────────────────────────────────────────
