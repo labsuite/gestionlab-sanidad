@@ -19,9 +19,14 @@ function renderDashboard() {
       ? DATA.equipos.filter(e => getUbicacionesAlumno().includes(e.Ubicacion))
       : DATA.equipos;
   const curso = getCursoAcademico();
+  // Al alumnado solo le cuentan (y le salen en la tabla) los planes que puede realizar:
+  // internos que no estén reservados al profesorado. Ver planAbiertoAlumnado().
+  const planesVisibles = eq => DATA.planesMantenimiento.filter(p =>
+    p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE' &&
+    (!esAlumno || planAbiertoAlumnado(p)));
   let pendientesMant = 0;
   misEquipos.forEach(eq => {
-    DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
+    planesVisibles(eq).forEach(plan => {
       // estadoPeriodoMant y no getRegistroMant: lo que ha registrado el alumnado y espera
       // el visto bueno ya está hecho, no debe volver a contarse como pendiente.
       getPeriodosEsperados(plan, eq, curso).forEach(p => {
@@ -48,7 +53,7 @@ function renderDashboard() {
     .map(e => ({ e, int: intervencionEquipoFuera(e.ID_Activo) }))
     .filter(x => x.int);
   if (fueraDelCentro.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('equipos')"><div class="alert-icon">📦</div><div class="alert-content"><div class="alert-title">${fueraDelCentro.length} equipo(s) fuera del centro (retirado(s) por el servicio técnico)</div><div class="alert-text">${fueraDelCentro.map(({e, int}) => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + (int.Fecha_Retirada ? ' · desde ' + formatDate(int.Fecha_Retirada) : '')).join(' · ')}</div></div></div>`;
-  if (pendientesMant > 0 && (esGestorAdmin || esProfesor)) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
+  if (pendientesMant > 0) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
   const incVisibles = esGestorAdmin
     ? incAbiertas
     : esProfesor
@@ -130,10 +135,9 @@ function renderDashboard() {
   }
 
   const tbody = document.getElementById('tabla-proximos');
-  if (esAlumno) { tbody.innerHTML = ''; return; }
   const pendientesList = [];
   misEquipos.forEach(eq => {
-    DATA.planesMantenimiento.filter(p => p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE').forEach(plan => {
+    planesVisibles(eq).forEach(plan => {
       getPeriodosEsperados(plan, eq, curso).forEach(periodo => {
         const est = estadoPeriodoMant(plan.ID_Plan, curso, periodo);
         if (est.tipo === 'pendiente' || est.tipo === 'en_curso' || est.tipo === 'aplazado_vencido') {
