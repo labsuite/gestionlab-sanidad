@@ -20,6 +20,35 @@ let _invMat = null;   // borrador en curso
 // `.card` no trae padding: el contenido libre necesita el suyo.
 const INVMAT_PAD = 'padding:16px 20px';
 
+// Los dos <input type="file"> viven fuera de la vista y se disparan desde un
+// botón de verdad. El input crudo se pintaba como un "Seleccionar archivo" gris
+// diminuto, y con `capture` puesto el navegador se saltaba el selector y abría
+// la cámara directamente: si el permiso de cámara estaba denegado (tablets
+// compartidas, navegador dentro de otra app) el toque no hacía absolutamente
+// nada, sin aviso ninguno. Con dos botones siempre queda la vía de la galería.
+const INVMAT_FOTO_OCULTA =
+  'position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)';
+
+/** Abre la cámara ('camara') o el selector de archivos ('archivo'). */
+function _invMatPedirFoto(cual) {
+  const input = document.getElementById('invmat-foto-' + cual);
+  if (!input) return;
+  input.value = '';   // permite volver a elegir la misma foto tras un fallo
+  try {
+    input.click();
+  } catch (e) {
+    showToast('Este navegador no deja abrir la cámara ni los archivos. Abre la app en Chrome.', 'error');
+  }
+}
+
+/** Navegadores incrustados en otra app (Classroom, Instagram, un lector de QR...),
+ *  donde el selector de archivos muchas veces no responde. */
+function _invMatEsNavegadorEmbebido() {
+  const ua = navigator.userAgent || '';
+  if (/\bwv\b|FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat|TikTok|GSA\//i.test(ua)) return true;
+  return /iPhone|iPad|iPod/.test(ua) && /AppleWebKit/.test(ua) && !/Safari|CriOS|FxiOS/.test(ua);
+}
+
 function _invMatNuevo() {
   return {
     categoria: '', tipoBase: '', nombreBase: '',
@@ -174,10 +203,23 @@ function _invMatRenderFormulario() {
             ${_invMat.iaError ? `<div style="font-size:11px;color:var(--warning);margin-top:8px">No se pudo leer la etiqueta automáticamente (${_esc(_invMat.iaError)}). Rellena los datos a mano.</div>` : ''}
             ${_invMat.iaExtraido ? `<div style="font-size:11px;color:var(--success);margin-top:8px">Leído de la etiqueta y rellenado abajo. Revísalo: lo que no se veía se ha dejado en blanco.</div>` : ''}
           ` : `
-            <input type="file" accept="image/*" capture="environment" onchange="_invMatSubirFoto(this)" style="width:100%;font-size:13px">
-            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;line-height:1.5">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary" style="flex:1 1 160px" onclick="_invMatPedirFoto('camara')">📷 Hacer una foto</button>
+              <button class="btn btn-secondary" style="flex:1 1 160px" onclick="_invMatPedirFoto('archivo')">🖼️ Elegir una foto ya hecha</button>
+            </div>
+            <input type="file" id="invmat-foto-camara" accept="image/*" capture="environment"
+                   onchange="_invMatSubirFoto(this)" style="${INVMAT_FOTO_OCULTA}">
+            <input type="file" id="invmat-foto-archivo" accept="image/*"
+                   onchange="_invMatSubirFoto(this)" style="${INVMAT_FOTO_OCULTA}">
+            <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">
               Sin foto no se puede proponer: es lo que permite comprobar los datos sin bajar al laboratorio.
             </div>
+            ${_invMatEsNavegadorEmbebido() ? `
+              <div style="background:var(--warning-light);border:1px solid #e8c98a;border-radius:var(--radius-sm);padding:10px 12px;font-size:11px;line-height:1.6;margin-top:8px">
+                Estás viendo la app dentro de otra aplicación, y ahí la cámara y la galería
+                suelen estar bloqueadas. Si al pulsar no pasa nada, abre esta página en Chrome o Safari
+                (menú ⋮ → “Abrir en el navegador”) y vuelve a intentarlo.
+              </div>` : ''}
           `}
         </div>
 
@@ -522,6 +564,7 @@ async function _invMatSubirFoto(input) {
     showToast(e.message || 'No se pudo subir la foto', 'error');
     console.error(e);
   }
+  input.value = '';   // si no, elegir la misma foto otra vez no dispara `change`
   hideLoading();
   renderInventariarMaterial();
 }
