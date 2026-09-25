@@ -43,10 +43,6 @@ def es_momento_fin(operacion):
     )
 
 
-def es_con_alumnado(plan):
-    return bool(plan.get('con_alumnado'))
-
-
 # Nº de cursos que debe esperar cada periodicidad multianual antes de volver a pedirse
 CICLO_ANIOS = {'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3}
 
@@ -74,8 +70,6 @@ def es_curso_debido_multianual(plan, registros_todos, curso_actual):
 def get_periodos_curso(plan, equipo):
     """Devuelve todos los periodos esperados del curso completo para un plan."""
     meses = MESES_CURSO
-    if es_con_alumnado(plan):
-        meses = [(y, m) for y, m in meses if m != 9]
 
     p      = plan.get('periodicidad', '')
     es_fin = es_momento_fin(plan.get('operacion', ''))

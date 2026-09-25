@@ -34,7 +34,7 @@ del equipo es solo lectura + ejecutar.
 | **Ejecutar** un mantenimiento (checklist) | Tarjeta del equipo o `Mantenimiento → Pendientes` (mismo modal `modal-registrar-mant`). |
 | **Corregir un mantenimiento ya finalizado** | `Mantenimiento → Realizados` (pestaña solo Admin/Gestor) → ✏️ Editar → `modal-registrar-mant` en modo edición (título "✏️ Editar mantenimiento", sin "Guardar progreso"). Acción `editar_registro` en `gestionar-mantenimiento`. |
 | **Marcar un periodo "no aplica" o aplazarlo** | Botón `⋯` en la fila de Pendientes y en la tarjeta del equipo → `modal-marcar-mant`. Bloque desplegable "No aplica / aplazados" bajo la tabla de Pendientes (revertir / editar). Acciones `marcar_periodo` / `revertir_periodo`. |
-| **¿Lo puede realizar el alumnado?** (`con_alumnado`) | Dos sitios, mismo campo del plan: casilla "Puede realizarse con el alumnado" en el modal del plan (`plan-con-alumnado`) y **atajo** en el modal `⋯` de cualquier periodo (`marcar-con-alumnado`). En el atajo se guarda **sola al marcarla** (acción `alumnado_plan`, que toca solo esa columna) — no pasa por el botón Guardar, que es del periodo y exige motivo. Visible para Admin/Gestor en cualquier equipo y para el Profesor en los suyos; el servidor revalida con `profesorAutorizado`. |
+| **Reservar un plan al profesorado** (`solo_profesorado`) | Dos sitios, mismo campo del plan: casilla "Solo profesorado (el alumnado no lo realiza)" en el modal del plan (`plan-solo-profesorado`, oculta si el plan es Externo) y **atajo** en el modal `⋯` de cualquier periodo (`marcar-solo-profesorado`). En el atajo se guarda **sola al marcarla** (acción `alumnado_plan`, que toca solo esa columna) — no pasa por el botón Guardar, que es del periodo y exige motivo. Visible para Admin/Gestor en cualquier equipo y para el Profesor en los suyos; el servidor revalida con `profesorAutorizado`. |
 
 ## "Realizado por" en mantenimientos externos
 
@@ -86,7 +86,30 @@ marcador `no_aplica`/`aplazado` con un mantenimiento hecho.
   crea/edita/borra Planes de sus equipos. **No** ve la pestaña Realizados ni los botones de
   exportar. El servidor (`gestionar-mantenimiento`) revalida: `requireStaff` + el nombre del
   profesor debe estar en `equipos.responsable`.
-- **Alumno**: solo Pendientes marcados `Con_Alumnado` y en su período (oct–may), como antes.
+- **Alumno**: todos los Pendientes **Internos** de cualquier equipo, en cualquier mes del
+  curso, salvo los planes marcados `solo_profesorado`. Los **Externos** no los ve.
+
+## Quién realiza los mantenimientos (cambiado 2026-09-25)
+
+Los **internos los realiza el alumnado** y el profesorado **supervisa**: lo que registra el
+alumnado entra como `pendiente_vb` y no es válido (ni sale en el Excel de calidad) hasta que
+un docente pulsa "✓ Firmar", que es quien rellena `supervisado_por`. Los **externos** siguen
+siendo del profesorado: los hace una empresa y los registra un docente.
+
+Antes el alumnado necesitaba que cada plan estuviera marcado `con_alumnado` (lista blanca de
+247 planes) y solo podía entre octubre y mayo. Ahora:
+
+- La columna se llama `solo_profesorado` y es la **excepción**, no el permiso: márcala para
+  reservar un plan interno concreto al profesorado (`scripts/migrar_solo_profesorado.py`
+  renombró la columna y puso todas las filas a `false`).
+- **No hay ventana de meses**: el alumnado puede registrar cualquier periodo pendiente en el
+  mes que sea. Con ello desapareció también la regla de "los planes con alumnado no se
+  programan en septiembre" — afectaba a `getPeriodosEsperados`, a `getPeriodosCursoCompleto`
+  (Excel de calidad) y a `scripts/rellenar_mantenimientos.py`, y los tres cuentan ya los diez
+  meses del curso.
+- El gate vive en `planAbiertoAlumnado(plan)` (`js/mantenimiento.js`) en el cliente y en la
+  Edge Function `gestionar-mantenimiento` (bloque `!esStaff`) en el servidor, que rechaza por
+  separado los externos y los `solo_profesorado`.
 
 ## Datos
 - 410 planes activos en `planes_mantenimiento` (2026-08-22; el número crece con el tiempo,

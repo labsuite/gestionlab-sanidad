@@ -78,12 +78,13 @@
            de abajo, que solo marca este periodo. -->
       <div class="form-group full" id="marcar-alumnado-wrap" style="margin-bottom:14px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
-          <input type="checkbox" id="marcar-con-alumnado" style="width:16px;height:16px;accent-color:var(--accent)" onchange="guardarAlumnadoMarcarMant()">
-          Puede realizarse con el alumnado
+          <input type="checkbox" id="marcar-solo-profesorado" style="width:16px;height:16px;accent-color:var(--accent)" onchange="guardarAlumnadoMarcarMant()">
+          Solo profesorado (el alumnado no lo realiza)
         </label>
         <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-          Vale para todos los periodos de este plan y se guarda al momento. Si lo marcas,
-          este mantenimiento aparece en el panel de pendientes del alumnado (oct–may).
+          Vale para todos los periodos de este plan y se guarda al momento. Por defecto los
+          mantenimientos internos los realiza el alumnado y el profesorado les da el visto
+          bueno; márcalo solo si este debe hacerlo el profesorado.
         </div>
       </div>
 
@@ -140,7 +141,7 @@
       <div class="form-grid form-grid-2">
         <div class="form-group">
           <label>Tipo</label>
-          <select id="plan-tipo-int">
+          <select id="plan-tipo-int" onchange="_togglePlanAlumnado()">
             <option>Interno</option>
             <option>Externo</option>
           </select>
@@ -180,13 +181,14 @@
           <textarea id="plan-instrucciones" rows="8" placeholder="Escribe los pasos que debe seguir el responsable para realizar este mantenimiento. Puedes usar líneas separadas para cada paso.&#10;&#10;Ej:&#10;1. Apagar el equipo y desenchufarlo.&#10;2. Limpiar la superficie con paño húmedo y jabón neutro.&#10;3. ..."></textarea>
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Estas instrucciones aparecerán en la app cuando toque registrar el mantenimiento.</div>
         </div>
-        <div class="form-group full">
+        <div class="form-group full" id="plan-alumnado-wrap">
           <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:500">
-            <input type="checkbox" id="plan-con-alumnado" style="width:16px;height:16px;accent-color:var(--accent)">
-            Puede realizarse con el alumnado
+            <input type="checkbox" id="plan-solo-profesorado" style="width:16px;height:16px;accent-color:var(--accent)">
+            Solo profesorado (el alumnado no lo realiza)
           </label>
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-            Si lo marcas, este mantenimiento aparecerá en el panel de pendientes de los alumnos (oct–may).
+            Por defecto los mantenimientos internos los realiza el alumnado y el profesorado
+            les da el visto bueno. Márcalo solo si este debe hacerlo el profesorado.
           </div>
         </div>
       </div>

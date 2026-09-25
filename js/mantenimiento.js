@@ -19,10 +19,17 @@ function getMesesCurso(cursoAcademico) {
   return meses; // 10 meses: Sep–Jun
 }
 
-// Normaliza Con_Alumnado: acepta 'Sí', '1', '1.0', 'TRUE', 'Yes'
-function _esConAlumnado(plan) {
-  const v = (plan.Con_Alumnado || '').toString().trim();
+// Normaliza Solo_Profesorado: acepta 'Sí', '1', '1.0', 'TRUE', 'Yes'
+function _esSoloProfesorado(plan) {
+  const v = (plan.Solo_Profesorado || '').toString().trim();
   return v === 'Sí' || v === '1' || v === '1.0' || v === 'TRUE' || v === 'Yes';
+}
+
+// Quién puede ejecutar un plan: los mantenimientos INTERNOS los hace el alumnado
+// (el profesorado supervisa y firma), salvo los marcados "solo profesorado". Los
+// EXTERNOS son siempre del profesorado: los hace una empresa y los registra un docente.
+function planAbiertoAlumnado(plan) {
+  return plan.Tipo_Intervencion !== 'Externo' && !_esSoloProfesorado(plan);
 }
 
 // Devuelve true si la operación es de limpieza/conservación (→ fin de periodo)
@@ -61,9 +68,7 @@ function _esCursoDebidoMultianual(plan, cursoAcademico) {
 function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   const [añoInicio, añoFin] = cursoAcademico.split('-').map(Number);
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-  const todosMeses = getMesesCurso(cursoAcademico);
-  // Planes con alumnado no se programan en septiembre (aún no han empezado las clases)
-  const mesesBase = _esConAlumnado(plan) ? todosMeses.filter(m => m.mes !== 9) : todosMeses;
+  const mesesBase = getMesesCurso(cursoAcademico);
   const mesesPasados = mesesBase.filter(({ año, mes }) => new Date(año, mes - 1, 1) <= hoy);
 
   switch (plan.Periodicidad) {
@@ -190,23 +195,14 @@ function _pasosDesdePlan(plan) {
 // ============================================================
 // QUIÉN PUEDE EJECUTAR UN MANTENIMIENTO
 // ============================================================
-// El alumnado solo puede con planes marcados Con_Alumnado y dentro del curso lectivo
-// (octubre–mayo). El servidor vuelve a comprobar el Con_Alumnado — esto es solo la UI.
-
-/** Meses en los que hay alumnado en el laboratorio. */
-function _enPeriodoAlumno() {
-  const mes = new Date().getMonth() + 1;
-  return mes >= 10 || mes <= 5;
-}
-
-/** ¿Puede el alumnado ejecutar este plan concreto? */
-function puedeAlumnoEjecutarPlan(plan) {
-  return _esConAlumnado(plan) && _enPeriodoAlumno();
-}
+// Los mantenimientos internos los ejecuta el alumnado en cualquier mes del curso;
+// el profesorado supervisa (visto bueno) en vez de registrarlos. Solo quedan fuera
+// los externos y los planes marcados "solo profesorado". El servidor lo revalida —
+// esto es solo la UI.
 
 /** ¿Puede el usuario actual abrir el modal de ejecución de este plan? */
 function puedeEjecutarPlanMant(plan) {
-  if (getUserRole() === 'Alumno') return puedeAlumnoEjecutarPlan(plan);
+  if (getUserRole() === 'Alumno') return planAbiertoAlumnado(plan);
   return puedeHacer('registrarMantenimiento');
 }
 
@@ -272,7 +268,7 @@ function buildMantenimientoEquipo(equipoId) {
   // La configuración de planes (alta/edición/borrado) vive ahora solo en la
   // sección Mantenimiento; aquí la tarjeta es informativa + ejecutar.
   // canMarcar: no aplica / aplazar / revertir — gestión, nunca alumnado.
-  // canEjecutar se decide por plan más abajo (el alumnado solo en los Con_Alumnado).
+  // canEjecutar se decide por plan más abajo (el alumnado, solo en los que le tocan).
   const canMarcar = puedeHacer('crearIntervenciones') ||
     (getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo));
   const canLog = canMarcar;
@@ -725,14 +721,16 @@ function openModalMarcarMant(idPlan, idEquipo, periodo, curso) {
   document.getElementById('marcar-periodo').value   = periodo;
   document.getElementById('marcar-curso').value     = curso;
 
-  // ¿Puede realizarlo el alumnado? Es editar el plan: Admin/Gestor en cualquier
-  // equipo, Profesor solo en los suyos (lo revalida la Edge Function).
-  const puedeAlumnado = puedeHacer('editarEquipos') ||
-    (getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo));
+  // ¿Se reserva al profesorado? Es editar el plan: Admin/Gestor en cualquier
+  // equipo, Profesor solo en los suyos (lo revalida la Edge Function). En los
+  // externos no se pregunta: el alumnado nunca los registra.
+  const puedeAlumnado = (puedeHacer('editarEquipos') ||
+    (getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo))) &&
+    plan.Tipo_Intervencion !== 'Externo';
   const wrapAlum = document.getElementById('marcar-alumnado-wrap');
   if (wrapAlum) wrapAlum.style.display = puedeAlumnado ? '' : 'none';
-  const chkAlum = document.getElementById('marcar-con-alumnado');
-  if (chkAlum) { chkAlum.checked = _esConAlumnado(plan); chkAlum.disabled = false; }
+  const chkAlum = document.getElementById('marcar-solo-profesorado');
+  if (chkAlum) { chkAlum.checked = _esSoloProfesorado(plan); chkAlum.disabled = false; }
 
   const tipo = marc?.Estado === 'aplazado' ? 'aplazado' : 'no_aplica';
   document.querySelectorAll('input[name="marcar-tipo"]').forEach(r => { r.checked = r.value === tipo; });
@@ -743,24 +741,24 @@ function openModalMarcarMant(idPlan, idEquipo, periodo, curso) {
   openModal('modal-marcar-mant');
 }
 
-// El interruptor "con alumnado" no espera al botón Guardar: es del plan (no de
+// El interruptor "solo profesorado" no espera al botón Guardar: es del plan (no de
 // este periodo) y confundir las dos cosas haría que marcar quién lo realiza
 // exigiera además un motivo de "no aplica".
 async function guardarAlumnadoMarcarMant() {
-  const chk = document.getElementById('marcar-con-alumnado');
+  const chk = document.getElementById('marcar-solo-profesorado');
   if (!_marcarMantActual || !chk) return;
   const { idPlan } = _marcarMantActual;
   const valor = chk.checked;
   chk.disabled = true;
   try {
     const { plan } = await callEdgeFunction('gestionar-mantenimiento', {
-      accion: 'alumnado_plan', id_plan: idPlan, con_alumnado: valor ? 'Sí' : 'No',
+      accion: 'alumnado_plan', id_plan: idPlan, solo_profesorado: valor ? 'Sí' : 'No',
     });
     const idx = DATA.planesMantenimiento.findIndex(p => p.ID_Plan === idPlan);
     if (idx !== -1) DATA.planesMantenimiento[idx] = _planMantenimientoSbToObj(plan);
     showToast(valor
-      ? 'El alumnado ya puede realizar este mantenimiento'
-      : 'Este mantenimiento ya no lo puede realizar el alumnado', 'success');
+      ? 'Este mantenimiento queda reservado al profesorado'
+      : 'El alumnado ya puede realizar este mantenimiento', 'success');
     _refrescarTrasMant();
   } catch (e) {
     chk.checked = !valor;   // deja el interruptor como estaba
@@ -863,6 +861,14 @@ function _cargarMesesTemporadaEnPlan() {
   if (mf) mf.value = eq?.Mes_Fin_Temporada || '';
 }
 
+// El interruptor "solo profesorado" solo tiene sentido en los planes internos:
+// un externo lo registra siempre el profesorado, lo marque quien lo marque.
+function _togglePlanAlumnado() {
+  const wrap = document.getElementById('plan-alumnado-wrap');
+  if (!wrap) return;
+  wrap.style.display = document.getElementById('plan-tipo-int').value === 'Externo' ? 'none' : '';
+}
+
 // Al cambiar el equipo en el selector (solo en alta), recargar los meses.
 function _onCambioEquipoPlan() {
   _planEditingEquipoId = document.getElementById('plan-equipo-select')?.value || null;
@@ -907,16 +913,17 @@ function openModalPlan(equipoId = null, idPlan = null) {
     document.getElementById('plan-periodicidad').value  = plan.Periodicidad;
     document.getElementById('plan-operacion').value     = plan.Operacion;
     document.getElementById('plan-instrucciones').value = plan.Instrucciones || '';
-    document.getElementById('plan-con-alumnado').checked = _esConAlumnado(plan);
+    document.getElementById('plan-solo-profesorado').checked = _esSoloProfesorado(plan);
   } else {
     document.getElementById('plan-tipo-int').value      = 'Interno';
     document.getElementById('plan-periodicidad').value  = 'Anual';
     document.getElementById('plan-operacion').value     = '';
     document.getElementById('plan-instrucciones').value = '';
-    document.getElementById('plan-con-alumnado').checked = false;
+    document.getElementById('plan-solo-profesorado').checked = false;
   }
 
   _togglePlanTemporada();
+  _togglePlanAlumnado();
   openModal('modal-gestionar-plan');
 }
 
@@ -925,7 +932,9 @@ async function guardarPlan() {
   const period       = document.getElementById('plan-periodicidad').value;
   const operacion    = document.getElementById('plan-operacion').value.trim();
   const instrucciones= document.getElementById('plan-instrucciones').value.trim();
-  const conAlumnado  = document.getElementById('plan-con-alumnado').checked ? 'Sí' : 'No';
+  // El alumnado no registra externos nunca: en un plan externo el interruptor no cuenta.
+  const soloProf     = tipo === 'Externo' ? 'No'
+    : (document.getElementById('plan-solo-profesorado').checked ? 'Sí' : 'No');
 
   const idEquipo = _planEditingEquipoId ||
     (document.getElementById('plan-equipo-select')?.value || '');
@@ -934,7 +943,7 @@ async function guardarPlan() {
 
   const payload = {
     id_equipo: idEquipo,
-    tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, con_alumnado: conAlumnado,
+    tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, solo_profesorado: soloProf,
   };
   const estacional = _PERIODICIDADES_ESTACIONALES.includes(period);
   if (estacional) {
@@ -1034,7 +1043,7 @@ function renderMantenimiento() {
   const esProfesor    = getUserRole() === 'Profesor';
   const esAlumno      = getUserRole() === 'Alumno';
   // canLog: abrir la ejecución. El alumnado también, porque su lista ya viene filtrada
-  // a los planes Con_Alumnado. canMarcar (no aplica / aplazar) sigue siendo gestión.
+  // a los planes que le tocan. canMarcar (no aplica / aplazar) sigue siendo gestión.
   const canLog  = puedeHacer('registrarMantenimiento');
   const canMarcar = puedeMarcarPeriodoMant();
   const puedeExportar   = esGestorAdmin;
@@ -1048,14 +1057,12 @@ function renderMantenimiento() {
     : DATA.equipos;
 
   // Calcular todos los status del curso actual
-  // Alumnos solo ven planes marcados Con_Alumnado=Sí y dentro de su período (oct-may)
-  const mesActual = new Date().getMonth() + 1; // 1-12
-  const enPeriodoAlumno = mesActual >= 10 || mesActual <= 5;
+  // El alumnado solo ve los internos que no estén reservados al profesorado.
   const todoStatus = [];
   equiposScope.forEach(eq => {
     const planes = DATA.planesMantenimiento.filter(p => {
       if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
-      if (esAlumno && (!_esConAlumnado(p) || !enPeriodoAlumno)) return false;
+      if (esAlumno && !planAbiertoAlumnado(p)) return false;
       return true;
     });
     planes.forEach(plan => {
@@ -1348,8 +1355,8 @@ function _renderFilasPendientes(lista, canLog, canMarcar) {
     const instrRow = comoTexto
       ? `<tr id="mant-instr-${instrKey}" style="display:none"><td colspan="6" style="background:var(--bg);padding:10px 14px;font-size:12px;white-space:pre-line;line-height:1.7;border-bottom:2px solid var(--border)">${comoTexto}</td></tr>`
       : '';
-    const alumBadge = _esConAlumnado(s.plan)
-      ? `<span title="Se puede realizar con alumnado" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:#dcfce7;color:#16a34a;border:1px solid #bbf7d0">👨‍🎓 alumnado</span>`
+    const alumBadge = _esSoloProfesorado(s.plan)
+      ? `<span title="Reservado al profesorado: el alumnado no lo ve" style="display:inline-block;margin-left:4px;font-size:11px;padding:1px 6px;border-radius:10px;background:var(--bg);color:var(--text-muted);border:1px solid var(--border)">🔒 solo profesorado</span>`
       : '';
     const eje = s.ejecucion;
     const ejeN = eje && Array.isArray(eje.Pasos) ? eje.Pasos.filter(p => p.hecho).length : 0;
@@ -1558,9 +1565,7 @@ async function exportarModeloCalidad(cursoAcademico) {
   // Devuelve TODOS los periodos del curso (incluidos futuros), para el documento anual
   function getPeriodosCursoCompleto(plan, equipo) {
     const [añoInicio, añoFin] = curso.split('-').map(Number);
-    const todosMeses = getMesesCurso(curso);
-    // Planes con alumnado no se programan en septiembre: mismo criterio que el script Python
-    const meses = _esConAlumnado(plan) ? todosMeses.filter(m => m.mes !== 9) : todosMeses;
+    const meses = getMesesCurso(curso);
     switch (plan.Periodicidad) {
       case 'Mensual':    return meses.map(m => m.str);
       case 'Trimestral': {

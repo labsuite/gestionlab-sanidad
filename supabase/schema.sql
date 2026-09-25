@@ -242,7 +242,10 @@ create table planes_mantenimiento (
   activo              boolean not null default true,
   operacion           text,
   instrucciones       text,
-  con_alumnado        boolean not null default false
+  -- Los mantenimientos internos los realiza el alumnado (el profesorado firma el visto
+  -- bueno); marcar esta columna reserva ESE plan al profesorado. Los externos quedan
+  -- fuera del alumnado por su tipo_intervencion, sin necesidad de marcarlos.
+  solo_profesorado    boolean not null default false
 );
 
 create table registro_mantenimientos (

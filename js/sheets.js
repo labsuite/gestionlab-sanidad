@@ -194,7 +194,7 @@ function _planMantenimientoSbToObj(p) {
     Operacion: p.operacion || '',
     Activo: p.activo ? 'TRUE' : 'FALSE',
     Instrucciones: p.instrucciones || '',
-    Con_Alumnado: p.con_alumnado ? 'Sí' : 'No',
+    Solo_Profesorado: p.solo_profesorado ? 'Sí' : 'No',
   };
 }
 

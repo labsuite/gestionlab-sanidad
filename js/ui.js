@@ -111,14 +111,12 @@ function _updateBadgeMantenimiento() {
   if (!badgeMant) return;
   const curso = getCursoAcademico();
   const esAlumno = getUserRole() === 'Alumno';
-  const mesActual = new Date().getMonth() + 1;
-  const enPeriodoAlumno = mesActual >= 10 || mesActual <= 5;
   let pendientes = 0;
   DATA.equipos.forEach(eq => {
     DATA.planesMantenimiento
       .filter(p => {
         if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
-        if (esAlumno && (p.Con_Alumnado !== 'Sí' || !enPeriodoAlumno)) return false;
+        if (esAlumno && !planAbiertoAlumnado(p)) return false;
         return true;
       })
       .forEach(plan => {
@@ -145,7 +143,7 @@ const PERMISOS = {
   Alumno: {
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'perfil'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
-    // Ejecutar mantenimientos preventivos marcados Con_Alumnado. NO incluye marcar
+    // Ejecutar los mantenimientos internos que no sean "solo profesorado". NO incluye marcar
     // "no aplica"/aplazar (eso es crearIntervenciones), y lo que finalizan queda en
     // 'pendiente_vb' hasta que un docente lo firma — ver gestionar-mantenimiento.
     registrarMantenimiento: true,

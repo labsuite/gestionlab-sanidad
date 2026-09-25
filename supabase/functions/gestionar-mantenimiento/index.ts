@@ -45,9 +45,11 @@ Deno.serve(async (req) => {
   // con el checklist a medias (compartida, para retomarla en otra sesión); "finalizar"
   // (alias antiguo: "registrar") la cierra fijando la fecha.
   //
-  // Abierto también al ALUMNADO, pero solo en planes marcados `con_alumnado`, y lo que
-  // finalizan NO entra como 'finalizado': queda en 'pendiente_vb' hasta que un docente le
-  // da el visto bueno (acción "visto_bueno"). Importa porque `registro_mantenimientos`
+  // Abierto también al ALUMNADO: los mantenimientos INTERNOS los realiza el alumnado
+  // salvo los planes marcados `solo_profesorado`; los EXTERNOS nunca (los hace una
+  // empresa y los registra un docente). Lo que finalizan NO entra como 'finalizado':
+  // queda en 'pendiente_vb' hasta que un docente le da el visto bueno (acción
+  // "visto_bueno"). Importa porque `registro_mantenimientos`
   // alimenta el Excel del modelo de calidad, donde la firma del supervisor es lo que da
   // validez al documento — ahí no puede entrar nada sin revisar.
   if (accion === "registrar" || accion === "finalizar" ||
@@ -68,9 +70,16 @@ Deno.serve(async (req) => {
       }
       const idPlanAlum = String(body.id_plan || "").trim();
       const { data: planAlum } = await supabaseAdmin
-        .from("planes_mantenimiento").select("con_alumnado, activo").eq("id_plan", idPlanAlum).maybeSingle();
-      if (!planAlum || planAlum.activo === false || !planAlum.con_alumnado) {
+        .from("planes_mantenimiento").select("solo_profesorado, activo, tipo_intervencion")
+        .eq("id_plan", idPlanAlum).maybeSingle();
+      if (!planAlum || planAlum.activo === false) {
         return jsonError("Este mantenimiento no está habilitado para realizarse con alumnado", 403);
+      }
+      if (planAlum.tipo_intervencion === "Externo") {
+        return jsonError("Los mantenimientos externos los registra el profesorado", 403);
+      }
+      if (planAlum.solo_profesorado) {
+        return jsonError("Este mantenimiento está reservado al profesorado", 403);
       }
     }
 
@@ -336,7 +345,7 @@ Deno.serve(async (req) => {
       .split(",").map((r) => r.trim()).includes(miNombre);
   }
 
-  // ── Solo el interruptor "puede realizarse con el alumnado" ───────────
+  // ── Solo el interruptor "solo profesorado" ───────────────────────────
   // Atajo desde el modal "⋯" de un periodo: toca esa única columna sin arrastrar
   // el resto del plan (actualizar_plan reescribe todos los campos, y desde ahí no
   // se editan operación ni instrucciones).
@@ -350,7 +359,7 @@ Deno.serve(async (req) => {
       return jsonError("Solo puedes editar planes de equipos de los que eres responsable", 403);
     }
     const { data, error } = await supabaseAdmin.from("planes_mantenimiento")
-      .update({ con_alumnado: body.con_alumnado === true || body.con_alumnado === "Sí" })
+      .update({ solo_profesorado: body.solo_profesorado === true || body.solo_profesorado === "Sí" })
       .eq("id_plan", idPlan).select().single();
     if (error) return jsonError(`No se pudo actualizar el plan: ${error.message}`, 400);
     return jsonOk({ plan: data });
@@ -364,7 +373,7 @@ Deno.serve(async (req) => {
       periodicidad: body.periodicidad ? String(body.periodicidad) : null,
       operacion,
       instrucciones: body.instrucciones ? String(body.instrucciones) : null,
-      con_alumnado: body.con_alumnado === true || body.con_alumnado === "Sí",
+      solo_profesorado: body.solo_profesorado === true || body.solo_profesorado === "Sí",
     };
     // Meses de temporada: se guardan en el equipo, no en el plan (llegan solo
     // cuando la periodicidad es Pretemporada/Posttemporada).

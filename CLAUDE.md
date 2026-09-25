@@ -58,6 +58,7 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
 - `onboardear_auth_supabase.py` — alta en bloque de cuentas reales de Supabase Auth para todo el profesorado/alumnado activo del catálogo `usuarios` que aún no la tenga (mismo patrón que la Edge Function `crear-usuario`, en bloque)
 - `rellenar_mantenimientos.py` — INSERT en `registro_mantenimientos` de todos los periodos de un curso como realizados (solo Internos); `DRY_RUN = True` por defecto. Usar al inicio de cada curso para poblar el historial.
+- `migrar_solo_profesorado.py` — renombra `planes_mantenimiento.con_alumnado` a `solo_profesorado` e invierte el criterio (los mantenimientos internos pasan a ser del alumnado por defecto); se ejecuta una sola vez, idempotente
 - `quitar_externos_excel.py` — elimina filas de Tipo_Intervencion=Externo de un XLSX ya exportado; busca automáticamente el más reciente en Descargas o acepta ruta como argumento. Genera `*_sin_externos.xlsx` sin tocar el original. (No toca Supabase — manipula el XLSX directamente.)
 - `generar_modelo_calidad.py` — genera los dos Excel del modelo de calidad (inventario + plan de mantenimiento) desde Python; alternativa al botón de la app cuando se necesita uso puntual offline.
 - `migrar_*.py` — scripts puntuales ya ejecutados que copiaron los datos de cada módulo desde Sheets a Supabase durante la migración; se conservan como registro histórico de cómo se pobló cada tabla, no hace falta volver a ejecutarlos.
@@ -129,7 +130,7 @@ Salida: `MD84MAN01_Plan_mantemento_YYYY-YYYY.xlsx`
 | J | Si hay incidencia abierta: `Descripcion_Problema (ID_Incidencia)` |
 
 **Notas de implementación:**
-- Los periodos se calculan con `getPeriodosCursoCompleto` (incluye futuros, aplica filtro `Con_Alumnado` igual que el script Python).
+- Los periodos se calculan con `getPeriodosCursoCompleto` (incluye futuros; los diez meses del curso, septiembre incluido, igual que el script Python).
 - Al generar el XLSX se normalizan todas las fuentes del `xl/styles.xml`: Arial→Xunta Sans, `color theme="1"` (negro)→`#002B4A`, fuentes sin color→`#002B4A`, 8pt→10pt. El template tiene zonas de estilos que degeneran a negro a partir de la fila ~33-66 según hoja.
 - Para eliminar los Externos del documento ya generado: usar `scripts/quitar_externos_excel.py`.
 
