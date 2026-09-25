@@ -60,6 +60,142 @@ function _invMatNuevo() {
 }
 
 // ------------------------------------------------------------
+// CÁMARA DENTRO DE LA PROPIA PÁGINA
+// ------------------------------------------------------------
+// `capture="environment"` en un <input type="file"> no vale para esto: el
+// navegador se salta el selector y delega en la app de cámara del sistema, y si
+// el permiso está denegado —o no hay ninguna app que atienda— el toque no hace
+// absolutamente nada y no avisa de nada. Con getUserMedia el permiso se pide de
+// verdad, el fallo tiene nombre y se le puede explicar a quien está delante.
+// El <input> con `capture` se queda solo como último recurso para navegadores
+// sin getUserMedia.
+
+let _invMatCamStream = null;
+let _invMatCamFacing = 'environment';
+
+/** z-index: por encima de los modales (1000) y por debajo del cargando (2000). */
+const INVMAT_CAM_Z = 1500;
+
+async function _invMatAbrirCamara() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    _invMatPedirFoto('camara');   // WebView viejo: que lo intente el input
+    return;
+  }
+  _invMatPintarCamara();
+  try {
+    await _invMatArrancarCamara('environment');
+  } catch (e) {
+    _invMatCerrarCamara();
+    showToast(_invMatMensajeErrorCamara(e), 'error');
+    console.error('[camara]', e);
+  }
+}
+
+function _invMatPintarCamara() {
+  if (document.getElementById('invmat-cam')) return;
+  const cap = document.createElement('div');
+  cap.id = 'invmat-cam';
+  cap.style.cssText =
+    'position:fixed;inset:0;z-index:' + INVMAT_CAM_Z + ';background:#000;' +
+    'display:flex;flex-direction:column';
+  cap.innerHTML =
+    '<video id="invmat-cam-video" autoplay playsinline muted ' +
+           'style="flex:1;min-height:0;width:100%;object-fit:contain;background:#000"></video>' +
+    '<div id="invmat-cam-aviso" style="color:#fff;text-align:center;font-size:13px;padding:10px 16px">' +
+      'Abriendo la cámara…</div>' +
+    '<div style="display:flex;gap:10px;justify-content:center;align-items:center;' +
+         'padding:14px 16px calc(14px + env(safe-area-inset-bottom));background:#111">' +
+      '<button class="btn btn-secondary" onclick="_invMatCerrarCamara()">Cancelar</button>' +
+      '<button class="btn btn-primary" id="invmat-cam-disparo" disabled ' +
+              'style="font-size:16px;padding:12px 28px" onclick="_invMatCapturar()">📷 Capturar</button>' +
+      '<button class="btn btn-secondary" id="invmat-cam-girar" style="display:none" ' +
+              'onclick="_invMatGirarCamara()" title="Cambiar de cámara">🔄</button>' +
+    '</div>';
+  document.body.appendChild(cap);
+  document.addEventListener('keydown', _invMatCamEscape);
+}
+
+function _invMatCamEscape(ev) { if (ev.key === 'Escape') _invMatCerrarCamara(); }
+
+async function _invMatArrancarCamara(facing) {
+  _invMatPararStream();
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+    audio: false,
+  });
+  _invMatCamStream = stream;
+  _invMatCamFacing = facing;
+  const video = document.getElementById('invmat-cam-video');
+  if (!video) { _invMatPararStream(); return; }
+  video.srcObject = stream;
+  // iOS a veces rechaza el play() y aun así pinta; y en navegadores viejos
+  // play() no devuelve promesa, de ahí el Promise.resolve.
+  await Promise.resolve(video.play()).catch(() => {});
+
+  const aviso = document.getElementById('invmat-cam-aviso');
+  if (aviso) aviso.textContent = 'Encuadra la etiqueta y pulsa Capturar.';
+  const disparo = document.getElementById('invmat-cam-disparo');
+  if (disparo) disparo.disabled = false;
+
+  // El botón de girar solo tiene sentido si hay más de una cámara.
+  try {
+    const dispositivos = await navigator.mediaDevices.enumerateDevices();
+    const camaras = dispositivos.filter(d => d.kind === 'videoinput');
+    const girar = document.getElementById('invmat-cam-girar');
+    if (girar && camaras.length > 1) girar.style.display = '';
+  } catch { /* enumerateDevices puede fallar; el botón se queda oculto */ }
+}
+
+async function _invMatGirarCamara() {
+  const otra = _invMatCamFacing === 'environment' ? 'user' : 'environment';
+  try {
+    await _invMatArrancarCamara(otra);
+  } catch (e) {
+    showToast(_invMatMensajeErrorCamara(e), 'error');
+  }
+}
+
+function _invMatPararStream() {
+  if (!_invMatCamStream) return;
+  _invMatCamStream.getTracks().forEach(t => t.stop());
+  _invMatCamStream = null;
+}
+
+function _invMatCerrarCamara() {
+  _invMatPararStream();
+  document.removeEventListener('keydown', _invMatCamEscape);
+  document.getElementById('invmat-cam')?.remove();
+}
+
+/** Congela el fotograma actual y lo sube como si fuese un archivo elegido. */
+function _invMatCapturar() {
+  const video = document.getElementById('invmat-cam-video');
+  if (!video || !video.videoWidth) { showToast('La cámara aún no está lista', 'error'); return; }
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+  canvas.toBlob(blob => {
+    _invMatCerrarCamara();
+    if (!blob) { showToast('No se pudo capturar la foto', 'error'); return; }
+    const nombre = 'etiqueta-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '') + '.jpg';
+    _invMatProcesarFoto(new File([blob], nombre, { type: 'image/jpeg' }));
+  }, 'image/jpeg', 0.9);
+}
+
+/** Traduce el fallo de getUserMedia a algo que se pueda leer en el laboratorio. */
+function _invMatMensajeErrorCamara(e) {
+  const n = e && e.name;
+  if (n === 'NotAllowedError' || n === 'SecurityError')
+    return 'El permiso de cámara está bloqueado en este navegador. Tócalo en el candado 🔒 de la barra de direcciones → Permisos → Cámara → Permitir, y vuelve a intentarlo.';
+  if (n === 'NotFoundError' || n === 'OverconstrainedError')
+    return 'Este dispositivo no tiene cámara disponible. Haz la foto con el móvil y súbela con "Elegir una foto ya hecha".';
+  if (n === 'NotReadableError')
+    return 'La cámara la está usando otra aplicación. Ciérrala y vuelve a intentarlo.';
+  return 'No se pudo abrir la cámara' + (e && e.message ? ' (' + e.message + ')' : '') + '. Puedes subir una foto ya hecha.';
+}
+
+// ------------------------------------------------------------
 // HELPERS
 // ------------------------------------------------------------
 
@@ -204,7 +340,7 @@ function _invMatRenderFormulario() {
             ${_invMat.iaExtraido ? `<div style="font-size:11px;color:var(--success);margin-top:8px">Leído de la etiqueta y rellenado abajo. Revísalo: lo que no se veía se ha dejado en blanco.</div>` : ''}
           ` : `
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <button class="btn btn-primary" style="flex:1 1 160px" onclick="_invMatPedirFoto('camara')">📷 Hacer una foto</button>
+              <button class="btn btn-primary" style="flex:1 1 160px" onclick="_invMatAbrirCamara()">📷 Hacer una foto</button>
               <button class="btn btn-secondary" style="flex:1 1 160px" onclick="_invMatPedirFoto('archivo')">🖼️ Elegir una foto ya hecha</button>
             </div>
             <input type="file" id="invmat-foto-camara" accept="image/*" capture="environment"
@@ -544,9 +680,14 @@ function _invMatQuitarFoto() {
   renderInventariarMaterial();
 }
 
-async function _invMatSubirFoto(input) {
+function _invMatSubirFoto(input) {
   const file = input.files?.[0];
-  if (!file) return;
+  input.value = '';   // si no, elegir la misma foto otra vez no dispara `change`
+  if (file) _invMatProcesarFoto(file);
+}
+
+/** Sube la foto, venga del selector de archivos o de la cámara de la página. */
+async function _invMatProcesarFoto(file) {
   if (file.size > 10 * 1024 * 1024) { showToast('La foto pesa más de 10 MB', 'error'); return; }
   showLoading('Subiendo la foto...');
   try {
@@ -564,7 +705,6 @@ async function _invMatSubirFoto(input) {
     showToast(e.message || 'No se pudo subir la foto', 'error');
     console.error(e);
   }
-  input.value = '';   // si no, elegir la misma foto otra vez no dispara `change`
   hideLoading();
   renderInventariarMaterial();
 }
