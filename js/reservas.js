@@ -371,7 +371,7 @@ function _renderTabGestion() {
   const seccion = (titulo, lista) => {
     if (!lista.length) return '';
     return `<div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 8px">${titulo}</div>
-    <div class="card" style="padding:0;overflow:hidden">
+    <div class="card" style="padding:0">
       <table><thead><tr><th>Equipo</th><th>Solicitante</th><th>Tramo</th><th>Propósito / Condiciones</th><th>Estado</th><th></th></tr></thead>
       <tbody>${lista.map(renderFila).join('')}</tbody></table>
     </div>`;

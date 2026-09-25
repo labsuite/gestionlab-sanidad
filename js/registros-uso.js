@@ -136,7 +136,10 @@ function _duracionHorasReg(r) {
 function _cicloModuloUsuario(email) {
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === (email || '').toLowerCase().trim());
   if (!u) return '—';
-  return [u.Ciclo_Principal, u.Modulo].filter(Boolean).join(' · ') || '—';
+  // Espacio tras cada coma: la lista de módulos viene pegada ("A,B,C") y sin punto
+  // de corte el navegador la trata como una palabra larguísima que ensancha la tabla.
+  const modulos = (u.Modulo || '').replace(/\s*,\s*/g, ', ');
+  return [u.Ciclo_Principal, modulos].filter(Boolean).join(' · ') || '—';
 }
 
 function _horasAcumuladasReg(tipo, idEquipo) {
@@ -297,7 +300,9 @@ function _renderHistorialReg(tipo) {
 
   if (!cerradas.length) return `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin sesiones registradas todavía</div></div>`;
 
-  return `<div class="card" style="padding:0;overflow:hidden">
+  // Sin overflow:hidden en línea: pisaba la regla .card:has(table) { overflow-x: auto }
+  // de css/styles.css y la tabla se recortaba por la derecha (se perdía Incidencias).
+  return `<div class="card" style="padding:0">
     <table><thead><tr>
       <th>Fecha</th><th>Horario</th><th>Usuario</th>
       ${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}
@@ -309,7 +314,7 @@ function _renderHistorialReg(tipo) {
         <td>${_fmtFechaReg(r.Fecha)}</td>
         <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
         <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
-        ${cfg.mostrarCicloModulo ? `<td style="font-size:12px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
+        ${cfg.mostrarCicloModulo ? `<td style="font-size:12px;min-width:180px;max-width:240px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
         ${cfg.campos.map(c => `<td style="font-size:12px">${r[c.campo] || '—'}</td>`).join('')}
         <td style="font-size:12px">${r.Incidencias || '—'}</td>
       </tr>`).join('')}
