@@ -491,7 +491,7 @@ async function guardarSesionRegistro() {
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
   } catch (e) {
-    showToast('Error al guardar la sesión', 'error'); console.error(e);
+    showToast(e.message || 'Error al guardar la sesión', 'error'); console.error(e);
   } finally { hideLoading(); }
 }
 
@@ -508,7 +508,7 @@ async function descartarSesionAbierta(tipo, idx) {
     _updateBadgeRegistrosUso();
     showToast('Sesión descartada', 'success');
   } catch (e) {
-    showToast('Error al eliminar', 'error'); console.error(e);
+    showToast(e.message || 'Error al eliminar', 'error'); console.error(e);
   } finally { hideLoading(); }
 }
 
@@ -544,7 +544,7 @@ async function _iniciarSesionRapida(tipo, idEquipo) {
     _updateBadgeRegistrosUso();
     mostrarToastConAccion(`Sesión iniciada a las ${objLocal.Hora_Inicio} ✓ — vuelve aquí (o escanea de nuevo) para terminarla`, 'Deshacer', () => _deshacerInicioSesionReg(tipo, objLocal.ID_Registro), 6000);
   } catch (e) {
-    showToast('Error al iniciar la sesión', 'error'); console.error(e);
+    showToast(e.message || 'Error al iniciar la sesión', 'error'); console.error(e);
   } finally { hideLoading(); }
 }
 
@@ -560,7 +560,7 @@ async function _deshacerInicioSesionReg(tipo, id) {
     _updateBadgeRegistrosUso();
     showToast('Inicio de sesión deshecho', 'success');
   } catch (e) {
-    showToast('Error al deshacer', 'error'); console.error(e);
+    showToast(e.message || 'Error al deshacer', 'error'); console.error(e);
   } finally { hideLoading(); }
 }
 

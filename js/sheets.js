@@ -12,15 +12,28 @@
 async function callEdgeFunction(nombre, body) {
   if (previewRole) throw new Error('Estás en vista previa — sal de ese modo para guardar cambios reales');
   const { data: { session } } = await _sbMigracion.auth.getSession();
+  // Sin sesión NO se manda la clave anónima como si fuese un token: el servidor
+  // la rechaza con un 401 genérico y quien usa la app solo ve "Error al …".
+  // Como las tablas se leen con la clave anónima (RLS de solo lectura), la app
+  // sigue pintando los datos y parece funcionar hasta que se intenta guardar
+  // algo — así que hay que decirlo claro y devolver a la pantalla de login.
+  if (!session?.access_token) {
+    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
+    throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');
+  }
   const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${session?.access_token || SUPABASE_MIGRACION_ANON}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401) {
+    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
+    throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');
+  }
   if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
   return data;
 }
