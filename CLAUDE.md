@@ -212,6 +212,27 @@ cada caso en `docs/proteccion-datos.md`.
 
 ---
 
+## "Lee bien pero no deja guardar" = la sesión ha caducado
+
+⚠ Las tablas se leen con la **clave anónima** (hay políticas RLS de solo lectura para
+`anon`), pero escribir pasa siempre por una Edge Function, que exige el token de la sesión.
+Por eso una sesión caducada no vacía la pantalla: la app pinta todos los datos como
+siempre y solo falla al guardar. Pasa sobre todo en los dispositivos compartidos de las
+cuentas de **grupo**, que se quedan abiertos días.
+
+`callEdgeFunction()` (`js/sheets.js`) ya **no** manda la clave anónima como si fuese el
+token cuando no hay sesión — eso producía un 401 "Sesión inválida o caducada" que cada
+módulo traducía a su toast genérico ("Error al iniciar la sesión"…). Ahora avisa
+"Tu sesión ha caducado…" y vuelve a la pantalla de login, tanto si no hay sesión como si
+el servidor responde 401. No reintroducir el `|| SUPABASE_MIGRACION_ANON` de la cabecera
+`Authorization`.
+
+En los `catch` usar `showToast(e.message || '<texto de respaldo>', 'error')` — patrón ya
+habitual en residuos, material y mantenimiento — para que el mensaje real del servidor
+llegue a la pantalla en vez de quedar solo en la consola.
+
+---
+
 ## Añadir una columna nueva a una tabla
 
 ⚠ Al añadir una columna a una tabla de Supabase, actualizar: la migración SQL (`supabase/schema.sql`),
