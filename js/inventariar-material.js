@@ -53,10 +53,101 @@ function _invMatNuevo() {
   return {
     categoria: '', tipoBase: '', nombreBase: '',
     atributos: {}, textoEtiqueta: '',
-    cantidad: '', unidad: '', idUbicacion: '', observaciones: '',
+    cantidad: '', unidad: '', idUbicacion: _invMatSitioActual().idUbicacion, observaciones: '',
     fotoPath: '', fotoNombre: '',
     iaExtraido: null, iaNoVisibles: [], iaError: '',
   };
+}
+
+// ------------------------------------------------------------
+// DÓNDE SE ESTÁ INVENTARIANDO — se elige una vez, no en cada bote
+// ------------------------------------------------------------
+// El alumnado va armario por armario: saca un bote, lo propone, saca el
+// siguiente. Con el desplegable de ubicaciones dentro del formulario había que
+// volver a buscar el mismo sitio entre las ~180 ubicaciones del centro para
+// cada bote, y eso era el mayor coste de la tanda. Ahora el sitio es de quien
+// inventaría, no de la propuesta: se elige arriba (primero el laboratorio y
+// solo entonces sus zonas), sobrevive al envío y se recuerda en el navegador
+// por si la tablet se bloquea o se recarga la página a media tanda.
+const INVMAT_SITIO_KEY = 'gestionlab_invmat_sitio';
+let _invMatSitio = null;   // { lab, idUbicacion }
+
+/** El sitio actual, validado contra el catálogo (puede haberse desactivado). */
+function _invMatSitioActual() {
+  if (!_invMatSitio) {
+    let guardado = null;
+    try { guardado = JSON.parse(localStorage.getItem(INVMAT_SITIO_KEY) || 'null'); } catch (e) { /* modo privado */ }
+    _invMatSitio = { lab: guardado?.lab || '', idUbicacion: guardado?.idUbicacion || '' };
+  }
+  const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === _invMatSitio.idUbicacion && x.Activa !== 'FALSE');
+  if (u) _invMatSitio.lab = u.Laboratorio_Aula || 'Otros';
+  else if (_invMatSitio.idUbicacion) _invMatSitio.idUbicacion = '';
+  return _invMatSitio;
+}
+
+function _invMatFijarSitio(cambios) {
+  const sitio = Object.assign(_invMatSitioActual(), cambios);
+  try { localStorage.setItem(INVMAT_SITIO_KEY, JSON.stringify(sitio)); } catch (e) { /* modo privado */ }
+  if (_invMat) _invMat.idUbicacion = sitio.idUbicacion;   // el bote en curso se muda con quien lo cuenta
+  renderInventariarMaterial();
+}
+
+function _invMatCambiarLabSitio(v)  { _invMatFijarSitio({ lab: v, idUbicacion: '' }); }
+function _invMatCambiarUbicSitio(v) { _invMatFijarSitio({ idUbicacion: v }); }
+
+/** Laboratorios con ubicaciones activas, tal cual están en el catálogo. */
+function _invMatLabsSitio() {
+  return [...new Set(DATA.ubicaciones
+    .filter(u => u.Activa !== 'FALSE')
+    .map(u => u.Laboratorio_Aula || 'Otros'))].sort();
+}
+
+/** Etiqueta legible de una ubicación. El ID siempre se muestra: zona y subzona
+ *  solas no identifican el sitio (hay quince "Encimera" por laboratorio). */
+function _invMatEtiquetaUbic(idUbicacion) {
+  const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbicacion);
+  if (!u) return idUbicacion || '';
+  return [...[u.Zona, u.Subzona].filter(Boolean), u.ID_Ubicacion].join(' · ');
+}
+
+/** La tarjeta de arriba: el laboratorio y, dentro, la zona concreta. */
+function _invMatRenderSitio() {
+  const sitio = _invMatSitioActual();
+  const labs = _invMatLabsSitio();
+  const ubics = DATA.ubicaciones
+    .filter(u => u.Activa !== 'FALSE' && (u.Laboratorio_Aula || 'Otros') === sitio.lab);
+  const zonas = [...new Set(ubics.map(u => u.Zona || 'Sin zona'))].sort();
+
+  return `
+    <div class="card" id="invmat-sitio" style="margin-bottom:16px">
+      <div class="card-header">
+        <div class="card-title">📍 ¿Dónde estás inventariando?</div>
+      </div>
+      <div style="${INVMAT_PAD}">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+          <select onchange="_invMatCambiarLabSitio(this.value)">
+            <option value="">Laboratorio…</option>
+            ${labs.map(l => `<option value="${_escAttr(l)}" ${l === sitio.lab ? 'selected' : ''}>${_esc(l)}</option>`).join('')}
+          </select>
+          ${sitio.lab ? `
+            <select onchange="_invMatCambiarUbicSitio(this.value)">
+              <option value="">Armario, cajón o estante…</option>
+              ${zonas.map(z => `
+                <optgroup label="${_escAttr(z)}">
+                  ${ubics.filter(u => (u.Zona || 'Sin zona') === z).map(u =>
+                    `<option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === sitio.idUbicacion ? 'selected' : ''}>${_esc([u.Subzona, u.Descripcion_Completa].filter(Boolean)[0] || u.Zona || u.ID_Ubicacion)} · ${_esc(u.ID_Ubicacion)}</option>`
+                  ).join('')}
+                </optgroup>`).join('')}
+            </select>` : ''}
+        </div>
+        <div style="font-size:12px;margin-top:10px;line-height:1.6;color:${sitio.idUbicacion ? 'var(--success)' : 'var(--text-muted)'}">
+          ${sitio.idUbicacion
+            ? `✓ Todo lo que envíes se guardará en <strong>${_esc(_invMatEtiquetaUbic(sitio.idUbicacion))}</strong>.
+               No hay que volver a elegirlo en cada bote: cámbialo solo cuando te muevas de sitio.`
+            : 'Elige el sitio una sola vez, antes de empezar. Se queda puesto para todos los botes de esa estantería; solo hay que cambiarlo al moverse.'}
+        </div>
+      </div>
+    </div>`;
 }
 
 // ------------------------------------------------------------
@@ -304,6 +395,7 @@ function renderInventariarMaterial() {
        <button class="btn btn-secondary" onclick="showPage('material')">← Volver al inventario</button>
      </div>` +
     (esStaff ? _invMatRenderPanelValidacion() : '') +
+    _invMatRenderSitio() +
     _invMatRenderFormulario() +
     (esStaff ? '' : _invMatRenderMisPropuestas());
 }
@@ -414,9 +506,9 @@ function _invMatRenderFormulario() {
           </div>
         </div>
 
-        <!-- 4 · CUÁNTO Y DÓNDE ──────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay y dónde?</label>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">
+        <!-- 4 · CUÁNTO ───────────────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay?</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">
             <input type="number" min="0" step="0.01" value="${_escAttr(_invMat.cantidad)}" placeholder="Cantidad"
                    oninput="_invMat.cantidad=this.value">
             <input list="invmat-unidades" value="${_escAttr(_invMat.unidad)}" placeholder="Unidad (caja, bote…)"
@@ -424,11 +516,18 @@ function _invMatRenderFormulario() {
             <datalist id="invmat-unidades">
               ${_invMatUnidades().map(u => `<option value="${_escAttr(u)}"></option>`).join('')}
             </datalist>
-            <select onchange="_invMat.idUbicacion=this.value">
-              <option value="">¿Dónde está?</option>
-              ${_invMatOpcionesUbicacion()}
-            </select>
           </div>
+        <!-- El sitio no se pregunta aquí: sale de la tarjeta de arriba y es el
+             mismo para toda la tanda. Solo se recuerda dónde va a quedar. -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;margin-bottom:14px;
+                    background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px">
+          ${_invMat.idUbicacion
+            ? `<span>📍 Se guardará en <strong>${_esc(_invMatEtiquetaUbic(_invMat.idUbicacion))}</strong></span>`
+            : `<span style="color:var(--warning)">📍 Falta decir dónde está — elígelo arriba</span>`}
+          <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_invMatIrAlSitio()">
+            Cambiar de sitio
+          </button>
+        </div>
         <div class="form-group" style="margin-bottom:14px">
           <textarea rows="2" placeholder="Observaciones (opcional)" oninput="_invMat.observaciones=this.value">${_esc(_invMat.observaciones)}</textarea>
         </div>
@@ -483,15 +582,15 @@ function _invMatCampoAtributo(a) {
     <input value="${_escAttr(v ?? '')}" oninput="${set}.value)"></div>`;
 }
 
-function _invMatOpcionesUbicacion() {
-  const ubics = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE');
-  const zonas = [...new Set(ubics.map(u => u.Laboratorio_Aula || 'Otros'))].sort();
-  return zonas.map(z => `
-    <optgroup label="${_escAttr(z)}">
-      ${ubics.filter(u => (u.Laboratorio_Aula || 'Otros') === z).map(u =>
-        `<option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === _invMat.idUbicacion ? 'selected' : ''}>${_esc([u.Zona, u.Subzona].filter(Boolean).join(' · ') || u.ID_Ubicacion)} · ${_esc(u.ID_Ubicacion)}</option>`
-      ).join('')}
-    </optgroup>`).join('');
+/** Lleva la vista a la tarjeta del sitio y la resalta un momento: desde el
+ *  paso 4, en el móvil, queda muy arriba y no se ve que ha cambiado nada. */
+function _invMatIrAlSitio() {
+  const card = document.getElementById('invmat-sitio');
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.style.transition = 'box-shadow .3s';
+  card.style.boxShadow = '0 0 0 3px var(--accent)';
+  setTimeout(() => { card.style.boxShadow = ''; }, 1200);
 }
 
 /** Aviso en vivo si el nombre que se está componiendo ya existe en el catálogo. */
