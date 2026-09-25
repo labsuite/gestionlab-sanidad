@@ -1351,13 +1351,42 @@ async function guardarUbicacion() {
     subzona: v('ubi-subzona'),
     descripcion_completa: v('ubi-desc'),
   };
+  // El ID es la clave primaria y es lo que va grabado en el chip de las
+  // etiquetas NFC/QR (urlEtiqueta → ?armario=<ID>): cambiarlo deja muertas
+  // las etiquetas ya pegadas, y eso no se arregla desde la app (ver CLAUDE.md).
+  // Lo de dentro de la base de datos sí se arrastra solo.
+  if (editingRow && editingRow.sheet === 'Ubicaciones') {
+    const idPrevio = DATA.ubicaciones[editingRow.rowIndex]?.ID_Ubicacion;
+    if (idPrevio && idPrevio !== id) {
+      const nEquipos = DATA.equipos.filter(e => e.Ubicacion === idPrevio).length;
+      const nLotes   = (DATA.materialUbicaciones || []).filter(l => l.ID_Ubicacion === idPrevio).length;
+      const detalle  = (nEquipos || nLotes)
+        ? `
+
+Se actualizarán solas ${nEquipos} equipo(s) y ${nLotes} lote(s) de material.`
+        : '';
+      if (!confirm(
+        `Vas a cambiar el ID de "${idPrevio}" a "${id}".${detalle}
+
+` +
+        `⚠️ Las etiquetas NFC/QR ya grabadas con "${idPrevio}" dejarán de funcionar: ` +
+        `habrá que volver a grabarlas con el botón 🔗.
+
+¿Continuar?`)) return;
+    }
+  }
+
   showLoading('Guardando...');
   try {
     if (editingRow && editingRow.sheet === 'Ubicaciones') {
       const idOriginal = DATA.ubicaciones[editingRow.rowIndex].ID_Ubicacion;
-      const { ubicacion } = await callEdgeFunction('gestionar-ubicacion', { accion: 'actualizar', id_original: idOriginal, ...datos });
+      const { ubicacion, renombrada } = await callEdgeFunction('gestionar-ubicacion', { accion: 'actualizar', id_original: idOriginal, ...datos });
       DATA.ubicaciones[editingRow.rowIndex] = _ubicacionSbToObj(ubicacion);
-      showToast('Ubicación actualizada', 'success');
+      if (id !== idOriginal) _propagarRenombradoUbicacion(idOriginal, id);
+      const arrastrados = (renombrada?.equipos || 0) + (renombrada?.material || 0);
+      showToast(arrastrados > 0
+        ? `Ubicación renombrada (${arrastrados} referencia(s) actualizada(s))`
+        : 'Ubicación actualizada', 'success');
     } else {
       const { ubicacion } = await callEdgeFunction('gestionar-ubicacion', { accion: 'crear', ...datos });
       DATA.ubicaciones.push(_ubicacionSbToObj(ubicacion));
@@ -1366,6 +1395,22 @@ async function guardarUbicacion() {
     closeModal('modal-ubicacion'); renderAll();
   } catch(e) { showToast('Error guardando: ' + e.message, 'error'); }
   hideLoading(); editingRow = null;
+}
+
+/**
+ * Espejo en memoria del renombrado que el servidor acaba de hacer: la FK en
+ * cascada y el repaso de `equipos.ubicacion` / `material.ubicacion` ocurren en
+ * Postgres, pero DATA sigue con el ID viejo hasta la siguiente recarga, y
+ * renderAll() pintaría los equipos y los lotes como si su zona hubiera
+ * desaparecido. Coincidencia exacta, igual que en el servidor.
+ */
+function _propagarRenombradoUbicacion(idViejo, idNuevo) {
+  const campo = (lista, clave) => (lista || []).forEach(x => { if (x[clave] === idViejo) x[clave] = idNuevo; });
+  campo(DATA.equipos, 'Ubicacion');
+  campo(DATA.material, 'Ubicacion');
+  campo(DATA.materialUbicaciones, 'ID_Ubicacion');
+  campo(DATA.propuestasUbicacion, 'ID_Ubicacion');
+  campo(DATA.propuestasMaterial, 'ID_Ubicacion');
 }
 
 /**

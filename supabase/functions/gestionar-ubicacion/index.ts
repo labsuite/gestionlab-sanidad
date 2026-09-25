@@ -2,7 +2,12 @@
 // A diferencia de Proveedores, el ID_Ubicacion lo escribe la persona a mano
 // (no se genera solo) y puede cambiarlo al editar — por eso "actualizar"
 // necesita id_original (la fila que se edita) además de id_ubicacion (el
-// valor nuevo, que puede ser el mismo o uno corregido).
+// valor nuevo, que puede ser el mismo o uno corregido). Ese ID es la clave
+// primaria: renombrarlo solo funciona porque las claves ajenas que apuntan
+// aquí están en ON UPDATE CASCADE (scripts/migrar_fk_ubicacion_cascade.py) y
+// porque al final de "actualizar" se repasan a mano las columnas de texto
+// sin FK. Al añadir una tabla nueva que guarde el ID de una ubicación,
+// darle la FK con on update cascade en vez de un text suelto.
 // "eliminar" solo borra de verdad una ubicación que no usa nadie; si hay
 // equipos o lotes dentro devuelve el recuento y el cliente ofrece
 // "cambiar_estado" (activa=false), que la retira de los selectores sin
@@ -125,5 +130,34 @@ Deno.serve(async (req) => {
     return jsonError(`No se pudo actualizar: ${error.message}`, 400);
   }
   if (!data) return jsonError(`No se encontró la ubicación "${idOriginal}"`, 404);
-  return jsonOk({ ubicacion: data });
+
+  // ----------------------------------------------------------
+  // RENOMBRAR — el ID es la clave primaria, así que cambiarlo arrastra por
+  // clave ajena en cascada lo que sí la tiene (`material_ubicaciones`,
+  // `propuestas_material`, `propuestas_ubicacion_equipo`). Pero `equipos.ubicacion`
+  // y `material.ubicacion` guardan el ID como TEXTO suelto, sin FK (ver el
+  // comentario de schema.sql: datos pendientes de limpiar) — si no se repasan
+  // aquí, el equipo se queda nombrando una ubicación que ya no existe y
+  // desaparece de su laboratorio sin que nadie lo toque. Coincidencia exacta:
+  // los campos que aún llevan texto libre tipo "Lab 205" no se tocan.
+  // ----------------------------------------------------------
+  const renombrada = { equipos: 0, material: 0 };
+  if (idUbicacion !== idOriginal) {
+    const arrastrar = async (tabla: string, campo: string) => {
+      const { data: filas, error: errUp } = await supabaseAdmin.from(tabla)
+        .update({ [campo]: idUbicacion }).eq(campo, idOriginal).select(campo);
+      if (errUp) throw new Error(`${tabla}: ${errUp.message}`);
+      return filas?.length ?? 0;
+    };
+    try {
+      renombrada.equipos  = await arrastrar("equipos", "ubicacion");
+      renombrada.material = await arrastrar("material", "ubicacion");
+    } catch (e) {
+      return jsonError(
+        `La ubicación se renombró a "${idUbicacion}", pero no se pudieron actualizar ` +
+        `las referencias: ${e.message}. Recarga y revisa los equipos de esa zona.`, 400);
+    }
+  }
+
+  return jsonOk({ ubicacion: data, id_original: idOriginal, renombrada });
 });

@@ -452,7 +452,7 @@ create table material (
 create table material_ubicaciones (
   id                   text primary key,
   id_material          text not null references material(id_material) on delete cascade,
-  id_ubicacion         text not null references ubicaciones(id_ubicacion),
+  id_ubicacion         text not null references ubicaciones(id_ubicacion) on update cascade,
   stock_local          numeric not null default 0,
   stock_minimo_local   numeric,
   stock_optimo_local   numeric,
@@ -690,7 +690,7 @@ create policy "tareas_personales_select_anon" on tareas_personales for select to
 create table if not exists propuestas_ubicacion_equipo (
   id_propuesta          text primary key,
   id_equipo             text not null references equipos(id_activo) on delete cascade on update cascade,
-  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null,
+  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null on update cascade,
   no_encontrado         boolean not null default false,
   ubicacion_anterior    text,          -- lo que tenía el equipo al proponer (para poder revertir)
   propuesto_por         text,
@@ -777,7 +777,7 @@ create table if not exists propuestas_material (
   nombre_generado       text,
   unidad                text,
   cantidad              numeric,
-  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null,
+  id_ubicacion          text references ubicaciones(id_ubicacion) on delete set null on update cascade,
   foto_path             text,
   id_material_sugerido  text references material(id_material) on delete set null,
   ia_extraido           jsonb,
