@@ -66,7 +66,9 @@ function renderUbicaciones() {
         <div>${u.Activa !== 'FALSE' ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-gray">Inactiva</span>'}</div>
         <div class="row-actions">
           ${rol === 'Administrador' ? `<button class="icon-btn" onclick="mostrarUrlNfc('${u.ID_Ubicacion.replace(/'/g,"\\'")}')" title="URL para etiqueta NFC">🔗</button>` : ''}
-          ${puedeEditar ? `<button class="icon-btn" onclick="editUbicacion(${DATA.ubicaciones.indexOf(u)})">✏️</button>` : ''}
+          ${puedeEditar ? `<button class="icon-btn" onclick="editUbicacion(${DATA.ubicaciones.indexOf(u)})" title="Editar">✏️</button>` : ''}
+          ${puedeEditar && u.Activa === 'FALSE' ? `<button class="icon-btn" onclick="cambiarEstadoUbicacion(${DATA.ubicaciones.indexOf(u)}, true)" title="Reactivar">♻️</button>` : ''}
+          ${puedeEditar ? `<button class="icon-btn danger" onclick="borrarUbicacion(${DATA.ubicaciones.indexOf(u)})" title="Eliminar">🗑️</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -1364,6 +1366,75 @@ async function guardarUbicacion() {
     closeModal('modal-ubicacion'); renderAll();
   } catch(e) { showToast('Error guardando: ' + e.message, 'error'); }
   hideLoading(); editingRow = null;
+}
+
+/**
+ * Borrar una ubicación no es como borrar un proveedor: la nombran los equipos,
+ * los lotes de `material_ubicaciones` (que además la exige NOT NULL) y la
+ * columna legacy `material.ubicacion`. El servidor cuenta primero y, si hay
+ * algo colgando, responde 200 con el detalle en vez de reventar con un error
+ * de clave ajena — aquí eso se traduce a "no puedo borrarla, ¿la desactivo?",
+ * que es lo que se quiere casi siempre: la zona ya no existe físicamente pero
+ * el histórico que la menciona tiene que seguir en pie.
+ */
+async function borrarUbicacion(idx) {
+  const u = DATA.ubicaciones[idx];
+  if (!u) return;
+  if (!confirm(`¿Eliminar la ubicación "${u.ID_Ubicacion}"? Esta acción no se puede deshacer.`)) return;
+
+  showLoading('Eliminando...');
+  let res;
+  try {
+    res = await callEdgeFunction('gestionar-ubicacion', { accion: 'eliminar', id_ubicacion: u.ID_Ubicacion });
+  } catch (e) {
+    hideLoading();
+    showToast(e.message || 'No se pudo eliminar la ubicación', 'error');
+    console.error(e);
+    return;
+  }
+  hideLoading();
+
+  if (res.eliminada) {
+    DATA.ubicaciones.splice(idx, 1);
+    showToast('Ubicación eliminada', 'success');
+    renderAll();
+    return;
+  }
+
+  const n = res.en_uso || {};
+  const partes = [];
+  if (n.equipos)  partes.push(`${n.equipos} equipo(s)`);
+  if (n.lotes)    partes.push(`${n.lotes} lote(s) de material`);
+  if (n.material) partes.push(`${n.material} ítem(s) del catálogo`);
+  if (n.otros)    partes.push('otros registros');
+  const detalle = partes.join(', ') || 'otros registros';
+
+  if (u.Activa === 'FALSE') {
+    showToast(`No se puede eliminar: la usan ${detalle}. Ya está desactivada.`, 'error');
+    return;
+  }
+  if (!confirm(
+    `No se puede eliminar "${u.ID_Ubicacion}": la usan ${detalle}.\n\n` +
+    `¿La desactivo? Dejará de aparecer al elegir ubicación, pero no se pierde ` +
+    `nada de lo que ya apunta a ella.`)) return;
+  await cambiarEstadoUbicacion(idx, false);
+}
+
+async function cambiarEstadoUbicacion(idx, activa) {
+  const u = DATA.ubicaciones[idx];
+  if (!u) return;
+  showLoading(activa ? 'Reactivando...' : 'Desactivando...');
+  try {
+    const { ubicacion } = await callEdgeFunction('gestionar-ubicacion',
+      { accion: 'cambiar_estado', id_ubicacion: u.ID_Ubicacion, activa });
+    DATA.ubicaciones[idx] = _ubicacionSbToObj(ubicacion);
+    showToast(activa ? 'Ubicación reactivada' : 'Ubicación desactivada', 'success');
+    renderAll();
+  } catch (e) {
+    showToast(e.message || 'No se pudo cambiar el estado', 'error');
+    console.error(e);
+  }
+  hideLoading();
 }
 
 async function guardarUsuario() {

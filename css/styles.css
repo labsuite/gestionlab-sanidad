@@ -1421,7 +1421,9 @@
   /* Ubicaciones: scroll horizontal en móvil */
   .ubi-grupo-rows.open { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .ubi-table-header,
-  .ubi-row { min-width: 560px; }
+  /* 640 y no 560: la celda de acciones lleva hasta cuatro botones
+     (NFC, editar, reactivar, eliminar) y con 560 el último se sale. */
+  .ubi-row { min-width: 640px; }
 
 
   /* Row actions: siempre visibles */
