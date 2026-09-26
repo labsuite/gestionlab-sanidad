@@ -56,6 +56,10 @@ function _invMatNuevo() {
     cantidad: '', unidad: '', idUbicacion: _invMatSitioActual().idUbicacion, observaciones: '',
     fotoPath: '', fotoNombre: '',
     iaExtraido: null, iaNoVisibles: [], iaError: '',
+    // Qué es esto respecto al catálogo: 'nuevo' | 'mismo' (ya está, en otro
+    // sitio) | 'alicuota' (trasvase de otro). Con 'mismo' o 'alicuota' NO se
+    // da de alta nada: se le cuelga un bote al material que ya existe.
+    relacion: 'nuevo', idMaterialRelacionado: '', textoRelacion: '',
   };
 }
 
@@ -362,8 +366,17 @@ function _invMatNombreGenerado() {
 function _invMatQueFalta() {
   const falta = [];
   if (!_invMat?.fotoPath) falta.push('la foto de la etiqueta');
-  if (!_invMat?.categoria) falta.push('la categoría');
-  if (!_invMat?.tipoBase) falta.push('el tipo de producto');
+  // Si ya está en el catálogo no hay nada que componer: el nombre, la categoría
+  // y los atributos son los del material que se señala. Solo hace falta la foto
+  // (es lo que permite comprobarlo sin bajar al laboratorio) y saber cuál es.
+  if (_invMat?.relacion !== 'nuevo') {
+    if (!_invMat?.idMaterialRelacionado) falta.push('decir cuál es del inventario');
+    // Sin sitio no hay nada que colocar: el bote se crea justo ahí.
+    if (!_invMat?.idUbicacion) falta.push('decir dónde estás (arriba del todo)');
+  } else {
+    if (!_invMat?.categoria) falta.push('la categoría');
+    if (!_invMat?.tipoBase) falta.push('el tipo de producto');
+  }
   if (!falta.length) return '';
   return falta.length === 1 ? falta[0] : falta.slice(0, -1).join(', ') + ' y ' + falta[falta.length - 1];
 }
@@ -451,8 +464,12 @@ function _invMatRenderFormulario() {
           `}
         </div>
 
-        <!-- 2 · QUÉ ES ───────────────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">2 · ¿Qué es?</label>
+        <!-- 2 · ¿YA ESTÁ EN LA APP? ──────────────────────── -->
+        ${_invMatRenderRelacion()}
+
+        ${_invMat.relacion === 'nuevo' ? `
+        <!-- 3 · QUÉ ES ───────────────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">3 · ¿Qué es?</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
           <select onchange="_invMatCambiarCategoria(this.value)">
             <option value="">Categoría…</option>
@@ -472,8 +489,8 @@ function _invMatRenderFormulario() {
             y en observaciones, y el profesorado decidirá cómo catalogarlo.
           </div>` : ''}
 
-        <!-- 3 · DATOS ────────────────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">3 · Datos del producto</label>
+        <!-- 4 · DATOS ────────────────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · Datos del producto</label>
         ${!_invMat.tipoBase ? `
           <div style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:14px">
             Elige arriba la categoría y el tipo de producto: según lo que sea, aquí aparecerán
@@ -494,6 +511,7 @@ function _invMatRenderFormulario() {
             ${(ficha?.Atributos || []).map(a => _invMatCampoAtributo(a)).join('')}
           </div>
         ` : ''}
+        ` : ''}
 
         <!-- LO QUE PONE EN EL BOTE — no depende del tipo ────── -->
         <div class="form-group" style="margin-bottom:14px">
@@ -506,8 +524,8 @@ function _invMatRenderFormulario() {
           </div>
         </div>
 
-        <!-- 4 · CUÁNTO ───────────────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay?</label>
+        <!-- 5 · CUÁNTO ───────────────────────────────────────── -->
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">5 · ¿Cuánto hay?</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">
             <input type="number" min="0" step="0.01" value="${_escAttr(_invMat.cantidad)}" placeholder="Cantidad"
                    oninput="_invMat.cantidad=this.value">
@@ -549,6 +567,108 @@ function _invMatRenderFormulario() {
         </button>
       </div>
     </div>`;
+}
+
+// ------------------------------------------------------------
+// ¿ESTO YA ESTÁ EN LA APP?
+// ------------------------------------------------------------
+// El caso que más se repite inventariando no es "he encontrado algo nuevo",
+// es "he encontrado el mismo bote que ya estaba, pero en otro armario" — y
+// también "esto es un gotero sacado de la botella grande". Ninguno de los dos
+// es un alta: el material ya existe y lo que le falta es un BOTE
+// (`material_ubicaciones`) en ese sitio, o un bote hijo colgado del suyo.
+// Duplicar la entrada de catálogo sería justo lo contrario de inventariar.
+
+function _invMatMaterialRel() {
+  return DATA.material.find(m => m.ID_Material === _invMat.idMaterialRelacionado) || null;
+}
+
+/** Texto del desplegable: el ID va detrás porque es lo que desambigua. */
+function _invMatEtiquetaMaterial(m) {
+  return `${m.Nombre} · ${m.ID_Material}`;
+}
+
+function _invMatCambiarRelacion(v) {
+  _invMat.relacion = v;
+  if (v === 'nuevo') { _invMat.idMaterialRelacionado = ''; _invMat.textoRelacion = ''; }
+  renderInventariarMaterial();
+}
+
+/** Atajo desde el aviso de duplicado: "sí, es ese". */
+function _invMatMarcarMismo(idMaterial) {
+  const m = DATA.material.find(x => x.ID_Material === idMaterial);
+  if (!m) return;
+  _invMat.relacion = 'mismo';
+  _invMat.idMaterialRelacionado = m.ID_Material;
+  _invMat.textoRelacion = _invMatEtiquetaMaterial(m);
+  renderInventariarMaterial();
+}
+
+/** Solo se re-renderiza cuando el texto casa con un material de verdad: si no,
+ *  se perdería el foco del campo a cada tecla. */
+function _invMatElegirMaterialRel(v) {
+  _invMat.textoRelacion = v;
+  const txt = String(v || '').trim();
+  const id = txt.includes('·') ? txt.split('·').pop().trim() : '';
+  const m = (id && DATA.material.find(x => x.ID_Material === id))
+    || DATA.material.find(x => String(x.Nombre).toLowerCase() === txt.toLowerCase());
+  const antes = _invMat.idMaterialRelacionado;
+  _invMat.idMaterialRelacionado = m ? m.ID_Material : '';
+  if (_invMat.idMaterialRelacionado !== antes) renderInventariarMaterial();
+}
+
+function _invMatRenderRelacion() {
+  const rel = _invMat.relacion || 'nuevo';
+  const mat = _invMatMaterialRel();
+  const opciones = [
+    ['nuevo', '🆕 No está en la app', 'No aparece en el inventario: hay que darlo de alta.'],
+    ['mismo', '📍 Sí, y es este mismo producto', 'Ya está en el inventario, pero en otro sitio.'],
+    ['alicuota', '💧 Es una alícuota de algo que ya está', 'Un trasvase a otro frasco: un gotero sacado de la botella grande.'],
+  ];
+  const sitio = _invMat.idUbicacion ? _invMatEtiquetaUbic(_invMat.idUbicacion) : '';
+
+  return `
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">2 · ¿Esto ya está en el inventario?</label>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+      ${opciones.map(([v, titulo, ayuda]) => `
+        <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:9px 11px;line-height:1.45;
+                      border:1px solid ${rel === v ? 'var(--accent)' : 'var(--border)'};border-radius:var(--radius-sm);
+                      background:${rel === v ? 'var(--surface2)' : 'transparent'}">
+          <input type="radio" name="invmat-relacion" value="${v}" ${rel === v ? 'checked' : ''}
+                 onchange="_invMatCambiarRelacion('${v}')" style="margin-top:2px;flex-shrink:0">
+          <span><span style="font-size:13px;font-weight:500">${titulo}</span>
+            <span style="display:block;font-size:11px;color:var(--text-muted)">${ayuda}</span></span>
+        </label>`).join('')}
+    </div>
+
+    ${rel !== 'nuevo' ? `
+      <div class="form-group" style="margin-bottom:12px">
+        <label style="font-size:11px;color:var(--text-muted)">
+          ¿Cuál es? Escribe el nombre y elígelo de la lista <span style="color:var(--danger)">*</span>
+        </label>
+        <input list="invmat-materiales" value="${_escAttr(_invMat.textoRelacion || '')}"
+               placeholder="Empieza a escribir el nombre…"
+               oninput="_invMatElegirMaterialRel(this.value)">
+        <datalist id="invmat-materiales">
+          ${DATA.material.map(m => `<option value="${_escAttr(_invMatEtiquetaMaterial(m))}"></option>`).join('')}
+        </datalist>
+        ${mat ? `
+          <div style="font-size:12px;color:var(--success);margin-top:8px;line-height:1.6">
+            ✓ <strong>${_esc(mat.Nombre)}</strong>${mat.Unidad ? ` · se cuenta en ${_esc(mat.Unidad)}` : ''}<br>
+            ${rel === 'mismo'
+              ? `No se dará de alta otra vez. Al validarlo se le añadirá un bote${sitio ? ` en <strong>${_esc(sitio)}</strong>` : ''}
+                 con lo que cuentes abajo.`
+              : `Se registrará como alícuota suya${sitio ? ` guardada en <strong>${_esc(sitio)}</strong>` : ''};
+                 el profesorado indicará de qué bote salió.`}
+          </div>`
+        : `<div style="font-size:11px;color:var(--warning);margin-top:6px">
+             Hay que elegir uno de la lista: solo con el texto no se sabe cuál es.
+           </div>`}
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px;line-height:1.5">
+        Aun así hace falta la foto: es lo que permite comprobar que es el mismo producto.
+      </div>` : ''}
+  `;
 }
 
 /** Un campo de formulario a partir de la definición del atributo. */
@@ -599,9 +719,12 @@ function _invMatAvisoDuplicado(nombre) {
   const k = clave(nombre);
   const ya = DATA.material.find(m => clave(m.Nombre) === k);
   if (!ya) return '';
-  return `<div style="font-size:12px;color:var(--warning);margin-top:8px;line-height:1.5">
+  return `<div style="font-size:12px;color:var(--warning);margin-top:8px;line-height:1.6">
     ⚠️ Esto ya está en el inventario como <strong>${_esc(ya.Nombre)}</strong>.
-    Si es lo mismo, no hace falta darlo de alta: mejor contar su stock desde el inventario.
+    Si es el mismo producto no hay que darlo de alta otra vez — dilo arriba y se le
+    añadirá un bote en el sitio donde estás.
+    <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-top:6px;display:block"
+            onclick="_invMatMarcarMismo('${_escAttr(ya.ID_Material)}')">Sí, es ese mismo</button>
   </div>`;
 }
 
@@ -672,6 +795,8 @@ function _invMatRenderPanelValidacion() {
         <div style="font-size:11px;color:var(--text-muted);line-height:1.5">
           Al aceptar se crea el material con el nombre que aparezca en el recuadro (puedes corregirlo),
           su lote en la ubicación indicada y su movimiento de entrada. Tu nombre queda como responsable.
+          Si ya estaba en el inventario, "🔗 Ya existía…" no duplica nada: le añade el bote en el sitio
+          donde lo han encontrado, o lo cuelga como alícuota del bote del que salió.
         </div>
       </div>
     </div>`;
@@ -680,6 +805,10 @@ function _invMatRenderPanelValidacion() {
 function _invMatFilaValidacion(p) {
   const yaExiste = p.ID_Material_Sugerido
     ? DATA.material.find(m => m.ID_Material === p.ID_Material_Sugerido) : null;
+  // Lo que dice quien la propuso: que ya existe (en otro sitio) o que es una
+  // alícuota. Manda sobre el parecido que calculó el antiduplicados.
+  const declarado = (p.Relacion && p.Relacion !== 'nuevo' && p.ID_Material_Relacionado)
+    ? DATA.material.find(m => m.ID_Material === p.ID_Material_Relacionado) : null;
   const ficha = DATA.fichasAtributos.find(f =>
     f.Categoria === _invMatPrefijoCat(p.Categoria) && f.Tipo_Base === p.Tipo_Base);
   const mismaBase = _invMatMismaBase(p);
@@ -709,7 +838,11 @@ function _invMatFilaValidacion(p) {
             ${_esc(p.Propuesto_Por || '—')} · ${formatDate(p.Fecha) || p.Fecha}
           </div>
           ${p.IA_Avisos ? `<div style="font-size:11px;color:var(--warning);margin-top:6px">⚠️ ${_esc(p.IA_Avisos)}</div>` : ''}
-          ${yaExiste ? `<div style="font-size:12px;color:var(--warning);margin-top:6px">
+          ${declarado ? `<div style="font-size:12px;color:var(--accent);margin-top:6px;line-height:1.6">
+            ${p.Relacion === 'alicuota' ? '💧' : '📍'} Dice que ${p.Relacion === 'alicuota' ? 'es una <strong>alícuota</strong> de' : 'es <strong>el mismo producto</strong> que'}
+            <strong>${_esc(declarado.Nombre)}</strong> — no hay que darlo de alta, hay que colocarle el bote.
+          </div>` : ''}
+          ${yaExiste && !declarado ? `<div style="font-size:12px;color:var(--warning);margin-top:6px">
             ⚠️ Se parece a <strong>${_esc(yaExiste.Nombre)}</strong> — ¿es el mismo?</div>` : ''}
           ${mismaBase.length ? `<div style="font-size:12px;color:var(--text-muted);margin-top:6px;line-height:1.7">
             Ya hay material que empieza igual — ¿es alguno de estos?<br>
@@ -719,8 +852,10 @@ function _invMatFilaValidacion(p) {
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           ${p.Foto_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="abrirDocumento('${_escAttr(p.Foto_Path)}')">🔍 Ver foto</button>` : ''}
-          <button class="btn btn-primary" style="font-size:11px;padding:4px 10px" onclick="aceptarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}')">✓ Crear</button>
-          ${yaExiste ? `<button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="fusionarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}','${_escAttr(yaExiste.ID_Material)}')">Ya existía</button>` : ''}
+          <button class="btn ${declarado ? 'btn-secondary' : 'btn-primary'}" style="font-size:11px;padding:4px 10px"
+                  onclick="aceptarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}')">✓ Crear</button>
+          <button class="btn ${declarado ? 'btn-primary' : 'btn-secondary'}" style="font-size:11px;padding:4px 10px"
+                  onclick="fusionarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}','${_escAttr(declarado ? declarado.ID_Material : (yaExiste ? yaExiste.ID_Material : ''))}')">🔗 Ya existía…</button>
           <button class="btn btn-secondary" style="font-size:11px;padding:4px 10px" onclick="rechazarPropuestaMaterial('${_escAttr(p.ID_Propuesta)}')">Rechazar</button>
         </div>
       </div>
@@ -851,28 +986,40 @@ async function _invMatLeerEtiqueta() {
 
 async function enviarPropuestaMaterial() {
   if (!_invMat.fotoPath) { showToast('Falta la foto de la etiqueta', 'error'); return; }
-  if (!_invMat.categoria) { showToast('Falta la categoría', 'error'); return; }
+  const rel = _invMat.relacion || 'nuevo';
+  const matRel = rel === 'nuevo' ? null : _invMatMaterialRel();
+  if (rel !== 'nuevo' && !matRel) {
+    showToast('Elige de la lista con qué material del inventario se corresponde', 'error'); return;
+  }
+  if (rel === 'nuevo' && !_invMat.categoria) { showToast('Falta la categoría', 'error'); return; }
 
   showLoading('Enviando propuesta...');
   try {
+    // Con un material señalado, la categoría y el nombre son los SUYOS: no se
+    // compone ninguno nuevo, que es justo lo que se quiere evitar.
     const r = await callEdgeFunction('gestionar-propuesta-material', {
       accion: 'crear',
-      categoria: _invMatPrefijoCat(_invMat.categoria),
-      tipo_base: _invMat.tipoBase === '__otro__' ? null : _invMat.tipoBase,
-      nombre_base: _invMat.nombreBase || _invMatFichaActual()?.Nombre_Base || _invMat.textoEtiqueta || 'Sin identificar',
-      atributos: _invMat.atributos,
+      categoria: _invMatPrefijoCat(_invMat.categoria) || matRel?.Categoria || 'Otro',
+      tipo_base: (!matRel && _invMat.tipoBase !== '__otro__') ? _invMat.tipoBase : null,
+      nombre_base: matRel?.Nombre || _invMat.nombreBase || _invMatFichaActual()?.Nombre_Base
+                   || _invMat.textoEtiqueta || 'Sin identificar',
+      atributos: matRel ? {} : _invMat.atributos,
       texto_etiqueta: _invMat.textoEtiqueta,
-      unidad: _invMat.unidad, cantidad: _invMat.cantidad,
+      unidad: _invMat.unidad || matRel?.Unidad || '', cantidad: _invMat.cantidad,
       id_ubicacion: _invMat.idUbicacion,
       observaciones: _invMat.observaciones,
       foto_path: _invMat.fotoPath,
-      ia_extraido: _invMat.iaExtraido,
+      ia_extraido: matRel ? null : _invMat.iaExtraido,
+      relacion: rel,
+      id_material_relacionado: matRel?.ID_Material || null,
     });
     await loadAllData();
     _invMat = _invMatNuevo();
-    showToast(r.ya_existe
-      ? `Enviada. Ojo: se parece a "${r.ya_existe.nombre}" — lo revisará el profesorado.`
-      : 'Propuesta enviada. El profesorado la revisará.', 'success');
+    showToast(matRel
+      ? `Enviada como ${rel === 'mismo' ? 'el mismo material' : 'alícuota'} que "${matRel.Nombre}". El profesorado lo confirmará.`
+      : (r.ya_existe
+        ? `Enviada. Ojo: se parece a "${r.ya_existe.nombre}" — lo revisará el profesorado.`
+        : 'Propuesta enviada. El profesorado la revisará.'), 'success');
     renderInventariarMaterial();
     _invMatRenderAviso();
   } catch (e) {
@@ -904,19 +1051,184 @@ async function aceptarPropuestaMaterial(idPropuesta) {
   hideLoading();
 }
 
-async function fusionarPropuestaMaterial(idPropuesta, idMaterial) {
-  const mat = DATA.material.find(m => m.ID_Material === idMaterial);
-  if (!confirm(`¿Es lo mismo que "${mat?.Nombre || idMaterial}"?\n\nNo se creará nada nuevo. Si hay que ajustar el stock, hazlo desde el inventario.`)) return;
-  showLoading('Marcando como ya existente...');
+// ------------------------------------------------------------
+// "YA EXISTÍA" — qué se hace con lo que se contó
+// ------------------------------------------------------------
+// Marcar la propuesta como fusionada y no tocar nada era tirar el trabajo del
+// recuento: el bote sigue en ese armario y la app sigue sin saberlo. Aquí se
+// decide qué era de verdad — un bote más de ese material en ese sitio, una
+// alícuota de otro bote, o un recuento de uno que ya estaba fichado ahí.
+// En ningún caso se crea una segunda entrada de catálogo.
+
+let _invMatFusion = null;   // { idPropuesta, idMaterial, texto, modo, idLote, idLotePadre }
+
+function fusionarPropuestaMaterial(idPropuesta, idMaterial) {
+  const p = DATA.propuestasMaterial.find(x => x.ID_Propuesta === idPropuesta);
+  if (!p) { showToast('Propuesta no encontrada', 'error'); return; }
+  const id = idMaterial || p.ID_Material_Relacionado || p.ID_Material_Sugerido || '';
+  const mat = DATA.material.find(m => m.ID_Material === id) || null;
+  _invMatFusion = {
+    idPropuesta, idMaterial: mat ? mat.ID_Material : '',
+    texto: mat ? _invMatEtiquetaMaterial(mat) : '',
+    modo: '', idLote: '', idLotePadre: '',
+  };
+  _invMatFusionModoPorDefecto();
+  _invMatPintarFusion();
+  openModal('modal-fusion-propuesta');
+}
+
+/** El modo que se propone de entrada. Conservador a propósito: si ya hay un
+ *  bote fichado en ese mismo sitio no se suma solo — puede ser el mismo bote
+ *  contado otra vez, y sumarlo inflaría el stock. */
+function _invMatFusionModoPorDefecto() {
+  const f = _invMatFusion;
+  const p = DATA.propuestasMaterial.find(x => x.ID_Propuesta === f.idPropuesta);
+  const lotes = f.idMaterial ? getMatUbics(f.idMaterial) : [];
+  const enSitio = lotes.filter(l => l.ID_Ubicacion === p.ID_Ubicacion);
+  if (p.Relacion === 'alicuota' && lotes.length) {
+    f.modo = 'alicuota';
+    f.idLotePadre = (lotes.find(l => !l.ID_Lote_Padre) || lotes[0]).ID;
+  } else if (p.ID_Ubicacion && !enSitio.length) {
+    f.modo = 'nuevo_lote';
+  } else {
+    f.modo = 'ninguno';
+    f.idLote = enSitio.length ? enSitio[0].ID : '';
+  }
+}
+
+function _invMatFusionMaterial(v) {
+  const f = _invMatFusion; if (!f) return;
+  f.texto = v;
+  const txt = String(v || '').trim();
+  const id = txt.includes('·') ? txt.split('·').pop().trim() : '';
+  const m = (id && DATA.material.find(x => x.ID_Material === id))
+    || DATA.material.find(x => String(x.Nombre).toLowerCase() === txt.toLowerCase());
+  const antes = f.idMaterial;
+  f.idMaterial = m ? m.ID_Material : '';
+  if (f.idMaterial !== antes) {
+    f.idLote = ''; f.idLotePadre = '';
+    _invMatFusionModoPorDefecto();
+    _invMatPintarFusion();
+  }
+}
+
+function _invMatFusionModo(v) { _invMatFusion.modo = v; _invMatPintarFusion(); }
+
+function _invMatEtiquetaLote(l, mat) {
+  const unidad = l.Unidad_Lote || (mat ? mat.Unidad : '') || '';
+  const hija = l.ID_Lote_Padre ? ' (bote de uso)' : '';
+  return `${getNombreUbicacion(l.ID_Ubicacion)} — ${l.Stock_Local} ${unidad}${hija}`.trim();
+}
+
+function _invMatPintarFusion() {
+  const cont = document.getElementById('fusion-prop-body');
+  const f = _invMatFusion;
+  if (!cont || !f) return;
+  const p = DATA.propuestasMaterial.find(x => x.ID_Propuesta === f.idPropuesta);
+  if (!p) return;
+  const mat = DATA.material.find(m => m.ID_Material === f.idMaterial) || null;
+  const lotes = mat ? getMatUbics(mat.ID_Material) : [];
+  const enSitio = lotes.filter(l => l.ID_Ubicacion === p.ID_Ubicacion);
+  const cant = parseFloat(p.Cantidad) || 0;
+  const unidad = p.Unidad || (mat ? mat.Unidad : '') || '';
+  const sitio = p.ID_Ubicacion ? getNombreUbicacion(p.ID_Ubicacion) : '';
+
+  const opcion = (v, disponible, titulo, ayuda, extra) => !disponible ? '' : `
+    <label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;padding:10px 12px;line-height:1.45;
+                  border:1px solid ${f.modo === v ? 'var(--accent)' : 'var(--border)'};border-radius:var(--radius-sm);
+                  background:${f.modo === v ? 'var(--surface2)' : 'transparent'}">
+      <input type="radio" name="fusion-modo" ${f.modo === v ? 'checked' : ''}
+             onchange="_invMatFusionModo('${v}')" style="margin-top:3px;flex-shrink:0">
+      <span style="flex:1"><span style="font-size:13px;font-weight:500">${titulo}</span>
+        <span style="display:block;font-size:11px;color:var(--text-muted)">${ayuda}</span>
+        ${f.modo === v ? (extra || '') : ''}</span>
+    </label>`;
+
+  const selLotes = (lista, id, onchange) => `
+    <select onchange="${onchange}" style="margin-top:8px;font-size:12px">
+      ${lista.map(l => `<option value="${_escAttr(l.ID)}" ${l.ID === id ? 'selected' : ''}>${_esc(_invMatEtiquetaLote(l, mat))}</option>`).join('')}
+    </select>`;
+
+  cont.innerHTML = `
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;line-height:1.6">
+      <div style="font-size:13px;font-weight:600">${_esc(p.Nombre_Generado || p.Texto_Etiqueta || '—')}</div>
+      <div style="font-size:12px;color:var(--text-soft)">
+        Contado: <strong>${cant || '—'}</strong> ${_esc(unidad)}
+        ${sitio ? ` · 📍 ${_esc(sitio)}` : ' · sin sitio anotado'}
+        · ${_esc(p.Propuesto_Por || '—')}
+      </div>
+      ${p.Relacion && p.Relacion !== 'nuevo' ? `<div style="font-size:12px;color:var(--accent);margin-top:4px">
+        Quien lo inventarió dice que ${p.Relacion === 'alicuota' ? 'es una <strong>alícuota</strong>' : 'es <strong>el mismo producto</strong>'}.
+      </div>` : ''}
+    </div>
+
+    <div class="form-group" style="margin-bottom:14px">
+      <label>¿Cuál es el material que ya existe? *</label>
+      <input list="invmat-materiales-fusion" value="${_escAttr(f.texto)}"
+             placeholder="Escribe el nombre y elígelo de la lista" oninput="_invMatFusionMaterial(this.value)">
+      <datalist id="invmat-materiales-fusion">
+        ${DATA.material.map(m => `<option value="${_escAttr(_invMatEtiquetaMaterial(m))}"></option>`).join('')}
+      </datalist>
+    </div>
+
+    ${!mat ? `<div style="font-size:12px;color:var(--warning);line-height:1.6">
+      Elige un material de la lista para poder decidir qué se hace con lo contado.
+    </div>` : `
+      <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">¿Qué se hace con lo que se contó?</label>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${opcion('nuevo_lote', !!p.ID_Ubicacion,
+          `📍 Es el mismo, pero en ${_esc(sitio)}`,
+          `Se le añade un bote de ${cant || 0} ${_esc(unidad)} ahí. No se crea ninguna entrada nueva de inventario.`
+          + (enSitio.length ? ' Ojo: ahí ya hay un bote fichado de este material.' : ''))}
+        ${opcion('alicuota', lotes.length > 0,
+          '💧 Es una alícuota de uno de sus botes',
+          `Se cuelga como bote de uso${sitio ? ` en ${_esc(sitio)}` : ''}. El bote del que salió no se descuenta: si hay que ajustarlo, se hace desde el inventario.`,
+          selLotes(lotes, f.idLotePadre, '_invMatFusion.idLotePadre=this.value'))}
+        ${opcion('sumar', enSitio.length > 0,
+          '➕ Sumarlo a un bote que ya está fichado ahí',
+          `Suma ${cant || 0} ${_esc(unidad)} al bote elegido. Solo si es material que no estaba contado, no si es el mismo bote otra vez.`,
+          selLotes(enSitio, f.idLote || (enSitio.length ? enSitio[0].ID : ''), '_invMatFusion.idLote=this.value'))}
+        ${opcion('ninguno', true,
+          '🚫 Solo marcarla — no tocar el stock',
+          'Queda resuelta como "ya existía" y el inventario se queda como está.')}
+      </div>`}
+
+    <div class="form-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-fusion-propuesta')">Cancelar</button>
+      <button class="btn btn-primary" ${mat ? '' : 'disabled style="opacity:.5;cursor:not-allowed"'}
+              onclick="_invMatConfirmarFusion()">Resolver</button>
+    </div>`;
+}
+
+async function _invMatConfirmarFusion() {
+  const f = _invMatFusion;
+  if (!f || !f.idMaterial) { showToast('Elige el material que ya existe', 'error'); return; }
+  const cuerpo = {
+    accion: 'fusionar', id_propuesta: f.idPropuesta, id_material: f.idMaterial,
+    modo_stock: f.modo || 'ninguno',
+  };
+  if (f.modo === 'sumar') {
+    if (!f.idLote) { showToast('Elige a qué bote se suma', 'error'); return; }
+    cuerpo.id_lote = f.idLote;
+  }
+  if (f.modo === 'alicuota') {
+    if (!f.idLotePadre) { showToast('Elige de qué bote salió la alícuota', 'error'); return; }
+    cuerpo.id_lote_padre = f.idLotePadre;
+  }
+  showLoading('Resolviendo...');
   try {
-    await callEdgeFunction('gestionar-propuesta-material', {
-      accion: 'fusionar', id_propuesta: idPropuesta, id_material: idMaterial,
-    });
+    await callEdgeFunction('gestionar-propuesta-material', cuerpo);
     await loadAllData();
-    showToast('Marcada como ya existente', 'success');
-    renderInventariarMaterial(); _invMatRenderAviso();
+    closeModal('modal-fusion-propuesta');
+    _invMatFusion = null;
+    showToast(cuerpo.modo_stock === 'ninguno'
+      ? 'Marcada como ya existente'
+      : 'Resuelta: el bote ya está en el inventario', 'success');
+    renderInventariarMaterial();
+    if (typeof renderMaterial === 'function') renderMaterial();
+    _invMatRenderAviso();
   } catch (e) {
-    showToast(e.message || 'No se pudo fusionar', 'error');
+    showToast(e.message || 'No se pudo resolver', 'error');
     console.error(e);
   }
   hideLoading();

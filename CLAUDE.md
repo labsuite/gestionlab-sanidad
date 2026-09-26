@@ -399,6 +399,40 @@ Select `mat-categoria` en `html/modales-material.html`:
 
 ---
 
+## Inventariando: "ya existía" NO crea una segunda entrada
+
+Cuando el alumnado inventaría y lo que tiene en la mano ya está en el catálogo,
+el alta sería un duplicado. Lo que falta no es un material: es un **bote**
+(`material_ubicaciones`) en ese sitio. La propuesta lo dice desde el principio
+(`propuestas_material.relacion` + `id_material_relacionado`, paso 2 del
+formulario):
+
+- `nuevo` — no está en la app. Al aceptar se crea el material, su lote y su movimiento.
+- `mismo` — es ese mismo producto, en un sitio que la app no tenía. Se le añade
+  un bote en la ubicación del recuento.
+- `alicuota` — un trasvase (un gotero sacado de la botella grande). Se cuelga
+  como bote hijo (`id_lote_padre`) del bote del que salió.
+
+Con `mismo` o `alicuota` no se piden categoría, tipo ni atributos: son los del
+material señalado. La foto sí, siempre.
+
+Quien valida lo remata en el modal **🔗 Ya existía…** (`fusionarPropuestaMaterial`
+→ `_invMatPintarFusion`), que manda `modo_stock` a la Edge Function:
+`nuevo_lote` | `alicuota` | `sumar` (a un bote ya fichado en ese mismo sitio) |
+`ninguno` (solo marcarla). Detalles a respetar al tocarlo:
+
+- Si ya hay un bote fichado en esa ubicación, **el modo por defecto es `ninguno`**:
+  puede ser el mismo bote contado dos veces, y sumar inflaría el stock. Que lo
+  decida quien valida.
+- La **madre nunca se descuenta** al registrar una alícuota: quien inventaría
+  cuenta lo que ve, y lo que quede en el bote grande es otro recuento.
+- Antes de colgarle el primer bote a un material "legacy" (sin ningún lote y con
+  `stock_actual` propio) hay que materializar ese stock como bote en su
+  ubicación — `asegurarLoteLegacy()` —, o `sincronizarStock()` lo borra al
+  recalcular el total como suma de lotes.
+
+---
+
 ## Pendiente de hacer – CÓDIGO
 
 ### Árbol de decisión en Guía de residuos

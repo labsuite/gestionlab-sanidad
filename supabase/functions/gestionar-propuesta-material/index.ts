@@ -32,6 +32,56 @@ function genId(prefix: string): string {
 const numField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : Number(v);
 const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
 
+// ── Lotes y stock ─────────────────────────────────────────────────────
+// Mismo modelo que gestionar-material: el stock de un material con lotes es
+// SIEMPRE la suma de sus lotes; `material.stock_actual` es solo el espejo.
+async function lotesDe(supabaseAdmin: any, idMaterial: string) {
+  const { data } = await supabaseAdmin.from("material_ubicaciones")
+    .select("*").eq("id_material", idMaterial);
+  return data || [];
+}
+
+async function sincronizarStock(supabaseAdmin: any, idMaterial: string) {
+  const lotes = await lotesDe(supabaseAdmin, idMaterial);
+  if (!lotes.length) return;   // ítem legacy: su stock_actual se lleva a mano
+  const total = lotes.reduce((s: number, l: any) => s + (Number(l.stock_local) || 0), 0);
+  await supabaseAdmin.from("material").update({ stock_actual: total }).eq("id_material", idMaterial);
+}
+
+/**
+ * Un ítem "legacy" (sin ningún lote) lleva su stock en `material.stock_actual`.
+ * En cuanto se le cuelga un lote, el stock pasa a ser la suma de los lotes — así
+ * que lo que había antes hay que materializarlo primero como bote en su propia
+ * ubicación, o se pierde al sincronizar. Devuelve un mensaje de error si no se
+ * puede (no hay dónde ponerlo), o null si todo listo.
+ */
+async function asegurarLoteLegacy(supabaseAdmin: any, mat: any): Promise<string | null> {
+  const lotes = await lotesDe(supabaseAdmin, mat.id_material);
+  if (lotes.length) return null;
+  const stockPrevio = Number(mat.stock_actual) || 0;
+  if (stockPrevio <= 0) return null;   // nada que conservar
+  if (!mat.ubicacion) {
+    return `"${mat.nombre}" tiene ${stockPrevio} de stock pero ninguna ubicación asignada. ` +
+      `Ponle su sitio desde el inventario antes de añadirle otro bote, o se perdería ese stock.`;
+  }
+  const { error } = await supabaseAdmin.from("material_ubicaciones").insert({
+    id: genId("LU"), id_material: mat.id_material, id_ubicacion: mat.ubicacion,
+    stock_local: stockPrevio, stock_minimo_local: Number(mat.stock_minimo) || 0,
+    stock_optimo_local: Number(mat.stock_optimo) || 0,
+  });
+  if (error) return `No se pudo preparar el material: ${error.message}`;
+  return null;
+}
+
+async function registrarMovimiento(
+  supabaseAdmin: any, mat: any, tipo: string, cantidad: number, usuario: string, motivo: string,
+) {
+  await supabaseAdmin.from("movimientos").insert({
+    id_movimiento: genId("MOV"), material: mat?.nombre || "", id_material: mat?.id_material || null,
+    tipo, cantidad, usuario, motivo,
+  });
+}
+
 async function getFicha(supabaseAdmin: any, categoria: string, tipoBase: string | null) {
   if (!tipoBase) return null;
   const { data } = await supabaseAdmin.from("atributos_material")
@@ -232,6 +282,22 @@ Deno.serve(async (req) => {
       ? body.ia_extraido as Record<string, unknown> : null;
     const avisos = leidos ? avisosDiscrepancia(ficha, atributos, leidos) : "";
 
+    // Lo que dice quien inventaría sobre lo que tiene en la mano: si es el
+    // mismo producto que ya está en la app pero en otro sitio, o una alícuota
+    // de otro, NO hay que dar de alta nada — hay que colgarle un bote. Se
+    // guarda tal cual y lo confirma el profesorado al validar.
+    let relacion = String(body.relacion || "nuevo");
+    if (!["nuevo", "mismo", "alicuota"].includes(relacion)) relacion = "nuevo";
+    let idRelacionado = strField(body.id_material_relacionado);
+    if (relacion !== "nuevo") {
+      if (!idRelacionado) return jsonError("Dinos con qué material del inventario se corresponde", 400);
+      const { data: rel } = await supabaseAdmin.from("material")
+        .select("id_material").eq("id_material", idRelacionado).maybeSingle();
+      if (!rel) return jsonError("Ese material del inventario no existe", 404);
+    } else {
+      idRelacionado = null;
+    }
+
     const datos = {
       id_propuesta: genId("PMAT"),
       categoria, tipo_base: tipoBase, nombre_base: nombreBase,
@@ -242,6 +308,7 @@ Deno.serve(async (req) => {
       id_ubicacion: strField(body.id_ubicacion),
       foto_path: fotoPath,
       id_material_sugerido: parecido?.id_material || null,
+      relacion, id_material_relacionado: idRelacionado,
       ia_extraido: leidos,
       ia_avisos: avisos || null,
       propuesto_por: firma,
@@ -284,23 +351,101 @@ Deno.serve(async (req) => {
     }
 
     if (accion === "fusionar") {
-      // No era nuevo: ya existía. No se crea nada; si se contó una cantidad,
-      // se deja anotada para que se revise como ajuste de stock, no se aplica
-      // sola (el stock es dato de gestión, no de una propuesta).
-      const idMaterial = String(body.id_material || p.id_material_sugerido || "").trim();
+      // No era nuevo: ya estaba en el catálogo. NUNCA se crea una segunda
+      // entrada de material — lo que suele faltar es el BOTE en el sitio donde
+      // lo han encontrado. `modo_stock` dice qué se hace con lo que se contó:
+      //   nuevo_lote → bote nuevo de ese material en la ubicación del recuento
+      //   alicuota   → bote hijo (id_lote_padre) del bote del que se trasvasó
+      //   sumar      → se suma al bote que ya había en ese mismo sitio
+      //   ninguno    → solo se marca la propuesta; el stock no se toca
+      const idMaterial = String(
+        body.id_material || p.id_material_relacionado || p.id_material_sugerido || "",
+      ).trim();
       if (!idMaterial) return jsonError("Indica con qué material se fusiona", 400);
       const { data: mat } = await supabaseAdmin.from("material")
-        .select("id_material, nombre").eq("id_material", idMaterial).maybeSingle();
+        .select("*").eq("id_material", idMaterial).maybeSingle();
       if (!mat) return jsonError("El material con el que fusionar no existe", 404);
 
-      const nota = [strField(body.notas_revision), `Ya existía como "${mat.nombre}"`]
+      const modo = String(body.modo_stock || "ninguno");
+      if (!["nuevo_lote", "alicuota", "sumar", "ninguno"].includes(modo)) {
+        return jsonError("modo_stock no reconocido", 400);
+      }
+      const cantidad = Number(p.cantidad) || 0;
+      const idUbicacion = strField(body.id_ubicacion) || p.id_ubicacion;
+      const unidadLote = (p.unidad && p.unidad !== mat.unidad) ? String(p.unidad) : null;
+      const unidadTexto = p.unidad || mat.unidad || "";
+      let detalle = "";
+      let lote: any = null;
+
+      if (modo === "nuevo_lote" || modo === "alicuota") {
+        if (!idUbicacion) return jsonError("La propuesta no dice dónde estaba: no se puede crear el bote", 400);
+        const problema = await asegurarLoteLegacy(supabaseAdmin, mat);
+        if (problema) return jsonError(problema, 400);
+
+        let idLotePadre: string | null = null;
+        if (modo === "alicuota") {
+          idLotePadre = strField(body.id_lote_padre);
+          if (!idLotePadre) return jsonError("Indica de qué bote salió la alícuota", 400);
+          const { data: padre } = await supabaseAdmin.from("material_ubicaciones")
+            .select("*").eq("id", idLotePadre).maybeSingle();
+          if (!padre) return jsonError("El bote del que sale la alícuota ya no existe", 404);
+          if (padre.id_material !== idMaterial) return jsonError("Ese bote no es de este material", 400);
+        }
+
+        const { data: creado, error: errLote } = await supabaseAdmin.from("material_ubicaciones").insert({
+          id: genId("LU"), id_material: idMaterial, id_ubicacion: idUbicacion,
+          stock_local: cantidad, stock_minimo_local: 0, stock_optimo_local: 0,
+          unidad_lote: unidadLote, id_lote_padre: idLotePadre,
+        }).select().single();
+        if (errLote) return jsonError(`No se pudo crear el bote: ${errLote.message}`, 400);
+        lote = creado;
+        await sincronizarStock(supabaseAdmin, idMaterial);
+
+        // La madre NO se descuenta: quien inventaría cuenta lo que ve, y lo que
+        // quedó en el bote grande es otro recuento. Queda dicho en la nota para
+        // que se ajuste desde el inventario si hace falta.
+        await registrarMovimiento(
+          supabaseAdmin, mat, modo === "alicuota" ? "Subdivisión" : "Entrada", cantidad, revisor,
+          modo === "alicuota"
+            ? `Alícuota encontrada al inventariar (propuso: ${p.propuesto_por || "—"})`
+            : `Bote encontrado al inventariar (propuso: ${p.propuesto_por || "—"})`,
+        );
+        detalle = modo === "alicuota"
+          ? ` · alícuota de ${cantidad} ${unidadTexto} en ${idUbicacion}`
+          : ` · bote nuevo de ${cantidad} ${unidadTexto} en ${idUbicacion}`;
+
+      } else if (modo === "sumar") {
+        const idLote = strField(body.id_lote);
+        if (!idLote) return jsonError("Indica a qué bote se suma", 400);
+        const { data: destino } = await supabaseAdmin.from("material_ubicaciones")
+          .select("*").eq("id", idLote).maybeSingle();
+        if (!destino) return jsonError("Ese bote ya no existe", 404);
+        if (destino.id_material !== idMaterial) return jsonError("Ese bote no es de este material", 400);
+        // Bloqueo optimista, igual que en las subdivisiones: si alguien tocó el
+        // bote mientras tanto, la escritura no cuela.
+        const { data: actualizado } = await supabaseAdmin.from("material_ubicaciones")
+          .update({ stock_local: (Number(destino.stock_local) || 0) + cantidad })
+          .eq("id", idLote).eq("stock_local", destino.stock_local).select().maybeSingle();
+        if (!actualizado) return jsonError("El stock de ese bote cambió mientras se procesaba — vuelve a intentarlo", 409);
+        lote = actualizado;
+        await sincronizarStock(supabaseAdmin, idMaterial);
+        await registrarMovimiento(
+          supabaseAdmin, mat, "Entrada", cantidad, revisor,
+          `Recuento al inventariar (propuso: ${p.propuesto_por || "—"})`,
+        );
+        detalle = ` · +${cantidad} ${unidadTexto} en ${destino.id_ubicacion}`;
+      }
+
+      const nota = [strField(body.notas_revision), `Ya existía como "${mat.nombre}"${detalle}`]
         .filter(Boolean).join(" · ");
       const { data } = await supabaseAdmin.from("propuestas_material")
         .update({
           estado: "fusionada", revisado_por: revisor, fecha_revision: ahora,
           notas_revision: nota, id_material_creado: idMaterial,
         }).eq("id_propuesta", idPropuesta).select().single();
-      return jsonOk({ propuesta: data, material: mat, revisado_por: revisor });
+      const { data: matFinal } = await supabaseAdmin.from("material")
+        .select("*").eq("id_material", idMaterial).maybeSingle();
+      return jsonOk({ propuesta: data, material: matFinal || mat, lote, revisado_por: revisor });
     }
 
     // ── aceptar: se crea el material ──────────────────────────────────
