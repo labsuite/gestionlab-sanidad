@@ -525,7 +525,7 @@ function _invMatRenderFormulario() {
         </div>
 
         <!-- 5 · CUÁNTO ───────────────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">5 · ¿Cuánto hay?</label>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">${_invMat.relacion === 'nuevo' ? '5' : '3'} · ¿Cuánto hay?</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">
             <input type="number" min="0" step="0.01" value="${_escAttr(_invMat.cantidad)}" placeholder="Cantidad"
                    oninput="_invMat.cantidad=this.value">
