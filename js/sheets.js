@@ -413,8 +413,6 @@ function _propuestaMaterialSbToObj(p) {
     ID_Ubicacion: p.id_ubicacion || '',
     Foto_Path: p.foto_path || '',
     ID_Material_Sugerido: p.id_material_sugerido || '',
-    Relacion: p.relacion || 'nuevo',
-    ID_Material_Relacionado: p.id_material_relacionado || '',
     IA_Extraido: p.ia_extraido || null,
     IA_Avisos: p.ia_avisos || '',
     Propuesto_Por: p.propuesto_por || '',

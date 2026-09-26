@@ -282,22 +282,6 @@ Deno.serve(async (req) => {
       ? body.ia_extraido as Record<string, unknown> : null;
     const avisos = leidos ? avisosDiscrepancia(ficha, atributos, leidos) : "";
 
-    // Lo que dice quien inventaría sobre lo que tiene en la mano: si es el
-    // mismo producto que ya está en la app pero en otro sitio, o una alícuota
-    // de otro, NO hay que dar de alta nada — hay que colgarle un bote. Se
-    // guarda tal cual y lo confirma el profesorado al validar.
-    let relacion = String(body.relacion || "nuevo");
-    if (!["nuevo", "mismo", "alicuota"].includes(relacion)) relacion = "nuevo";
-    let idRelacionado = strField(body.id_material_relacionado);
-    if (relacion !== "nuevo") {
-      if (!idRelacionado) return jsonError("Dinos con qué material del inventario se corresponde", 400);
-      const { data: rel } = await supabaseAdmin.from("material")
-        .select("id_material").eq("id_material", idRelacionado).maybeSingle();
-      if (!rel) return jsonError("Ese material del inventario no existe", 404);
-    } else {
-      idRelacionado = null;
-    }
-
     const datos = {
       id_propuesta: genId("PMAT"),
       categoria, tipo_base: tipoBase, nombre_base: nombreBase,
@@ -308,7 +292,6 @@ Deno.serve(async (req) => {
       id_ubicacion: strField(body.id_ubicacion),
       foto_path: fotoPath,
       id_material_sugerido: parecido?.id_material || null,
-      relacion, id_material_relacionado: idRelacionado,
       ia_extraido: leidos,
       ia_avisos: avisos || null,
       propuesto_por: firma,
@@ -356,18 +339,18 @@ Deno.serve(async (req) => {
       // lo han encontrado. `modo_stock` dice qué se hace con lo que se contó:
       //   nuevo_lote → bote nuevo de ese material en la ubicación del recuento
       //   alicuota   → bote hijo (id_lote_padre) del bote del que se trasvasó
-      //   sumar      → se suma al bote que ya había en ese mismo sitio
+      //   reemplazar → mismo sitio que un bote ya fichado: lo que se ha contado
+      //                ES el stock de ahora, así que sustituye a lo que había
+      //   sumar      → excepción: es OTRO bote distinto guardado en ese sitio
       //   ninguno    → solo se marca la propuesta; el stock no se toca
-      const idMaterial = String(
-        body.id_material || p.id_material_relacionado || p.id_material_sugerido || "",
-      ).trim();
+      const idMaterial = String(body.id_material || p.id_material_sugerido || "").trim();
       if (!idMaterial) return jsonError("Indica con qué material se fusiona", 400);
       const { data: mat } = await supabaseAdmin.from("material")
         .select("*").eq("id_material", idMaterial).maybeSingle();
       if (!mat) return jsonError("El material con el que fusionar no existe", 404);
 
       const modo = String(body.modo_stock || "ninguno");
-      if (!["nuevo_lote", "alicuota", "sumar", "ninguno"].includes(modo)) {
+      if (!["nuevo_lote", "alicuota", "reemplazar", "sumar", "ninguno"].includes(modo)) {
         return jsonError("modo_stock no reconocido", 400);
       }
       const cantidad = Number(p.cantidad) || 0;
@@ -414,26 +397,37 @@ Deno.serve(async (req) => {
           ? ` · alícuota de ${cantidad} ${unidadTexto} en ${idUbicacion}`
           : ` · bote nuevo de ${cantidad} ${unidadTexto} en ${idUbicacion}`;
 
-      } else if (modo === "sumar") {
+      } else if (modo === "reemplazar" || modo === "sumar") {
         const idLote = strField(body.id_lote);
-        if (!idLote) return jsonError("Indica a qué bote se suma", 400);
+        if (!idLote) return jsonError("Indica de qué bote se trata", 400);
         const { data: destino } = await supabaseAdmin.from("material_ubicaciones")
           .select("*").eq("id", idLote).maybeSingle();
         if (!destino) return jsonError("Ese bote ya no existe", 404);
         if (destino.id_material !== idMaterial) return jsonError("Ese bote no es de este material", 400);
+        const previo = Number(destino.stock_local) || 0;
+        // Reemplazar es lo normal cuando el sitio coincide: quien inventaría ha
+        // contado lo que hay AHORA en ese bote, no una entrada nueva.
+        const nuevoStock = modo === "sumar" ? previo + cantidad : cantidad;
         // Bloqueo optimista, igual que en las subdivisiones: si alguien tocó el
         // bote mientras tanto, la escritura no cuela.
         const { data: actualizado } = await supabaseAdmin.from("material_ubicaciones")
-          .update({ stock_local: (Number(destino.stock_local) || 0) + cantidad })
+          .update({ stock_local: nuevoStock })
           .eq("id", idLote).eq("stock_local", destino.stock_local).select().maybeSingle();
         if (!actualizado) return jsonError("El stock de ese bote cambió mientras se procesaba — vuelve a intentarlo", 409);
         lote = actualizado;
         await sincronizarStock(supabaseAdmin, idMaterial);
-        await registrarMovimiento(
-          supabaseAdmin, mat, "Entrada", cantidad, revisor,
-          `Recuento al inventariar (propuso: ${p.propuesto_por || "—"})`,
-        );
-        detalle = ` · +${cantidad} ${unidadTexto} en ${destino.id_ubicacion}`;
+        const diferencia = nuevoStock - previo;
+        if (diferencia !== 0) {
+          await registrarMovimiento(
+            supabaseAdmin, mat, modo === "sumar" ? "Entrada" : "Ajuste", Math.abs(diferencia), revisor,
+            modo === "sumar"
+              ? `Otro bote contado al inventariar (propuso: ${p.propuesto_por || "—"})`
+              : `Recuento al inventariar: ${previo} → ${nuevoStock} (propuso: ${p.propuesto_por || "—"})`,
+          );
+        }
+        detalle = modo === "sumar"
+          ? ` · +${cantidad} ${unidadTexto} en ${destino.id_ubicacion}`
+          : ` · recuento en ${destino.id_ubicacion}: ${previo} → ${nuevoStock} ${unidadTexto}`;
       }
 
       const nota = [strField(body.notas_revision), `Ya existía como "${mat.nombre}"${detalle}`]

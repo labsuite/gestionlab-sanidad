@@ -793,16 +793,7 @@ create table if not exists propuestas_material (
   revisado_por          text,
   fecha_revision        timestamptz,
   notas_revision        text,
-  id_material_creado    text references material(id_material) on delete set null,
-  -- Qué dice quien propone que es esto respecto al catálogo. Ver
-  -- scripts/migrar_relacion_propuesta_material.py:
-  --   nuevo    → no está en la app; al aceptarla se crea el material
-  --   mismo    → ya está, pero en un sitio que la app no tenía: se le añade un
-  --              bote en esa ubicación, NO una segunda entrada de catálogo
-  --   alicuota → trasvase de otro material: bote hijo (id_lote_padre) del bote
-  --              del que salió
-  relacion                 text not null default 'nuevo',
-  id_material_relacionado  text references material(id_material) on delete set null
+  id_material_creado    text references material(id_material) on delete set null
 );
 
 create index if not exists idx_propuestas_material_estado on propuestas_material (estado);

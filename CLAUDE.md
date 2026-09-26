@@ -401,31 +401,34 @@ Select `mat-categoria` en `html/modales-material.html`:
 
 ## Inventariando: "ya existía" NO crea una segunda entrada
 
-Cuando el alumnado inventaría y lo que tiene en la mano ya está en el catálogo,
-el alta sería un duplicado. Lo que falta no es un material: es un **bote**
-(`material_ubicaciones`) en ese sitio. La propuesta lo dice desde el principio
-(`propuestas_material.relacion` + `id_material_relacionado`, paso 2 del
-formulario):
+⚠ **Quien inventaría no sabe si eso ya estaba en la app, ni si es una alícuota.**
+Ve un bote en un armario y lo único que puede hacer es fotografiarlo, decir qué
+es y cuánto hay. No se le pregunta nada más: esa clasificación la hace el
+profesorado al validar, que es quien conoce el inventario. (Mismo criterio que
+[[feedback_asignacion_explicita]] y [[feedback_no_asumir_juicios_dominio]]: si
+hace falta un juicio de dominio, lo da quien lo tiene.)
 
-- `nuevo` — no está en la app. Al aceptar se crea el material, su lote y su movimiento.
-- `mismo` — es ese mismo producto, en un sitio que la app no tenía. Se le añade
-  un bote en la ubicación del recuento.
-- `alicuota` — un trasvase (un gotero sacado de la botella grande). Se cuelga
-  como bote hijo (`id_lote_padre`) del bote del que salió.
+Cuando lo propuesto ya está en el catálogo, el alta sería un duplicado: lo que
+falta no es un material, es un **bote** (`material_ubicaciones`) en ese sitio. El
+botón **🔗 Ya existía…** del panel de validación (`fusionarPropuestaMaterial` →
+`_invMatPintarFusion`) abre el modal donde se elige el material y qué se hace
+con lo contado — `modo_stock` en la Edge Function `gestionar-propuesta-material`:
 
-Con `mismo` o `alicuota` no se piden categoría, tipo ni atributos: son los del
-material señalado. La foto sí, siempre.
+| modo | cuándo | qué hace |
+|---|---|---|
+| `reemplazar` | ya hay un bote fichado **en esa misma ubicación** (por defecto) | lo contado **sustituye** al stock de ese bote; movimiento `Ajuste` con la diferencia |
+| `nuevo_lote` | el sitio es otro (por defecto si ahí no había nada) | le añade un bote con lo contado; movimiento `Entrada` |
+| `alicuota` | es un trasvase (gotero de la botella grande) | bote hijo (`id_lote_padre`) del bote elegido; movimiento `Subdivisión` |
+| `sumar` | excepción: son dos botes distintos guardados en el mismo sitio | suma al bote elegido |
+| `ninguno` | — | solo marca la propuesta; el stock no se toca |
 
-Quien valida lo remata en el modal **🔗 Ya existía…** (`fusionarPropuestaMaterial`
-→ `_invMatPintarFusion`), que manda `modo_stock` a la Edge Function:
-`nuevo_lote` | `alicuota` | `sumar` (a un bote ya fichado en ese mismo sitio) |
-`ninguno` (solo marcarla). Detalles a respetar al tocarlo:
+Detalles a respetar al tocarlo:
 
-- Si ya hay un bote fichado en esa ubicación, **el modo por defecto es `ninguno`**:
-  puede ser el mismo bote contado dos veces, y sumar inflaría el stock. Que lo
-  decida quien valida.
-- La **madre nunca se descuenta** al registrar una alícuota: quien inventaría
-  cuenta lo que ve, y lo que quede en el bote grande es otro recuento.
+- **Mismo sitio ⇒ sobrescribir, no sumar.** Lo que el alumnado cuenta en una
+  ubicación es el stock de ahora, no una entrada nueva; sumarlo contaría dos
+  veces el mismo bote.
+- La **madre nunca se descuenta** al registrar una alícuota: lo que quede en el
+  bote grande es otro recuento.
 - Antes de colgarle el primer bote a un material "legacy" (sin ningún lote y con
   `stock_actual` propio) hay que materializar ese stock como bote en su
   ubicación — `asegurarLoteLegacy()` —, o `sincronizarStock()` lo borra al
