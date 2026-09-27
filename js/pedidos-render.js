@@ -308,6 +308,15 @@ function estadoPedidoClass(estado) {
   return {'Abierto':'estado-abierto','Presupuesto solicitado':'estado-presupuesto','Presupuesto aprobado':'estado-aprobado','Recepción parcial':'estado-recepcion','Recepción completa':'estado-completo'}[estado] || 'estado-abierto';
 }
 
+// Facturas que el proveedor ha subido por el link público y todavía nadie ha
+// pasado por el lector de IA (`Extraido_En` vacío), en pedidos no archivados.
+// Único sitio donde se define el criterio: lo usan el banner del dashboard
+// (renderDashboard) y el badge del menú (updateBadges), que deben coincidir.
+function facturasProveedorSinLeer() {
+  return DATA.documentosProveedor.filter(d => !d.Extraido_En &&
+    DATA.pedidos.some(p => p.ID_Pedido === d.Pedido && p.Estado !== 'Archivado'));
+}
+
 let _mostrarArchivados = false;
 const _pedidosAnioColapsados = new Set();
 function _togglePedidosAnio(key) {

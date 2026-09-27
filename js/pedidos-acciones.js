@@ -554,6 +554,9 @@ async function leerDocumentoConIA(idDocumento, pedidoId) {
       if (pedIdx !== -1) Object.assign(DATA.pedidos[pedIdx], _pedidoSbToObj(pedido));
     }
     verDetallePedido(pedidoId);
+    // La factura ya está leída: baja el contador del menú y el banner del dashboard
+    // sin esperar a que se recargue la app.
+    renderDashboard(); updateBadges();
     abrirModalRevisionExtraccion(idDocumento, pedidoId);
   } catch (e) { showToast('Error leyendo el documento: ' + e.message, 'error'); console.error(e); }
   hideLoading();
@@ -567,7 +570,7 @@ async function eliminarDocumentoProveedor(idDocumento, pedidoId) {
     DATA.documentosProveedor = DATA.documentosProveedor.filter(d => d.ID_Documento !== idDocumento);
     showToast('Documento eliminado', 'success');
     verDetallePedido(pedidoId);
-    renderPedidos();
+    renderPedidos(); renderDashboard(); updateBadges();
   } catch (e) { showToast('Error eliminando: ' + e.message, 'error'); console.error(e); }
   hideLoading();
 }

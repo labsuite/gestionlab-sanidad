@@ -89,6 +89,16 @@ function updateBadges() {
   const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(_snoozes[s.ID_Solicitud] && _snoozes[s.ID_Solicitud] > _hoy)).length;
   const badgeSol = document.getElementById('badge-solicitudes');
   if (badgeSol) { badgeSol.textContent = pendientes; badgeSol.style.display = pendientes > 0 ? '' : 'none'; }
+
+  // Facturas que ha subido el proveedor por el link público y aún no ha leído
+  // nadie. Mismo criterio que el banner del dashboard (facturasProveedorSinLeer)
+  // y misma restricción de rol: solo las gestiona quien gestiona pedidos.
+  const badgePed = document.getElementById('badge-pedidos');
+  if (badgePed) {
+    const nFacturas = puedeHacer('gestionarPedidos') ? facturasProveedorSinLeer().length : 0;
+    badgePed.textContent = nFacturas;
+    badgePed.style.display = nFacturas > 0 ? '' : 'none';
+  }
 }
 
 function _updateBadgeResiduos() {
