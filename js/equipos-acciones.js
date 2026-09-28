@@ -858,11 +858,12 @@ function openModalRegistrarActuacion(intIdx) {
   const radExterna = document.getElementById('act-ejec-externa');
   if (esExterna) { if (radExterna) radExterna.checked = true; sv('act-proveedor-ext', i.Proveedor); }
   else { if (radInterna) radInterna.checked = true; if (i.Realizado_Por) sv('act-realizado-por', i.Realizado_Por); }
-  toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
   sv('act-lugar', i.Lugar_Intervencion || 'En el centro');
   sv('act-fecha-retirada',   i.Fecha_Retirada   || '');
   sv('act-fecha-devolucion', i.Fecha_Devolucion || '');
-  toggleActLugar();
+  // Va después del lugar: decide si "¿Dónde se hace?" se enseña (solo con SAT) y,
+  // si la actuación es interna, lo deja en "En el centro".
+  toggleActEjecucion(esExterna ? 'Externa' : 'Interna');
 
   _aplicarModoModalActuacion(i);
   _renderTareasEnModal(i.ID_Intervencion);
@@ -960,9 +961,20 @@ function toggleActEjecucion(tipo) {
   const intGrp   = document.getElementById('act-interna-group');
   const extGrp   = document.getElementById('act-externa-group');
   const costeGrp = document.getElementById('act-coste-group');
+  const lugarGrp = document.getElementById('act-lugar-group');
   if (intGrp)   intGrp.style.display   = tipo === 'Interna' ? '' : 'none';
   if (extGrp)   extGrp.style.display   = tipo === 'Externa' ? '' : 'none';
   if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
+  // "¿Dónde se hace?" solo tiene sentido con un SAT: quien se puede llevar el
+  // equipo a su taller es el técnico externo. Una actuación interna es siempre
+  // aquí, así que ni se pregunta — se fija "En el centro" y se oculta.
+  if (lugarGrp) lugarGrp.style.display = tipo === 'Externa' ? '' : 'none';
+  if (tipo !== 'Externa') {
+    sv('act-lugar', 'En el centro');
+    sv('act-fecha-retirada', '');
+    sv('act-fecha-devolucion', '');
+  }
+  toggleActLugar();
 }
 
 // El SAT puede actuar en el propio centro o llevarse el equipo a su taller.
@@ -1033,7 +1045,10 @@ async function marcarResultadoTarea(tareaId, resultado) {
 // Lee los campos de "¿dónde se hace?" del modal de actuación. Devuelve null si
 // falta la fecha de retirada (obligatoria cuando el equipo sale del centro).
 function _datosLugarActuacion() {
-  const lugar = v('act-lugar') || 'En el centro';
+  // Una actuación interna se hace siempre aquí (ni se pregunta, ver toggleActEjecucion):
+  // el equipo solo sale del centro si se lo lleva un SAT.
+  const esExterna = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value === 'Externa';
+  const lugar = esExterna ? (v('act-lugar') || 'En el centro') : 'En el centro';
   if (lugar !== 'Equipo retirado') {
     return { lugar_intervencion: lugar, fecha_retirada: '', fecha_devolucion: '' };
   }
@@ -1494,13 +1509,12 @@ function openModalRegistrarActuacionDirecta(equipoId, ctx) {
   }
   sv('act-proveedor-ext', '');
 
-  const radInterna = document.getElementById('act-ejec-interna');
-  if (radInterna) { radInterna.checked = true; toggleActEjecucion('Interna'); }
-
   sv('act-lugar', 'En el centro');
   sv('act-fecha-retirada',   '');
   sv('act-fecha-devolucion', '');
-  toggleActLugar();
+  const radInterna = document.getElementById('act-ejec-interna');
+  if (radInterna) radInterna.checked = true;
+  toggleActEjecucion('Interna');
 
   _aplicarModoModalActuacion(null);
   openModal('modal-registrar-actuacion');
