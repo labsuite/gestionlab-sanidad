@@ -925,7 +925,7 @@ async function aceptarPropuestaMaterial(idPropuesta) {
 // alícuota de otro bote, o un recuento de uno que ya estaba fichado ahí.
 // En ningún caso se crea una segunda entrada de catálogo.
 
-let _invMatFusion = null;   // { idPropuesta, idMaterial, texto, modo, idLote, idLotePadre }
+let _invMatFusion = null;   // { idPropuesta, idMaterial, texto, modo, idLote, idLotePadre, unidad }
 
 function fusionarPropuestaMaterial(idPropuesta, idMaterial) {
   const p = DATA.propuestasMaterial.find(x => x.ID_Propuesta === idPropuesta);
@@ -935,7 +935,7 @@ function fusionarPropuestaMaterial(idPropuesta, idMaterial) {
   _invMatFusion = {
     idPropuesta, idMaterial: mat ? mat.ID_Material : '',
     texto: mat ? _invMatEtiquetaMaterial(mat) : '',
-    modo: '', idLote: '', idLotePadre: '',
+    modo: '', idLote: '', idLotePadre: '', unidad: '',
   };
   _invMatFusionModoPorDefecto();
   _invMatPintarFusion();
@@ -952,6 +952,12 @@ function _invMatFusionModoPorDefecto() {
   const enSitio = lotes.filter(l => l.ID_Ubicacion === p.ID_Ubicacion);
   f.idLotePadre = lotes.length ? (lotes.find(l => !l.ID_Lote_Padre) || lotes[0]).ID : '';
   f.idLote = enSitio.length ? enSitio[0].ID : '';
+  // Unidad del bote que se va a crear: la del recuento si la hay, si no la del
+  // material. Se pregunta en vez de heredarla en silencio porque lo contado
+  // puede venir en otra unidad (cajas de puntas de un material fichado en
+  // bolsas) y porque lo que teclea quien inventaría no siempre es una unidad.
+  const mat = f.idMaterial ? DATA.material.find(m => m.ID_Material === f.idMaterial) : null;
+  f.unidad = String(p.Unidad || (mat ? mat.Unidad : '') || '').trim();
   if (!p.ID_Ubicacion) f.modo = 'ninguno';
   else if (enSitio.length) f.modo = 'reemplazar';
   else f.modo = 'nuevo_lote';
@@ -1010,6 +1016,22 @@ function _invMatPintarFusion() {
       ${lista.map(l => `<option value="${_escAttr(l.ID)}" ${l.ID === id ? 'selected' : ''}>${_esc(_invMatEtiquetaLote(l, mat))}</option>`).join('')}
     </select>`;
 
+  // Unidad del bote nuevo: combo abierto, como el de los botes del material
+  // (_unidadesSugeridas en js/material.js). Las conocidas están a un toque, pero
+  // se puede estrenar una — sin esto, alicuotar en "cajas" un material fichado
+  // en "bolsas" obligaba a ir antes a editar el material.
+  const unidadBote = String(f.unidad || unidad || '').trim();
+  const campoUnidad = `
+    <div style="margin-top:8px">
+      <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:3px">Unidad de este bote</label>
+      <input list="fusion-unidades" value="${_escAttr(f.unidad)}" placeholder="caja, bolsa, bote…" style="font-size:12px"
+             oninput="_invMatFusion.unidad=this.value"
+             onchange="_invMatFusion.unidad=this.value; _invMatPintarFusion()">
+      <datalist id="fusion-unidades">
+        ${_invMatUnidades().map(u => `<option value="${_escAttr(u)}"></option>`).join('')}
+      </datalist>
+    </div>`;
+
   cont.innerHTML = `
     <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:14px;line-height:1.6">
       <div style="font-size:13px;font-weight:600">${_esc(p.Nombre_Generado || p.Texto_Etiqueta || '—')}</div>
@@ -1040,12 +1062,13 @@ function _invMatPintarFusion() {
           selLotes(enSitio, f.idLote, '_invMatFusion.idLote=this.value; _invMatPintarFusion()'))}
         ${opcion('nuevo_lote', !!p.ID_Ubicacion,
           `📍 Es el mismo, pero en ${_esc(sitio)}`,
-          `Se le añade un bote de ${cant || 0} ${_esc(unidad)} ahí. No se crea ninguna entrada nueva de inventario.`
-          + (enSitio.length ? ' Ojo: ahí ya hay un bote fichado de este material — si es ese mismo, usa la opción de arriba.' : ''))}
+          `Se le añade un bote de ${cant || 0} ${_esc(unidadBote)} ahí. No se crea ninguna entrada nueva de inventario.`
+          + (enSitio.length ? ' Ojo: ahí ya hay un bote fichado de este material — si es ese mismo, usa la opción de arriba.' : ''),
+          campoUnidad)}
         ${opcion('alicuota', lotes.length > 0,
           '💧 Es una alícuota de uno de sus botes',
-          `Se cuelga como bote de uso${sitio ? ` en ${_esc(sitio)}` : ''}. El bote del que salió no se descuenta: si hay que ajustarlo, se hace desde el inventario.`,
-          selLotes(lotes, f.idLotePadre, '_invMatFusion.idLotePadre=this.value'))}
+          `Se cuelga como bote de uso de ${cant || 0} ${_esc(unidadBote)}${sitio ? ` en ${_esc(sitio)}` : ''}. El bote del que salió no se descuenta: si hay que ajustarlo, se hace desde el inventario.`,
+          selLotes(lotes, f.idLotePadre, '_invMatFusion.idLotePadre=this.value') + campoUnidad)}
         ${opcion('sumar', enSitio.length > 0,
           '➕ Es otro bote distinto: sumarlo al que ya estaba',
           `Suma ${cant || 0} ${_esc(unidad)} al bote elegido. Solo si de verdad son dos botes guardados en el mismo sitio.`,
@@ -1076,6 +1099,13 @@ async function _invMatConfirmarFusion() {
   if (f.modo === 'alicuota') {
     if (!f.idLotePadre) { showToast('Elige de qué bote salió la alícuota', 'error'); return; }
     cuerpo.id_lote_padre = f.idLotePadre;
+  }
+  // Solo los modos que CREAN bote llevan unidad: reemplazar y sumar caen sobre
+  // un bote que ya tiene la suya.
+  if (f.modo === 'nuevo_lote' || f.modo === 'alicuota') {
+    const u = String(f.unidad || '').trim();
+    if (!u) { showToast('Indica en qué unidad se cuenta este bote', 'error'); return; }
+    cuerpo.unidad_lote = u;
   }
   showLoading('Resolviendo...');
   try {

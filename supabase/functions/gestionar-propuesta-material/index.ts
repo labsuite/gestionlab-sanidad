@@ -355,8 +355,14 @@ Deno.serve(async (req) => {
       }
       const cantidad = Number(p.cantidad) || 0;
       const idUbicacion = strField(body.id_ubicacion) || p.id_ubicacion;
-      const unidadLote = (p.unidad && p.unidad !== mat.unidad) ? String(p.unidad) : null;
-      const unidadTexto = p.unidad || mat.unidad || "";
+      // La unidad del bote que se crea la elige quien valida: el recuento puede
+      // venir en cajas de un material que se ficha en bolsas (y lo que teclea
+      // quien inventaría no siempre es una unidad). Si no la manda, vale la de
+      // la propuesta, como antes. Solo se guarda cuando difiere de la del
+      // material — `unidad_lote` es la excepción, no la copia.
+      const unidadElegida = String(strField(body.unidad_lote) || p.unidad || "").trim();
+      const unidadLote = (unidadElegida && unidadElegida !== mat.unidad) ? unidadElegida : null;
+      const unidadTexto = unidadElegida || mat.unidad || "";
       let detalle = "";
       let lote: any = null;
 
