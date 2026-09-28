@@ -65,6 +65,35 @@ Un hilo sin actuaciones todavía muestra los mismos dos botones en el hueco vac�
 ("Aún sin actuaciones"), en vez del antiguo texto "Pulsa Responder". El botón **Responder**
 de la card de incidencias sigue yendo a planificar, sin cambios.
 
+Desde 2026-09-28 esos dos botones **no cuelgan de la fila de la actuación activa**, sino del
+pie de la lista (`#hilo-acciones`, `_renderAccionesHilo`), justo encima del bloque de cierre:
+lo que hacen es alargar el HILO, no crear nada dentro de la intervención desde la que se
+pulsaban — ahí parecían una "subintervención". En la fila de cada actuación quedan solo las
+acciones que sí son suyas: 🔍 ficha, 📦 Devuelto y 🔧 Ejecutar / ✏️ Editar intervención /
+📎 Factura. Las condiciones no cambian: se ven con `crearIntervenciones` y mientras la
+actuación activa no esté `Cerrada`.
+
+## Una actuación no se finaliza sin tareas (desde 2026-09-28)
+
+Las tareas son las que dicen qué se hizo y cómo quedó; una actuación cerrada sin ninguna es
+una visita vacía. Por eso **"Guardar y finalizar actuación" exige al menos una tarea**:
+
+- Lo impone el servidor: la acción `actualizar` de `gestionar-intervencion` rechaza con 400
+  (`"Una actuación no se cierra sin tareas…"`) un `actuacion_finalizada: true` sobre una
+  intervención sin filas en `tareas_intervencion`. Se comprueba solo en el **paso** de no
+  finalizada a finalizada: las que ya se cerraron sin tareas antes de esta regla se siguen
+  pudiendo corregir (fecha, coste, adjunto) con "Guardar cambios"; si se reabren, volver a
+  cerrarlas ya exigirá una tarea.
+- La acción `crear` ya **no** acepta `actuacion_finalizada` (una intervención recién creada
+  no puede tener tareas). El modo directo de `guardarActuacion` crea → guarda la tarea →
+  finaliza con una segunda llamada a `actualizar`; el modo vinculado hace lo mismo al final,
+  después de guardar la tarea escrita en el modal.
+- En el cliente se avisa antes de llegar al error: la tarea que se esté escribiendo cuenta
+  como tarea, así que solo se bloquea si no hay ninguna ni se está añadiendo. La lista vacía
+  del modal lo dice en ámbar ("Añade al menos una para poder finalizarla").
+- "💾 Guardar sin cerrar" sigue guardando los datos de la visita sin tareas — solo el cierre
+  las exige.
+
 ## Cierre explícito de la incidencia (desde 2026-09-16)
 
 Antes, al marcar la última tarea como Resuelto la Edge Function cerraba la incidencia y

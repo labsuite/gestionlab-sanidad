@@ -87,7 +87,10 @@ Deno.serve(async (req) => {
       coste_intervencion: numField(body.coste_intervencion),
       url_adjunto: strField(body.url_adjunto),
       nombre_adjunto: strField(body.nombre_adjunto),
-      actuacion_finalizada: boolField(body.actuacion_finalizada) ?? false,
+      // Una intervención recién creada no puede tener tareas todavía, y sin tareas
+      // no se finaliza nada: el cliente crea primero, guarda la tarea y solo después
+      // manda "actuacion_finalizada" por la acción "actualizar" (que lo comprueba).
+      actuacion_finalizada: false,
       lugar_intervencion: strField(body.lugar_intervencion),
       fecha_retirada: strField(body.fecha_retirada),
       fecha_devolucion: strField(body.fecha_devolucion),
@@ -121,6 +124,22 @@ Deno.serve(async (req) => {
     // "Finalizar actuación" — marca explícita de la usuaria, independiente de `estado`
     // (que se deriva de las tareas). boolField devuelve false tal cual, para poder reabrir.
     if ("actuacion_finalizada" in body) datos.actuacion_finalizada = boolField(body.actuacion_finalizada);
+
+    // Las tareas son las que dan resultado y cierre a la actuación: sin ninguna,
+    // finalizarla deja una visita vacía que no dice qué se hizo. Se comprueba solo
+    // al CERRAR (paso de no finalizada a finalizada): las que ya se cerraron sin
+    // tareas antes de esta regla se siguen pudiendo corregir, y si se reabren,
+    // volver a cerrarlas ya exigirá al menos una tarea.
+    if (datos.actuacion_finalizada === true) {
+      const { data: previa } = await supabaseAdmin.from("intervenciones")
+        .select("actuacion_finalizada").eq("id_intervencion", idIntervencion).maybeSingle();
+      if (!previa) return jsonError(`No se encontró la intervención "${idIntervencion}"`, 404);
+      if (!previa.actuacion_finalizada) {
+        const { count } = await supabaseAdmin.from("tareas_intervencion")
+          .select("id_tarea", { count: "exact", head: true }).eq("id_intervencion", idIntervencion);
+        if (!count) return jsonError("Una actuación no se cierra sin tareas: añade al menos una tarea antes de finalizarla.", 400);
+      }
+    }
 
     const { data: intervencion, error } = await supabaseAdmin.from("intervenciones")
       .update(datos).eq("id_intervencion", idIntervencion).select().single();

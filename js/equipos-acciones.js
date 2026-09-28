@@ -419,6 +419,8 @@ function abrirHiloIncidencia(incId) {
 
   const pieCierre = document.getElementById('hilo-cierre');
   if (pieCierre) pieCierre.innerHTML = '';
+  const pieAcciones = document.getElementById('hilo-acciones');
+  if (pieAcciones) pieAcciones.innerHTML = '';
 
   if (!inc.Intervencion_Generada) {
     // Dos caminos, nunca uno impuesto: la actuación puede registrarse tal cual se
@@ -469,13 +471,6 @@ function abrirHiloIncidencia(incId) {
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">✏️ Editar intervención</button>`;
       else if (c.Estado === 'Pendiente factura')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalAdjuntarFactura(${cIdx});closeModal('modal-hilo-incidencia')">📎 Factura</button>`;
-      // Otra actuación del mismo caso: registrarla ya (se hizo sin avisar) o
-      // planificarla. Antes solo existía el camino de planificar.
-      if (c.Estado !== 'Cerrada') {
-        const eqId = (inc.Equipo || '').split(' – ')[0].trim();
-        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}', origenIntId:'${c.ID_Intervencion}'});closeModal('modal-hilo-incidencia')">🔧 Registrar otra</button>`;
-        accion += ` <button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Planificar otra</button>`;
-      }
     }
 
     return `<div style="display:flex;align-items:flex-start;gap:10px;padding:10px 0;${idx < chain.length-1 ? 'border-bottom:1px solid var(--border);' : ''}">
@@ -496,8 +491,28 @@ function abrirHiloIncidencia(incId) {
     </div>`;
   }).join('');
 
+  _renderAccionesHilo(inc, chain);
   _renderCierreHilo(inc);
   openModal('modal-hilo-incidencia');
+}
+
+// Acciones que hacen crecer el HILO, no la actuación concreta desde la que se
+// pulsan: registrar otra actuación (ya hecha, sin avisar) o planificarla. Antes
+// colgaban de la fila de la actuación activa y parecía que creaban algo dentro
+// de ella; van al pie de la lista, que es a lo que de verdad se añaden.
+function _renderAccionesHilo(inc, chain) {
+  const cont = document.getElementById('hilo-acciones');
+  if (!cont) return;
+  cont.innerHTML = '';
+  if (!puedeHacer('crearIntervenciones')) return;
+  const activa = chain.find(c => c.ID_Intervencion === inc.Intervencion_Generada);
+  if (!activa || activa.Estado === 'Cerrada') return;
+  const eqId  = (inc.Equipo || '').split(' – ')[0].trim();
+  const cIdx  = DATA.intervenciones.indexOf(activa);
+  cont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
+    <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}', origenIntId:'${activa.ID_Intervencion}'});closeModal('modal-hilo-incidencia')">🔧 Registrar otra actuación</button>
+    <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Planificar otra actuación</button>
+  </div>`;
 }
 
 // Pie del hilo: aquí (y solo aquí) se da la incidencia por resuelta o descartada
@@ -766,7 +781,9 @@ function _renderTareasEnModal(intId) {
   if (!cont) return;
   const tareas = getTareasIntervencion(intId);
   if (!tareas.length) {
-    cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 0">Aún no hay tareas registradas en esta actuación.</div>';
+    // Sin tareas no se puede finalizar (lo impide también la Edge Function): se
+    // avisa aquí, antes de pulsar el botón, no solo con un error al intentarlo.
+    cont.innerHTML = '<div style="font-size:12px;color:var(--warning,#c17f3a);padding:4px 0">Aún no hay tareas en esta actuación. Añade al menos una para poder finalizarla — son las que dicen qué se hizo y cómo quedó.</div>';
     return;
   }
   // Toda tarea es editable, esté como esté: marcar un resultado no es una decisión
@@ -1035,7 +1052,9 @@ async function guardarActuacion(finalizar) {
   // Aquí sí hace falta una tarea: sin ella no hay nada que crear todavía.
   if (equipoDirecto) {
     if (!desc) {
-      if (finalizar) { closeModal('modal-registrar-actuacion'); renderAll(); volverAlHilo(); }
+      showToast(finalizar
+        ? 'Una actuación no se cierra sin tareas: describe al menos una.'
+        : 'Escribe la descripción de la tarea', 'error');
       return;
     }
     const fechaReal = v('act-fecha-real');
@@ -1062,7 +1081,7 @@ async function guardarActuacion(finalizar) {
         ...(incVinc ? { incidencia_id: incVinc } : {}),
         fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
         coste_intervencion: coste, estado: 'Planificada',
-        actuacion_finalizada: !!finalizar, ...lugarDatos,
+        ...lugarDatos,
       }));
       DATA.intervenciones.push(_intervencionSbToObj(intervencion));
       // Al vincularla, la incidencia apunta ya a esta actuación como la activa:
@@ -1091,11 +1110,20 @@ async function guardarActuacion(finalizar) {
     showLoading('Guardando...');
     try {
       await _guardarTareaIntervencion(intervencion.id_intervencion, desc, 'Pendiente', '', v('act-observaciones'));
+      // La actuación se finaliza DESPUÉS de tener su primera tarea — el servidor
+      // no deja cerrarla sin ninguna, y al crearla todavía no existía.
+      if (finalizar) {
+        const { intervencion: finalizada } = await callEdgeFunction('gestionar-intervencion', {
+          accion: 'actualizar', id_intervencion: intervencion.id_intervencion, actuacion_finalizada: true,
+        });
+        const idxFin = DATA.intervenciones.findIndex(x => x.ID_Intervencion === finalizada.id_intervencion);
+        if (idxFin !== -1) DATA.intervenciones[idxFin] = _intervencionSbToObj(finalizada);
+      }
       closeModal('modal-registrar-actuacion');
       showToast(`Intervención ${intervencion.id_intervencion} registrada. Tarea → Pendiente`, 'success');
       renderAll();
       volverAlHilo();
-    } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+    } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
     hideLoading();
     return;
   }
@@ -1104,6 +1132,16 @@ async function guardarActuacion(finalizar) {
   const intIdx = parseInt(v('act-int-idx'));
   const i = DATA.intervenciones[intIdx];
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
+
+  // Las tareas son las que dan sentido y cierre a la actuación: no se finaliza sin
+  // ninguna. Cuenta también la que se esté escribiendo ahora mismo (se guarda en
+  // este mismo golpe). Una actuación ya finalizada se puede seguir corrigiendo
+  // aunque no tenga tareas — es de antes de esta regla, y el botón dice "Guardar
+  // cambios", no "finalizar".
+  if (finalizar && i.Actuacion_Finalizada !== 'Sí' && !desc && !getTareasIntervencion(i.ID_Intervencion).length) {
+    showToast('Añade al menos una tarea antes de finalizar la actuación', 'error');
+    return;
+  }
 
   // Los campos de visita se leen y se guardan siempre (no solo la primera vez),
   // ya que se quedan editables para poder corregirlos más adelante si hiciera falta.
@@ -1132,20 +1170,27 @@ async function guardarActuacion(finalizar) {
       accion: 'actualizar', id_intervencion: i.ID_Intervencion,
       fecha_realizacion: fechaReal, realizado_por: realizadoPor, proveedor: proveedorExt,
       coste_intervencion: coste, ...lugarDatos,
-      ...(finalizar ? { actuacion_finalizada: true } : {}),
       ...(urlAdjunto ? { url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto } : {}),
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); hideLoading(); return; }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); hideLoading(); return; }
 
-  // La tarea nueva es opcional aquí: "Guardar sin cerrar"/"Guardar y finalizar" deben
-  // guardar los datos de la visita (fecha, ejecución, observaciones, adjunto) aunque
-  // no se haya escrito ninguna tarea — para eso está el botón aparte "Añadir tarea".
+  // La tarea nueva es opcional para "Guardar sin cerrar": los datos de la visita
+  // (fecha, ejecución, observaciones, adjunto) se guardan igual, y para añadir
+  // tareas está el botón aparte. Para FINALIZAR sí hace falta al menos una — se
+  // comprobó arriba, y el servidor lo vuelve a comprobar.
   showLoading(desc ? 'Guardando tarea...' : 'Guardando...');
   try {
     if (desc) await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
 
     if (finalizar) {
+      // Se finaliza al final, con la tarea ya guardada: el servidor rechaza cerrar
+      // una actuación que no tenga ninguna.
+      const { intervencion: finalizada } = await callEdgeFunction('gestionar-intervencion', {
+        accion: 'actualizar', id_intervencion: i.ID_Intervencion, actuacion_finalizada: true,
+      });
+      DATA.intervenciones[intIdx] = _intervencionSbToObj(finalizada);
+
       closeModal('modal-registrar-actuacion');
       showToast(desc
         ? 'Actuación finalizada. Tarea añadida como Pendiente — márcala desde la ficha cuando toque.'
@@ -1160,7 +1205,7 @@ async function guardarActuacion(finalizar) {
       showToast(desc ? 'Tarea añadida como Pendiente. Márcala con ✓ cuando sepas el resultado.' : 'Datos de la actuación guardados', 'success');
       renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
     }
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 
