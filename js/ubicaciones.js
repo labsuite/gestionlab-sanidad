@@ -397,11 +397,7 @@ function _moduloNombre(m) { const i = m.indexOf('|'); return i > -1 ? m.slice(i 
 let _pwInline = {};
 
 function _misGruposDelUsuario() {
-  const emailNorm = getEffectiveUser().email;
-  const yo = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
-  const ids = _parseGrupos(yo?.Grupos_Asignados);
-  if (!ids.length) return [];
-  return ids.map(id => DATA.usuarios.find(u => u.ID_Usuario === id)).filter(Boolean);
+  return misCuentasDeGrupo();   // js/config.js — mismo criterio en toda la app
 }
 
 function _renderMisGrupos() {

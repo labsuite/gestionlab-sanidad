@@ -7,7 +7,7 @@
 // (ver la página) pero solo editar filas con Rol=Alumno, y no puede
 // cambiarles el rol — antes esto solo se comprobaba en el cliente
 // (js/ubicaciones.js `guardarUsuario`), aquí se fuerza también server-side.
-import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, passwordDeGrupo, esCuentaDeGrupo, nombreCorto, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdmin, requireAdminOrGestor, requireStaff, jsonError, jsonOk, passwordDesdeEmail, passwordDeGrupo, esCuentaDeGrupo, idsDeMisGrupos, nombreCorto, handleCorsPreflight } from "../_shared/auth.ts";
 import { cifrar, descifrar, hayClaveDeCifrado } from "../_shared/secretos.ts";
 
 function genId(prefix: string): string {
@@ -88,20 +88,18 @@ async function requiereGrupoPropio(
   if (user?.rol !== "Profesor") return null;
 
   const email = String(user?.email || "").toLowerCase().trim();
-  const { data: ficha } = await supabaseAdmin.from("usuarios")
-    .select("grupos_asignados").eq("email", email).maybeSingle();
+  const { ids: mios, sinFicha } = await idsDeMisGrupos(supabaseAdmin, email);
 
   // Sin ficha en el catálogo no hay forma de saber qué grupos lleva. Pasa cuando
   // el email del login no coincide con el del catálogo: mejor decirlo que dejar
   // pasar a todos por no encontrar la fila.
-  if (!ficha) {
+  if (sinFicha) {
     return jsonError(
       "No encontramos tu ficha de usuario, así que no podemos saber qué grupos llevas. Avisa a un administrador.",
       403,
     );
   }
 
-  const mios = String(ficha.grupos_asignados || "").split(",").map((x: string) => x.trim()).filter(Boolean);
   if (!mios.includes(idGrupo)) {
     return jsonError(
       "Solo puedes ver la contraseña de los grupos que tienes asignados. Si te falta alguno, pídeselo a un administrador.",

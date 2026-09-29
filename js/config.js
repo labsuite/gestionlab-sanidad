@@ -265,6 +265,37 @@ function _esCuentaDeGrupo(email) {
 }
 
 /**
+ * Las cuentas de GRUPO que lleva quien mira: las filas de `usuarios` cuyos ID
+ * están en su `Grupos_Asignados` (se marcan a mano en la ficha del docente, no
+ * se deducen de los módulos — daban grupos de más y de menos). Respeta la vista
+ * previa de rol.
+ */
+function misCuentasDeGrupo() {
+  const emailNorm = getEffectiveUser().email;
+  const yo = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  const ids = String(yo?.Grupos_Asignados || '').split(',').map(g => g.trim()).filter(Boolean);
+  return ids.map(id => DATA.usuarios.find(u => u.ID_Usuario === id)).filter(Boolean);
+}
+
+/**
+ * ¿Ha salido esto de uno de mis grupos (o de mí)? Un Profesor solo revisa lo que
+ * ha inventariado su propio alumnado: con las propuestas de los nueve grupos
+ * mezcladas no sabe qué es suyo y acaba validando material de un laboratorio que
+ * no pisa. Admin y Gestor lo ven todo — son quienes rescatan lo que se queda sin
+ * revisar porque su docente no está.
+ *
+ * Solo decide qué enseña la interfaz; quien manda es el servidor
+ * (`requiereAlumnadoPropio()` en supabase/functions/_shared/auth.ts).
+ */
+function esDeMiAlumnado(emailAutor) {
+  if (getUserRole() !== 'Profesor') return true;
+  const email = String(emailAutor || '').toLowerCase().trim();
+  if (!email) return false;
+  if (email === getEffectiveUser().email) return true;
+  return misCuentasDeGrupo().some(g => (g.Email || '').toLowerCase().trim() === email);
+}
+
+/**
  * Devuelve los ID_Ubicacion accesibles para el Alumno actual.
  * Primero intenta derivar los labs desde los módulos asignados en Supabase (user_modulos).
  * Si no hay datos en Supabase (migración pendiente), usa el campo Ubicaciones_Asignadas de Sheets.

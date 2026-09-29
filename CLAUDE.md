@@ -185,6 +185,11 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
   `ver_password_grupo`, `cambiar_password_grupo` y `resetear_password`. Admin y Gestor llegan
   a todos. Al añadir cualquier acción nueva que toque contraseñas de grupo, pasarla también
   por ahí. Ver `docs/modulo-usuarios.md`.
+- ⚠ Y restringe una segunda cosa desde 2026-09-29: un Profesor solo valida el **material
+  inventariado por sus grupos** (panel de Inventariar material). Servidor:
+  `requiereAlumnadoPropio()` en `_shared/auth.ts`, en `aceptar`/`fusionar`/`rechazar` de
+  `gestionar-propuesta-material`. Cliente: `esDeMiAlumnado()` / `misCuentasDeGrupo()` en
+  `js/config.js` — usar esos, no volver a leer `Grupos_Asignados` a mano.
 - El import de alumnado está **retirado** (botón quitado, Edge Function en 410, script
   aborta). El de profesorado sigue vivo.
 

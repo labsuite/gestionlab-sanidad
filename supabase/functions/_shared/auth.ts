@@ -243,6 +243,74 @@ export function esCuentaDeGrupo(email: string): boolean {
   return String(email || "").toLowerCase().trim().endsWith(DOMINIO_GRUPOS_ALUMNADO);
 }
 
+/**
+ * Los grupos que lleva un docente, tal como están en su ficha
+ * (`usuarios.grupos_asignados`, marcados a mano: deducirlos de los módulos daba
+ * grupos de más y de menos). `sinFicha` distingue "no lleva ninguno" de "no
+ * encontramos su fila", que son dos errores muy distintos de cara a quien mira.
+ */
+export async function idsDeMisGrupos(
+  supabaseAdmin: any, email: string,
+): Promise<{ ids: string[]; sinFicha: boolean }> {
+  const { data: ficha } = await supabaseAdmin.from("usuarios")
+    .select("grupos_asignados").ilike("email", String(email || "").trim()).maybeSingle();
+  if (!ficha) return { ids: [], sinFicha: true };
+  const ids = String(ficha.grupos_asignados || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+  return { ids, sinFicha: false };
+}
+
+/**
+ * Un Profesor solo resuelve lo que ha propuesto SU alumnado: las propuestas de
+ * los grupos de su ficha, más las suyas propias. Con las de los nueve grupos
+ * mezcladas acababa validando material de laboratorios que no pisa, y una vez
+ * aceptada una propuesta ya ha creado material y movimientos de stock.
+ *
+ * Administrador y Gestor llegan a todas: son quienes reparten los grupos y
+ * quienes tienen que poder rescatar lo que se queda sin revisar porque su
+ * docente no está.
+ *
+ * Devuelve null si puede seguir, o la respuesta de error si no. Espejo servidor
+ * de `esDeMiAlumnado()` en js/config.js — aquí es donde se impone de verdad.
+ */
+export async function requiereAlumnadoPropio(
+  supabaseAdmin: any,
+  user: { email?: string; rol?: string } | undefined,
+  emailAutor: unknown,
+): Promise<Response | null> {
+  if (user?.rol !== "Profesor") return null;
+
+  const miEmail = String(user?.email || "").toLowerCase().trim();
+  const autor = String(emailAutor || "").toLowerCase().trim();
+  if (autor && autor === miEmail) return null;   // lo propuso quien está validando
+
+  const { ids, sinFicha } = await idsDeMisGrupos(supabaseAdmin, miEmail);
+  if (sinFicha) {
+    return jsonError(
+      "No encontramos tu ficha de usuario, así que no podemos saber qué grupos llevas. Avisa a un administrador.",
+      403,
+    );
+  }
+  if (!ids.length) {
+    return jsonError(
+      "No tienes ningún grupo asignado en tu ficha, así que no puedes validar lo que inventaría el alumnado. " +
+      "Pídele a un administrador que te asigne tus grupos.",
+      403,
+    );
+  }
+
+  const { data: grupos } = await supabaseAdmin.from("usuarios")
+    .select("email").in("id_usuario", ids);
+  const emails = (grupos || [])
+    .map((g: { email?: string }) => String(g.email || "").toLowerCase().trim()).filter(Boolean);
+  if (!autor || !emails.includes(autor)) {
+    return jsonError(
+      "Esto lo ha inventariado un grupo que no llevas tú. Lo revisa su docente, o Gestión.",
+      403,
+    );
+  }
+  return null;
+}
+
 export function passwordDesdeEmail(email: string): string {
   const local = String(email || "").split("@")[0].trim().toLowerCase();
   if (!local) return generarPasswordTemporal();

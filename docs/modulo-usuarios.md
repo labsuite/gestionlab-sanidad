@@ -284,6 +284,34 @@ secreto `GRUPO_PASSWORD_KEY`, pasa lo mismo — no se recupera nada, se rotan la
 datos. Ver `docs/proteccion-datos.md` para el detalle, incluido el efecto sobre los registros
 de uso (pasan a identificar al grupo, no a la persona).
 
+### Segundo uso de `grupos_asignados`: validar el inventario de MI alumnado (2026-09-29)
+
+`grupos_asignados` ya no sirve solo para las contraseñas. En **Inventariar material** el panel
+"✅ Material propuesto, pendiente de validar" solo lista, para un **Profesor**, las propuestas
+de los grupos que lleva él (más las que haya enviado él mismo). Antes veía las de los nueve
+grupos mezcladas y acababa validando material de laboratorios que no pisa: aceptar una
+propuesta crea material, su bote y su movimiento de stock, así que no es una lista informativa.
+
+- Cliente: `esDeMiAlumnado(emailAutor)` y `misCuentasDeGrupo()` en `js/config.js` (genéricos, no
+  atados al módulo de material); `_invMatPendientes()` en `js/inventariar-material.js` filtra con
+  ellos, y de ahí sale también el aviso del inventario (`_invMatRenderAviso`) — un solo sitio.
+- Servidor: `requiereAlumnadoPropio()` en `supabase/functions/_shared/auth.ts`, llamado desde
+  `gestionar-propuesta-material` en las tres acciones que resuelven (`aceptar`, `fusionar`,
+  `rechazar`), **antes** de cualquier escritura. El cruce ID de grupo → email se hace en el
+  servidor: lo que compara es `propuestas_material.email_propuesto_por` con el email de las
+  cuentas de grupo asignadas.
+- **Admin y Gestor siguen viéndolas todas**, por lo mismo que en las contraseñas: alguien tiene
+  que poder rescatar lo que se queda sin revisar porque su docente no está.
+- Dos avisos para que "no aparece" no se confunda con "está roto": si quedan pendientes de otros
+  grupos, el panel lo dice al pie (`_invMatNotaAjenas`); y un Profesor **sin grupos asignados**
+  ve una tarjeta que le explica que le falta la asignación en su ficha, en vez de un panel vacío.
+- `requiereGrupoPropio()` (contraseñas) y `requiereAlumnadoPropio()` (inventario) comparten ya
+  el lector de la columna, `idsDeMisGrupos()`. Cualquier puerta nueva que tenga que acotarse
+  "a lo mío" debería salir de ahí y no volver a leer `grupos_asignados` a mano.
+
+El panel de **Ubicar equipos** (propuestas de ubicación) sigue sin acotar: ahí el reparto
+natural es por laboratorio, no por grupo.
+
 ## Import de alumnado: RETIRADO (2026-09-19)
 
 Los tres caminos que creaban cuentas personales de alumnado están cerrados:

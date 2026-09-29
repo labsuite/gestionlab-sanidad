@@ -19,7 +19,7 @@
 // escribe el servidor con el nombre de quien valida.
 import {
   requireStaff, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto,
-  jsonError, jsonOk, handleCorsPreflight,
+  requiereAlumnadoPropio, jsonError, jsonOk, handleCorsPreflight,
 } from "../_shared/auth.ts";
 import { componerNombreMaterial, buscarMaterialParecido, claveNombre } from "../_shared/material.ts";
 
@@ -323,6 +323,11 @@ Deno.serve(async (req) => {
       .select("*").eq("id_propuesta", idPropuesta).maybeSingle();
     if (!p) return jsonError("Propuesta no encontrada", 404);
     if (p.estado !== "pendiente") return jsonError("Esta propuesta ya está resuelta", 400);
+
+    // Un Profesor solo valida lo de sus grupos. Va antes de cualquier escritura:
+    // aceptar o fusionar crea material, lotes y movimientos de stock.
+    const vetado = await requiereAlumnadoPropio(supabaseAdmin, user, p.email_propuesto_por);
+    if (vetado) return vetado;
 
     if (accion === "rechazar") {
       const { data } = await supabaseAdmin.from("propuestas_material")

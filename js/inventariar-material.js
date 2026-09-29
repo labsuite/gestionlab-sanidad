@@ -368,8 +368,23 @@ function _invMatQueFalta() {
   return falta.length === 1 ? falta[0] : falta.slice(0, -1).join(', ') + ' y ' + falta[falta.length - 1];
 }
 
+/**
+ * Lo que queda por validar de MI alumnado. Un Profesor solo revisa las
+ * propuestas de los grupos que tiene asignados en su ficha (`esDeMiAlumnado`, en
+ * js/config.js): la lista con los nueve grupos mezclados liaba más que ayudaba.
+ * Admin y Gestor siguen viéndolas todas.
+ */
 function _invMatPendientes() {
-  return DATA.propuestasMaterial.filter(p => p.Estado === 'pendiente');
+  return DATA.propuestasMaterial
+    .filter(p => p.Estado === 'pendiente')
+    .filter(p => esDeMiAlumnado(p.Email_Propuesto_Por));
+}
+
+/** Pendientes de otros grupos, solo para poder decir cuántas hay y de quién es. */
+function _invMatPendientesAjenas() {
+  return DATA.propuestasMaterial
+    .filter(p => p.Estado === 'pendiente')
+    .filter(p => !esDeMiAlumnado(p.Email_Propuesto_Por));
 }
 
 /** Unidades ya usadas, para el desplegable de unidad (mismo criterio que los botes). */
@@ -661,10 +676,38 @@ function _invMatMismaBase(p) {
     .slice(0, 4);
 }
 
+/**
+ * Nota al pie cuando hay propuestas pendientes que no son de mis grupos: sin
+ * decirlo, un docente que sabe que su compañera mandó material pensaría que la
+ * app las ha perdido.
+ */
+function _invMatNotaAjenas() {
+  const n = _invMatPendientesAjenas().length;
+  if (!n) return '';
+  return `<div style="font-size:11px;color:var(--text-muted);line-height:1.5">
+    Hay ${n} propuesta(s) más de otros grupos: las revisa su docente. Aquí solo
+    aparece lo que ha inventariado el alumnado que llevas tú.
+  </div>`;
+}
+
 /** Panel de validación (Profesor / Gestor / Administrador). */
 function _invMatRenderPanelValidacion() {
   const pendientes = _invMatPendientes();
-  if (!pendientes.length) return '';
+  if (!pendientes.length) {
+    // Un Profesor sin grupos en su ficha no revisaría nunca nada. Decírselo, que
+    // si no parece que la app no lista propuestas que él sabe que existen.
+    if (getUserRole() === 'Profesor' && !misCuentasDeGrupo().length && _invMatPendientesAjenas().length) {
+      return `<div class="card" style="margin-bottom:18px">
+        <div class="card-header"><div class="card-title">✅ Material propuesto, pendiente de validar</div></div>
+        <div style="${INVMAT_PAD};font-size:13px;color:var(--text-muted);line-height:1.6">
+          Hay material esperando validación, pero no tienes ningún grupo asignado en tu ficha,
+          así que no sabemos cuál es el de tu alumnado. Pídele a un administrador que te asigne
+          tus grupos (Usuarios → tu ficha → Grupos).
+        </div>
+      </div>`;
+    }
+    return '';
+  }
 
   return `
     <div class="card" style="margin-bottom:18px;border-left:3px solid var(--accent)">
@@ -682,6 +725,7 @@ function _invMatRenderPanelValidacion() {
           Si ya estaba en el inventario, "🔗 Ya existía…" no duplica nada: le añade el bote en el sitio
           donde lo han encontrado, o lo cuelga como alícuota del bote del que salió.
         </div>
+        ${_invMatNotaAjenas()}
       </div>
     </div>`;
 }
@@ -750,7 +794,7 @@ function _invMatRenderAviso() {
       <div class="alert-icon">🧴</div>
       <div class="alert-content">
         <div class="alert-title">${n} material(es) propuesto(s) esperando tu visto bueno</div>
-        <div class="alert-text">Del alumnado que está inventariando. Pulsa aquí para revisarlos.</div>
+        <div class="alert-text">${getUserRole() === 'Profesor' ? 'Del alumnado de tus grupos' : 'Del alumnado que está inventariando'}. Pulsa aquí para revisarlos.</div>
       </div>
     </div>`;
 }
