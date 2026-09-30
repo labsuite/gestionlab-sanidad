@@ -326,6 +326,7 @@ function showPage(page) {
   };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
+  if (page === 'inventariar-material' && typeof _invMatAlEntrar === 'function') _invMatAlEntrar();
 }
 
 function showApp() {

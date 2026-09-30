@@ -54,7 +54,7 @@ function _invMatNuevo() {
     categoria: '', tipoBase: '', nombreBase: '',
     atributos: {}, textoEtiqueta: '',
     cantidad: '', unidad: '', idUbicacion: _invMatSitioActual().idUbicacion, observaciones: '',
-    fotoPath: '', fotoNombre: '',
+    fotoPath: '', fotoNombre: '', fotoPreview: '', fotoDeAntes: false,
     iaExtraido: null, iaNoVisibles: [], iaError: '',
   };
 }
@@ -362,6 +362,7 @@ function _invMatNombreGenerado() {
 function _invMatQueFalta() {
   const falta = [];
   if (!_invMat?.fotoPath) falta.push('la foto de la etiqueta');
+  else if (_invMat.fotoDeAntes) falta.push('confirmar que la foto es de este bote');
   if (!_invMat?.categoria) falta.push('la categoría');
   if (!_invMat?.tipoBase) falta.push('el tipo de producto');
   if (!falta.length) return '';
@@ -438,10 +439,22 @@ function _invMatRenderFormulario() {
             1 · Foto de la etiqueta <span style="color:var(--danger)">*</span>
           </label>
           ${_invMat.fotoPath ? `
+            ${_invMat.fotoDeAntes ? `
+              <div style="background:var(--warning-light);border:1px solid #e8c98a;border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;line-height:1.6;margin-bottom:10px">
+                <strong>Esta foto es de antes de salir de esta pantalla.</strong>
+                ¿Es la del bote que tienes delante? Si ya vas por otro, empieza de cero.
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                  <button class="btn btn-primary" style="font-size:11px;padding:3px 10px" onclick="_invMatConfirmarFoto()">Sí, es este bote</button>
+                  <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_invMatReiniciar()">Es otro: empezar de cero</button>
+                </div>
+              </div>` : ''}
+            ${_invMat.fotoPreview ? `
+              <img src="${_escAttr(_invMat.fotoPreview)}" alt="Foto de la etiqueta"
+                   style="display:block;max-width:100%;max-height:160px;border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:8px">` : ''}
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
               <span style="font-size:13px;color:var(--success)">✓ Foto subida${_invMat.fotoNombre ? ` — ${_esc(_invMat.fotoNombre)}` : ''}</span>
               <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px" onclick="_invMatQuitarFoto()">Cambiar</button>
-              <button class="btn btn-primary" style="font-size:11px;padding:3px 10px" onclick="_invMatLeerEtiqueta()">✨ Leer la etiqueta</button>
+              ${_invMat.fotoDeAntes ? '' : `<button class="btn btn-primary" style="font-size:11px;padding:3px 10px" onclick="_invMatLeerEtiqueta()">✨ Leer la etiqueta</button>`}
             </div>
             ${_invMat.iaError ? `<div style="font-size:11px;color:var(--warning);margin-top:8px">No se pudo leer la etiqueta automáticamente (${_esc(_invMat.iaError)}). Rellena los datos a mano.</div>` : ''}
             ${_invMat.iaExtraido ? `<div style="font-size:11px;color:var(--success);margin-top:8px">Leído de la etiqueta y rellenado abajo. Revísalo: lo que no se veía se ha dejado en blanco.</div>` : ''}
@@ -803,7 +816,26 @@ function _invMatRenderAviso() {
 // INTERACCIÓN
 // ------------------------------------------------------------
 
-function _invMatReiniciar() { _invMat = _invMatNuevo(); renderInventariarMaterial(); }
+function _invMatReiniciar() { _invMatSoltarPreview(); _invMat = _invMatNuevo(); renderInventariarMaterial(); }
+
+/** La miniatura es un object URL del archivo: hay que soltarlo al descartarla. */
+function _invMatSoltarPreview() {
+  if (_invMat?.fotoPreview) { try { URL.revokeObjectURL(_invMat.fotoPreview); } catch (e) { /* nada */ } }
+}
+
+/**
+ * Al volver a esta pantalla el borrador sigue ahí, foto incluida — a propósito,
+ * para no perder medio formulario por un toque en el menú. Pero quien vuelve
+ * suele venir a por el SIGUIENTE bote, no a acabar el anterior: así se colaron
+ * la foto de una micropipeta en la propuesta de un agar (2026-09-30) y la
+ * lectura con IA de esa foto vieja. Por eso, si al entrar hay foto, se pide
+ * confirmar que es la del bote que se tiene delante antes de leerla o enviarla.
+ */
+function _invMatAlEntrar() {
+  if (_invMat?.fotoPath) { _invMat.fotoDeAntes = true; renderInventariarMaterial(); }
+}
+
+function _invMatConfirmarFoto() { _invMat.fotoDeAntes = false; renderInventariarMaterial(); }
 
 function _invMatCambiarCategoria(v) {
   _invMat.categoria = v; _invMat.tipoBase = ''; _invMat.atributos = {};
@@ -830,7 +862,8 @@ function _invMatRefrescarNombre() {
 }
 
 function _invMatQuitarFoto() {
-  _invMat.fotoPath = ''; _invMat.fotoNombre = '';
+  _invMatSoltarPreview();
+  _invMat.fotoPath = ''; _invMat.fotoNombre = ''; _invMat.fotoPreview = ''; _invMat.fotoDeAntes = false;
   _invMat.iaExtraido = null; _invMat.iaNoVisibles = []; _invMat.iaError = '';
   renderInventariarMaterial();
 }
@@ -855,6 +888,9 @@ async function _invMatProcesarFoto(file) {
     const idTemp = 'PROP' + Date.now().toString(36).toUpperCase();
     _invMat.fotoPath = await subirDocumento('etiqueta', idTemp, base64, file.name, file.type);
     _invMat.fotoNombre = file.name;
+    _invMatSoltarPreview();
+    try { _invMat.fotoPreview = URL.createObjectURL(file); } catch (e) { _invMat.fotoPreview = ''; }
+    _invMat.fotoDeAntes = false;
     showToast('Foto subida', 'success');
   } catch (e) {
     showToast(e.message || 'No se pudo subir la foto', 'error');
@@ -867,6 +903,7 @@ async function _invMatProcesarFoto(file) {
 /** Pide a Gemini los campos EXACTOS de la ficha y prerrellena el formulario. */
 async function _invMatLeerEtiqueta() {
   if (!_invMat.fotoPath) return;
+  if (_invMat.fotoDeAntes) { showToast('Confirma primero que la foto es la del bote que tienes delante', 'error'); return; }
   if (!_invMat.categoria) { showToast('Elige antes la categoría, así se sabe qué buscar', 'error'); return; }
   showLoading('Leyendo la etiqueta...');
   try {
@@ -925,6 +962,7 @@ async function enviarPropuestaMaterial() {
       ia_extraido: _invMat.iaExtraido,
     });
     await loadAllData();
+    _invMatSoltarPreview();
     _invMat = _invMatNuevo();
     showToast(r.ya_existe
       ? `Enviada. Ojo: se parece a "${r.ya_existe.nombre}" — lo revisará el profesorado.`
