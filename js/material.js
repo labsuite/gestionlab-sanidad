@@ -782,6 +782,19 @@ function openModalMaterialCatalogacion(nombreSugerido, unidadSugerida) {
   if (unidadSugerida) sv('mat-unidad', unidadSugerida);
 }
 
+// Hay materiales guardados con la categoría corta ("Medio de cultivo") y otros
+// con el texto entero de la opción ("Medio de cultivo — agares, …"). Con la
+// corta el select se quedaba en blanco al editar y el guardado fallaba por
+// "categoría obligatoria"; se busca la opción que empieza igual.
+function _opcionCategoriaMaterial(cat) {
+  const sel = document.getElementById('mat-categoria');
+  if (!sel || !cat) return cat || '';
+  const base = cat.split(' — ')[0].trim();
+  const op = [...sel.options].find(o => o.value === cat)
+          || [...sel.options].find(o => o.value.split(' — ')[0].trim() === base);
+  return op ? op.value : cat;
+}
+
 function editMaterial(idx) {
   const m = DATA.material[idx];
   editingRow = { sheet: 'Material', rowIndex: idx };
@@ -812,7 +825,7 @@ function editMaterial(idx) {
     });
   }
   document.getElementById('modal-material-title').textContent = 'Editar material';
-  sv('mat-id', m.ID_Material); sv('mat-nombre', m.Nombre); sv('mat-categoria', m.Categoria);
+  sv('mat-id', m.ID_Material); sv('mat-nombre', m.Nombre); sv('mat-categoria', _opcionCategoriaMaterial(m.Categoria));
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = true;
   sv('mat-referencia', m.Referencia_Proveedor); sv('mat-unidad', m.Unidad); sv('mat-unidades-extra', m.Unidades_Extra);
   sv('mat-ubicacion', m.Ubicacion);
@@ -1136,7 +1149,7 @@ async function guardarMaterial() {
     } else {
       renderAll();
     }
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 
