@@ -13,6 +13,7 @@
 //   gated client-side por Puede_Revisar_Inventario, un flag de datos no de
 //   rol); aplicarla/descartarla es Admin/Gestor/Profesor (requireStaff).
 import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { unidadValida, MSG_UNIDAD_NUMERICA } from "../_shared/material.ts";
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -189,6 +190,11 @@ Deno.serve(async (req) => {
       const unidad = String(body.unidad || "").trim();
       if (!idMaterial) return jsonError("id_material es obligatorio", 400);
       if (!nombre || !categoria || !unidad) return jsonError("Nombre, categoría y unidad son obligatorios", 400);
+      if (!unidadValida(unidad)) return jsonError(MSG_UNIDAD_NUMERICA, 400);
+      const lotesIn = Array.isArray(body.lotes) ? body.lotes as Record<string, unknown>[] : [];
+      if (lotesIn.some((l) => strField(l.unidad_lote) && !unidadValida(l.unidad_lote))) {
+        return jsonError(`Bote: ${MSG_UNIDAD_NUMERICA}`, 400);
+      }
 
       const datos = {
         nombre, categoria, unidad,

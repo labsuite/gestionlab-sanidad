@@ -112,3 +112,14 @@ export function buscarMaterialParecido(nombre: string, materiales: any[]): any |
   }
   return mejorPunt >= 0.7 ? mejor : null;
 }
+
+// Una unidad es QUÉ se cuenta (caja, bote, bolsa…), nunca CUÁNTO. En el
+// inventario colaborativo se coló muchas veces la cantidad en el campo de la
+// unidad ("1", "25"): se rechaza en todas las puertas que la guardan.
+// Espejo de unidadValida() en js/config.js.
+export function unidadValida(u: unknown): string {
+  const s = String(u ?? "").trim();
+  return s && !/^[\d\s.,]+$/.test(s) ? s : "";
+}
+export const MSG_UNIDAD_NUMERICA =
+  "En «unidad» va qué se cuenta (caja, bote, bolsa…), no cuántos: el número va en la cantidad";

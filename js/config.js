@@ -240,6 +240,15 @@ function esResponsableDeEquipo(equipo) {
   return responsables.some(r => r === miNombre);
 }
 
+// Una unidad es QUÉ se cuenta (caja, bote…), nunca CUÁNTO: el alumnado metía a
+// menudo la cantidad en ese campo ("1", "25"). Devuelve la unidad limpia, o ''
+// si no es una unidad. Espejo de unidadValida() en supabase/functions/_shared/material.ts.
+function unidadValida(u) {
+  const s = String(u ?? '').trim();
+  return s && !/^[\d\s.,]+$/.test(s) ? s : '';
+}
+const MSG_UNIDAD_NUMERICA = 'En «unidad» va qué se cuenta (caja, bote, bolsa…), no cuántos: el número va en la cantidad';
+
 /**
  * Nombre y primer apellido, que es como consta el profesorado en los registros
  * ("Paloma Fernández"). Se quita el último apellido en vez de coger las dos

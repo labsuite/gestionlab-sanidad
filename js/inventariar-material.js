@@ -393,7 +393,7 @@ function _invMatUnidades() {
   const delCatalogo = DATA.material.flatMap(m =>
     [m.Unidad, ...String(m.Unidades_Extra || '').split(',')].map(u => (u || '').trim()));
   const deLotes = DATA.materialUbicaciones.map(l => (l.Unidad_Lote || '').trim());
-  return [...new Set([...delCatalogo, ...deLotes].filter(Boolean))].sort();
+  return [...new Set([...delCatalogo, ...deLotes].map(unidadValida).filter(Boolean))].sort();
 }
 
 // ------------------------------------------------------------
@@ -945,6 +945,9 @@ async function _invMatLeerEtiqueta() {
 async function enviarPropuestaMaterial() {
   if (!_invMat.fotoPath) { showToast('Falta la foto de la etiqueta', 'error'); return; }
   if (!_invMat.categoria) { showToast('Falta la categoría', 'error'); return; }
+  if (String(_invMat.unidad || '').trim() && !unidadValida(_invMat.unidad)) {
+    showToast(MSG_UNIDAD_NUMERICA, 'error'); return;
+  }
 
   showLoading('Enviando propuesta...');
   try {
@@ -980,8 +983,10 @@ async function aceptarPropuestaMaterial(idPropuesta) {
   const p = DATA.propuestasMaterial.find(x => x.ID_Propuesta === idPropuesta);
   const nombre = document.getElementById(`invmat-nombre-${idPropuesta}`)?.value?.trim() || p?.Nombre_Generado || '';
   if (!nombre) { showToast('El material necesita un nombre', 'error'); return; }
-  const unidad = p?.Unidad || prompt(`¿En qué unidad se cuenta "${nombre}"? (caja, bote, unidad…)`, '');
-  if (!unidad) { showToast('Hace falta la unidad', 'error'); return; }
+  // Si quien inventarió puso un número como unidad, no vale: se pregunta.
+  const unidad = unidadValida(p?.Unidad)
+    || unidadValida(prompt(`¿En qué unidad se cuenta "${nombre}"? (caja, bote, unidad…)`, ''));
+  if (!unidad) { showToast('Hace falta la unidad (caja, bote, unidad…), no un número', 'error'); return; }
 
   showLoading('Creando el material...');
   try {
@@ -1039,7 +1044,7 @@ function _invMatFusionModoPorDefecto() {
   // puede venir en otra unidad (cajas de puntas de un material fichado en
   // bolsas) y porque lo que teclea quien inventaría no siempre es una unidad.
   const mat = f.idMaterial ? DATA.material.find(m => m.ID_Material === f.idMaterial) : null;
-  f.unidad = String(p.Unidad || (mat ? mat.Unidad : '') || '').trim();
+  f.unidad = unidadValida(p.Unidad) || unidadValida(mat ? mat.Unidad : '');
   if (!p.ID_Ubicacion) f.modo = 'ninguno';
   else if (enSitio.length) f.modo = 'reemplazar';
   else f.modo = 'nuevo_lote';

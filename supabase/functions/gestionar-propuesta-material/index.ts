@@ -21,7 +21,7 @@ import {
   requireStaff, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto,
   requiereAlumnadoPropio, jsonError, jsonOk, handleCorsPreflight,
 } from "../_shared/auth.ts";
-import { componerNombreMaterial, buscarMaterialParecido, claveNombre } from "../_shared/material.ts";
+import { componerNombreMaterial, buscarMaterialParecido, claveNombre, unidadValida, MSG_UNIDAD_NUMERICA } from "../_shared/material.ts";
 
 const GEMINI_MODELO = "gemini-3.6-flash";
 
@@ -282,6 +282,8 @@ Deno.serve(async (req) => {
       ? body.ia_extraido as Record<string, unknown> : null;
     const avisos = leidos ? avisosDiscrepancia(ficha, atributos, leidos) : "";
 
+    if (strField(body.unidad) && !unidadValida(body.unidad)) return jsonError(MSG_UNIDAD_NUMERICA, 400);
+
     const datos = {
       id_propuesta: genId("PMAT"),
       categoria, tipo_base: tipoBase, nombre_base: nombreBase,
@@ -365,7 +367,8 @@ Deno.serve(async (req) => {
       // quien inventaría no siempre es una unidad). Si no la manda, vale la de
       // la propuesta, como antes. Solo se guarda cuando difiere de la del
       // material — `unidad_lote` es la excepción, no la copia.
-      const unidadElegida = String(strField(body.unidad_lote) || p.unidad || "").trim();
+      if (strField(body.unidad_lote) && !unidadValida(body.unidad_lote)) return jsonError(MSG_UNIDAD_NUMERICA, 400);
+      const unidadElegida = unidadValida(body.unidad_lote) || unidadValida(p.unidad);
       const unidadLote = (unidadElegida && unidadElegida !== mat.unidad) ? unidadElegida : null;
       const unidadTexto = unidadElegida || mat.unidad || "";
       let detalle = "";
@@ -457,7 +460,8 @@ Deno.serve(async (req) => {
     // El nombre puede venir corregido por quien valida; si no, el compuesto.
     const nombreFinal = String(body.nombre || p.nombre_generado || "").trim();
     if (!nombreFinal) return jsonError("El material necesita un nombre", 400);
-    const unidad = String(body.unidad || p.unidad || "").trim();
+    if (String(body.unidad || "").trim() && !unidadValida(body.unidad)) return jsonError(MSG_UNIDAD_NUMERICA, 400);
+    const unidad = unidadValida(body.unidad) || unidadValida(p.unidad);
     if (!unidad) return jsonError("El material necesita una unidad", 400);
 
     // ID con el mismo criterio que generarIdMaterial() del cliente: 3 letras

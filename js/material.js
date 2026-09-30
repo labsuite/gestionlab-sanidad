@@ -626,7 +626,7 @@ function _unidadesSugeridas(unidadBase, unidadesExtra) {
   const delCatalogo = DATA.material.flatMap(m =>
     [m.Unidad, ...String(m.Unidades_Extra || '').split(',')].map(u => (u || '').trim()));
   const deLotes = DATA.materialUbicaciones.map(l => (l.Unidad_Lote || '').trim());
-  return [...new Set([...delMaterial, ...delCatalogo, ...deLotes].filter(Boolean))];
+  return [...new Set([...delMaterial, ...delCatalogo, ...deLotes].map(unidadValida).filter(Boolean))];
 }
 
 function renderLotesModal() {
@@ -1090,6 +1090,9 @@ function generarIdMaterial(nombre) {
 async function guardarMaterial() {
   const nombre = v('mat-nombre'), cat = v('mat-categoria'), unidad = v('mat-unidad');
   if (!nombre || !cat || !unidad) { showToast('Nombre, categoría y unidad son obligatorios', 'error'); return; }
+  if (!unidadValida(unidad) || _lotesTemp.some(l => (l.Unidad_Lote || '').trim() && !unidadValida(l.Unidad_Lote))) {
+    showToast(MSG_UNIDAD_NUMERICA, 'error'); return;
+  }
   const id = (editingRow && editingRow.sheet === 'Material') ? v('mat-id') : generarIdMaterial(nombre);
   const gestionAuto = document.getElementById('mat-gestion-auto') ? document.getElementById('mat-gestion-auto').checked : true;
 
