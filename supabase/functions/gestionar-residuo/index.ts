@@ -170,7 +170,21 @@ const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas: lo que gener
 - Bolsa plástica (químicos): frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas. OJO: La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).
 - Cómo reconocer los contenedores por el color: contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.
 - Punzantes — contenedor amarillo: puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes. OJO: para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal"); los que no puedan ir a la basura, aquí. Las secciones histológicas y los bloques de parafina solo llevan trazas de X-Free: a la basura sin más.
-- El salvavidas: bote azul de ballesta "Reactivos de laboratorio": para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol. En el catálogo es la categoría "Reactivos de laboratorio" (antes "Frasco Propio"). OJO: siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.`;
+- El salvavidas: bote azul de ballesta "Reactivos de laboratorio": para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol. En el catálogo es la categoría "Reactivos de laboratorio" (antes "Frasco Propio"). OJO: siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.
+- Fregadero: La lejía diluida (desinfección de superficies) va al fregadero con abundante agua, sola: nunca la mezcles antes con ácidos ni con otros residuos (desprende cloro). La lejía concentrada, al salvavidas.`;
+
+// Por qué existe cada categoría (palabras del gestor), para que el bloqueo fijo de
+// Nivel 1 no se quede en un "no coinciden" sin explicación.
+const MOTIVO_CATEGORIA: Record<string, string> = {
+  "Aguas Laboratorio": "Aguas de laboratorio recoge las mezclas acuosas: tinciones, kits y lo que generan los aparatos de diagnóstico.",
+  "Contenedor Inertes": "El Contenedor Inertes recoge los disolventes no halogenados, también el formol o etanol sin muestra.",
+  "Muestras en formol": "El contenedor cuadrado azul es SOLO para formol o etanol con la muestra dentro: va a incinerar.",
+  "Bolsa plástica (químicos)": "La bolsa plástica es para envases vacíos y papel, guantes o filtros manchados de químicos.",
+  "Reactivos de laboratorio": "El salvavidas es para cantidades pequeñas de químicos, cada uno en su frasco bien cerrado (oxidantes incluidos).",
+  "Residuo Cortante": "Lo que corta o pincha va siempre al contenedor amarillo de punzantes.",
+  "Basura normal": "Esto no va a ningún contenedor: a la basura normal (los portas, protegidos para que nadie se corte).",
+  "Fregadero": "Esto no va a ningún contenedor: al fregadero con abundante agua, solo.",
+};
 
 function getWarningFormato(formato: string | null): string | null {
   const f = (formato || "").toLowerCase();
@@ -249,8 +263,10 @@ REGLAS:
 - Si detectas un riesgo agudo (derrame, presión/burbujeo, olor fuerte, mezcla accidental de incompatibles), es INCOMPATIBLE y dilo con claridad.
 
 FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con una de estas dos etiquetas, sin ningún texto antes, y ser BREVE (2 a 4 frases, sin listas largas):
-- [OK] → el residuo puede ir en ese contenedor. Añade una frase de confirmación y el aviso de formato si aplica.
-- [BLOQUEO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, Desconocido>|contenedor_sugerido=<la categoría de contenedor correcta, o "ninguno">] → el residuo NO puede ir ahí. Explica por qué en una frase y di a qué contenedor y laboratorio llevarlo (si existe uno activo compatible en el centro); si no existe ninguno, di que lo deje en su propio envase cerrado y rotulado en la zona de residuos pendientes y avise a su profesor/a.
+- [OK] → el residuo puede ir en ese contenedor. Añade una frase diciendo POR QUÉ va ahí y el aviso de formato si aplica.
+- [BLOQUEO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, Desconocido>|contenedor_sugerido=<la categoría de contenedor correcta, o "ninguno">] → el residuo NO puede ir ahí. Explica por qué NO puede ir aquí y por qué el correcto es el otro, y di a qué contenedor y laboratorio llevarlo (si existe uno activo compatible en el centro); si no existe ninguno, di que lo deje en su propio envase cerrado y rotulado en la zona de residuos pendientes y avise a su profesor/a.
+
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el efluente del lavador de ELISA lleva la solución de parada ácida: por eso va con las tinciones y nunca junto a nada con lejía".
 
 Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la etiqueta inicial.`;
 
@@ -340,7 +356,8 @@ Deno.serve(async (req) => {
       // ── Nivel 1 (determinista, bloqueo duro): categoría del contenedor ──
       if ((residuo.contenedor_tipo || "") !== (contenedorActual.categoria || "")) {
         return jsonError(
-          `Este residuo es de tipo "${residuo.contenedor_tipo || "sin categoría"}" y el contenedor es de categoría "${contenedorActual.categoria || "sin categoría"}": no coinciden.`,
+          `Esto no va aquí: según el catálogo, "${residuo.nombre}" va a "${residuo.contenedor_tipo || "sin categoría"}", no a "${contenedorActual.categoria || "sin categoría"}".` +
+            (MOTIVO_CATEGORIA[residuo.contenedor_tipo || ""] ? ` ${MOTIVO_CATEGORIA[residuo.contenedor_tipo || ""]}` : ""),
           400,
         );
       }

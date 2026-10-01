@@ -11,6 +11,9 @@ con las decisiones que tomó la usuaria ese mismo día:
 7. Tinciones, también con etanol/metanol, ácidas y fenólicas → Aguas Laboratorio
    (el gestor: pueden ir juntas mientras no reaccionen entre sí). El ácido
    peryódico (oxidante) se queda en el salvavidas.
+10. Tercera ronda: la lejía diluida va al fregadero (categoría "Fregadero", no es
+    un contenedor); la indicación va en la descripción, que es lo único que deja
+    a las IAs decir "al desagüe".
 9. Segunda ronda: fuera los portas de Neubauer y los cartuchos DRI-CHEM;
    secciones, bloques de parafina y preparación histológica completa → basura
    (solo trazas de X-Free); frotis con lactofenol → punzantes.
@@ -36,6 +39,7 @@ BASURA = 'Basura normal'
 BASURA_ANTES = 'Basura normal (protegidos)'
 INERTES = 'Contenedor Inertes'
 CORTANTE = 'Residuo Cortante'
+FREGADERO = 'Fregadero'
 PROTEGIDOS = ' A la basura normal protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.'
 SALVAVIDAS = 'Reactivos de laboratorio'
 BOLSA = 'Bolsa plástica (químicos)'
@@ -99,6 +103,11 @@ MOVER = {
     'Rojo de Ponceau': (AGUAS, None),
     'Carbol-fucsina de Ziehl-Neelsen': (AGUAS, None),
     'Azul de lactofenol líquido': (AGUAS, None),
+    # 10
+    'Lejía diluida (desinfección)': (FREGADERO,
+        'Soluciones muy diluidas de hipoclorito residuales de desinfección de superficies. Pueden verterse al '
+        'fregadero con abundante agua (indicación del gestor, 2026-10). Nunca mezclarlas antes con ácidos ni con otros '
+        'residuos: desprende cloro. Si está concentrada, va al salvavidas "Reactivos de laboratorio".'),
 }
 
 # Fuera del catálogo (la usuaria: "no son nada" / "quítalos"); sin adiciones registradas.

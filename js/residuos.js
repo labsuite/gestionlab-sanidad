@@ -55,6 +55,10 @@ const _NORMAS_GESTOR = [
     ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal"); los que no puedan ir a la basura, aquí. Las secciones histológicas y los bloques de parafina solo llevan trazas de X-Free: a la basura sin más.',
   },
   {
+    icon: '🚰', titulo: 'Fregadero',
+    texto: 'La lejía diluida (desinfección de superficies) va al fregadero con abundante agua, sola: nunca la mezcles antes con ácidos ni con otros residuos (desprende cloro). La lejía concentrada, al salvavidas.',
+  },
+  {
     icon: '🛟', titulo: 'El salvavidas: bote azul de ballesta "Reactivos de laboratorio"',
     texto: 'Para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol. En el catálogo es la categoría "Reactivos de laboratorio" (antes "Frasco Propio").',
     ojo: 'Siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.',
@@ -919,10 +923,12 @@ breve de que este consultorio solo sirve para decir dónde tirar residuos de lab
 FORMATO DE RESPUESTA — MUY IMPORTANTE, sigue esto exactamente. Tu respuesta debe EMPEZAR
 literalmente con una de estas cuatro etiquetas, sin ningún texto antes, y debe ser BREVE
 (unas pocas frases, nunca una lista larga ni una explicación extensa):
-- [RESUELTO] → cuando hay contenedor adecuado (en este laboratorio o en otro), seguido de dónde está, el formato, y el aviso de formato si aplica.
+- [RESUELTO] → cuando hay contenedor adecuado (en este laboratorio o en otro), seguido de dónde está, POR QUÉ va ahí (en una frase, ver abajo), el formato, y el aviso de formato si aplica.
 - [NO_RESUELTO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, o "Desconocido">|prioridad=<Alta o Normal>] → cuando describe un residuo real pero no hay ningún contenedor compatible en ningún laboratorio del centro, seguido de las instrucciones de manejo provisional respetando siempre las reglas de arriba.
 - [PREGUNTA] → cuando la descripción del usuario es ambigua entre varios tipos del catálogo con destino distinto y necesitas que aclare antes de poder responder, seguido de UNA sola pregunta corta y concreta (no una lista larga de opciones). No es un caso resuelto ni escalado, la conversación sigue en el siguiente mensaje del usuario.
 - [FUERA_DE_TEMA] → cuando el mensaje no describe un residuo real a tirar, seguido solo del recordatorio, sin responder nada más.
+
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el efluente del lavador de ELISA lleva la solución de parada ácida: por eso va con las tinciones y nunca junto a nada con lejía". Si además hay un contenedor con el que sea fácil confundirlo, di por qué ese otro NO.
 
 Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea esas cuatro.`;
 
