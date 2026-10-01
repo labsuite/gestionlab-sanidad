@@ -565,7 +565,12 @@ create table revisiones_inventario (
   stock_real        numeric,
   diferencia        numeric,
   usuario           text,
-  observaciones     text
+  observaciones     text,
+  -- Dónde se contó (2026-10-01). Con id_lote, el recuento sustituye el stock de ese
+  -- bote; con solo id_ubicacion, ahí no constaba nada y al aplicarlo se crea el bote.
+  -- Las dos a null = recuento antiguo del total del material.
+  id_lote           text,
+  id_ubicacion      text
 );
 
 -- ============================================================

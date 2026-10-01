@@ -48,6 +48,7 @@ function renderPanelRevisiones() {
           <tr style="color:var(--text-muted);text-align:left">
             <th style="padding:4px 8px">Fecha</th>
             <th style="padding:4px 8px">Material</th>
+            <th style="padding:4px 8px">Ubicación</th>
             <th style="padding:4px 8px;text-align:center">App</th>
             <th style="padding:4px 8px;text-align:center">Real</th>
             <th style="padding:4px 8px;text-align:center">Dif.</th>
@@ -65,6 +66,9 @@ function renderPanelRevisiones() {
             return `<tr style="border-top:1px solid var(--border)">
               <td style="padding:6px 8px;color:var(--text-muted)">${formatDate(r.Fecha)||r.Fecha||'—'}</td>
               <td style="padding:6px 8px;font-weight:500">${r.Nombre_Material||'—'}</td>
+              <td style="padding:6px 8px">${r.ID_Ubicacion
+                ? _esc(getNombreUbicacion(r.ID_Ubicacion)) + (r.ID_Lote ? '' : ' <span style="color:var(--text-muted);font-size:11px">(bote nuevo)</span>')
+                : '<span style="color:var(--text-muted)">Total (recuento antiguo)</span>'}</td>
               <td style="padding:6px 8px;text-align:center">${r.Stock_App} ${unidad}</td>
               <td style="padding:6px 8px;text-align:center">${r.Stock_Real} ${unidad}</td>
               <td style="padding:6px 8px;text-align:center;font-weight:600;color:${difColor}">${dif > 0 ? '+' : ''}${dif}</td>
@@ -81,16 +85,55 @@ function renderPanelRevisiones() {
     </div>`;
 }
 
-function openModalContarStock(matId) {
+// El recuento es de UNA ubicación: quien cuenta está delante de un armario y solo
+// sabe lo que hay ahí. Valores del selector: "lote:<ID>" (bote ya fichado) o
+// "ubic:<ID_Ubicacion>" (ahí no constaba nada, o el sitio de un ítem sin botes).
+function _contarOpcionesUbic(mat) {
+  const esAlumno = getUserRole() === 'Alumno';
+  const permitidas = esAlumno ? getUbicacionesAlumno() : DATA.ubicaciones.map(u => u.ID_Ubicacion);
+  const lotes = getMatUbics(mat.ID_Material).filter(l => permitidas.includes(l.ID_Ubicacion));
+  const conBote = new Set(getMatUbics(mat.ID_Material).map(l => l.ID_Ubicacion));
+  const opts = lotes.map(l => ({
+    valor: 'lote:' + l.ID, stock: parseFloat(l.Stock_Local) || 0, unidad: l.Unidad_Lote || mat.Unidad || '',
+    texto: getNombreUbicacion(l.ID_Ubicacion) + (l.ID_Lote_Padre ? ' (alícuota)' : ''),
+  }));
+  // Ítem legacy: su stock vive en el propio material, en su ubicación
+  if (!conBote.size && mat.Ubicacion && permitidas.includes(mat.Ubicacion)) {
+    conBote.add(mat.Ubicacion);
+    opts.push({ valor: 'ubic:' + mat.Ubicacion, stock: parseFloat(mat.Stock_Actual) || 0,
+      unidad: mat.Unidad || '', texto: getNombreUbicacion(mat.Ubicacion) });
+  }
+  const otras = permitidas.filter(id => !conBote.has(id))
+    .map(id => ({ valor: 'ubic:' + id, stock: 0, unidad: mat.Unidad || '', texto: getNombreUbicacion(id) }))
+    .sort((a, b) => a.texto.localeCompare(b.texto, 'es'));
+  return { fichadas: opts, otras };
+}
+
+function openModalContarStock(matId, preseleccion) {
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
   document.getElementById('contar-mat-id').value = matId;
   document.getElementById('contar-mat-nombre').textContent = mat.Nombre;
-  const stock = getStockTotal(mat);
-  document.getElementById('contar-stock-app').textContent = stock + ' ' + (mat.Unidad || '');
+  const { fichadas, otras } = _contarOpcionesUbic(mat);
+  _contarOpciones = [...fichadas, ...otras];
+  const opt = o => `<option value="${_escAttr(o.valor)}">${_esc(o.texto)}</option>`;
+  document.getElementById('contar-ubic-sel').innerHTML =
+    (fichadas.length === 1 && !preseleccion ? '' : '<option value="">— Elige la ubicación —</option>') +
+    (fichadas.length ? `<optgroup label="Donde ya consta">${fichadas.map(opt).join('')}</optgroup>` : '') +
+    (otras.length ? `<optgroup label="Ahí no consta todavía">${otras.map(opt).join('')}</optgroup>` : '');
+  if (preseleccion && _contarOpciones.some(o => o.valor === preseleccion)) {
+    document.getElementById('contar-ubic-sel').value = preseleccion;
+  }
+  _contarActualizarStockApp();
   document.getElementById('contar-stock-real').value = '';
   document.getElementById('contar-obs').value = '';
   openModal('modal-contar-stock');
+}
+
+let _contarOpciones = [];
+function _contarActualizarStockApp() {
+  const o = _contarOpciones.find(o => o.valor === document.getElementById('contar-ubic-sel').value);
+  document.getElementById('contar-stock-app').textContent = o ? `${o.stock} ${o.unidad}`.trim() : '—';
 }
 
 async function guardarConteo() {
@@ -102,17 +145,21 @@ async function guardarConteo() {
   }
   const mat = DATA.material.find(m => m.ID_Material === matId);
   if (!mat) return;
+  const sitio = document.getElementById('contar-ubic-sel').value;
+  if (!sitio) { showToast('Elige en qué ubicación has contado', 'error'); return; }
   const stockReal = parseFloat(realStr);
   const obs = document.getElementById('contar-obs').value;
   showLoading('Enviando revisión...');
   try {
     const { revision } = await callEdgeFunction('gestionar-material', {
       accion: 'revision_crear', id_material: matId, stock_real: stockReal, observaciones: obs, usuario: currentUser?.name || '',
+      lote_id: sitio.startsWith('lote:') ? sitio.slice(5) : undefined,
+      id_ubicacion: sitio.startsWith('ubic:') ? sitio.slice(5) : undefined,
     });
     DATA.revisionesInventario.push(_revisionInventarioSbToObj(revision));
     showToast('Revisión enviada. El profesor la revisará pronto.', 'success');
     closeModal('modal-contar-stock');
-  } catch(e) { showToast('Error al enviar la revisión', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error al enviar la revisión', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -125,7 +172,7 @@ async function aplicarRevisionInventario(revId) {
     await loadAllData(); // refresca material, lotes, movimientos y revisiones
     showToast('Ajuste aplicado correctamente', 'success');
     renderPanelRevisiones(); renderMaterial();
-  } catch(e) { showToast('Error aplicando el ajuste', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error aplicando el ajuste', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -276,6 +323,7 @@ function renderFilaMaterial(m) {
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
           <button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Consumo en esta ubicación">📦</button>
+          ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}','lote:${l.ID}')" title="Contar stock en esta ubicación">🔢</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir/alicuotar">✂️</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="eliminarLoteDirecto('${l.ID}')" title="Eliminar este bote">🗑️</button>` : ''}

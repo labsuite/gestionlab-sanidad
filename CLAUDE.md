@@ -443,6 +443,17 @@ Detalles a respetar al tocarlo:
   ubicación — `asegurarLoteLegacy()` —, o `sincronizarStock()` lo borra al
   recalcular el total como suma de lotes.
 
+### Recontar lo que ya está fichado: 🔢 Contar stock, por ubicación
+
+Para material que **ya está en la app**, el alumnado no pasa por "Inventariar": con la
+casilla *Puede revisar inventario* de su grupo (Usuarios → Alumnos) le sale el 🔢 en la
+fila del material y en cada sub-fila de bote. Desde 2026-10-01 el recuento es **de una
+ubicación** (solo las del grupo + zona común), no del total: `revisiones_inventario`
+guarda `id_lote` (bote contado) o solo `id_ubicacion` (ahí no constaba). Al **Aplicar**
+(`revision_aplicar`, docente) lo contado **sustituye** al stock de ese bote, o crea el bote
+si no existía (materializando antes el stock legacy). Las revisiones sin ubicación son
+antiguas y siguen el comportamiento viejo (diferencia sobre el primer bote).
+
 ---
 
 ## Pendiente de hacer – CÓDIGO

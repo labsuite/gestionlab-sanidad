@@ -378,6 +378,8 @@ function _revisionInventarioSbToObj(r) {
     Diferencia: r.diferencia != null ? String(r.diferencia) : '',
     Usuario: r.usuario || '',
     Observaciones: r.observaciones || '',
+    ID_Lote: r.id_lote || '',
+    ID_Ubicacion: r.id_ubicacion || '',
   };
 }
 

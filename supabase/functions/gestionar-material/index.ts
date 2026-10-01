@@ -164,13 +164,31 @@ Deno.serve(async (req) => {
       if (body.stock_real === "" || body.stock_real === undefined || isNaN(stockReal) || stockReal < 0) {
         return jsonError("Introduce la cantidad real que has contado", 400);
       }
-      const stockApp = await stockTotal(supabaseAdmin, idMaterial);
-      const stockAppFinal = stockApp !== null ? stockApp : (Number(mat.stock_actual) || 0);
+      // El recuento es de UNA ubicación: lo que hay en ese armario, no el total del
+      // material. Con lote_id se cuenta un bote ya fichado; con solo id_ubicacion,
+      // en ese sitio no constaba nada (o es el sitio de un ítem legacy sin botes).
+      const lotes = await getLotes(supabaseAdmin, idMaterial);
+      const loteId = strField(body.lote_id);
+      let idUbicacion = strField(body.id_ubicacion);
+      let stockAppFinal: number;
+      if (loteId) {
+        const lote = lotes.find((l: any) => l.id === loteId);
+        if (!lote) return jsonError("Ese bote ya no existe. Recarga la página y vuelve a elegir la ubicación.", 400);
+        idUbicacion = lote.id_ubicacion;
+        stockAppFinal = Number(lote.stock_local) || 0;
+      } else if (idUbicacion) {
+        const enEseSitio = lotes.filter((l: any) => l.id_ubicacion === idUbicacion);
+        if (enEseSitio.length) return jsonError("En esa ubicación ya hay un bote fichado: elígelo en la lista.", 400);
+        stockAppFinal = (!lotes.length && mat.ubicacion === idUbicacion) ? (Number(mat.stock_actual) || 0) : 0;
+      } else {
+        return jsonError("Indica en qué ubicación has contado", 400);
+      }
       const diferencia = stockReal - stockAppFinal;
       const datos = {
         id_revision: genId("REV"), id_material: idMaterial, nombre_material: mat.nombre,
         stock_app: stockAppFinal, stock_real: stockReal, diferencia,
         usuario: usuarioNombre, observaciones: String(body.observaciones || ""),
+        id_lote: loteId, id_ubicacion: idUbicacion,
       };
       const { data, error } = await supabaseAdmin.from("revisiones_inventario").insert(datos).select().single();
       if (error) return jsonError(`No se pudo enviar la revisión: ${error.message}`, 400);
@@ -419,6 +437,53 @@ Deno.serve(async (req) => {
     if (!mat) return jsonError("Material no encontrado", 404);
     const lotes = await getLotes(supabaseAdmin, rev.id_material);
     const stockRealNum = Number(rev.stock_real);
+    if (rev.id_lote || rev.id_ubicacion) {
+      // Recuento de UNA ubicación: lo contado sustituye el stock de ese bote (mismo
+      // criterio que "reemplazar" al validar propuestas: es el stock de ahora, no
+      // una entrada). El ajuste se recalcula contra el stock de este momento, por si
+      // hubo consumos entre el recuento y su aplicación.
+      let lote = rev.id_lote ? lotes.find((l: any) => l.id === rev.id_lote) : null;
+      if (rev.id_lote && !lote) {
+        return jsonError("El bote contado ya no existe (se eliminó o se trasladó). Descarta esta revisión.", 400);
+      }
+      if (!lote) lote = lotes.find((l: any) => l.id_ubicacion === rev.id_ubicacion) || null; // se fichó ahí entretanto
+      let previo: number;
+      if (lote) {
+        previo = Number(lote.stock_local) || 0;
+        await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stockRealNum }).eq("id", lote.id);
+        await sincronizarStockMaterial(supabaseAdmin, rev.id_material);
+      } else if (!lotes.length && (!mat.ubicacion || mat.ubicacion === rev.id_ubicacion)) {
+        // Ítem legacy (sin botes) contado en su propio sitio
+        previo = Number(mat.stock_actual) || 0;
+        await supabaseAdmin.from("material").update({ stock_actual: stockRealNum, ubicacion: rev.id_ubicacion }).eq("id_material", rev.id_material);
+      } else {
+        // Ahí no constaba: se crea el bote. Si el material era legacy, su stock se
+        // materializa antes como bote en su sitio, o sincronizar lo borraría.
+        previo = 0;
+        if (!lotes.length && (Number(mat.stock_actual) || 0) > 0) {
+          await supabaseAdmin.from("material_ubicaciones").insert({
+            id: genId("LU"), id_material: rev.id_material, id_ubicacion: mat.ubicacion,
+            stock_local: Number(mat.stock_actual) || 0, stock_minimo_local: Number(mat.stock_minimo) || 0,
+            stock_optimo_local: Number(mat.stock_optimo) || 0,
+          });
+        }
+        const { error } = await supabaseAdmin.from("material_ubicaciones").insert({
+          id: genId("LU"), id_material: rev.id_material, id_ubicacion: rev.id_ubicacion,
+          stock_local: stockRealNum, stock_minimo_local: 0, stock_optimo_local: 0,
+        });
+        if (error) return jsonError(`No se pudo crear el bote en esa ubicación: ${error.message}`, 400);
+        await sincronizarStockMaterial(supabaseAdmin, rev.id_material);
+      }
+      const ajuste = Math.abs(stockRealNum - previo);
+      if (ajuste > 0) {
+        await registrarMovimiento(supabaseAdmin, mat, "Ajuste", ajuste, String(body.usuario || "Usuario"),
+          `Ajuste por recuento en ${rev.id_ubicacion}`, `${previo} → ${stockRealNum}`);
+      }
+      await supabaseAdmin.from("revisiones_inventario").delete().eq("id_revision", idRevision);
+      const { data: matFinal } = await supabaseAdmin.from("material").select("*").eq("id_material", rev.id_material).single();
+      return jsonOk({ material: matFinal, aplicada: idRevision });
+    }
+    // Revisiones antiguas, sin ubicación: recuento del total del material
     if (lotes.length > 0) {
       const stockAppActual = lotes.reduce((s: number, l: any) => s + (Number(l.stock_local) || 0), 0);
       const diferencia = stockRealNum - stockAppActual;
