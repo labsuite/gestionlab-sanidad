@@ -1157,9 +1157,16 @@ function _abrirAdicionPorNfc(categoria, lab) {
     const activo = x => x.Lab === lab && (x.Estado || 'activo') === 'activo';
     // Las etiquetas grabadas antes de dividir Aguas en dos garrafas (2026-10-01)
     // dicen "Aguas Laboratorio": se abre la garrafa de aguas que haya en ese lab.
-    const c = DATA.contenedoresResiduo.find(x => x.Categoria === categoria && activo(x))
-      || (categoria === 'Aguas Laboratorio'
-        && DATA.contenedoresResiduo.find(x => (x.Categoria || '').startsWith('Aguas Laboratorio') && activo(x)));
+    let c = DATA.contenedoresResiduo.find(x => x.Categoria === categoria && activo(x));
+    if (!c && categoria === 'Aguas Laboratorio') {
+      const aguas = DATA.contenedoresResiduo.filter(x => (x.Categoria || '').startsWith('Aguas Laboratorio') && activo(x));
+      if (aguas.length > 1) {
+        // Con dos garrafas en el mismo lab no se adivina: que la persona elija.
+        showToast(`Etiqueta antigua: en el Lab ${lab} hay ${aguas.length} garrafas de aguas (Tinciones y Equipos). Elige la tuya aquí abajo — y avisa para regrabar la etiqueta.`, 'warning');
+        return;
+      }
+      c = aguas[0];
+    }
     if (!c) {
       showToast(`No se encontró un contenedor activo de "${categoria}" en Lab ${lab}`, 'error');
       return;

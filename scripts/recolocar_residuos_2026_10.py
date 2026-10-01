@@ -67,7 +67,8 @@ MOVER = {
         '+ restos de muestra y conjugado + la lejía diluida del protocolo de limpieza del lavador. NO lleva solución de '
         'parada ni TMB: se añaden después del último lavado y se quedan en la placa (que va a bolsa de autoclave). '
         'Va a aguas de laboratorio, como lo que generan los aparatos automáticos de diagnóstico (norma del gestor, 2026-10); '
-        'como lleva lejía, nunca junto a nada ácido.'),
+        'como lleva lejía, nunca junto a nada ácido. El lavador está en el 205: cuando se vacíe su botella, '
+        'llevarla a la garrafa de Equipos del 203 (se hacen pocos ELISA).'),
     # 2
     'Reactivos bioquímicos de autoanalizador (Metrolab 2300)': (AGUAS, None),
     'Reactivos de quimioluminiscencia (Maglumi 600)': (AGUAS, None),

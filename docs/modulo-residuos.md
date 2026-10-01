@@ -93,9 +93,11 @@ que suele ser ácido) y `Aguas Laboratorio - Equipos` (autoanalizadores, citóme
 botella del lavador de ELISA —que lleva la lejía de la limpieza, NO la parada ni el TMB, que se
 quedan en la placa—, kits de diagnóstico, tampones, medios, PCR, OCT). Así lo ácido y lo que
 lleva lejía nunca coinciden. La garrafa del 203 pasó a Equipos (ahí están casi todos los
-autoanalizadores) y la del 205 a Tinciones. Las etiquetas NFC antiguas con
-`cont-cat=Aguas Laboratorio` siguen funcionando: `_abrirAdicionPorNfc` abre la garrafa de aguas
-que haya en ese lab, pero conviene regrabarlas.
+autoanalizadores) y la del 205 a Tinciones. Luego (decisión de la usuaria) se añadieron
+garrafas de Tinciones en el 203 y el 207: **203 = Equipos + Tinciones, 205 = Tinciones, 207 =
+Tinciones**. El lavador de ELISA está en el 205 y se vacía en la de Equipos del 203 (pocos ELISA).
+Etiquetas NFC antiguas con `cont-cat=Aguas Laboratorio`: `_abrirAdicionPorNfc` abre la garrafa
+de aguas del lab si solo hay una; si hay dos (203) no adivina, deja elegir en Contenedores. Regrabarlas.
 
 **Kits de tinción con botes desconocidos**: por defecto a Tinciones; las IAs separan oxidantes,
 pícrico/Bouin y DAB (salvavidas) y xileno/X-Free/formol (Inertes), y escalan plata, mercurio o
