@@ -460,7 +460,7 @@ antiguas y siguen el comportamiento viejo (diferencia sobre el primer bote).
 
 ### Árbol de decisión en Guía de residuos
 
-**Pendiente:** el gestor ya dio las normas generales (2026-10-01, en `_NORMAS_GESTOR` de `js/residuos.js`, ver `docs/modulo-residuos.md`); catálogo ya recolocado (`scripts/recolocar_residuos_2026_10.py`). Falta estructurar el árbol.
+**Pendiente:** el gestor ya dio las normas generales (2026-10-01, en `_NORMAS_GESTOR` de `js/residuos.js`, ver `docs/modulo-residuos.md`); catálogo ya recolocado (`scripts/recolocar_residuos_2026_10.py`). **Árbol hecho** como asistente de preguntas (tarjeta "🧭 ¿Dónde lo tiro?", ver `docs/modulo-residuos.md`); el diseño de abajo es el original — falta decidir si el árbol pasa a ser la vista por defecto en lugar de la lista.
 
 Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
 

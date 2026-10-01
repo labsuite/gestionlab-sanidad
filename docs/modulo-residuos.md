@@ -107,8 +107,18 @@ Azul tripán y yoduro de propidio → salvavidas `Reactivos de laboratorio` (se 
 cantidad; decisión de la usuaria). La categoría `Contenedor Citotóxicos` se quedó sin tipos;
 el cubo "Citotóxicos" del 207 sigue activo hasta que la usuaria decida qué hacer con él.
 
-No se usa `Residuo Biológico GII`: calibradores/controles de autoanalizadores → `Aguas Laboratorio -
-Equipos`; ropa/EPI con sangre → `Bolsa de autoclave`. La categoría desaparece.
+`Residuo Biológico GII` solo se usa para la ropa/EPI con sangre o muestras (corrección de la
+usuaria); los calibradores/controles de autoanalizadores → `Aguas Laboratorio - Equipos`.
+
+## Árbol de decisión "🧭 ¿Dónde lo tiro?" (2026-10-01)
+
+Tarjeta en la Guía, encima de las normas: una pregunta cada vez con botones (`_ARBOL_RESIDUOS`,
+`_pintarArbol`, `arbolResponder`/`arbolAtras`/`arbolReiniciar` en `js/residuos.js`). Cada hoja
+es una categoría del catálogo (`Contenedor_Tipo`): muestra el porqué (`_ARBOL_HOJAS`, palabras
+del gestor), los contenedores activos de esa categoría con **"+ Añadir residuo aquí"**
+(`openModalAdicion`) y, plegados, los tipos del catálogo que incluye. Basura normal y Fregadero
+no tienen contenedor. "No sé qué es" lleva al consultorio / "Avisar a la gestora". La lista por
+categorías sigue debajo; si se cambia el nombre de una categoría, actualizar las hojas del árbol.
 
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)

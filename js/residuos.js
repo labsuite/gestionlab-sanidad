@@ -131,6 +131,173 @@ function _riesgoBadges(riesgo) {
   }).join(' ');
 }
 
+// ── Árbol de decisión "¿Dónde lo tiro?" ──────────────────────
+// Una pregunta cada vez (normas del gestor, 2026-10-01). Cada hoja es una
+// categoría del catálogo (Contenedor_Tipo): muestra el porqué, los contenedores
+// activos de esa categoría con "Añadir residuo aquí" y los tipos que incluye.
+const _ARBOL_RESIDUOS = {
+  inicio: {
+    pregunta: '¿Qué tienes que tirar?',
+    opciones: [
+      { texto: '✂️ Algo que corta o pincha', ir: 'corta' },
+      { texto: '🫙 Una muestra en formol o etanol', ir: 'formol' },
+      { texto: '🦠 Algo biológico: cultivos, muestras o material que las tocó', ir: 'biologico' },
+      { texto: '🧤 Un sólido: envase vacío, papel, guantes, portas…', ir: 'solido' },
+      { texto: '💧 Un líquido', ir: 'liquido' },
+      { texto: '🤷 No lo sé / nada de esto', ir: 'dudo' },
+    ],
+  },
+  corta: {
+    pregunta: '¿Qué es exactamente?',
+    opciones: [
+      { texto: 'Un porta NO contaminado, con el material ya fijado', hoja: 'Basura normal' },
+      { texto: 'Bisturí, cuchilla de microtomo, aguja, lanceta… o un porta contaminado', hoja: 'Residuo Cortante' },
+    ],
+  },
+  biologico: {
+    pregunta: '¿Es ropa de protección (bata, guantes, EPI) manchada de sangre o muestras?',
+    opciones: [
+      { texto: 'Sí, es ropa o EPI', hoja: 'Residuo Biológico GII' },
+      { texto: 'No: cultivos, muestras, puntas, tubos…', hoja: 'Bolsa de autoclave' },
+    ],
+  },
+  formol: {
+    pregunta: '¿La muestra sigue dentro?',
+    opciones: [
+      { texto: 'Sí, la muestra está dentro', hoja: 'Muestras en formol' },
+      { texto: 'No, es solo el formol o el etanol (aunque haya tenido muestra)', hoja: 'Contenedor Inertes' },
+    ],
+  },
+  solido: {
+    pregunta: '¿Qué tipo de sólido?',
+    opciones: [
+      { texto: 'Un envase vacío de plástico o aluminio que tuvo algo peligroso', hoja: 'Bolsa plástica (químicos)' },
+      { texto: 'Papel, guantes, filtros… manchados de un químico', hoja: 'Bolsa plástica (químicos)' },
+      { texto: 'Portas teñidos, secciones histológicas o bloques de parafina', hoja: 'Basura normal' },
+      { texto: 'Otra cosa', ir: 'dudo' },
+    ],
+  },
+  liquido: {
+    pregunta: '¿De dónde sale el líquido?',
+    opciones: [
+      { texto: '🎨 De una tinción (también los kits de tinción)', hoja: 'Aguas Laboratorio - Tinciones' },
+      { texto: '🔬 De un aparato o kit de diagnóstico, tampones, medios, PCR…', hoja: 'Aguas Laboratorio - Equipos' },
+      { texto: '🧽 Lejía diluida de limpiar', hoja: 'Fregadero' },
+      { texto: '🧪 Un disolvente: formol o etanol sin muestra, X-Free, isopropanol…', ir: 'disolvente' },
+      { texto: '⚗️ Un ácido que no es de tinción', hoja: 'Contenedor Ácidos' },
+      { texto: '🔥 Un oxidante: agua oxigenada, permanganato, ácido peryódico…', hoja: 'Reactivos de laboratorio' },
+      { texto: '🤷 Otro reactivo / no lo sé', ir: 'dudo' },
+    ],
+  },
+  disolvente: {
+    pregunta: '¿Lleva cloroformo u otro disolvente clorado (p. ej. Carnoy)?',
+    opciones: [
+      { texto: 'Sí', hoja: 'Contenedor Halogenados' },
+      { texto: 'No', hoja: 'Contenedor Inertes' },
+    ],
+  },
+  dudo: {
+    pregunta: '¿Es un químico en poca cantidad (menos de 1 L, más o menos)?',
+    opciones: [
+      { texto: 'Sí', hoja: 'Reactivos de laboratorio' },
+      { texto: 'No, o no sé qué es', hoja: '_consultar' },
+    ],
+  },
+};
+
+// Por qué va ahí (normas del gestor). Las hojas sin contenedor físico lo dicen.
+const _ARBOL_HOJAS = {
+  'Bolsa de autoclave': { icon: '🦠', porque: 'Lo biológico se inactiva en autoclave antes de tirarlo.' },
+  'Residuo Biológico GII': { icon: '🦺', porque: 'La ropa y los EPI contaminados con sangre o muestras no se autoclavan de forma práctica: van como residuo biológico de grupo II.' },
+  'Basura normal': { icon: '🗑️', sinContenedor: true, porque: 'Solo lleva trazas fijadas: va a la basura normal. Los portas, bien protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.' },
+  'Residuo Cortante': { icon: '✂️', porque: 'Contenedor amarillo de punzantes: todo lo que corta o pincha, esté contaminado o no.' },
+  'Muestras en formol': { icon: '🫙', porque: 'Contenedor cuadrado azul, va a incinerar: SOLO formol o etanol con la muestra dentro. En autoclave el formol se liberaría y dañaría ojos y pulmones.' },
+  'Contenedor Inertes': { icon: '🧪', porque: 'Disolventes no halogenados: aquí va también el formol o etanol que ya no lleva la muestra.' },
+  'Contenedor Halogenados': { icon: '🧪', porque: 'Los disolventes clorados (cloroformo…) van separados de los no halogenados.' },
+  'Bolsa plástica (químicos)': { icon: '🛍️', porque: 'Envases vacíos y sólidos manchados de químicos. Los frascos bien cerrados (que no se acumule líquido en el fondo); lo manchado de disolventes volátiles, antes en una bolsa zip. La bolsa es la misma para todo: marca con una X para qué la usas.' },
+  'Aguas Laboratorio - Tinciones': { icon: '🎨', porque: 'Todo lo de las tinciones va junto (el protocolo ya lo mezcla). Suele ser ácido: por eso no va a la garrafa de Equipos, que lleva lejía. Ojo con los kits: si su ficha de seguridad lleva un oxidante, ácido pícrico/Bouin o DAB, eso va al salvavidas; y el xileno o el formol, a Inertes.' },
+  'Aguas Laboratorio - Equipos': { icon: '🔬', porque: 'Lo que generan los aparatos de diagnóstico (también la botella del lavador del ELISA, que se vacía en la garrafa de Equipos del 203), kits, tampones y medios. Lleva la lejía de la limpieza de los aparatos: nada ácido aquí.' },
+  'Fregadero': { icon: '🚰', sinContenedor: true, porque: 'La lejía diluida va al fregadero con abundante agua, sola: nunca mezclada antes con ácidos (desprende cloro). La lejía concentrada, al salvavidas.' },
+  'Contenedor Ácidos': { icon: '⚗️', porque: 'Los ácidos que no son de tinción van juntos aquí.' },
+  'Reactivos de laboratorio': { icon: '🛟', porque: 'El salvavidas: bote azul de ballesta para químicos en poca cantidad, cada uno en su frasco bien cerrado y resistente (Falcon, plástico) o de vidrio protegido. Aquí van también los oxidantes.' },
+};
+
+let _arbolCamino = [];   // [{ nodo, respuesta }]
+
+function _renderArbolResiduos() {
+  return `<div class="card" style="margin-bottom:20px">
+    <div class="card-header"><div class="card-title">🧭 ¿Dónde lo tiro?</div></div>
+    <div id="arbol-residuos" style="padding:14px 18px">${_pintarArbol()}</div>
+  </div>`;
+}
+
+function _pintarArbol() {
+  const ultimo = _arbolCamino[_arbolCamino.length - 1];
+  const migas = _arbolCamino.length
+    ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.5">${_arbolCamino.map(p => p.respuesta).join(' › ')}</div>`
+    : '';
+  const nav = _arbolCamino.length
+    ? `<div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="arbolAtras()">← Atrás</button>
+        <button class="btn btn-secondary" onclick="arbolReiniciar()">Empezar de nuevo</button>
+      </div>`
+    : '';
+  if (ultimo && ultimo.hoja) return migas + _pintarHojaArbol(ultimo.hoja) + nav;
+  const id = ultimo ? ultimo.ir : 'inicio';
+  const nodo = _ARBOL_RESIDUOS[id];
+  const botones = nodo.opciones.map((o, i) => `
+    <button class="btn btn-secondary" style="display:block;width:100%;text-align:left;white-space:normal;margin-bottom:8px;padding:10px 14px"
+      onclick="arbolResponder('${id}', ${i})">${o.texto}</button>`).join('');
+  return `${migas}<div style="font-weight:600;font-size:15px;margin-bottom:12px">${nodo.pregunta}</div>${botones}${nav}`;
+}
+
+function _pintarHojaArbol(cat) {
+  if (cat === '_consultar') {
+    return `<div style="font-size:14px;line-height:1.6;margin-bottom:12px">
+        <strong>No lo tires todavía.</strong> Déjalo en su envase, cerrado y rotulado, en la zona de residuos pendientes,
+        y pregunta al consultorio o avisa a la gestora.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="abrirChatResiduo()">💬 Preguntar al consultorio</button>
+        <button class="btn btn-secondary" onclick="openModalConsultaResiduo()">Avisar a la gestora</button>
+      </div>`;
+  }
+  const h = _ARBOL_HOJAS[cat] || { icon: '🗑️', porque: '' };
+  const tipos = DATA.tiposResiduo.filter(t => t.Contenedor_Tipo === cat).map(t => t.Nombre).sort((a, b) => a.localeCompare(b, 'es'));
+  let contenedores = '';
+  if (!h.sinContenedor) {
+    const activos = DATA.contenedoresResiduo
+      .map((c, idx) => ({ c, idx }))
+      .filter(({ c }) => c.Categoria === cat && (c.Estado || 'activo') === 'activo')
+      .sort((a, b) => String(a.c.Lab).localeCompare(String(b.c.Lab)));
+    contenedores = activos.length
+      ? activos.map(({ c, idx }) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--border)">
+            <div style="font-size:13px"><strong>Lab ${c.Lab}</strong>${c.Zona ? ' · ' + c.Zona : ''}${c.Formato ? ' · ' + c.Formato : ''} ${_nivelBadge(c.Nivel)}</div>
+            <button class="btn btn-primary" onclick="openModalAdicion(${idx})">+ Añadir residuo aquí</button>
+          </div>`).join('')
+      : `<div style="font-size:13px;color:#b45309;padding:8px 0;border-top:1px solid var(--border)">⚠️ No hay ningún contenedor activo de este tipo registrado. Déjalo en su envase cerrado y rotulado y avisa a la gestora.</div>`;
+  }
+  return `<div style="font-size:18px;font-weight:700;margin-bottom:6px">${h.icon} ${cat}</div>
+    <div style="font-size:13px;line-height:1.6;color:var(--text-soft);margin-bottom:10px">${h.porque}</div>
+    ${contenedores}
+    ${tipos.length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">Qué residuos del catálogo van aquí (${tipos.length})</summary>
+      <div style="font-size:13px;color:var(--text-soft);line-height:1.7;margin-top:6px">${tipos.join(' · ')}</div></details>` : ''}`;
+}
+
+function _repintarArbol() {
+  const el = document.getElementById('arbol-residuos');
+  if (el) el.innerHTML = _pintarArbol();
+}
+
+function arbolResponder(id, i) {
+  const o = _ARBOL_RESIDUOS[id].opciones[i];
+  _arbolCamino.push({ respuesta: o.texto.replace(/^[^\p{L}\p{N}]+\s/u, ''), ir: o.ir, hoja: o.hoja });
+  _repintarArbol();
+}
+
+function arbolAtras() { _arbolCamino.pop(); _repintarArbol(); }
+function arbolReiniciar() { _arbolCamino = []; _repintarArbol(); }
+
 // ── Página: Guía de residuos ─────────────────────────────────
 function renderResiduosGuia() {
   const el = document.getElementById('page-residuos-guia');
@@ -146,6 +313,7 @@ function renderResiduosGuia() {
         <button class="btn btn-primary" onclick="abrirChatResiduo()">💬 Abrir consultorio de residuos</button>
       </div>
     </div>
+    ${_renderArbolResiduos()}
     ${_renderNormasGestor()}
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <input type="text" id="res-search" class="form-input"
