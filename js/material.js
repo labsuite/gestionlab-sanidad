@@ -1394,7 +1394,7 @@ async function guardarTraslado() {
     closeModal('modal-traslado'); renderMaterial();
     renderDashboard();
     updateBadges();
-  } catch(e) { showToast('Error en el traslado', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error en el traslado', 'error'); console.error(e); }
   hideLoading();
 }
 
