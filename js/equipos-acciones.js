@@ -506,7 +506,9 @@ function _renderAccionesHilo(inc, chain) {
   cont.innerHTML = '';
   if (!puedeHacer('crearIntervenciones')) return;
   const activa = chain.find(c => c.ID_Intervencion === inc.Intervencion_Generada);
-  if (!activa || activa.Estado === 'Cerrada') return;
+  // Aunque la activa esté cerrada (p.ej. cerrada con una tarea "No resuelto")
+  // puede hacer falta otra actuación; solo se ocultan con la incidencia cerrada.
+  if (!activa || ['Resuelta', 'Descartada'].includes(inc.Estado)) return;
   const eqId  = (inc.Equipo || '').split(' – ')[0].trim();
   const cIdx  = DATA.intervenciones.indexOf(activa);
   cont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
@@ -785,11 +787,15 @@ const _RESULTADO_BADGE = {'Resuelto':'badge-green','Resuelto parcialmente':'badg
 function _renderTareasEnModal(intId) {
   const cont = document.getElementById('act-tareas-lista');
   if (!cont) return;
+  // Volver una tarea a "Pendiente" reabre la actuación en el servidor: los
+  // botones del pie (Cerrar / Guardar cambios / Reabrir) se ajustan a eso.
+  const intMod = DATA.intervenciones.find(x => x.ID_Intervencion === intId);
+  if (intMod) _aplicarModoModalActuacion(intMod);
   const tareas = getTareasIntervencion(intId);
   if (!tareas.length) {
     // Sin tareas no se puede finalizar (lo impide también la Edge Function): se
     // avisa aquí, antes de pulsar el botón, no solo con un error al intentarlo.
-    cont.innerHTML = '<div style="font-size:12px;color:var(--warning,#c17f3a);padding:4px 0">Aún no hay tareas en esta actuación. Añade al menos una para poder finalizarla — son las que dicen qué se hizo y cómo quedó.</div>';
+    cont.innerHTML = '<div style="font-size:12px;color:var(--warning,#c17f3a);padding:4px 0">Aún no hay tareas en esta actuación. Añade al menos una para poder cerrarla — son las que dicen qué se hizo y cómo quedó.</div>';
     return;
   }
   // Toda tarea es editable, esté como esté: marcar un resultado no es una decisión
@@ -891,7 +897,7 @@ function _aplicarModoModalActuacion(i) {
   const fechaTxt     = (i && i.Fecha_Realizacion) ? ' del ' + formatDate(i.Fecha_Realizacion) : '';
 
   if (btnReab) btnReab.style.display = finalizada ? '' : 'none';
-  if (btnFin)  btnFin.textContent = finalizada ? 'Guardar cambios' : 'Guardar y finalizar actuación';
+  if (btnFin)  btnFin.textContent = finalizada ? 'Guardar cambios' : '🔒 Cerrar actuación';
 
   if (finalizada || yaRegistrada) {
     // Mismo nombre que el botón que abre este modal ("✏️ Editar intervención"),
@@ -904,7 +910,7 @@ function _aplicarModoModalActuacion(i) {
         bEditar.style.background = 'var(--warning-light,#fdf3e7)';
         bEditar.style.border     = '1px solid var(--warning,#c17f3a)';
         bEditar.style.color      = 'var(--warning,#c17f3a)';
-        bEditar.innerHTML = `Estás <strong>editando una actuación ya finalizada</strong>${fechaTxt}. Los cambios se guardan sobre <strong>${i.ID_Intervencion}</strong> — <strong>no se crea una actuación nueva</strong>. Para registrar una actuación distinta, cierra esto y usa «📅 Programar otra actuación» desde la ficha de la intervención.`;
+        bEditar.innerHTML = `Estás <strong>editando una actuación ya cerrada</strong>${fechaTxt}. Los cambios se guardan sobre <strong>${i.ID_Intervencion}</strong> — <strong>no se crea una actuación nueva</strong>. Para registrar una actuación distinta, cierra esto y usa «📅 Programar otra actuación» desde la ficha de la intervención.`;
       } else {
         bEditar.style.background = 'var(--accent-light)';
         bEditar.style.border     = 'none';
@@ -924,7 +930,7 @@ async function reabrirActuacion() {
   const intIdx = parseInt(v('act-int-idx'));
   const i = DATA.intervenciones[intIdx];
   if (!i) { showToast('Intervención no encontrada', 'error'); return; }
-  if (!confirm(`Vas a reabrir la actuación ${i.ID_Intervencion}. Volverá a quedar en curso y podrás finalizarla otra vez cuando termines. ¿Continuar?`)) return;
+  if (!confirm(`Vas a reabrir la actuación ${i.ID_Intervencion}. Volverá a quedar «En gestión» y podrás cerrarla otra vez cuando termines. ¿Continuar?`)) return;
   showLoading('Reabriendo...');
   try {
     const { intervencion } = await callEdgeFunction('gestionar-intervencion', {
@@ -1072,12 +1078,7 @@ async function guardarActuacion(finalizar) {
   // ── MODO DIRECTO: crear nueva intervención + primera tarea (Pendiente) ───
   // Aquí sí hace falta una tarea: sin ella no hay nada que crear todavía.
   if (equipoDirecto) {
-    if (!desc) {
-      showToast(finalizar
-        ? 'Una actuación no se cierra sin tareas: describe al menos una.'
-        : 'Escribe la descripción de la tarea', 'error');
-      return;
-    }
+    if (!desc) { showToast('Escribe la descripción de la tarea', 'error'); return; }
     const fechaReal = v('act-fecha-real');
     if (!fechaReal) { showToast('La fecha de realización es obligatoria', 'error'); return; }
     const tipoEjec     = document.querySelector('input[name="act-tipo-ejec"]:checked')?.value || 'Interna';
@@ -1131,19 +1132,18 @@ async function guardarActuacion(finalizar) {
     showLoading('Guardando...');
     try {
       await _guardarTareaIntervencion(intervencion.id_intervencion, desc, 'Pendiente', '', v('act-observaciones'));
-      // La actuación se finaliza DESPUÉS de tener su primera tarea — el servidor
-      // no deja cerrarla sin ninguna, y al crearla todavía no existía.
-      if (finalizar) {
-        const { intervencion: finalizada } = await callEdgeFunction('gestionar-intervencion', {
-          accion: 'actualizar', id_intervencion: intervencion.id_intervencion, actuacion_finalizada: true,
-        });
-        const idxFin = DATA.intervenciones.findIndex(x => x.ID_Intervencion === finalizada.id_intervencion);
-        if (idxFin !== -1) DATA.intervenciones[idxFin] = _intervencionSbToObj(finalizada);
-      }
+      // La tarea nace "Pendiente" y una actuación no se cierra con tareas sin
+      // resultado: en vez de salir, el modal se reabre sobre la actuación recién
+      // creada para marcar el resultado y, entonces sí, «🔒 Cerrar actuación».
       closeModal('modal-registrar-actuacion');
-      showToast(`Intervención ${intervencion.id_intervencion} registrada. Tarea → Pendiente`, 'success');
       renderAll();
-      volverAlHilo();
+      const hilo = _hiloIncidenciaActiva;
+      const idxNueva = DATA.intervenciones.findIndex(x => x.ID_Intervencion === intervencion.id_intervencion);
+      if (idxNueva !== -1) {
+        openModalRegistrarActuacion(idxNueva);
+        _hiloIncidenciaActiva = hilo;
+      }
+      showToast(`Actuación ${intervencion.id_intervencion} registrada. Marca el resultado de la tarea${finalizar ? ' y vuelve a pulsar «🔒 Cerrar actuación»' : ''}.`, 'success');
     } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
     hideLoading();
     return;
@@ -1159,9 +1159,21 @@ async function guardarActuacion(finalizar) {
   // este mismo golpe). Una actuación ya finalizada se puede seguir corrigiendo
   // aunque no tenga tareas — es de antes de esta regla, y el botón dice "Guardar
   // cambios", no "finalizar".
-  if (finalizar && i.Actuacion_Finalizada !== 'Sí' && !desc && !getTareasIntervencion(i.ID_Intervencion).length) {
-    showToast('Añade al menos una tarea antes de finalizar la actuación', 'error');
-    return;
+  const yaCerrada = i.Actuacion_Finalizada === 'Sí';
+  if (finalizar && !yaCerrada) {
+    const tareasInt  = getTareasIntervencion(i.ID_Intervencion);
+    const pendientes = tareasInt.filter(t => t.Resultado === 'Pendiente').length;
+    // Cerrada = terminada: ninguna tarea puede quedar sin resultado. La que se
+    // está escribiendo nacería "Pendiente", así que primero hay que añadirla.
+    if (desc) {
+      showToast('Antes de cerrar, añade la tarea que estás escribiendo («➕ Añadir tarea a la lista») y marca su resultado.', 'error');
+      return;
+    }
+    if (!tareasInt.length) { showToast('Añade al menos una tarea antes de cerrar la actuación', 'error'); return; }
+    if (pendientes) {
+      showToast(`Queda${pendientes > 1 ? 'n' : ''} ${pendientes} tarea${pendientes > 1 ? 's' : ''} sin resultado: márcala${pendientes > 1 ? 's' : ''} (✓ Resuelto o el desplegable) antes de cerrar la actuación.`, 'error');
+      return;
+    }
   }
 
   // Los campos de visita se leen y se guardan siempre (no solo la primera vez),
@@ -1205,17 +1217,19 @@ async function guardarActuacion(finalizar) {
     if (desc) await _guardarTareaIntervencion(i.ID_Intervencion, desc, 'Pendiente', '', v('act-observaciones'));
 
     if (finalizar) {
-      // Se finaliza al final, con la tarea ya guardada: el servidor rechaza cerrar
-      // una actuación que no tenga ninguna.
-      const { intervencion: finalizada } = await callEdgeFunction('gestionar-intervencion', {
-        accion: 'actualizar', id_intervencion: i.ID_Intervencion, actuacion_finalizada: true,
-      });
-      DATA.intervenciones[intIdx] = _intervencionSbToObj(finalizada);
+      // Con la actuación ya cerrada ("Guardar cambios"), una tarea nueva nace
+      // Pendiente y el servidor la reabre: no se vuelve a cerrar aquí.
+      if (!(yaCerrada && desc)) {
+        const { intervencion: finalizada } = await callEdgeFunction('gestionar-intervencion', {
+          accion: 'actualizar', id_intervencion: i.ID_Intervencion, actuacion_finalizada: true,
+        });
+        DATA.intervenciones[intIdx] = _intervencionSbToObj(finalizada);
+      }
 
       closeModal('modal-registrar-actuacion');
       showToast(desc
-        ? 'Actuación finalizada. Tarea añadida como Pendiente — márcala desde la ficha cuando toque.'
-        : 'Actuación finalizada. Para registrar otra distinta, usa «Programar otra actuación».', 'success');
+        ? 'Tarea añadida como Pendiente: la actuación vuelve a quedar «En gestión» hasta que marques su resultado y la cierres.'
+        : (yaCerrada ? 'Cambios guardados.' : 'Actuación cerrada.'), 'success');
       renderAll();
       // Se vino del hilo de una incidencia: se vuelve a él para poder darla por
       // resuelta (o no) a propósito, en vez de salir a la pantalla de fondo.

@@ -34,19 +34,33 @@ calcularResultadoAgregado(tareas):
   todas Resuelto/Descartado→ 'Resuelto' (si hay algún Resuelto) o 'Descartado' (si todas descartadas)
   resto (mezcla con No resuelto, sin pendientes) → 'Resuelto parcialmente'
 
-calcularEstadoIntervencion(resultadoAgregado):
-  sin resultado                              → 'Planificada'
-  'Pendiente' / 'Resuelto parcialmente'      → 'En gestión'
-  resto (Resuelto o Descartado, interna o externa) → 'Cerrada'
 ```
 
-**La factura no es obligatoria (desde 2026-10-01).** Antes una actuación externa resuelta
-pasaba a `Pendiente factura` y no se cerraba hasta adjuntarla, lo que bloqueaba cerrar la
-incidencia. Pero las facturas del SAT suelen agrupar varias actuaciones, así que ahora se
-cierra igual que una interna; la factura se adjunta, si se quiere, en el "Documento adjunto"
-de la actuación. El estado `Pendiente factura` y el modal `modal-adjuntar-factura`
-(`guardarFactura`) quedan solo como legado: ya no se genera ese estado y las 3 actuaciones
-que estaban en él se pasaron a `Cerrada`.
+**El estado lo marcan las acciones, no las tareas (desde 2026-10-01):**
+
+```
+calcularEstadoIntervencion(intervención):
+  actuacion_finalizada (botón «🔒 Cerrar actuación») → 'Cerrada'
+  con fecha_realizacion                              → 'En gestión'
+  sin fecha_realizacion                              → 'Planificada'
+```
+
+El `resultado` sigue saliendo de las tareas, pero ya no decide si la actuación está
+cerrada: una visita del SAT que terminó con una tarea `No resuelto` se cierra igual (lo
+que faltaba va a su seguimiento). Antes se quedaba `En gestión` para siempre aunque se
+hubiera "finalizado", y no se veía cuándo una actuación estaba cerrada.
+
+- Cerrar exige al menos una tarea y **ninguna `Pendiente`** (cliente y servidor).
+- Si una tarea de una actuación cerrada vuelve a `Pendiente`, `guardar_tarea` la reabre
+  sola (automatizar solo degrada; cerrar es siempre a propósito).
+- `estado` ya no se acepta del navegador en `crear`/`actualizar`: se recalcula siempre.
+- En modo directo la primera tarea nace `Pendiente`, así que tras crear la actuación el
+  modal se reabre sobre ella para marcar el resultado y cerrarla.
+- La factura **no** es obligatoria: `Pendiente factura` y `guardarFactura` son legado (las
+  facturas del SAT agrupan varias actuaciones); se adjunta en el "Documento adjunto".
+- Migración del 2026-10-01: las `Cerrada` sin marca pasaron a `actuacion_finalizada=true`,
+  las finalizadas sin tareas pendientes a `Cerrada`, e INT-L35AOW (finalizada con 3 tareas
+  `Pendiente`) se reabrió.
 
 La incidencia vinculada **no** se cierra sola con las tareas: mientras siga abierta se
 mantiene en `En gestión`, aunque la intervención llegue a `Cerrada`. Pasar a `Resuelta` o

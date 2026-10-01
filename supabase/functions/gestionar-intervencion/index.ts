@@ -28,14 +28,19 @@ function calcularResultadoAgregado(tareas: { resultado: string | null }[]): stri
   return "Resuelto parcialmente";
 }
 
-// Una actuación externa resuelta ya NO pasa por "Pendiente factura": las facturas
-// del SAT suelen agrupar varias actuaciones, así que exigir una por actuación
-// bloqueaba el cierre de la incidencia. La factura es opcional y se adjunta,
-// si se quiere, en el "Documento adjunto" de la propia actuación.
-function calcularEstadoIntervencion(resultadoAgregado: string): string {
-  if (!resultadoAgregado) return "Planificada";
-  if (resultadoAgregado === "Pendiente" || resultadoAgregado === "Resuelto parcialmente") return "En gestión";
-  return "Cerrada";
+// El ESTADO de una actuación lo marcan las acciones de la usuaria, no el
+// resultado de las tareas (desde 2026-10-01):
+//   Planificada → aún no se ha hecho (sin fecha de realización)
+//   En gestión  → hecha o empezada, sin cerrar
+//   Cerrada     → la usuaria pulsó "Cerrar actuación" (actuacion_finalizada)
+// Antes salía de las tareas y una visita terminada con una tarea "No resuelto"
+// se quedaba "En gestión" para siempre aunque se hubiese cerrado. El resultado
+// (Resuelto / Resuelto parcialmente...) sigue saliendo de las tareas, aparte.
+// Tampoco hay ya "Pendiente factura": la factura es opcional (las del SAT suelen
+// agrupar varias actuaciones) y se adjunta en el "Documento adjunto".
+function calcularEstadoIntervencion(i: { actuacion_finalizada?: boolean | null; fecha_realizacion?: string | null }): string {
+  if (i.actuacion_finalizada) return "Cerrada";
+  return i.fecha_realizacion ? "En gestión" : "Planificada";
 }
 
 Deno.serve(async (req) => {
@@ -86,7 +91,7 @@ Deno.serve(async (req) => {
       realizado_por: strField(body.realizado_por),
       proveedor: strField(body.proveedor),
       descripcion_actuacion: strField(body.descripcion_actuacion),
-      estado: strField(body.estado) || "Planificada",
+      estado: calcularEstadoIntervencion({ fecha_realizacion: strField(body.fecha_realizacion) }),
       coste_intervencion: numField(body.coste_intervencion),
       url_adjunto: strField(body.url_adjunto),
       nombre_adjunto: strField(body.nombre_adjunto),
@@ -124,9 +129,11 @@ Deno.serve(async (req) => {
     for (const c of CAMPOS) if (c in body) datos[c] = (c === "coste_intervencion") ? numField(body[c]) : strField(body[c]);
     if ("equipo_operativo_tras_intervencion" in body) datos.equipo_operativo_tras_intervencion = boolField(body.equipo_operativo_tras_intervencion);
     if ("actualiza_proximo_preventivo" in body) datos.actualiza_proximo_preventivo = boolField(body.actualiza_proximo_preventivo);
-    // "Finalizar actuación" — marca explícita de la usuaria, independiente de `estado`
-    // (que se deriva de las tareas). boolField devuelve false tal cual, para poder reabrir.
+    // "Cerrar actuación" — marca explícita de la usuaria; de ella sale `estado`
+    // (ver calcularEstadoIntervencion). boolField devuelve false tal cual, para poder reabrir.
     if ("actuacion_finalizada" in body) datos.actuacion_finalizada = boolField(body.actuacion_finalizada);
+    // El estado no se escribe a mano: se recalcula abajo tras guardar.
+    delete datos.estado;
 
     // Las tareas son las que dan resultado y cierre a la actuación: sin ninguna,
     // finalizarla deja una visita vacía que no dice qué se hizo. Se comprueba solo
@@ -140,14 +147,20 @@ Deno.serve(async (req) => {
       if (!previa.actuacion_finalizada) {
         const { count } = await supabaseAdmin.from("tareas_intervencion")
           .select("id_tarea", { count: "exact", head: true }).eq("id_intervencion", idIntervencion);
-        if (!count) return jsonError("Una actuación no se cierra sin tareas: añade al menos una tarea antes de finalizarla.", 400);
+        if (!count) return jsonError("Una actuación no se cierra sin tareas: añade al menos una tarea antes de cerrarla.", 400);
       }
+      // Cerrada significa terminada: no puede quedar ninguna tarea sin resultado.
+      const { count: pendientes } = await supabaseAdmin.from("tareas_intervencion")
+        .select("id_tarea", { count: "exact", head: true }).eq("id_intervencion", idIntervencion).eq("resultado", "Pendiente");
+      if (pendientes) return jsonError(`Quedan ${pendientes} tarea(s) sin resultado: márcalas (Resuelto, No resuelto, Descartado...) antes de cerrar la actuación.`, 400);
     }
 
-    const { data: intervencion, error } = await supabaseAdmin.from("intervenciones")
+    const { data: guardada, error } = await supabaseAdmin.from("intervenciones")
       .update(datos).eq("id_intervencion", idIntervencion).select().single();
     if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
-    if (!intervencion) return jsonError(`No se encontró la intervención "${idIntervencion}"`, 404);
+    if (!guardada) return jsonError(`No se encontró la intervención "${idIntervencion}"`, 404);
+    const { data: intervencion } = await supabaseAdmin.from("intervenciones")
+      .update({ estado: calcularEstadoIntervencion(guardada) }).eq("id_intervencion", idIntervencion).select().single();
 
     await actualizarEstadoEquipoSiProcede(intervencion.id_equipo, body.estado_equipo);
     if (strField(body.incidencia_estado)) await actualizarIncidenciaVinculada(idIntervencion, String(body.incidencia_estado));
@@ -184,10 +197,15 @@ Deno.serve(async (req) => {
 
     const { data: tareas } = await supabaseAdmin.from("tareas_intervencion").select("resultado").eq("id_intervencion", idIntervencion);
     const resultadoAgg = calcularResultadoAgregado(tareas || []);
-    const estadoAgg = calcularEstadoIntervencion(resultadoAgg);
+    // Si una tarea de una actuación cerrada vuelve a "Pendiente", la actuación ya
+    // no está terminada: se reabre sola (automatizar solo puede degradar; cerrar
+    // es siempre a propósito, con el botón).
+    const finalizada = !!intervencion.actuacion_finalizada && resultadoAgg !== "Pendiente";
+    const estadoAgg = calcularEstadoIntervencion({ ...intervencion, actuacion_finalizada: finalizada });
 
     const { data: intervencionActualizada } = await supabaseAdmin.from("intervenciones")
-      .update({ resultado: resultadoAgg, estado: estadoAgg }).eq("id_intervencion", idIntervencion).select().single();
+      .update({ resultado: resultadoAgg, estado: estadoAgg, actuacion_finalizada: finalizada })
+      .eq("id_intervencion", idIntervencion).select().single();
 
     // El estado del equipo solo se DEGRADA automáticamente desde las tareas
     // ("No operativo" / "Operativo con fallos"). Volver a "Operativo" es una

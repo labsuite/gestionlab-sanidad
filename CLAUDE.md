@@ -352,12 +352,13 @@ intervenciones, igual que el badge de impacto — si se copiara al estado del eq
 Una **Intervención** es una actuación/visita; cada `tareas_intervencion` es una acción
 concreta dentro de ella. `resultado` y `estado` son **derivados** de las tareas por la Edge
 Function `gestionar-intervencion` (`calcularResultadoAgregado` / `calcularEstadoIntervencion`)
-— no se editan a mano.
+— no se editan a mano. `resultado` sale de las tareas; `estado`, de `actuacion_finalizada`.
 
 `actuacion_finalizada` (boolean not null default false, añadido 2026-09-02): marca **explícita**
-de que la usuaria pulsó "Guardar y finalizar actuación", independiente de `estado` (que puede
-seguir "En gestión" si quedan tareas Pendiente). La escribe/borra la acción `actualizar` de la
-Edge Function; `guardar_tarea` no la toca. Uso en cliente (`Actuacion_Finalizada` tras
+de que la usuaria pulsó «🔒 Cerrar actuación». Desde 2026-10-01 **es lo que decide `estado`**:
+finalizada → `Cerrada`; si no, `En gestión` con fecha de realización o `Planificada` sin ella
+(el resultado de las tareas ya no cuenta, y no existe `Pendiente factura`). Cerrar exige no
+tener tareas `Pendiente`; si una vuelve a `Pendiente`, `guardar_tarea` la reabre. Uso en cliente (`Actuacion_Finalizada` tras
 `_intervencionSbToObj`, valor `'Sí'`/`'No'`):
 - Al abrir el modal de actuación sobre una intervención finalizada → título "✏️ Editar
   intervención INT-XXX", banner ámbar de aviso ("no se crea una actuación nueva") y botón
