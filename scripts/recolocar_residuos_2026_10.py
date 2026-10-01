@@ -14,6 +14,9 @@ con las decisiones que tomó la usuaria ese mismo día:
 10. Tercera ronda: la lejía diluida va al fregadero (categoría "Fregadero", no es
     un contenedor); la indicación va en la descripción, que es lo único que deja
     a las IAs decir "al desagüe".
+13. Sexta ronda: no se usa "Residuo Biológico GII". Calibradores/controles de
+    autoanalizadores → Aguas Equipos (como los antisueros Ortho); ropa/EPI con
+    sangre → Bolsa de autoclave.
 12. Quinta ronda: el azul tripán (se usa en poca cantidad) y el yoduro de
     propidio (su ficha dice "mismo tratamiento") → salvavidas "Reactivos de laboratorio".
 11. Cuarta ronda: Aguas se divide en DOS garrafas — "Tinciones" (todo lo ácido)
@@ -123,6 +126,12 @@ MOVER = {
     'Rojo de Ponceau': (AGUAS, None),
     'Carbol-fucsina de Ziehl-Neelsen': (AGUAS, None),
     'Azul de lactofenol líquido': (AGUAS, None),
+    # 13
+    'Calibradores y controles de autoanalizadores': (AGUAS_E,
+        'Materiales de calibración y control de calidad de los autoanalizadores, con matriz biológica; pueden llevar '
+        'azida sódica como conservante (ver R074). Residuo de equipos: a la garrafa de Aguas - Equipos; nunca al desagüe.'),
+    'Ropa de protección contaminada con muestras biológicas': ('Bolsa de autoclave',
+        'Batas, guantes y EPI contaminados con sangre u otras muestras clínicas. Biológico: a la bolsa de autoclave.'),
     # 12
     'Material con azul tripán (Neubauer)': (SALVAVIDAS,
         'Solución de azul tripán sobrante y material en contacto con ella (cámara Neubauer, puntas, tubos); carcinógeno '

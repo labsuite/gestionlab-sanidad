@@ -107,6 +107,9 @@ Azul tripán y yoduro de propidio → salvavidas `Reactivos de laboratorio` (se 
 cantidad; decisión de la usuaria). La categoría `Contenedor Citotóxicos` se quedó sin tipos;
 el cubo "Citotóxicos" del 207 sigue activo hasta que la usuaria decida qué hacer con él.
 
+No se usa `Residuo Biológico GII`: calibradores/controles de autoanalizadores → `Aguas Laboratorio -
+Equipos`; ropa/EPI con sangre → `Bolsa de autoclave`. La categoría desaparece.
+
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado
