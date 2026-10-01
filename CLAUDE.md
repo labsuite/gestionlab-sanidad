@@ -54,6 +54,7 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `asignar_grupos_profesorado.py` — primera propuesta de `usuarios.grupos_asignados` (qué grupo lleva cada docente), deducida de los módulos; `DRY_RUN` por defecto y solo escribe en quien no tenga nada. A partir de ahí se asigna a mano desde la app.
 - `migrar_grupos_asignados.py` — crea la columna `usuarios.grupos_asignados`; ya ejecutado
 - `limpiar_logins_huerfanos.py` — borra de Supabase Auth los logins sin fila en `usuarios` ni en `public.users`; `DRY_RUN` por defecto
+- `corregir_inventario_2026_09.py` — corrección puntual (una vez) de los materiales con un número como unidad y fusión de 4 duplicados; simulación por defecto, `--aplicar` para guardar
 - `normalizar_unidades_material.py` — unifica cómo se escriben las unidades (caja/s, bote/s…) y las categorías de material, y limpia las propuestas pendientes con un número en la unidad; simulación por defecto, `--aplicar` para guardar
 - `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
 - `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
