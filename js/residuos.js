@@ -69,13 +69,13 @@ function _renderNormasGestor() {
   const items = _NORMAS_GESTOR.map(n => `
     <div style="display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--border)">
       <div style="font-size:20px;line-height:1.2">${n.icon}</div>
-      <div style="font-size:13px;line-height:1.55">
+      <div style="flex:1;min-width:0;overflow-wrap:anywhere;font-size:13px;line-height:1.55">
         <div style="font-weight:600;margin-bottom:2px">${n.titulo}</div>
         <div style="color:var(--text-soft)">${n.texto}</div>
         ${n.ojo ? `<div style="margin-top:4px;color:#b45309">⚠️ ${n.ojo}</div>` : ''}
       </div>
     </div>`).join('');
-  return `<details class="card" style="margin-bottom:20px">
+  return `<details class="card" style="margin-bottom:20px;padding:14px 18px">
     <summary style="cursor:pointer;font-weight:600;font-size:14px">📋 Normas generales del gestor de residuos</summary>
     <div style="margin-top:10px">${items}</div>
   </details>`;
