@@ -56,6 +56,7 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `limpiar_logins_huerfanos.py` — borra de Supabase Auth los logins sin fila en `usuarios` ni en `public.users`; `DRY_RUN` por defecto
 - `corregir_inventario_2026_09.py` — corrección puntual (una vez) de los materiales con un número como unidad y fusión de 4 duplicados; simulación por defecto, `--aplicar` para guardar
 - `normalizar_unidades_material.py` — unifica cómo se escriben las unidades (caja/s, bote/s…) y las categorías de material, y limpia las propuestas pendientes con un número en la unidad; simulación por defecto, `--aplicar` para guardar
+- `recolocar_residuos_2026_10.py` — recolocación (una vez, ya ejecutada) del catálogo de residuos según las normas del gestor de 2026-10-01; simulación por defecto, `--aplicar` para guardar
 - `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
 - `importar_alumnos.py` — **RETIRADO**, aborta al arrancar (ya no hay cuentas personales de alumnado)
 - `onboardear_auth_supabase.py` — alta en bloque de cuentas reales de Supabase Auth para todo el profesorado/alumnado activo del catálogo `usuarios` que aún no la tenga (mismo patrón que la Edge Function `crear-usuario`, en bloque)
@@ -448,7 +449,7 @@ Detalles a respetar al tocarlo:
 
 ### Árbol de decisión en Guía de residuos
 
-**Pendiente:** el gestor ya dio las normas generales (2026-10-01, en `_NORMAS_GESTOR` de `js/residuos.js`, ver `docs/modulo-residuos.md`); falta recolocar en el catálogo las fichas que las contradicen (decisión de la usuaria) y, con eso, estructurar el árbol.
+**Pendiente:** el gestor ya dio las normas generales (2026-10-01, en `_NORMAS_GESTOR` de `js/residuos.js`, ver `docs/modulo-residuos.md`); catálogo ya recolocado (`scripts/recolocar_residuos_2026_10.py`). Falta estructurar el árbol.
 
 Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
 

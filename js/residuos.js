@@ -18,7 +18,7 @@ const _WARNINGS_FORMATO = [
   },
   {
     match: 'bolsa plástica',
-    texto: '⚠️ Envases vacíos de plástico o aluminio que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con ellas. Que NO se acumule líquido en el fondo: los frascos y botes, bien cerrados. Lo manchado con disolventes volátiles, antes en una bolsa zip (esta bolsa va abierta).',
+    texto: '⚠️ La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Envases vacíos de plástico o aluminio que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con ellas. Que NO se acumule líquido en el fondo: los frascos y botes, bien cerrados. Lo manchado con disolventes volátiles, antes en una bolsa zip (esta bolsa va abierta).',
   },
   {
     match: 'garrafa',
@@ -33,7 +33,7 @@ const _WARNINGS_FORMATO = [
 const _NORMAS_GESTOR = [
   {
     icon: '💧', titulo: 'Aguas de laboratorio',
-    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. Es también el destino habitual de lo que se usa en las tinciones.',
+    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. También TODO lo de las tinciones, incluidas las fracciones con etanol o metanol (el gestor separa luego las fases, que decantan por densidad), y el agua con restos de formol.',
   },
   {
     icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
@@ -43,7 +43,7 @@ const _NORMAS_GESTOR = [
   {
     icon: '🛍️', titulo: 'Bolsa plástica (químicos)',
     texto: 'Frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas.',
-    ojo: 'Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).',
+    ojo: 'La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).',
   },
   {
     icon: '🎨', titulo: 'Cómo reconocer los contenedores por el color',
@@ -52,11 +52,11 @@ const _NORMAS_GESTOR = [
   {
     icon: '✂️', titulo: 'Punzantes',
     texto: 'Puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes.',
-    ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte.',
+    ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal (protegidos)")',
   },
   {
     icon: '🛟', titulo: 'El salvavidas: bote azul de ballesta "Reactivos de laboratorio"',
-    texto: 'Para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol.',
+    texto: 'Para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol. En el catálogo es la categoría "Reactivos de laboratorio" (antes "Frasco Propio").',
     ojo: 'Siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.',
   },
 ];

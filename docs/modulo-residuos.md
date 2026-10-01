@@ -62,10 +62,20 @@ Consecuencias en los prompts: el guardarraíl "nunca basura general" tiene la ex
 portas, y la guía provisional de un químico pequeño sin contenedor claro es el salvavidas (no
 para biológico/cortopunzante, riesgo agudo ni mezclas accidentales).
 
-⚠ Varias fichas del catálogo aún contradicen estas normas (efluente del lavador ELISA en Frasco
-Propio, reactivos de autoanalizador en Pendiente Consenur, tejidos en formol sin la categoría
-del contenedor cuadrado azul, frotis en Inertes…). Recolocarlas es decisión de la usuaria —
-no moverlas por deducción.
+**Catálogo recolocado el 2026-10-01** con las decisiones de la usuaria
+(`scripts/recolocar_residuos_2026_10.py`, ya ejecutado): efluente del lavador ELISA, reactivos de
+autoanalizadores, agua con formol, fijador de citometría y **todas** las tinciones (también las
+fracciones con etanol/metanol, Lugol y Coomassie) → `Aguas Laboratorio`; tejidos en formol →
+`Muestras en formol` (nombre que usa el gestor); frotis/portas teñidos → `Basura normal
+(protegidos)` (no es un contenedor, no se registran adiciones); `Frasco Propio` **es** el
+salvavidas y se renombró a `Reactivos de laboratorio`. Categoría nueva `Bolsa plástica
+(químicos)` con dos tipos. Contenedores dados de alta en el lab 207 (Almacén de residuos): la
+bolsa (formato `Bolsa plástica`) y el salvavidas (formato `Bidón azul de ballesta`). La bolsa
+lleva el recordatorio de que es la misma para todo y hay que marcar con una X su uso.
+
+⚠ Choque abierto con el Nivel 2: el agua con formol y el fijador de citometría son
+`Cancerígeno / CMR`, y la regla de exclusividad CMR no deja que compartan garrafa de Aguas con
+ningún otro tipo. Pendiente de decidir con la usuaria.
 
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
