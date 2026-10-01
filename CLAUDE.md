@@ -448,7 +448,7 @@ Detalles a respetar al tocarlo:
 
 ### Árbol de decisión en Guía de residuos
 
-**Pendiente:** esperando esquema definitivo de Consenur para estructurar el árbol.
+**Pendiente:** el gestor ya dio las normas generales (2026-10-01, en `_NORMAS_GESTOR` de `js/residuos.js`, ver `docs/modulo-residuos.md`); falta recolocar en el catálogo las fichas que las contradicen (decisión de la usuaria) y, con eso, estructurar el árbol.
 
 Rediseñar `renderResiduosGuia()` para que la página tenga dos modos:
 

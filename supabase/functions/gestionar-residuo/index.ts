@@ -144,9 +144,18 @@ const WARNINGS_FORMATO: { match: string; texto: string }[] = [
   { match: "bidón azul", texto: "Los líquidos van en su propio bote cerrado y rotulado dentro del bidón; no verter directamente." },
   { match: "cubo con tapa", texto: "No cerrar la tapa hasta que esté lleno y listo para Consenur; dejarla apoyada." },
   { match: "contenedor rígido", texto: "No cerrar la tapa hasta que esté lleno y listo para Consenur; dejarla apoyada." },
-  { match: "bolsa plástica", texto: "Solo envases vacíos de plástico o aluminio; nada a granel ni con restos líquidos." },
+  { match: "bolsa plástica", texto: "Envases vacíos de plástico o aluminio que contuvieron peligrosos, y papel/guantes/filtros manchados; que no se acumule líquido en el fondo (frascos bien cerrados); lo manchado de disolventes volátiles, antes en bolsa zip." },
   { match: "garrafa", texto: "Mantener bien cerrada entre adiciones; zona ventilada, lejos de calor e ignición." },
 ];
+// Normas generales del gestor de residuos (2026-10-01). Réplica de _NORMAS_GESTOR
+// en js/residuos.js (consultorio y tarjeta de la Guía): mantener las dos iguales.
+const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. Es también el destino habitual de lo que se usa en las tinciones.
+- Muestras en formol — contenedor cuadrado azul (va a incinerar): SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja. OJO: Formol o etanol SIN muestras (aunque las hayan tenido) → disolventes no halogenados (en este centro, Contenedor Inertes).
+- Bolsa plástica (químicos): frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas. OJO: que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).
+- Cómo reconocer los contenedores por el color: contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.
+- Punzantes: puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes. OJO: para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte.
+- El salvavidas: bote azul de ballesta "Reactivos de laboratorio": para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol. OJO: siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.`;
+
 function getWarningFormato(formato: string | null): string | null {
   const f = (formato || "").toLowerCase();
   if (!f) return null;
@@ -212,11 +221,14 @@ ${activos}
 CASOS YA REVISADOS Y APROBADOS POR GESTIÓN para contenedores de categoría "${cont.categoria}". Si lo que se quiere añadir coincide claramente con uno de estos, considéralo COMPATIBLE y responde [OK]:
 ${excepciones}
 
+NORMAS GENERALES DEL GESTOR DE RESIDUOS (acordadas con la empresa gestora; para juzgar un texto libre mandan sobre lo que sugiera el catálogo; algunos de estos contenedores existen aunque no estén en la lista de activos):
+${NORMAS_GESTOR}
+
 REGLAS:
 - El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
 - Incompatibilidad química con lo que ya hay dentro: nunca juntar Comburente con Inflamable ni con Explosivo; nunca Corrosivo con Comburente; nunca Explosivo con Inflamable ni con Corrosivo. Un residuo Citotóxico o Cancerígeno / CMR nunca puede convivir con ningún otro tipo distinto en el mismo contenedor.
 - Si la descripción en texto libre es ambigua entre varios tipos con contenedor distinto, o no describe un residuo real, es INCOMPATIBLE: mejor parar y que lo revise una persona.
-- Nunca propongas verter por el desagüe ni tirar a la basura general, salvo que el "Detalle" del tipo del catálogo coincidente lo indique explícitamente.
+- Nunca propongas verter por el desagüe ni tirar a la basura general, salvo que el "Detalle" del tipo del catálogo coincidente lo indique explícitamente o sean portas NO contaminados con el material ya fijado (norma del gestor: basura, protegidos).
 - Si detectas un riesgo agudo (derrame, presión/burbujeo, olor fuerte, mezcla accidental de incompatibles), es INCOMPATIBLE y dilo con claridad.
 
 FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con una de estas dos etiquetas, sin ningún texto antes, y ser BREVE (2 a 4 frases, sin listas largas):
@@ -235,8 +247,8 @@ Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la 
     { role: "model", parts: [{ text: "Entendido. Dame el caso a evaluar." }] },
     { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"PBS diluido sobrante de lavados, sin nada tóxico\"" }] },
     { role: "model", parts: [{ text: "[OK] El PBS diluido es un residuo acuoso de bajo riesgo y encaja en el contenedor de Aguas de Laboratorio. Mantén la garrafa cerrada entre adiciones." }] },
-    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"etanol del paso de decoloración de una tinción de Gram\"" }] },
-    { role: "model", parts: [{ text: "[BLOQUEO|categoria=Inflamable|contenedor_sugerido=Disolventes no halogenados] El etanol de decoloración es un disolvente inflamable y no va en Aguas de Laboratorio. Llévalo al contenedor de Disolventes no halogenados; si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
+    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"formol sobrante de un bote de biopsia, ya sin la muestra\"" }] },
+    { role: "model", parts: [{ text: "[BLOQUEO|categoria=Cancerígeno / CMR|contenedor_sugerido=Contenedor Inertes] El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Contenedor Inertes. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
     { role: "user", parts: [{ text: casoText }] },
   ];
 }

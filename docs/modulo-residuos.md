@@ -38,6 +38,35 @@
 | bolsa plástica | Solo envases vacíos de plástico/aluminio; nada a granel |
 | garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
 
+## Normas generales del gestor de residuos (2026-10-01)
+
+Reglas acordadas con el gestor de residuos y contadas por la usuaria. Viven en
+`_NORMAS_GESTOR` (`js/residuos.js`) y, copiadas, en `NORMAS_GESTOR`
+(`supabase/functions/gestionar-residuo/index.ts`) — **mantener las dos iguales**. Se usan en
+tres sitios:
+1. Tarjeta plegable **📋 Normas generales del gestor de residuos** en la Guía (`_renderNormasGestor`), para todos los roles.
+2. Prompt del consultorio (`_construirSystemPromptResiduo`).
+3. Prompt del validador IA de `añadir_adicion` (Nivel 3).
+
+En los dos prompts las normas **mandan sobre una ficha del catálogo** que diga otra cosa (son
+lo más reciente). Resumen: aguas de laboratorio = mezclas acuosas de autoanalizadores/lavador de
+ELISA/kits y lo habitual de tinciones · contenedor cuadrado azul = SOLO formol/etanol CON
+muestra (incinera); sin muestra → no halogenados (= Contenedor Inertes aquí) · bolsa plástica =
+envases vacíos y papel/guantes/filtros manchados, sin líquido acumulado, volátiles en zip ·
+rígidos negros → autoclave, azules → incinerar, azules de ballesta y bolsa → químicos ·
+punzantes = todo lo punzante; portas NO contaminados con material fijado pueden ir a la
+basura protegidos · **salvavidas**: bote azul de ballesta "Reactivos de laboratorio" para
+cantidades <~1 L de químicos de destino dudoso, en frasco cerrado y resistente.
+
+Consecuencias en los prompts: el guardarraíl "nunca basura general" tiene la excepción de esos
+portas, y la guía provisional de un químico pequeño sin contenedor claro es el salvavidas (no
+para biológico/cortopunzante, riesgo agudo ni mezclas accidentales).
+
+⚠ Varias fichas del catálogo aún contradicen estas normas (efluente del lavador ELISA en Frasco
+Propio, reactivos de autoanalizador en Pendiente Consenur, tejidos en formol sin la categoría
+del contenedor cuadrado azul, frotis en Inertes…). Recolocarlas es decisión de la usuaria —
+no moverlas por deducción.
+
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado

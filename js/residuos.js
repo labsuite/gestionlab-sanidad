@@ -18,13 +18,68 @@ const _WARNINGS_FORMATO = [
   },
   {
     match: 'bolsa plástica',
-    texto: '⚠️ Solo envases vacíos de plástico o aluminio que hayan contenido sustancias peligrosas. No introducir residuos a granel ni envases con restos líquidos.',
+    texto: '⚠️ Envases vacíos de plástico o aluminio que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con ellas. Que NO se acumule líquido en el fondo: los frascos y botes, bien cerrados. Lo manchado con disolventes volátiles, antes en una bolsa zip (esta bolsa va abierta).',
   },
   {
     match: 'garrafa',
     texto: '⚠️ Mantener bien cerrada entre adiciones. Conservar en zona ventilada, alejada de focos de calor e ignición.',
   },
 ];
+
+// Normas generales acordadas con el gestor de residuos (2026-10-01). Se pintan
+// en la Guía y se mandan al consultorio IA; mandan sobre una ficha del catálogo
+// que diga otra cosa. Réplica en NORMAS_GESTOR de
+// supabase/functions/gestionar-residuo/index.ts (validador IA): mantener las dos iguales.
+const _NORMAS_GESTOR = [
+  {
+    icon: '💧', titulo: 'Aguas de laboratorio',
+    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. Es también el destino habitual de lo que se usa en las tinciones.',
+  },
+  {
+    icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
+    texto: 'SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja.',
+    ojo: 'Formol o etanol SIN muestras (aunque las hayan tenido) → disolventes no halogenados (en este centro, Contenedor Inertes).',
+  },
+  {
+    icon: '🛍️', titulo: 'Bolsa plástica (químicos)',
+    texto: 'Frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas.',
+    ojo: 'Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).',
+  },
+  {
+    icon: '🎨', titulo: 'Cómo reconocer los contenedores por el color',
+    texto: 'Contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.',
+  },
+  {
+    icon: '✂️', titulo: 'Punzantes',
+    texto: 'Puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes.',
+    ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte.',
+  },
+  {
+    icon: '🛟', titulo: 'El salvavidas: bote azul de ballesta "Reactivos de laboratorio"',
+    texto: 'Para cantidades pequeñas (menos de 1 L, más o menos) de algo que no tienes claro dónde meter — p. ej. permanganato, β-mercaptoetanol.',
+    ojo: 'Siempre dentro de un frasco bien, bien cerrado y resistente (un Falcon, un frasco de plástico) o de vidrio protegido.',
+  },
+];
+
+function _normasGestorTexto() {
+  return _NORMAS_GESTOR.map(n => `- ${n.titulo}: ${n.texto}${n.ojo ? ' OJO: ' + n.ojo : ''}`).join('\n');
+}
+
+function _renderNormasGestor() {
+  const items = _NORMAS_GESTOR.map(n => `
+    <div style="display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--border)">
+      <div style="font-size:20px;line-height:1.2">${n.icon}</div>
+      <div style="font-size:13px;line-height:1.55">
+        <div style="font-weight:600;margin-bottom:2px">${n.titulo}</div>
+        <div style="color:var(--text-soft)">${n.texto}</div>
+        ${n.ojo ? `<div style="margin-top:4px;color:#b45309">⚠️ ${n.ojo}</div>` : ''}
+      </div>
+    </div>`).join('');
+  return `<details class="card" style="margin-bottom:20px">
+    <summary style="cursor:pointer;font-weight:600;font-size:14px">📋 Normas generales del gestor de residuos</summary>
+    <div style="margin-top:10px">${items}</div>
+  </details>`;
+}
 
 function _getWarningFormato(formato) {
   if (!formato) return null;
@@ -87,6 +142,7 @@ function renderResiduosGuia() {
         <button class="btn btn-primary" onclick="abrirChatResiduo()">💬 Abrir consultorio de residuos</button>
       </div>
     </div>
+    ${_renderNormasGestor()}
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:20px">
       <input type="text" id="res-search" class="form-input"
         placeholder="Buscar residuo, descripción o contenedor…"
@@ -827,14 +883,22 @@ existe NINGÚN contenedor activo compatible en NINGÚN laboratorio del centro.
 AVISOS POR FORMATO DE CONTENEDOR (inclúyelos si aplica):
 ${avisos}
 
+NORMAS GENERALES DEL GESTOR DE RESIDUOS (acordadas con la empresa gestora; son la palabra más
+reciente: si una ficha del catálogo dice otra cosa para el mismo caso, sigue la norma). Algunos
+de estos contenedores existen físicamente aunque no aparezcan en las listas de contenedores
+activos de arriba — puedes nombrarlos por su descripción (color, forma, rótulo):
+${_normasGestorTexto()}
+
 REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
 - Nunca digas que se puede verter por el desagüe ni tirar a la basura general, SALVO que el
   "Detalle" del tipo de residuo coincidente lo indique explícitamente para ese caso concreto
   (algunas entradas del catálogo ya traen esa indicación exacta, escrita por Gestión — cópiala
-  tal cual si aparece, incluidas sus condiciones). Nunca lo digas por iniciativa propia ni lo
-  generalices a otro residuo solo porque "parezca" poco peligroso: solo vale si está escrito ahí.
+  tal cual si aparece, incluidas sus condiciones), o se trate de portas NO contaminados con el
+  material ya fijado (norma del gestor: a la basura, protegidos para que nadie se corte). Nunca
+  lo digas por iniciativa propia ni lo generalices a otro residuo solo porque "parezca" poco
+  peligroso: solo vale si está escrito ahí.
 - Nunca sugieras mezclar con el contenido de otro contenedor ni con otro residuo pendiente.
-- Siempre indica que debe quedarse en su propio envase cerrado y rotulado (qué es, quién, fecha) en la zona de residuos pendientes del laboratorio, alejado de calor, luz directa y otros reactivos.
+- Si no hay contenedor claro: siempre en su propio envase cerrado y rotulado (qué es, quién, fecha). Si es un químico en poca cantidad (menos de 1 L, más o menos), ese envase va al salvavidas — el bote azul de ballesta "Reactivos de laboratorio" —, en un frasco bien cerrado y resistente (Falcon, plástico) o de vidrio protegido. Si no, en la zona de residuos pendientes del laboratorio, alejado de calor, luz directa y otros reactivos. El salvavidas NO vale para lo biológico ni lo cortopunzante, ni cuando hay riesgo agudo o mezcla accidental (ver abajo).
 - Si el usuario describe derrame, olor fuerte, exposición o cualquier riesgo agudo inmediato: corta ahí mismo, di literalmente "Avisa ya a tu profesor/a presente, esto no se resuelve por chat" y no des más pasos.
 - Si es un químico con pictograma GHS conocido (inflamable, corrosivo, tóxico, comburente, explosivo, gas comprimido): nunca digas que abra el envase para identificarlo ni que lo trasvase; si hay burbujeo o presión, dile que avise sin esperar.
 - Si es biológico o cortopunzante (sangre, cultivos, agujas, bisturís): nunca digas que se manipule con la mano aunque lleve guantes, nunca reencapuchar una aguja, indicar usar pinzas.
@@ -867,8 +931,8 @@ Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea es
     { role: 'model', parts: [{ text: 'Entendido.' }] },
     { role: 'user', parts: [{ text: '¿Qué hora es en Tokio?' }] },
     { role: 'model', parts: [{ text: '[FUERA_DE_TEMA] Este consultorio solo sirve para decir dónde tirar residuos de laboratorio, no puedo ayudarte con eso. Cuéntame qué residuo tienes y te digo qué hacer con él.' }] },
-    { role: 'user', parts: [{ text: 'Tengo el líquido que quedó en el cristalizador tras hacer una tinción de Gram, ¿qué hago con él?' }] },
-    { role: 'model', parts: [{ text: '[PREGUNTA] Ese líquido puede ser el etanol decolorante o las aguas de enjuague acuosas, y cada uno va a un sitio distinto — ¿cuál de los dos es?' }] },
+    { role: 'user', parts: [{ text: 'Tengo un bote de formol de una biopsia, ¿dónde lo tiro?' }] },
+    { role: 'model', parts: [{ text: '[PREGUNTA] ¿La muestra sigue dentro del formol, o es solo el formol que ya no tiene la muestra? Cada caso va a un contenedor distinto.' }] },
   ];
 }
 
