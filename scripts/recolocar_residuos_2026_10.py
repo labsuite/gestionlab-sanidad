@@ -5,10 +5,15 @@ con las decisiones que tomó la usuaria ese mismo día:
 1. Efluente del lavador de ELISA            → Aguas Laboratorio
 2. Reactivos de autoanalizadores (Pendiente) → Aguas Laboratorio
 3. Tejidos fijados en formol                 → Muestras en formol (categoría del gestor)
-4. Agua con formol / fijador de citometría   → Aguas Laboratorio
-5. Frotis y portas teñidos                   → Basura normal (protegidos)
+4. Agua con formol / fijador de citometría   → Contenedor Inertes (no halogenados; segunda ronda)
+5. Frotis y portas teñidos                   → Basura normal (protegidos; si no, punzantes)
 6. "Frasco Propio" ES el salvavidas          → se renombra a "Reactivos de laboratorio"
-7. Tinciones, también con etanol/metanol     → Aguas Laboratorio
+7. Tinciones, también con etanol/metanol, ácidas y fenólicas → Aguas Laboratorio
+   (el gestor: pueden ir juntas mientras no reaccionen entre sí). El ácido
+   peryódico (oxidante) se queda en el salvavidas.
+9. Segunda ronda: fuera los portas de Neubauer y los cartuchos DRI-CHEM;
+   secciones, bloques de parafina y preparación histológica completa → basura
+   (solo trazas de X-Free); frotis con lactofenol → punzantes.
 8. Alta de la bolsa plástica de químicos y del salvavidas como contenedores
    (lab 207, Almacén de residuos — donde están los demás químicos) y dos
    tipos nuevos para la bolsa.
@@ -27,7 +32,11 @@ DRY_RUN = "--aplicar" not in sys.argv   # simulación por defecto
 
 AGUAS = 'Aguas Laboratorio'
 FORMOL = 'Muestras en formol'
-BASURA = 'Basura normal (protegidos)'
+BASURA = 'Basura normal'
+BASURA_ANTES = 'Basura normal (protegidos)'
+INERTES = 'Contenedor Inertes'
+CORTANTE = 'Residuo Cortante'
+PROTEGIDOS = ' A la basura normal protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.'
 SALVAVIDAS = 'Reactivos de laboratorio'
 BOLSA = 'Bolsa plástica (químicos)'
 
@@ -48,18 +57,29 @@ MOVER = {
         'Piezas anatómicas en formol (o etanol) CON la muestra dentro. Contenedor cuadrado azul: va a incinerar. '
         'El formol ya sin la muestra no va aquí: va a disolventes no halogenados (Contenedor Inertes).'),
     # 4
-    'Agua con restos de formol': (AGUAS,
+    'Agua con restos de formol': (INERTES,
         'Agua de lavado de piezas en tallado histológico; contiene formaldehído (carcinógeno IARC grupo 1). '
-        'Va a aguas de laboratorio; nunca al desagüe.'),
-    'Reactivos de fijación para citometría de flujo (formaldehído diluido)': (AGUAS,
+        'Formol sin muestra: va a disolventes no halogenados (Contenedor Inertes); nunca al desagüe.'),
+    'Reactivos de fijación para citometría de flujo (formaldehído diluido)': (INERTES,
         'Soluciones de paraformaldehído o formaldehído al 1-4% para fijación de células para citometría; '
-        'carcinógeno grupo 1. Va a aguas de laboratorio; nunca al desagüe.'),
+        'carcinógeno grupo 1. Formol sin muestra: va a disolventes no halogenados (Contenedor Inertes); nunca al desagüe.'),
     # 5
-    'Frotis teñidos con HE': (BASURA, None),
-    'Frotis teñidos con Papanicolaou': (BASURA, None),
-    'Frotis teñidos con May-Grünwald/Giemsa': (BASURA, None),
-    'Frotis teñidos con Diff-Quick': (BASURA, None),
-    'Portas con tinción de panóptico': (BASURA, None),
+    'Frotis teñidos con HE': (BASURA, 'Portas con extensiones teñidas con hematoxilina-eosina; muestra fijada.' + PROTEGIDOS),
+    'Frotis teñidos con Papanicolaou': (BASURA, 'Portas con extensiones teñidas con colorantes del Papanicolaou; muestra fijada.' + PROTEGIDOS),
+    'Frotis teñidos con May-Grünwald/Giemsa': (BASURA, 'Portas con extensiones teñidas con May-Grünwald/Giemsa; muestra fijada.' + PROTEGIDOS),
+    'Frotis teñidos con Diff-Quick': (BASURA, 'Portas con extensiones teñidas con Diff-Quick; muestra fijada.' + PROTEGIDOS),
+    'Portas con tinción de panóptico': (BASURA, 'Portas con extensiones teñidas con panóptico rápido; muestra fijada.' + PROTEGIDOS),
+    'Preparación histológica completa (tejido fijado + incluido + teñido HE + montado DPX)': (BASURA,
+        'Porta con tejido fijado, incluido, teñido y montado con DPX. Solo lleva trazas de X-Free: el gestor dice que '
+        'puede tirarse sin más.' + PROTEGIDOS),
+    'Secciones histológicas con tejido (HE)': (BASURA,
+        'Preparaciones histológicas definitivas con tejido. Solo llevan trazas de X-Free: el gestor dice que pueden '
+        'tirarse sin más.' + PROTEGIDOS),
+    'Tejidos incluidos en parafina': (BASURA,
+        'Bloques de parafina con tejido incluido. Solo llevan trazas de X-Free: el gestor dice que pueden tirarse sin más.'),
+    'Frotis con azul de lactofenol': (CORTANTE,
+        'Portas con preparaciones de hongos teñidas con azul de lactofenol (contiene fenol). No van a la basura: '
+        'al contenedor amarillo de punzantes.'),
     # 7
     'Eosina en etanol': (AGUAS, None),
     'Colorantes del Papanicolaou (fracciones etanólicas)': (AGUAS, None),
@@ -70,7 +90,22 @@ MOVER = {
     'Lugol (solución yodo-yoduro potásico)': (AGUAS, None),
     'Solución de Coomassie Blue (tinción de proteínas)': (AGUAS, None),
     'Solución de desteñido de Coomassie (destaining)': (AGUAS, None),
+    'Alcohol ácido de Ziehl-Neelsen (decolorante)': (AGUAS, None),
+    'Hematoxilina de Mayer': (AGUAS, None),
+    'Solución de hematoxilina de Weigert o hematoxilina férrica': (AGUAS, None),
+    'Reactivo de Perls (tinción del hierro)': (AGUAS, None),
+    'Reactivo de Schiff (para PAS)': (AGUAS, None),
+    'Reactivos de tinción de Masson (tricrómico)': (AGUAS, None),
+    'Rojo de Ponceau': (AGUAS, None),
+    'Carbol-fucsina de Ziehl-Neelsen': (AGUAS, None),
+    'Azul de lactofenol líquido': (AGUAS, None),
 }
+
+# Fuera del catálogo (la usuaria: "no son nada" / "quítalos"); sin adiciones registradas.
+BORRAR = [
+    'Portas de cámara Neubauer sin azul tripán',
+    'Reactivos de química seca (cartuchos DRI-CHEM NX500i usados)',
+]
 
 NUEVOS_TIPOS = [
     {'nombre': 'Envases vacíos de plástico o aluminio que contuvieron sustancias peligrosas',
@@ -93,9 +128,28 @@ cur.execute("select id_residuo, nombre, contenedor_tipo, descripcion from tipos_
 tipos = {r[1]: r for r in cur.fetchall()}
 
 cambios = 0
+cur.execute("select count(*) from tipos_residuo where contenedor_tipo=%s", (BASURA_ANTES,))
+n = cur.fetchone()[0]
+if n:
+    print(f"{BASURA_ANTES} → {BASURA}: {n} tipos"); cambios += 1
+    if not DRY_RUN:
+        cur.execute("update tipos_residuo set contenedor_tipo=%s where contenedor_tipo=%s", (BASURA, BASURA_ANTES))
+
+for nombre in BORRAR:
+    if nombre not in tipos: continue
+    id_ = tipos[nombre][0]
+    cur.execute("select count(*) from adiciones_residuo where id_residuo=%s", (id_,))
+    if cur.fetchone()[0]:
+        print(f"⚠ {id_} {nombre}: tiene adiciones, NO se borra"); continue
+    print(f"- {id_}  {nombre}"); cambios += 1
+    if not DRY_RUN:
+        cur.execute("delete from tipos_residuo where id_residuo=%s", (id_,))
+
 for nombre, (cat, desc) in MOVER.items():
     if nombre not in tipos:
         print(f"⚠ NO ENCONTRADO: {nombre}"); continue
+    if tipos[nombre][2] == BASURA_ANTES and cat == BASURA and desc is None:
+        continue
     id_, _, cat_old, desc_old = tipos[nombre]
     if cat_old == cat and (desc is None or desc == desc_old):
         continue

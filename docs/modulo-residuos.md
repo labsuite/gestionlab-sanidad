@@ -62,20 +62,25 @@ Consecuencias en los prompts: el guardarraíl "nunca basura general" tiene la ex
 portas, y la guía provisional de un químico pequeño sin contenedor claro es el salvavidas (no
 para biológico/cortopunzante, riesgo agudo ni mezclas accidentales).
 
-**Catálogo recolocado el 2026-10-01** con las decisiones de la usuaria
-(`scripts/recolocar_residuos_2026_10.py`, ya ejecutado): efluente del lavador ELISA, reactivos de
-autoanalizadores, agua con formol, fijador de citometría y **todas** las tinciones (también las
-fracciones con etanol/metanol, Lugol y Coomassie) → `Aguas Laboratorio`; tejidos en formol →
-`Muestras en formol` (nombre que usa el gestor); frotis/portas teñidos → `Basura normal
-(protegidos)` (no es un contenedor, no se registran adiciones); `Frasco Propio` **es** el
+**Catálogo recolocado el 2026-10-01** en dos rondas con las decisiones de la usuaria
+(`scripts/recolocar_residuos_2026_10.py`, ya ejecutado, refleja el estado final): efluente del
+lavador ELISA, reactivos de autoanalizadores y **todas** las tinciones (etanólicas/metanólicas,
+ácidas, fenólicas, Lugol, Coomassie — "juntas mientras no reaccionen entre sí"; el ácido
+peryódico, oxidante, se queda en el salvavidas) → `Aguas Laboratorio`; agua con formol y
+fijador de citometría → `Contenedor Inertes` (no halogenados); tejidos en formol →
+`Muestras en formol` (nombre que usa el gestor); frotis/portas teñidos, secciones, bloques de
+parafina y preparación histológica completa (solo trazas de X-Free) → `Basura normal` (no es
+un contenedor, no se registran adiciones); frotis con lactofenol → `Residuo Cortante`; fuera del
+catálogo los portas de Neubauer sin tripán y los cartuchos DRI-CHEM; `Pendiente Consenur` ya no
+existe; `Frasco Propio` **es** el
 salvavidas y se renombró a `Reactivos de laboratorio`. Categoría nueva `Bolsa plástica
 (químicos)` con dos tipos. Contenedores dados de alta en el lab 207 (Almacén de residuos): la
 bolsa (formato `Bolsa plástica`) y el salvavidas (formato `Bidón azul de ballesta`). La bolsa
 lleva el recordatorio de que es la misma para todo y hay que marcar con una X su uso.
 
-⚠ Choque abierto con el Nivel 2: el agua con formol y el fijador de citometría son
-`Cancerígeno / CMR`, y la regla de exclusividad CMR no deja que compartan garrafa de Aguas con
-ningún otro tipo. Pendiente de decidir con la usuaria.
+⚠ Choque abierto con el Nivel 2: el agua con formol, el fijador de citometría y el gel de
+poliacrilamida son `Cancerígeno / CMR`, y la regla de exclusividad CMR no les deja compartir el
+bidón de Inertes con ningún otro tipo. Pendiente de decidir con la usuaria.
 
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)

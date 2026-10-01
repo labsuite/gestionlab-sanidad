@@ -33,12 +33,12 @@ const _WARNINGS_FORMATO = [
 const _NORMAS_GESTOR = [
   {
     icon: '💧', titulo: 'Aguas de laboratorio',
-    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. También TODO lo de las tinciones, incluidas las fracciones con etanol o metanol (el gestor separa luego las fases, que decantan por densidad), y el agua con restos de formol.',
+    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. También TODO lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol: el protocolo ya las mezcla y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad).',
   },
   {
     icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
     texto: 'SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja.',
-    ojo: 'Formol o etanol SIN muestras (aunque las hayan tenido) → disolventes no halogenados (en este centro, Contenedor Inertes).',
+    ojo: 'Formol o etanol SIN muestras (aunque las hayan tenido), y el agua con restos de formol → disolventes no halogenados (en este centro, Contenedor Inertes).',
   },
   {
     icon: '🛍️', titulo: 'Bolsa plástica (químicos)',
@@ -50,9 +50,9 @@ const _NORMAS_GESTOR = [
     texto: 'Contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.',
   },
   {
-    icon: '✂️', titulo: 'Punzantes',
+    icon: '✂️', titulo: 'Punzantes — contenedor amarillo',
     texto: 'Puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes.',
-    ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal (protegidos)")',
+    ojo: 'Para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal"); los que no puedan ir a la basura, aquí. Las secciones histológicas y los bloques de parafina solo llevan trazas de X-Free: a la basura sin más.',
   },
   {
     icon: '🛟', titulo: 'El salvavidas: bote azul de ballesta "Reactivos de laboratorio"',
