@@ -544,8 +544,14 @@ function _renderCierreHilo(inc) {
   // Cerrar la incidencia solo tiene sentido cuando ya no queda trabajo vivo: si
   // alguna actuación del hilo sigue planificada, en gestión o esperando factura,
   // en vez de los botones se explica qué falta.
+  // Una actuación anterior que quedó "Resuelto parcialmente"/"No resuelto" y ya
+  // tiene seguimiento es historia, no trabajo vivo: lo que faltaba pasó a la
+  // siguiente. Solo bloquean la actuación activa sin cerrar, las planificadas y
+  // las que aún tienen alguna tarea sin resultado.
   const chain     = inc.Intervencion_Generada ? getChainIntervencion(inc.Intervencion_Generada) : [];
-  const sinCerrar = chain.filter(c => c.Estado !== 'Cerrada');
+  const sinCerrar = chain.filter(c => c.Estado !== 'Cerrada' && (
+    c.ID_Intervencion === inc.Intervencion_Generada || c.Estado === 'Planificada' ||
+    getTareasIntervencion(c.ID_Intervencion).some(t => t.Resultado === 'Pendiente')));
   if (sinCerrar.length) {
     const detalle = sinCerrar.map(c => `${c.ID_Intervencion} · ${c.Estado || 'sin estado'}`).join(', ');
     cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px;font-size:12px;color:var(--text-soft)">

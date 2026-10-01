@@ -118,6 +118,9 @@ Ahora:
   en su lugar se lista cuáles faltan ("Para poder cerrar la incidencia queda una actuación sin
   cerrar: INT-XXX · En gestión"). Cerrar la incidencia con trabajo vivo por delante no tiene
   sentido, y así se ve de un vistazo qué falta.
+  Excepción (2026-10-01): una actuación **anterior** a la activa que se quedó `En gestión`
+  solo porque alguna tarea acabó `No resuelto`/`Resuelto parcialmente` no bloquea — lo que
+  faltaba pasó a su seguimiento. Sí bloquea si tiene alguna tarea aún `Pendiente`.
 - El cierre vive en el pie del hilo (`_renderCierreHilo` → `cerrarIncidenciaDesdeHilo`):
   un `select` con el estado operativo con el que queda el equipo (preseleccionado `Operativo`,
   salvo que alguna tarea del hilo dejara `Operativo='No'`, en cuyo caso se propone el estado
