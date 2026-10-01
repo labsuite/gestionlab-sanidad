@@ -14,6 +14,8 @@ con las decisiones que tomó la usuaria ese mismo día:
 10. Tercera ronda: la lejía diluida va al fregadero (categoría "Fregadero", no es
     un contenedor); la indicación va en la descripción, que es lo único que deja
     a las IAs decir "al desagüe".
+12. Quinta ronda: el azul tripán (se usa en poca cantidad) y el yoduro de
+    propidio (su ficha dice "mismo tratamiento") → salvavidas "Reactivos de laboratorio".
 11. Cuarta ronda: Aguas se divide en DOS garrafas — "Tinciones" (todo lo ácido)
     y "Equipos" (lo que lleva lejía: lavador ELISA, limpieza del citómetro… y los
     neutros). Las dos garrafas que había: la del 203 (donde están casi todos los
@@ -121,6 +123,14 @@ MOVER = {
     'Rojo de Ponceau': (AGUAS, None),
     'Carbol-fucsina de Ziehl-Neelsen': (AGUAS, None),
     'Azul de lactofenol líquido': (AGUAS, None),
+    # 12
+    'Material con azul tripán (Neubauer)': (SALVAVIDAS,
+        'Solución de azul tripán sobrante y material en contacto con ella (cámara Neubauer, puntas, tubos); carcinógeno '
+        'IARC 2B. Se usa en poca cantidad: al salvavidas "Reactivos de laboratorio", dentro de un frasco bien cerrado '
+        'y resistente (Falcon, plástico) o de vidrio protegido.'),
+    'Solución de yoduro de propidio (PI) para viabilidad celular': (SALVAVIDAS,
+        'Solución de yoduro de propidio, alternativa al azul tripán para viabilidad; intercalante de DNA, posible '
+        'carcinógeno. Mismo tratamiento que el azul tripán: al salvavidas "Reactivos de laboratorio", en frasco bien cerrado.'),
     # 10
     'Lejía diluida (desinfección)': (FREGADERO,
         'Soluciones muy diluidas de hipoclorito residuales de desinfección de superficies. Pueden verterse al '

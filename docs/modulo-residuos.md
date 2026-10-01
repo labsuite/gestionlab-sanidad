@@ -103,6 +103,10 @@ de aguas del lab si solo hay una; si hay dos (203) no adivina, deja elegir en Co
 pícrico/Bouin y DAB (salvavidas) y xileno/X-Free/formol (Inertes). Los que llevan plata,
 mercurio o cromo son kits diagnósticos y van también a Tinciones (decisión de la usuaria).
 
+Azul tripán y yoduro de propidio → salvavidas `Reactivos de laboratorio` (se usan en poca
+cantidad; decisión de la usuaria). La categoría `Contenedor Citotóxicos` se quedó sin tipos;
+el cubo "Citotóxicos" del 207 sigue activo hasta que la usuaria decida qué hacer con él.
+
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado
