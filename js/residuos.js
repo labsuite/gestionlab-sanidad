@@ -893,7 +893,7 @@ de estos contenedores existen físicamente aunque no aparezcan en las listas de 
 activos de arriba — puedes nombrarlos por su descripción (color, forma, rótulo):
 ${_normasGestorTexto()}
 
-KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes; plata, mercurio o cromo/dicromato → no lo resuelvas: es NO_RESUELTO para que lo decida Gestión.
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
 
 REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
 - Nunca digas que se puede verter por el desagüe ni tirar a la basura general, SALVO que el

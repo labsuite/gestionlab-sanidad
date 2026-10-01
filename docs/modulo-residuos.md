@@ -100,8 +100,8 @@ Etiquetas NFC antiguas con `cont-cat=Aguas Laboratorio`: `_abrirAdicionPorNfc` a
 de aguas del lab si solo hay una; si hay dos (203) no adivina, deja elegir en Contenedores. Regrabarlas.
 
 **Kits de tinción con botes desconocidos**: por defecto a Tinciones; las IAs separan oxidantes,
-pícrico/Bouin y DAB (salvavidas) y xileno/X-Free/formol (Inertes), y escalan plata, mercurio o
-cromo a Gestión.
+pícrico/Bouin y DAB (salvavidas) y xileno/X-Free/formol (Inertes). Los que llevan plata,
+mercurio o cromo son kits diagnósticos y van también a Tinciones (decisión de la usuaria).
 
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)

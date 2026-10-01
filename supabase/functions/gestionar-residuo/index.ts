@@ -256,7 +256,7 @@ ${excepciones}
 NORMAS GENERALES DEL GESTOR DE RESIDUOS (acordadas con la empresa gestora; para juzgar un texto libre mandan sobre lo que sugiera el catálogo; algunos de estos contenedores existen aunque no estén en la lista de activos):
 ${NORMAS_GESTOR}
 
-KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes; plata, mercurio o cromo/dicromato → no lo resuelvas: es BLOQUEO con contenedor_sugerido=ninguno, para que lo decida Gestión.
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
 
 REGLAS:
 - El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
