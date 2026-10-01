@@ -266,7 +266,7 @@ FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con 
 - [OK] → el residuo puede ir en ese contenedor. Añade una frase diciendo POR QUÉ va ahí y el aviso de formato si aplica.
 - [BLOQUEO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, Desconocido>|contenedor_sugerido=<la categoría de contenedor correcta, o "ninguno">] → el residuo NO puede ir ahí. Explica por qué NO puede ir aquí y por qué el correcto es el otro, y di a qué contenedor y laboratorio llevarlo (si existe uno activo compatible en el centro); si no existe ninguno, di que lo deje en su propio envase cerrado y rotulado en la zona de residuos pendientes y avise a su profesor/a.
 
-SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el efluente del lavador de ELISA lleva la solución de parada ácida: por eso va con las tinciones y nunca junto a nada con lejía".
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Contenedor Inertes) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro".
 
 Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la etiqueta inicial.`;
 

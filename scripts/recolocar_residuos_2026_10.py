@@ -48,9 +48,11 @@ BOLSA = 'Bolsa plástica (químicos)'
 MOVER = {
     # 1
     'Efluente del lavador de microplacas (ELISA)': (AGUAS,
-        'Mezcla de solución de lavado PBS-Tween + trazas de TMB oxidado + solución de parada ácida + restos de muestra '
-        'generada en el depósito del lavador de placas HEALEES PW 812. Va a aguas de laboratorio, como lo que generan '
-        'los aparatos automáticos de diagnóstico (norma del gestor, 2026-10).'),
+        'Lo que se acumula en la botella de residuos del lavador de placas HEALEES PW 812: solución de lavado PBS-Tween '
+        '+ restos de muestra y conjugado + la lejía diluida del protocolo de limpieza del lavador. NO lleva solución de '
+        'parada ni TMB: se añaden después del último lavado y se quedan en la placa (que va a bolsa de autoclave). '
+        'Va a aguas de laboratorio, como lo que generan los aparatos automáticos de diagnóstico (norma del gestor, 2026-10); '
+        'como lleva lejía, nunca junto a nada ácido.'),
     # 2
     'Reactivos bioquímicos de autoanalizador (Metrolab 2300)': (AGUAS, None),
     'Reactivos de quimioluminiscencia (Maglumi 600)': (AGUAS, None),

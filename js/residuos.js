@@ -928,7 +928,7 @@ literalmente con una de estas cuatro etiquetas, sin ningún texto antes, y debe 
 - [PREGUNTA] → cuando la descripción del usuario es ambigua entre varios tipos del catálogo con destino distinto y necesitas que aclare antes de poder responder, seguido de UNA sola pregunta corta y concreta (no una lista larga de opciones). No es un caso resuelto ni escalado, la conversación sigue en el siguiente mensaje del usuario.
 - [FUERA_DE_TEMA] → cuando el mensaje no describe un residuo real a tirar, seguido solo del recordatorio, sin responder nada más.
 
-SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el efluente del lavador de ELISA lleva la solución de parada ácida: por eso va con las tinciones y nunca junto a nada con lejía". Si además hay un contenedor con el que sea fácil confundirlo, di por qué ese otro NO.
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Contenedor Inertes) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro". Si además hay un contenedor con el que sea fácil confundirlo, di por qué ese otro NO.
 
 Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea esas cuatro.`;
 
