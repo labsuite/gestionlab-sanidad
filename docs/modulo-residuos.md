@@ -80,6 +80,14 @@ lleva el recordatorio de que es la misma para todo y hay que marcar con una X su
 
 El choque con la exclusividad CMR se resolvió quitando esa regla (ver Nivel 2 más abajo).
 
+Tercera ronda: la **lejía diluida** va al fregadero (categoría `Fregadero`, no es contenedor); la
+indicación está en su descripción, que es lo que permite a las IAs decir "al desagüe".
+
+**Las IAs explican siempre el porqué** (petición de la usuaria): por qué va a un sitio y por qué
+no al de al lado, con algo concreto del residuo (qué lleva, con qué reacciona, qué norma lo
+decide). El bloqueo fijo de Nivel 1 también lo hace: dice a qué categoría va el residuo y añade
+la razón de `MOTIVO_CATEGORIA` (`gestionar-residuo`), sacada de las normas del gestor.
+
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado
