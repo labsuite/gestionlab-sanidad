@@ -28,10 +28,13 @@ function calcularResultadoAgregado(tareas: { resultado: string | null }[]): stri
   return "Resuelto parcialmente";
 }
 
-function calcularEstadoIntervencion(resultadoAgregado: string, esExterna: boolean): string {
+// Una actuación externa resuelta ya NO pasa por "Pendiente factura": las facturas
+// del SAT suelen agrupar varias actuaciones, así que exigir una por actuación
+// bloqueaba el cierre de la incidencia. La factura es opcional y se adjunta,
+// si se quiere, en el "Documento adjunto" de la propia actuación.
+function calcularEstadoIntervencion(resultadoAgregado: string): string {
   if (!resultadoAgregado) return "Planificada";
   if (resultadoAgregado === "Pendiente" || resultadoAgregado === "Resuelto parcialmente") return "En gestión";
-  if (resultadoAgregado === "Resuelto" && esExterna) return "Pendiente factura";
   return "Cerrada";
 }
 
@@ -181,8 +184,7 @@ Deno.serve(async (req) => {
 
     const { data: tareas } = await supabaseAdmin.from("tareas_intervencion").select("resultado").eq("id_intervencion", idIntervencion);
     const resultadoAgg = calcularResultadoAgregado(tareas || []);
-    const esExterna = !!intervencion.proveedor;
-    const estadoAgg = calcularEstadoIntervencion(resultadoAgg, esExterna);
+    const estadoAgg = calcularEstadoIntervencion(resultadoAgg);
 
     const { data: intervencionActualizada } = await supabaseAdmin.from("intervenciones")
       .update({ resultado: resultadoAgg, estado: estadoAgg }).eq("id_intervencion", idIntervencion).select().single();

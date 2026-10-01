@@ -34,12 +34,19 @@ calcularResultadoAgregado(tareas):
   todas Resuelto/Descartado→ 'Resuelto' (si hay algún Resuelto) o 'Descartado' (si todas descartadas)
   resto (mezcla con No resuelto, sin pendientes) → 'Resuelto parcialmente'
 
-calcularEstadoIntervencion(resultadoAgregado, tipoEjec):
+calcularEstadoIntervencion(resultadoAgregado):
   sin resultado                              → 'Planificada'
   'Pendiente' / 'Resuelto parcialmente'      → 'En gestión'
-  'Resuelto' + ejecución Externa             → 'Pendiente factura'
-  resto (Resuelto interno, o Descartado)     → 'Cerrada'
+  resto (Resuelto o Descartado, interna o externa) → 'Cerrada'
 ```
+
+**La factura no es obligatoria (desde 2026-10-01).** Antes una actuación externa resuelta
+pasaba a `Pendiente factura` y no se cerraba hasta adjuntarla, lo que bloqueaba cerrar la
+incidencia. Pero las facturas del SAT suelen agrupar varias actuaciones, así que ahora se
+cierra igual que una interna; la factura se adjunta, si se quiere, en el "Documento adjunto"
+de la actuación. El estado `Pendiente factura` y el modal `modal-adjuntar-factura`
+(`guardarFactura`) quedan solo como legado: ya no se genera ese estado y las 3 actuaciones
+que estaban en él se pasaron a `Cerrada`.
 
 La incidencia vinculada **no** se cierra sola con las tareas: mientras siga abierta se
 mantiene en `En gestión`, aunque la intervención llegue a `Cerrada`. Pasar a `Resuelta` o
@@ -107,7 +114,7 @@ Ahora:
 - `guardarFactura` cierra la **intervención** (`Cerrada`) y adjunta la factura, pero ya no
   toca la incidencia ni sube el equipo a `Operativo`.
 - El pie de cierre **solo aparece cuando todas las actuaciones del hilo están `Cerrada`**
-  (`getChainIntervencion`). Si queda alguna `Planificada`, `En gestión` o `Pendiente factura`,
+  (`getChainIntervencion`). Si queda alguna `Planificada` o `En gestión`,
   en su lugar se lista cuáles faltan ("Para poder cerrar la incidencia queda una actuación sin
   cerrar: INT-XXX · En gestión"). Cerrar la incidencia con trabajo vivo por delante no tiene
   sentido, y así se ve de un vistazo qué falta.
@@ -154,7 +161,7 @@ cualquier acción acaba llamando a `renderIncidencias()` sin argumento y la list
    - Botón **"Guardar y finalizar visita"** (pie del modal): si hay una descripción sin guardar la añade primero; si no hay nada nuevo, simplemente cierra — no exige escribir algo para poder finalizar.
 4. **Nueva visita** (`programarOtraVisita` → reutiliza `abrirPlanificacion` con un tercer argumento `origenIntId`) — para cuando hace falta volver otro día (pieza pendiente, otro técnico...). Crea una intervención encadenada (`Origen: 'Seguimiento de <ID>'`), reconstruible con `getChainIntervencion`. Distinto de añadir una tarea: eso es la misma visita, esto es una visita nueva.
    - Al abrir la planificación de esa nueva visita, las tareas sin resolver (`Pendiente`/`Resuelto parcialmente`/`No resuelto`) de la visita anterior aparecen como una lista de casillas ("Pendiente de la visita anterior") — se marcan solo las que correspondan a esta visita concreta (p.ej. si hay tareas para especialistas distintos, cada una se lleva a su propia visita programada). Al guardar, las marcadas + lo escrito a mano en "Otras tareas ya previstas" se crean como tareas `Pendiente` en la nueva intervención, ya listas para marcar su resultado desde "Ejecutar".
-5. **Factura** (`guardarFactura`, solo si `Estado='Pendiente factura'`) → cierra la intervención (`Cerrada`) y adjunta la factura. La incidencia sigue `En gestión` hasta cerrarla a mano en el hilo.
+5. **Factura** — opcional desde 2026-10-01: se adjunta en el "Documento adjunto" de la actuación y no condiciona ningún cierre (ver arriba). `guardarFactura` es legado de `Pendiente factura`.
 5 bis. **Cerrar la incidencia** (pie del hilo, `cerrarIncidenciaDesdeHilo`) → `Resuelta`/`Descartada` + estado operativo del equipo elegido a propósito. Es el único sitio donde una incidencia se cierra y donde un equipo vuelve a `Operativo` tras una avería.
 6. **Modo directo** (`openModalRegistrarActuacionDirecta`, botón 🔧 en la tabla de equipos) — crea una intervención sin pasar por una incidencia, con su primera tarea.
 
