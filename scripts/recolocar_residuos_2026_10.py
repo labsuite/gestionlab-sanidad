@@ -14,6 +14,10 @@ con las decisiones que tomó la usuaria ese mismo día:
 10. Tercera ronda: la lejía diluida va al fregadero (categoría "Fregadero", no es
     un contenedor); la indicación va en la descripción, que es lo único que deja
     a las IAs decir "al desagüe".
+11. Cuarta ronda: Aguas se divide en DOS garrafas — "Tinciones" (todo lo ácido)
+    y "Equipos" (lo que lleva lejía: lavador ELISA, limpieza del citómetro… y los
+    neutros). Las dos garrafas que había: la del 203 (donde están casi todos los
+    autoanalizadores) pasa a Equipos y la del 205 a Tinciones.
 9. Segunda ronda: fuera los portas de Neubauer y los cartuchos DRI-CHEM;
    secciones, bloques de parafina y preparación histológica completa → basura
    (solo trazas de X-Free); frotis con lactofenol → punzantes.
@@ -40,6 +44,17 @@ BASURA_ANTES = 'Basura normal (protegidos)'
 INERTES = 'Contenedor Inertes'
 CORTANTE = 'Residuo Cortante'
 FREGADERO = 'Fregadero'
+AGUAS_T = 'Aguas Laboratorio - Tinciones'
+AGUAS_E = 'Aguas Laboratorio - Equipos'
+# Reparto de lo que iba a Aguas (aprobado por la usuaria 2026-10-01).
+DIVISION = {
+    **{i: AGUAS_T for i in ['R067', 'R041', 'R023', 'R040', 'R066', 'R042', 'R020', 'R019', 'R021', 'R017', 'R030',
+                            'R080', 'R018', 'R065', 'R058', 'R098', 'R031', 'R051', 'R052', 'R104', 'R097', 'R094',
+                            'R113']},
+    **{i: AGUAS_E for i in ['R072', 'R038', 'R039', 'R111', 'R046', 'R043', 'R055', 'R087', 'R073', 'R101', 'R071',
+                            'R100', 'R070', 'R076']},
+}
+CONTENEDORES_AGUAS = {'RCJ9A6YB': AGUAS_E, 'RCJZJXTU': AGUAS_T}   # 203 → Equipos, 205 → Tinciones
 PROTEGIDOS = ' A la basura normal protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.'
 SALVAVIDAS = 'Reactivos de laboratorio'
 BOLSA = 'Bolsa plástica (químicos)'
@@ -161,6 +176,8 @@ for nombre, (cat, desc) in MOVER.items():
         print(f"⚠ NO ENCONTRADO: {nombre}"); continue
     if tipos[nombre][2] == BASURA_ANTES and cat == BASURA and desc is None:
         continue
+    if cat == AGUAS:
+        cat = DIVISION.get(tipos[nombre][0], cat)
     id_, _, cat_old, desc_old = tipos[nombre]
     if cat_old == cat and (desc is None or desc == desc_old):
         continue
@@ -187,6 +204,21 @@ for t in NUEVOS_TIPOS:
     if not DRY_RUN:
         cur.execute("insert into tipos_residuo (id_residuo, nombre, descripcion, riesgo, contenedor_tipo) values (%s,%s,%s,%s,%s)",
                     (generar_id('RES'), t['nombre'], t['descripcion'], t['riesgo'], BOLSA))
+
+cur.execute("select id_residuo, nombre from tipos_residuo where contenedor_tipo=%s", (AGUAS,))
+for id_, nombre in cur.fetchall():
+    if id_ not in DIVISION:
+        print(f"⚠ {id_} {nombre}: en Aguas sin garrafa asignada, se deja"); continue
+    print(f"{id_}  {nombre[:60]:<60}  {AGUAS} → {DIVISION[id_]}"); cambios += 1
+    if not DRY_RUN:
+        cur.execute("update tipos_residuo set contenedor_tipo=%s where id_residuo=%s", (DIVISION[id_], id_))
+for id_c, cat in CONTENEDORES_AGUAS.items():
+    cur.execute("select categoria, lab from contenedores_residuo where id_contenedor=%s and estado='activo'", (id_c,))
+    fila = cur.fetchone()
+    if not fila or fila[0] == cat: continue
+    print(f"contenedor {id_c} (lab {fila[1]})  {fila[0]} → {cat}"); cambios += 1
+    if not DRY_RUN:
+        cur.execute("update contenedores_residuo set categoria=%s where id_contenedor=%s", (cat, id_c))
 
 hoy = datetime.date.today()
 for c in NUEVOS_CONTENEDORES:

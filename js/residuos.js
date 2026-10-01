@@ -32,8 +32,8 @@ const _WARNINGS_FORMATO = [
 // supabase/functions/gestionar-residuo/index.ts (validador IA): mantener las dos iguales.
 const _NORMAS_GESTOR = [
   {
-    icon: '💧', titulo: 'Aguas de laboratorio',
-    texto: 'Las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. También TODO lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol: el protocolo ya las mezcla y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad).',
+    icon: '💧', titulo: 'Aguas de laboratorio — dos garrafas: Tinciones y Equipos',
+    texto: 'Las mezclas acuosas, en DOS garrafas. TINCIONES: todo lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol, y los kits de tinción aunque no se sepa qué lleva cada bote: el protocolo ya las mezcla en el cristalizador y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad). EQUIPOS: lo que generan los aparatos automáticos de diagnóstico (autoanalizadores, citómetro, coagulómetros, la botella del lavador de placas del ELISA), restos de kits de diagnóstico, tampones, medios… La de Equipos lleva la lejía de la limpieza de los aparatos: por eso NADA ácido va en ella, y lo ácido (las tinciones) va siempre a la de Tinciones.',
   },
   {
     icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
@@ -893,6 +893,8 @@ de estos contenedores existen físicamente aunque no aparezcan en las listas de 
 activos de arriba — puedes nombrarlos por su descripción (color, forma, rótulo):
 ${_normasGestorTexto()}
 
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes; plata, mercurio o cromo/dicromato → no lo resuelvas: es NO_RESUELTO para que lo decida Gestión.
+
 REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
 - Nunca digas que se puede verter por el desagüe ni tirar a la basura general, SALVO que el
   "Detalle" del tipo de residuo coincidente lo indique explícitamente para ese caso concreto
@@ -1152,9 +1154,12 @@ function exportarInformeConsenur() {
 function _abrirAdicionPorNfc(categoria, lab) {
   showPage('residuos-contenedores');
   setTimeout(() => {
-    const c = DATA.contenedoresResiduo.find(x =>
-      x.Categoria === categoria && x.Lab === lab && (x.Estado || 'activo') === 'activo'
-    );
+    const activo = x => x.Lab === lab && (x.Estado || 'activo') === 'activo';
+    // Las etiquetas grabadas antes de dividir Aguas en dos garrafas (2026-10-01)
+    // dicen "Aguas Laboratorio": se abre la garrafa de aguas que haya en ese lab.
+    const c = DATA.contenedoresResiduo.find(x => x.Categoria === categoria && activo(x))
+      || (categoria === 'Aguas Laboratorio'
+        && DATA.contenedoresResiduo.find(x => (x.Categoria || '').startsWith('Aguas Laboratorio') && activo(x)));
     if (!c) {
       showToast(`No se encontró un contenedor activo de "${categoria}" en Lab ${lab}`, 'error');
       return;

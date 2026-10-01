@@ -88,6 +88,19 @@ no al de al lado, con algo concreto del residuo (qué lleva, con qué reacciona,
 decide). El bloqueo fijo de Nivel 1 también lo hace: dice a qué categoría va el residuo y añade
 la razón de `MOTIVO_CATEGORIA` (`gestionar-residuo`), sacada de las normas del gestor.
 
+**Aguas en dos garrafas** (2026-10-01): `Aguas Laboratorio - Tinciones` (todo lo de tinciones,
+que suele ser ácido) y `Aguas Laboratorio - Equipos` (autoanalizadores, citómetro, coagulómetros,
+botella del lavador de ELISA —que lleva la lejía de la limpieza, NO la parada ni el TMB, que se
+quedan en la placa—, kits de diagnóstico, tampones, medios, PCR, OCT). Así lo ácido y lo que
+lleva lejía nunca coinciden. La garrafa del 203 pasó a Equipos (ahí están casi todos los
+autoanalizadores) y la del 205 a Tinciones. Las etiquetas NFC antiguas con
+`cont-cat=Aguas Laboratorio` siguen funcionando: `_abrirAdicionPorNfc` abre la garrafa de aguas
+que haya en ese lab, pero conviene regrabarlas.
+
+**Kits de tinción con botes desconocidos**: por defecto a Tinciones; las IAs separan oxidantes,
+pícrico/Bouin y DAB (salvavidas) y xileno/X-Free/formol (Inertes), y escalan plata, mercurio o
+cromo a Gestión.
+
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
 - Badge en nav suma consultas pendientes + contenedores al 75%/lleno/cerrado

@@ -108,7 +108,7 @@ const GHS_INCOMPATIBLES: [string, string][] = [
 // granel en garrafa). En bidones azules, bolsas, cubos y punzantes cada cosa va en
 // su propio envase cerrado: ahí no hay reacción posible y la matriz bloqueaba sin
 // motivo (p. ej. etanol:éter en el salvavidas después de un permanganato).
-const CATEGORIAS_A_GRANEL = ["Aguas Laboratorio", "Contenedor Inertes", "Contenedor Ácidos", "Contenedor Halogenados"];
+const CATEGORIAS_A_GRANEL = ["Aguas Laboratorio - Tinciones", "Aguas Laboratorio - Equipos", "Contenedor Inertes", "Contenedor Ácidos", "Contenedor Halogenados"];
 function contenidoSeMezcla(categoria: string | null, formato: string | null): boolean {
   const f = (formato || "").toLowerCase();
   if (f.includes("garrafa")) return true;
@@ -165,7 +165,7 @@ const WARNINGS_FORMATO: { match: string; texto: string }[] = [
 ];
 // Normas generales del gestor de residuos (2026-10-01). Réplica de _NORMAS_GESTOR
 // en js/residuos.js (consultorio y tarjeta de la Guía): mantener las dos iguales.
-const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas: lo que generan los aparatos automáticos de diagnóstico (como lo que sale del lavador de placas del ELISA), los restos de kits, etc. También TODO lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol: el protocolo ya las mezcla y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad).
+const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas, en DOS garrafas. TINCIONES: todo lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol, y los kits de tinción aunque no se sepa qué lleva cada bote: el protocolo ya las mezcla en el cristalizador y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad). EQUIPOS: lo que generan los aparatos automáticos de diagnóstico (autoanalizadores, citómetro, coagulómetros, la botella del lavador de placas del ELISA), restos de kits de diagnóstico, tampones, medios… La de Equipos lleva la lejía de la limpieza de los aparatos: por eso NADA ácido va en ella, y lo ácido (las tinciones) va siempre a la de Tinciones.
 - Muestras en formol — contenedor cuadrado azul (va a incinerar): SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja. OJO: Formol o etanol SIN muestras (aunque las hayan tenido), y el agua con restos de formol → disolventes no halogenados (en este centro, Contenedor Inertes).
 - Bolsa plástica (químicos): frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas. OJO: La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).
 - Cómo reconocer los contenedores por el color: contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.
@@ -176,7 +176,8 @@ const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas: lo que gener
 // Por qué existe cada categoría (palabras del gestor), para que el bloqueo fijo de
 // Nivel 1 no se quede en un "no coinciden" sin explicación.
 const MOTIVO_CATEGORIA: Record<string, string> = {
-  "Aguas Laboratorio": "Aguas de laboratorio recoge las mezclas acuosas: tinciones, kits y lo que generan los aparatos de diagnóstico.",
+  "Aguas Laboratorio - Tinciones": "La garrafa de Tinciones recoge todo lo de las tinciones, que suele ser ácido: por eso no va con la de Equipos, que lleva lejía.",
+  "Aguas Laboratorio - Equipos": "La garrafa de Equipos recoge lo que generan los aparatos de diagnóstico (incluida la botella del lavador del ELISA), kits y tampones; lleva la lejía de su limpieza, así que nada ácido.",
   "Contenedor Inertes": "El Contenedor Inertes recoge los disolventes no halogenados, también el formol o etanol sin muestra.",
   "Muestras en formol": "El contenedor cuadrado azul es SOLO para formol o etanol con la muestra dentro: va a incinerar.",
   "Bolsa plástica (químicos)": "La bolsa plástica es para envases vacíos y papel, guantes o filtros manchados de químicos.",
@@ -255,6 +256,8 @@ ${excepciones}
 NORMAS GENERALES DEL GESTOR DE RESIDUOS (acordadas con la empresa gestora; para juzgar un texto libre mandan sobre lo que sugiera el catálogo; algunos de estos contenedores existen aunque no estén en la lista de activos):
 ${NORMAS_GESTOR}
 
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes; plata, mercurio o cromo/dicromato → no lo resuelvas: es BLOQUEO con contenedor_sugerido=ninguno, para que lo decida Gestión.
+
 REGLAS:
 - El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
 - Solo si el contenido SE MEZCLA: el gestor permite juntar residuos distintos mientras no reaccionen entre sí (p. ej. las tinciones juntas en aguas de laboratorio, o el agua con formol en no halogenados). Lo que sí es INCOMPATIBLE: Comburente con Inflamable o con Explosivo; Corrosivo con Comburente; Explosivo con Inflamable o con Corrosivo; y lejía/hipoclorito con cualquier ácido (desprende cloro). Ser Cancerígeno / CMR o Citotóxico NO impide por sí solo compartir contenedor.
@@ -278,9 +281,9 @@ Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la 
   return [
     { role: "user", parts: [{ text: systemText }] },
     { role: "model", parts: [{ text: "Entendido. Dame el caso a evaluar." }] },
-    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"PBS diluido sobrante de lavados, sin nada tóxico\"" }] },
-    { role: "model", parts: [{ text: "[OK] El PBS diluido es un residuo acuoso de bajo riesgo y encaja en el contenedor de Aguas de Laboratorio. Mantén la garrafa cerrada entre adiciones." }] },
-    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio\" (Lab 203):\n- Descrito por la persona en texto libre: \"formol sobrante de un bote de biopsia, ya sin la muestra\"" }] },
+    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio - Equipos\" (Lab 203):\n- Descrito por la persona en texto libre: \"PBS diluido sobrante de lavados, sin nada tóxico\"" }] },
+    { role: "model", parts: [{ text: "[OK] El PBS diluido es un tampón acuoso de bajo riesgo, no es ácido ni reacciona con la lejía de la limpieza de los equipos: va bien en la garrafa de Equipos. Mantén la garrafa cerrada entre adiciones." }] },
+    { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio - Equipos\" (Lab 203):\n- Descrito por la persona en texto libre: \"formol sobrante de un bote de biopsia, ya sin la muestra\"" }] },
     { role: "model", parts: [{ text: "[BLOQUEO|categoria=Cancerígeno / CMR|contenedor_sugerido=Contenedor Inertes] El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Contenedor Inertes. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
     { role: "user", parts: [{ text: casoText }] },
   ];
