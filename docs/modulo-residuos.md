@@ -78,9 +78,7 @@ salvavidas y se renombró a `Reactivos de laboratorio`. Categoría nueva `Bolsa 
 bolsa (formato `Bolsa plástica`) y el salvavidas (formato `Bidón azul de ballesta`). La bolsa
 lleva el recordatorio de que es la misma para todo y hay que marcar con una X su uso.
 
-⚠ Choque abierto con el Nivel 2: el agua con formol, el fijador de citometría y el gel de
-poliacrilamida son `Cancerígeno / CMR`, y la regla de exclusividad CMR no les deja compartir el
-bidón de Inertes con ningún otro tipo. Pendiente de decidir con la usuaria.
+El choque con la exclusividad CMR se resolvió quitando esa regla (ver Nivel 2 más abajo).
 
 ## Consultas de residuo desconocido
 - `Consultas_Residuo` — columnas A-F de Sheets + 3 columnas añadidas para el consultorio IA: `Categoria_IA` (categoría GHS que infirió la IA, o vacío), `Guia_Provisional` (texto de manejo provisional que se le dio al usuario), `Prioridad` (`Normal` / `Alta`)
@@ -150,9 +148,17 @@ igual si se llega por selección manual que por escaneo NFC, porque ambos llaman
 - **Nivel 2 — incompatibilidad GHS**: el `Riesgo` del nuevo residuo se compara contra el de los
   tipos ya registrados en ese contenedor concreto (vía su historial en `Adiciones_Residuo`), usando
   una matriz pequeña de pares incompatibles (Comburente↔Inflamable, Comburente↔Explosivo,
-  Corrosivo↔Comburente, Explosivo↔Inflamable, Explosivo↔Corrosivo) más una regla de categorías
-  exclusivas: Citotóxico y Cancerígeno/CMR nunca pueden convivir con ningún otro tipo de residuo
-  distinto en el mismo contenedor (añadir más del mismo tipo exacto sí está permitido).
+  Corrosivo↔Comburente, Explosivo↔Inflamable, Explosivo↔Corrosivo). **Solo se aplica donde el
+  contenido se mezcla de verdad** (`contenidoSeMezcla`): formato garrafa, o sin formato y categoría
+  a granel (Aguas, Inertes, Ácidos, Halogenados). En bidón azul, bolsa, cubo, rígido, punzantes o
+  ballesta cada cosa va en su envase cerrado y no hay reacción posible (antes bloqueaba sin motivo,
+  p. ej. etanol:éter en el salvavidas tras un permanganato).
+  La antigua regla de "exclusividad" (CMR/citotóxico solo en su contenedor) **se quitó el
+  2026-10-01**: no venía del gestor y chocaba con sus normas ("juntas mientras no reaccionen").
+- **Nivel 2b — cloro**: donde se mezcla, lejía/hipoclorito nunca con algo ácido (en los dos
+  sentidos). Como los pictogramas no lo distinguen (ambos "Corrosivo"), se reconoce por texto
+  (`claseCloro`: nombre + descripción de la ficha, o el texto libre; ignora "ácidos nucleicos").
+  La IA sola no lo frenaba en la prueba real.
 
 Si hay conflicto en Nivel 1/2, la Edge Function devuelve **400** con un mensaje explicando qué ya
 hay dentro y por qué no es compatible; el cliente lo muestra vía `showToast`. Este bloqueo

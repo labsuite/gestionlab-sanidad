@@ -100,9 +100,34 @@ const GHS_INCOMPATIBLES: [string, string][] = [
   ["Explosivo", "Inflamable"],
   ["Explosivo", "Corrosivo"],
 ];
-// Estas categorías nunca deben convivir con ningún otro tipo de residuo distinto
-// en el mismo contenedor, aunque no haya un par específico en la matriz de arriba.
-const GHS_EXCLUSIVAS = ["Citotóxico", "Cancerígeno / CMR"];
+// Ya no hay categorías "exclusivas" (CMR/citotóxico solos en su contenedor): esa
+// regla era de la app, no del gestor, y chocaba con sus normas de 2026-10-01
+// (agua con formol en Inertes, tinciones mezcladas en Aguas).
+
+// La matriz solo tiene sentido donde el contenido se MEZCLA de verdad (líquido a
+// granel en garrafa). En bidones azules, bolsas, cubos y punzantes cada cosa va en
+// su propio envase cerrado: ahí no hay reacción posible y la matriz bloqueaba sin
+// motivo (p. ej. etanol:éter en el salvavidas después de un permanganato).
+const CATEGORIAS_A_GRANEL = ["Aguas Laboratorio", "Contenedor Inertes", "Contenedor Ácidos", "Contenedor Halogenados"];
+function contenidoSeMezcla(categoria: string | null, formato: string | null): boolean {
+  const f = (formato || "").toLowerCase();
+  if (f.includes("garrafa")) return true;
+  if (["bidón", "bidon", "bolsa", "cubo", "rígido", "rigido", "punzantes", "ballesta"].some((k) => f.includes(k))) return false;
+  return CATEGORIAS_A_GRANEL.includes(categoria || "");
+}
+
+// Lejía/hipoclorito + ácido desprende cloro. Los pictogramas GHS no lo distinguen
+// (los dos son "Corrosivo"), así que se reconoce por el texto de la ficha o el que
+// escribe la persona. Solo cuenta donde el contenido se mezcla (contenidoSeMezcla).
+const RE_HIPOCLORITO = /hipoclorito|lej[ií]a/i;
+const RE_ACIDO = /[áa]cid|\bhcl\b|h2so4|acidific/i;
+const RE_ACIDOS_NUCLEICOS = /[áa]cidos? nucleicos?/gi;
+function claseCloro(texto: string): "hipoclorito" | "acido" | null {
+  const t = (texto || "").replace(RE_ACIDOS_NUCLEICOS, "");
+  if (RE_HIPOCLORITO.test(t)) return "hipoclorito";
+  if (RE_ACIDO.test(t)) return "acido";
+  return null;
+}
 
 function parseRiesgo(riesgo: string | null): string[] {
   return (riesgo || "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -111,16 +136,7 @@ function parseRiesgo(riesgo: string | null): string[] {
 function chequearIncompatibilidad(
   riesgosNuevo: string[],
   riesgosExistentes: string[][],
-  hayOtroTipoDistinto: boolean,
 ): string | null {
-  for (const exclusiva of GHS_EXCLUSIVAS) {
-    if (hayOtroTipoDistinto && riesgosNuevo.includes(exclusiva)) {
-      return `el nuevo residuo es "${exclusiva}": esta categoría no puede convivir con ningún otro tipo de residuo distinto en el mismo contenedor`;
-    }
-    if (hayOtroTipoDistinto && riesgosExistentes.some((r) => r.includes(exclusiva))) {
-      return `el contenedor ya contiene un residuo "${exclusiva}": no se puede añadir ningún otro tipo distinto`;
-    }
-  }
   for (const [a, b] of GHS_INCOMPATIBLES) {
     const nuevoTieneA = riesgosNuevo.includes(a);
     const nuevoTieneB = riesgosNuevo.includes(b);
@@ -163,7 +179,7 @@ function getWarningFormato(formato: string | null): string | null {
 }
 
 interface ContextoIA {
-  contenedor: { categoria: string; lab: string; formato: string | null };
+  contenedor: { categoria: string; lab: string; formato: string | null; seMezcla: boolean };
   contenidoActual: { nombre: string; riesgo: string; detalle: string }[];
   itemCatalogo: { nombre: string; riesgo: string; contenedorTipo: string; detalle: string } | null;
   textoLibre: string | null;
@@ -208,6 +224,7 @@ CONTENEDOR DE DESTINO:
 - Categoría: ${cont.categoria || "sin categoría"}
 - Laboratorio: ${cont.lab || "?"}
 - Formato: ${cont.formato || "sin especificar"}${aviso ? `\n- Aviso de formato: ${aviso}` : ""}
+- ${cont.seMezcla ? "El contenido SE MEZCLA (líquido a granel): comprueba que no reaccione con lo que ya hay dentro." : "Cada residuo va en su propio envase cerrado: el contenido NO se mezcla, así que lo de dentro no importa para la reacción química; comprueba solo que el residuo corresponde a este contenedor y que va bien cerrado."}
 
 LO QUE YA HAY DENTRO DE ESTE CONTENEDOR (tipos distintos ya registrados):
 ${dentro}
@@ -226,7 +243,7 @@ ${NORMAS_GESTOR}
 
 REGLAS:
 - El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
-- Incompatibilidad química con lo que ya hay dentro: nunca juntar Comburente con Inflamable ni con Explosivo; nunca Corrosivo con Comburente; nunca Explosivo con Inflamable ni con Corrosivo. Un residuo Citotóxico o Cancerígeno / CMR nunca puede convivir con ningún otro tipo distinto en el mismo contenedor.
+- Solo si el contenido SE MEZCLA: el gestor permite juntar residuos distintos mientras no reaccionen entre sí (p. ej. las tinciones juntas en aguas de laboratorio, o el agua con formol en no halogenados). Lo que sí es INCOMPATIBLE: Comburente con Inflamable o con Explosivo; Corrosivo con Comburente; Explosivo con Inflamable o con Corrosivo; y lejía/hipoclorito con cualquier ácido (desprende cloro). Ser Cancerígeno / CMR o Citotóxico NO impide por sí solo compartir contenedor.
 - Si la descripción en texto libre es ambigua entre varios tipos con contenedor distinto, o no describe un residuo real, es INCOMPATIBLE: mejor parar y que lo revise una persona.
 - Nunca propongas verter por el desagüe ni tirar a la basura general, salvo que el "Detalle" del tipo del catálogo coincidente lo indique explícitamente o sean portas NO contaminados con el material ya fijado (norma del gestor: basura, protegidos).
 - Si detectas un riesgo agudo (derrame, presión/burbujeo, olor fuerte, mezcla accidental de incompatibles), es INCOMPATIBLE y dilo con claridad.
@@ -347,11 +364,32 @@ Deno.serve(async (req) => {
     }
 
     // ── Nivel 2 (determinista, bloqueo duro): incompatibilidad GHS — solo si hay tipo del catálogo ──
-    if (residuo && idsExistentesDistintos.length > 0) {
+    const seMezcla = contenidoSeMezcla(contenedorActual.categoria, contenedorActual.formato);
+    if (residuo && seMezcla && idsExistentesDistintos.length > 0) {
       const riesgosNuevo = parseRiesgo(residuo.riesgo);
       const riesgosExistentes = (tiposExistentes || []).map((t) => parseRiesgo(t.riesgo));
-      const conflicto = chequearIncompatibilidad(riesgosNuevo, riesgosExistentes, true);
+      const conflicto = chequearIncompatibilidad(riesgosNuevo, riesgosExistentes);
       if (conflicto) return jsonError(`No se puede añadir este residuo a este contenedor: ${conflicto}.`, 400);
+    }
+
+    // ── Nivel 2b (determinista): lejía/hipoclorito nunca con un ácido (cloro) ──
+    if (seMezcla) {
+      const claseNuevo = claseCloro(residuo ? `${residuo.nombre} ${residuo.descripcion || ""}` : descripcionLibre);
+      if (claseNuevo) {
+        const dentro = [
+          ...tiposExistentes.map((t) => `${t.nombre} ${t.descripcion || ""}`),
+          ...(adicionesExistentes || []).map((a: { descripcion_libre: string | null }) => a.descripcion_libre || ""),
+        ];
+        const opuesta = claseNuevo === "hipoclorito" ? "acido" : "hipoclorito";
+        if (dentro.some((t) => claseCloro(t) === opuesta)) {
+          return jsonError(
+            claseNuevo === "hipoclorito"
+              ? "No se puede añadir: este contenedor ya tiene algo ácido, y la lejía/hipoclorito con un ácido desprende cloro. Llévalo a otra garrafa sin ácidos o al salvavidas, en su frasco cerrado."
+              : "No se puede añadir: este contenedor ya tiene lejía/hipoclorito, y con un ácido desprende cloro. Llévalo a otra garrafa sin lejía o al salvavidas, en su frasco cerrado.",
+            400,
+          );
+        }
+      }
     }
 
     // ── Capa IA: ¿de verdad se puede tirar esto en ESTE contenedor? ──
@@ -372,7 +410,7 @@ Deno.serve(async (req) => {
       }
 
       const ctx: ContextoIA = {
-        contenedor: { categoria: contenedorActual.categoria || "", lab: String(contenedorActual.lab || ""), formato: contenedorActual.formato },
+        contenedor: { categoria: contenedorActual.categoria || "", lab: String(contenedorActual.lab || ""), formato: contenedorActual.formato, seMezcla },
         contenidoActual: (tiposExistentes || []).map((t) => ({ nombre: t.nombre, riesgo: t.riesgo || "", detalle: t.descripcion || "" })),
         itemCatalogo: residuo
           ? { nombre: residuo.nombre || "", riesgo: residuo.riesgo || "", contenedorTipo: residuo.contenedor_tipo || "", detalle: residuo.descripcion || "" }
