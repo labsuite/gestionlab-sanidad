@@ -352,10 +352,10 @@ async function guardarRecepcionLinea() {
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
   const idUbicacion = document.getElementById('rec-ubicacion-group')?.style.display !== 'none' ? v('rec-ubicacion-sel') : '';
-  const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
+  const mat = _materialDeLinea(l);
   if (!mat && cantRec > 0) {
     closeModal('modal-recepcion-linea');
-    _pendingRecepcion = { lineaId, pedidoId, cantRec, obs: v('rec-obs') };
+    _pendingRecepcion = { lineaId, pedidoId, cantRec, obs: v('rec-obs'), idUbicacion };
     openModalMaterial(); sv('mat-nombre', l.Material);
     setTimeout(() => {
       const footer = document.querySelector('#modal-material .form-footer');
@@ -378,10 +378,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');

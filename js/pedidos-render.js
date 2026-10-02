@@ -420,7 +420,7 @@ function _unidadLineaPedido(l) {
   if (l.Unidad) return l.Unidad;
   const mat = _materialDeLinea(l);
   if (mat?.Unidad) return mat.Unidad;
-  const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
+  const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL\S+)/);
   if (solIdM) {
     const solVinc = DATA.solicitudes.find(s => s.ID_Solicitud === solIdM[1]);
     const uMatch = (solVinc?.Observaciones || '').match(/\[Unidad:\s*([^\]]+)\]/);

@@ -79,7 +79,7 @@ async function actualizarEstadoPedidoPostRecepcion(supabaseAdmin: any, pedidoId:
 }
 
 async function actualizarSolicitudOrigen(supabaseAdmin: any, linea: any, pedidoId: string) {
-  const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL-\S+)/);
+  const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL\S+)/);
   let solOrigen = null;
   if (solIdMatch) {
     const { data } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", solIdMatch[1]).neq("estado", "Recibido").maybeSingle();
@@ -98,25 +98,42 @@ async function actualizarSolicitudOrigen(supabaseAdmin: any, linea: any, pedidoI
   }).eq("id_solicitud", solOrigen.id_solicitud);
 }
 
-async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null) {
+// `idMaterial` llega cuando el material se acaba de catalogar desde la propia
+// recepción: la usuaria puede haberle corregido el nombre (se pidió "5 mL" y
+// lo que existe es "2 mL"), así que buscarlo por el nombre de la línea no lo
+// encontraría y el stock no entraría.
+async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null) {
   const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
   if (!linea) return { error: jsonError(`No se encontró la línea "${idLinea}"`, 404) };
   const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", linea.pedido).maybeSingle();
   if (!pedido) return { error: jsonError("Pedido no encontrado", 404) };
 
+  let mat = null;
+  const idMat = idMaterial || linea.id_material;
+  if (idMat) {
+    const { data } = await supabaseAdmin.from("material").select("*").eq("id_material", idMat).maybeSingle();
+    mat = data;
+  }
+  if (!mat) mat = await buscarMaterialPorNombre(supabaseAdmin, linea.material);
+
   const cantPed = Number(linea.cantidad_pedida) || 0;
   const cantRecTotal = (Number(linea.cantidad_recibida) || 0) + cantRec;
   const estadoLinea = cantRecTotal >= cantPed ? "Recibido" : (cantRecTotal > 0 ? "Recibido parcialmente" : "Pendiente");
   const datosLinea: Record<string, unknown> = { cantidad_recibida: cantRecTotal, estado_linea: estadoLinea };
-  if (observaciones) datosLinea.observaciones = observaciones;
+  if (mat && mat.id_material !== linea.id_material) datosLinea.id_material = mat.id_material;
+  // La marca "Desde solicitud …" es lo que enlaza la línea con su solicitud:
+  // una observación escrita al recibir se le añade, no la sustituye.
+  if (observaciones) {
+    const marca = (linea.observaciones || "").match(/Desde solicitud SOL\S+/)?.[0];
+    datosLinea.observaciones = marca && !observaciones.includes(marca) ? `${marca} · ${observaciones}` : observaciones;
+  }
 
   const { data: lineaActualizada, error } = await supabaseAdmin.from("lineas_pedido").update(datosLinea).eq("id_linea", idLinea).select().single();
   if (error) return { error: jsonError(`No se pudo guardar la recepción: ${error.message}`, 400) };
 
   // Servicios: no hay stock que tocar.
-  if (pedido.tipo !== "Servicio" && cantRec > 0) {
-    const mat = await buscarMaterialPorNombre(supabaseAdmin, linea.material);
-    if (mat) await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
+  if (pedido.tipo !== "Servicio" && cantRec > 0 && mat) {
+    await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
   if (estadoLinea === "Recibido") await actualizarSolicitudOrigen(supabaseAdmin, lineaActualizada, linea.pedido);
@@ -216,7 +233,7 @@ Deno.serve(async (req) => {
     // Revertir solicitud vinculada si procede (2 intentos, igual que en recepción).
     const estadosRevertibles = ["Añadida a pedido", "En espera de recepción"];
     let solOrigen = null;
-    const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL-\S+)/);
+    const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL\S+)/);
     if (solIdMatch) {
       const { data } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", solIdMatch[1]).in("estado", estadosRevertibles).maybeSingle();
       solOrigen = data;
@@ -270,7 +287,7 @@ Deno.serve(async (req) => {
     const cantRec = Number(body.cantidad);
     if (!idLinea) return jsonError("id_linea es obligatorio", 400);
     if (!cantRec || cantRec <= 0) return jsonError("Indica una cantidad válida", 400);
-    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion));
+    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion), strField(body.id_material));
     if (resultado.error) return resultado.error;
     return jsonOk(resultado);
   }

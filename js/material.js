@@ -1192,11 +1192,13 @@ async function guardarMaterial() {
     closeModal('modal-material'); editingRow = null; _lotesTemp = [];
 
     if (_pendingRecepcion) {
-      const { lineaId, pedidoId, cantRec, obs } = _pendingRecepcion;
+      // Se recibe contra el material que se acaba de guardar, no contra el
+      // nombre de la línea: al catalogarlo se le puede haber corregido el
+      // nombre (se pidió un tamaño que no existe) y entonces no coincidiría.
+      const { lineaId, pedidoId, cantRec, obs, idUbicacion } = _pendingRecepcion;
       _pendingRecepcion = null;
-      const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
-      const mat = l && DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-      if (mat) { showToast('Material catalogado. Registrando recepción...', 'success'); await _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs); }
+      showToast('Material catalogado. Registrando recepción...', 'success');
+      await _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, material.id_material);
     } else {
       renderAll();
     }

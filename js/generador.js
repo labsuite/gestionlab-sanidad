@@ -125,7 +125,7 @@ async function generarHojaPedido() {
       const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
       let unidad = mat?.Unidad || '';
       if (!unidad) {
-        const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL-\S+)/);
+        const solIdM = (l.Observaciones || '').match(/Desde solicitud (SOL\S+)/);
         if (solIdM) {
           const solVinc = DATA.solicitudes.find(s => s.ID_Solicitud === solIdM[1]);
           const uMatch  = (solVinc?.Observaciones || '').match(/\[Unidad:\s*([^\]]+)\]/);
