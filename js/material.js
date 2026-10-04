@@ -472,7 +472,7 @@ function _mesAnyoStock(fechaIso) {
 
 /** Resumen de una línea para la fila desplegada del material.
  *  Agrupa por mes: dos recepciones del mismo mes se leen como una sola tanda
- *  ("10 cajas (jul 2026)"), que es la granularidad útil de un vistazo. El desglose
+ *  ("jul 2026 (10 cajas)"), que es la granularidad útil de un vistazo. El desglose
  *  entrada a entrada está en el modal de historial. */
 function _resumenAntiguedad(mat) {
   const { tandas, sinAtribuir, hayEntradas } = getAntiguedadStock(mat);
@@ -483,13 +483,15 @@ function _resumenAntiguedad(mat) {
     const ya = porMes.find(x => x.mes === mes);
     if (ya) ya.cantidad += t.cantidad; else porMes.push({ mes, cantidad: t.cantidad });
   });
-  // Cantidad con unidad y el mes entre paréntesis: "24 de oct 2026" se leía
-  // como una fecha (el 24 de octubre), no como 24 unidades entradas en octubre.
-  const partes = porMes.map(t => `<strong>${t.cantidad}</strong> ${unidad} (${t.mes})`.replace(/\s+\(/, ' ('));
+  // Lo que interesa aquí es desde cuándo está el stock, no cuánto hay (eso ya
+  // lo dice la barra de stock): el mes va delante y destacado, la cantidad
+  // detrás y en gris. Con la unidad, para que no se lea "24 de oct" como fecha.
+  const cant = n => `<span style="color:var(--text-muted)">(${`${n} ${unidad}`.trim()})</span>`;
+  const partes = porMes.map(t => `<strong>${t.mes}</strong> ${cant(t.cantidad)}`);
   if (sinAtribuir > 0) {
     partes.push(hayEntradas
-      ? `<strong>${sinAtribuir}</strong> sin datos de entrada`
-      : `<strong>${sinAtribuir}</strong> ${unidad} anteriores a GestionLab`.trim());
+      ? `<strong>sin fecha de entrada</strong> ${cant(sinAtribuir)}`
+      : `<strong>anterior a GestionLab</strong> ${cant(sinAtribuir)}`);
   }
   if (!partes.length) return '<span style="color:var(--text-muted)">Sin stock</span>';
   return partes.join(' · ');
