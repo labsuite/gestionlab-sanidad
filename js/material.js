@@ -472,7 +472,7 @@ function _mesAnyoStock(fechaIso) {
 
 /** Resumen de una línea para la fila desplegada del material.
  *  Agrupa por mes: dos recepciones del mismo mes se leen como una sola tanda
- *  ("10 de jul 2026"), que es la granularidad útil de un vistazo. El desglose
+ *  ("10 cajas (jul 2026)"), que es la granularidad útil de un vistazo. El desglose
  *  entrada a entrada está en el modal de historial. */
 function _resumenAntiguedad(mat) {
   const { tandas, sinAtribuir, hayEntradas } = getAntiguedadStock(mat);
@@ -483,7 +483,9 @@ function _resumenAntiguedad(mat) {
     const ya = porMes.find(x => x.mes === mes);
     if (ya) ya.cantidad += t.cantidad; else porMes.push({ mes, cantidad: t.cantidad });
   });
-  const partes = porMes.map(t => `<strong>${t.cantidad}</strong> de ${t.mes}`);
+  // Cantidad con unidad y el mes entre paréntesis: "24 de oct 2026" se leía
+  // como una fecha (el 24 de octubre), no como 24 unidades entradas en octubre.
+  const partes = porMes.map(t => `<strong>${t.cantidad}</strong> ${unidad} (${t.mes})`.replace(/\s+\(/, ' ('));
   if (sinAtribuir > 0) {
     partes.push(hayEntradas
       ? `<strong>${sinAtribuir}</strong> sin datos de entrada`
