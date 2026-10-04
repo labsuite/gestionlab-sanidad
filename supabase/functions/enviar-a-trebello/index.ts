@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
   //     la tabla del Word.
   // El id es el de la línea de GestionLab, no un UUID al azar: así reenviar
   // el pedido no le cambia la identidad a cada artículo.
-  const items = (lineas || []).map((l: any) => {
+  const aItem = (l: any) => {
     const pedida   = parseFloat(l.cantidad_pedida)   || 0;
     const recibida = parseFloat(l.cantidad_recibida) || 0;
     return {
@@ -109,15 +109,29 @@ Deno.serve(async (req) => {
       solicitude_id: null,
       requester_name: null,
     };
-  });
+  };
 
+  // ── Material común: va en una hoja aparte (misma factura) ─────────────
+  // Guantes, papel… los usa todo el departamento aunque se pidan desde los
+  // laboratorios. Las líneas que lo son (marca de la línea o, si no tiene,
+  // la de la ficha del material) viajan como un SEGUNDO pedido de Trebello,
+  // con ciclo "Material común", para que la jefa no las impute a Laboratorios.
+  const { data: materiales } = await supabaseAdmin.from("material").select("id_material, nombre, material_comun");
+  const lineaEsComun = (l: any): boolean => {
+    if (pedido.tipo === "Servicio") return false;
+    if (l.material_comun === true || l.material_comun === false) return l.material_comun;
+    const nombre = String(l.material || "");
+    const mat = (materiales || []).find((m: any) => l.id_material && m.id_material === l.id_material)
+             || (materiales || []).find((m: any) => m.nombre === nombre || nombre.startsWith(m.nombre));
+    return mat?.material_comun === true;
+  };
+  const lineasComunes = (lineas || []).filter(lineaEsComun);
+  const lineasPropias = (lineas || []).filter((l: any) => !lineasComunes.includes(l));
+
+  // Portes/tasas: con la parte del laboratorio, salvo que todo sea común.
   const gastoExtra = parseFloat(pedido.gasto_extra_importe) || 0;
-  const cargoExtra = gastoExtra > 0
-    ? {
-        id: `${idPedido}-cargo-extra`,
-        concepto: pedido.gasto_extra_concepto || "Gasto extra",
-        importe: gastoExtra,
-      }
+  const cargoExtra = (id: string) => gastoExtra > 0
+    ? { id: `${id}-cargo-extra`, concepto: pedido.gasto_extra_concepto || "Gasto extra", importe: gastoExtra }
     : null;
 
   // ── Facturas del proveedor ────────────────────────────────────────────
@@ -139,57 +153,99 @@ Deno.serve(async (req) => {
   }
 
   // ── Envío ─────────────────────────────────────────────────────────────
-  const payload = {
-    pedido_id: idPedido,
-    nombre: pedido.nombre_lista || null,
+  const base = {
     casa_comercial: pedido.proveedor || null,
-    ciclo: pedido.ciclo || null,
-    modulo: pedido.modulo || null,
     numero_factura: pedido.numero_factura || null,
     data_factura: soloFecha(pedido.fecha_factura),
     data_pedido: soloFecha(pedido.fecha_pedido_enviado || pedido.fecha_aprobacion || pedido.fecha_creacion),
     // Las observaciones NO se mandan: en la hoja de pedido salen impresas en
     // "OBSERVACIÓNS", que es un campo del documento oficial, no un cajón para
     // las notas internas del pedido de laboratorio.
-    items,
-    cargo_extra: cargoExtra,
     facturas,
   };
 
-  let resp: Response;
-  try {
-    resp = await fetch(TREBELLO_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-gestionlab-secret": TREBELLO_SECRET },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(45000),
-    });
-  } catch (e) {
-    return jsonError(`No se pudo contactar con Trebello: ${e instanceof Error ? e.message : String(e)}`, 502);
+  async function enviar(payload: Record<string, unknown>) {
+    let resp: Response;
+    try {
+      resp = await fetch(TREBELLO_URL!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-gestionlab-secret": TREBELLO_SECRET! },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(45000),
+      });
+    } catch (e) {
+      return { error: `No se pudo contactar con Trebello: ${e instanceof Error ? e.message : String(e)}`, status: 502 };
+    }
+    let resultado: any = null;
+    try { resultado = await resp.json(); } catch { /* respuesta no JSON */ }
+    if (!resp.ok) return { error: resultado?.error || `Trebello respondió ${resp.status}`, status: resp.status === 409 ? 409 : 502 };
+    return { resultado };
   }
 
-  let resultado: any = null;
-  try { resultado = await resp.json(); } catch { /* respuesta no JSON */ }
+  // La parte del laboratorio conserva la clave de siempre (ID_Pedido), así
+  // los pedidos enviados antes de existir el material común se actualizan en
+  // vez de duplicarse. La común usa ID_Pedido + "-COMUN".
+  const resultados: any[] = [];
+  const cambios: Record<string, unknown> = {};
+  const avisos: string[] = [];
 
-  if (!resp.ok) {
-    return jsonError(resultado?.error || `Trebello respondió ${resp.status}`, resp.status === 409 ? 409 : 502);
+  if (lineasPropias.length) {
+    const r = await enviar({
+      ...base,
+      pedido_id: idPedido,
+      nombre: pedido.nombre_lista || null,
+      ciclo: pedido.ciclo || null,
+      modulo: pedido.modulo || null,
+      items: lineasPropias.map(aItem),
+      cargo_extra: cargoExtra(idPedido),
+    });
+    if (r.error) return jsonError(r.error, r.status);
+    resultados.push(r.resultado);
+    cambios.trebello_pedido_id = r.resultado?.pedido_id || null;
+  } else if (pedido.trebello_pedido_id) {
+    avisos.push("En Trebello sigue la hoja de laboratorio que se envió antes; ahora todo es material común, así que habría que borrarla allí");
+  }
+
+  if (lineasComunes.length) {
+    const r = await enviar({
+      ...base,
+      pedido_id: `${idPedido}-COMUN`,
+      nombre: `${pedido.nombre_lista || idPedido} · Material común`,
+      ciclo: "Material común",
+      modulo: null,
+      items: lineasComunes.map(aItem),
+      cargo_extra: lineasPropias.length ? null : cargoExtra(`${idPedido}-COMUN`),
+    });
+    if (r.error) {
+      // La parte del laboratorio ya llegó: se guarda, para no perder la pista.
+      if (Object.keys(cambios).length) await supabaseAdmin.from("pedidos").update(cambios).eq("id_pedido", idPedido);
+      return jsonError(`${lineasPropias.length ? "La hoja de laboratorio se envió, pero la de material común no: " : ""}${r.error}`, r.status);
+    }
+    resultados.push(r.resultado);
+    cambios.trebello_pedido_comun_id = r.resultado?.pedido_id || null;
+  } else if (pedido.trebello_pedido_comun_id) {
+    avisos.push("En Trebello sigue la hoja de material común que se envió antes; ahora no queda ninguna línea común, así que habría que borrarla allí");
   }
 
   // ── Marcar el envío en el pedido ──────────────────────────────────────
   // doc_enviada_jefatura deja de marcarse a mano: ahora significa "llegó de
   // verdad a Trebello", y solo se pone si el envío respondió OK.
   await supabaseAdmin.from("pedidos").update({
-    trebello_pedido_id: resultado?.pedido_id || null,
+    ...cambios,
     fecha_envio_trebello: new Date().toISOString(),
     doc_enviada_jefatura: true,
   }).eq("id_pedido", idPedido);
 
   return jsonOk({
     ok: true,
-    trebello_pedido_id: resultado?.pedido_id || null,
-    nuevo: !!resultado?.novo,
+    trebello_pedido_id: cambios.trebello_pedido_id ?? pedido.trebello_pedido_id ?? null,
+    trebello_pedido_comun_id: cambios.trebello_pedido_comun_id ?? pedido.trebello_pedido_comun_id ?? null,
+    hojas: resultados.length,
+    lineas_comunes: lineasComunes.length,
+    nuevo: resultados.some((r) => !!r?.novo),
     facturas_enviadas: facturas.length,
     facturas_no_enviadas: noEnviados,
-    facturas_rechazadas: resultado?.facturas_rexeitadas || [],
+    facturas_rechazadas: [...new Set(resultados.flatMap((r) => r?.facturas_rexeitadas || []))],
+    avisos,
   });
 });

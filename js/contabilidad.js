@@ -193,19 +193,32 @@ function _renderContabilidadConAnio(anio) {
     try { return new Date(fecha).getFullYear() === anio; } catch { return false; }
   });
 
-  // Agregar por ciclo → módulo
+  // Agregar por ciclo → módulo. Las líneas de material común (lineaEsComun)
+  // salen del ciclo del pedido y van a su propia partida, igual que en
+  // Trebello van en una hoja aparte. Los portes se quedan con la parte del
+  // laboratorio, salvo que el pedido sea todo material común.
   const resumen = {};
-  for (const p of pedidosAnio) {
-    const ciclo  = (p.Ciclo  || '').trim() || '(Sin ciclo asignado)';
-    const modulo = (p.Modulo || '').trim() || '(Sin módulo)';
+  const sumar = (ciclo, modulo, p, subtotal, comun) => {
     if (!resumen[ciclo]) resumen[ciclo] = {};
     if (!resumen[ciclo][modulo]) resumen[ciclo][modulo] = { subtotal: 0, pedidos: [] };
-    const lineasP  = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
-    const subtotal = lineasP.reduce((sum, l) =>
-      sum + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0),
-      parseFloat(p.Gasto_Extra_Importe) || 0);
     resumen[ciclo][modulo].subtotal += subtotal;
-    resumen[ciclo][modulo].pedidos.push({ id: p.ID_Pedido, nombre: p.Nombre_Lista, subtotal });
+    resumen[ciclo][modulo].pedidos.push({ id: p.ID_Pedido, nombre: p.Nombre_Lista, subtotal, comun });
+  };
+  const importeLineas = ls => ls.reduce((sum, l) =>
+    sum + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
+  for (const p of pedidosAnio) {
+    const lineasP = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
+    const comunes = p.Tipo === 'Servicio' ? [] : lineasP.filter(lineaEsComun);
+    const propias = lineasP.filter(l => !comunes.includes(l));
+    const gastoExtra = parseFloat(p.Gasto_Extra_Importe) || 0;
+    const portesAComun = !propias.length;
+    if (propias.length || !comunes.length) {
+      sumar((p.Ciclo || '').trim() || '(Sin ciclo asignado)', (p.Modulo || '').trim() || '(Sin módulo)',
+            p, importeLineas(propias) + (portesAComun ? 0 : gastoExtra), false);
+    }
+    if (comunes.length) {
+      sumar(CICLO_MATERIAL_COMUN, 'Departamento', p, importeLineas(comunes) + (portesAComun ? gastoExtra : 0), true);
+    }
   }
 
   const totalBase = Object.values(resumen)
@@ -252,7 +265,7 @@ function _renderContabilidadConAnio(anio) {
       <div class="empty-state-text">Genera hojas de pedido, introduce precios con el botón 💶 y asigna ciclos para ver el resumen.</div>
     </div>`;
   } else {
-    for (const ciclo of Object.keys(resumen).sort()) {
+    for (const ciclo of Object.keys(resumen).sort((a, b) => (a === CICLO_MATERIAL_COMUN) - (b === CICLO_MATERIAL_COMUN) || a.localeCompare(b))) {
       const mods          = resumen[ciclo];
       const subtotalCiclo = Object.values(mods).reduce((s, m) => s + m.subtotal, 0);
       html += `
@@ -281,10 +294,10 @@ function _renderContabilidadConAnio(anio) {
                   style="font-size:11px;padding:2px 8px;border-radius:20px;border:1px solid var(--accent);
                          background:transparent;color:var(--accent);cursor:pointer;white-space:nowrap"
                   title="${p.nombre}">📋 ${p.id}</button>
-                <button onclick="abrirReasignacion('${p.id}')"
+                ${p.comun ? '' : `<button onclick="abrirReasignacion('${p.id}')"
                   style="font-size:11px;padding:2px 5px;border-radius:20px;border:1px solid var(--border);
                          background:transparent;color:var(--text-muted);cursor:pointer"
-                  title="Reasignar ciclo/módulo">🔀</button>`).join('')}
+                  title="Reasignar ciclo/módulo">🔀</button>`}`).join('')}
             </div>
           </td>
           <td style="text-align:right;padding:8px 4px;color:var(--text-soft)">${fmt(d.subtotal)}</td>

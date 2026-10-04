@@ -322,3 +322,29 @@ con la descarga del PDF. Si un pedido del puente aparece en `EN_REVISION`, reenv
 `/api/gestionlab/stock`) lee **Google Sheets**, retirado en GestionLab el 2026-08-06. No tiene
 nada que ver con este puente, que va por HTTP contra Postgres, pero conviene reescribirlo o
 retirarlo cuando se toque ese módulo.
+
+---
+
+## Material común del departamento (2026-10-04)
+
+Guantes, papel secante, algún EPI… se piden desde los laboratorios, **en la misma factura**
+que lo demás (para no pedir facturas separadas a las casas comerciales), pero los usa todo el
+departamento. La jefa no quería verlo imputado entero a "Laboratorios".
+
+- **Se marca una vez, en la ficha del material**: casilla "🤝 Material común del departamento"
+  (`material.material_comun`). En cada pedido no hay que hacer nada.
+- **Cada línea lo hereda** (`lineas_pedido.material_comun` = `null`). El botón 🤝 de la línea
+  en el detalle del pedido lo fuerza solo en esa línea (`accion: 'imputacion'` de
+  `gestionar-linea-pedido`, permitido aunque la línea ya esté recibida: es contable). Si el
+  valor coincide con el de la ficha se guarda `null`, para que vuelva a heredar.
+  Usar siempre `lineaEsComun()` (`js/config.js`) / su espejo en `enviar-a-trebello`.
+- **Contabilidad** (`js/contabilidad.js`): las líneas comunes salen del ciclo del pedido y van a
+  la partida `CICLO_MATERIAL_COMUN` ("Material común"), al final de la lista. Los portes
+  (`gasto_extra`) se quedan en la parte del laboratorio salvo que todo el pedido sea común.
+- **Trebello: dos hojas, una factura.** `enviar-a-trebello` manda la parte del laboratorio con
+  la clave de siempre (`ID_Pedido`, ciclo/módulo del pedido) y la parte común como **otro**
+  pedido de Trebello con clave `ID_Pedido-COMUN`, ciclo `"Material común"`, sin módulo y las
+  mismas facturas adjuntas. Su uuid va en `pedidos.trebello_pedido_comun_id`. Así la jefa firma
+  dos hojas y cada una suma a lo suyo, sin que la casa comercial tenga que partir la factura.
+- Si al reenviar una de las dos partes se ha quedado vacía, la hoja que ya estaba en Trebello
+  **no se borra** (el endpoint de Trebello no tiene baja): el envío avisa para borrarla allí.

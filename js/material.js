@@ -811,6 +811,7 @@ function openModalMaterial() {
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = false;
   ['mat-id','mat-nombre','mat-unidad','mat-unidades-extra','mat-ubicacion','mat-referencia','mat-observaciones','mat-ubicacion-search'].forEach(id => sv(id, ''));
   sv('mat-categoria', ''); sv('mat-stock', '0'); sv('mat-minimo', '0'); sv('mat-optimo', '0'); sv('mat-proveedor', '');
+  const comunChkNuevo = document.getElementById('mat-comun'); if (comunChkNuevo) comunChkNuevo.checked = false;
   clearUbicacionMat();
   const sel = document.getElementById('mat-proveedor');
   if (sel) sel.innerHTML = '<option value="">Seleccionar...</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
@@ -879,6 +880,7 @@ function editMaterial(idx) {
   sv('mat-ubicacion', m.Ubicacion);
   sv('mat-stock', m.Stock_Actual); sv('mat-minimo', m.Stock_Minimo); sv('mat-optimo', m.Stock_Optimo);
   sv('mat-observaciones', m.Observaciones);
+  const comunChk = document.getElementById('mat-comun'); if (comunChk) comunChk.checked = m.Material_Comun === true;
   if (m.Ubicacion) {
     document.getElementById('mat-ubicacion').value = m.Ubicacion;
   }
@@ -1176,6 +1178,7 @@ async function guardarMaterial() {
       referencia_proveedor: v('mat-referencia'), proveedor: v('mat-proveedor'), unidad, unidades_extra: v('mat-unidades-extra'), ubicacion: ubicPrincipal,
       stock_actual: stockGlobal, stock_minimo: minStock, stock_optimo: optStock,
       observaciones: v('mat-observaciones'), gestion_automatica: gestionAuto, lotes: lotesBody,
+      material_comun: !!document.getElementById('mat-comun')?.checked,
     });
 
     if (esEdicion) DATA.material[editingRow.rowIndex] = _materialSbToObj(material);

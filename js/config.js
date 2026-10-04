@@ -249,6 +249,23 @@ function unidadValida(u) {
 }
 const MSG_UNIDAD_NUMERICA = 'En «unidad» va qué se cuenta (caja, bote, bolsa…), no cuántos: el número va en la cantidad';
 
+/** Nombre de la partida (y del ciclo en la hoja de Trebello) del material común. */
+const CICLO_MATERIAL_COMUN = 'Material común';
+
+/**
+ * ¿Esta línea de pedido es material común del departamento? Lo forzado en la
+ * propia línea manda; si no, lo que diga la ficha del material. Espejo de
+ * `lineaEsComun()` en supabase/functions/enviar-a-trebello/index.ts.
+ */
+function lineaEsComun(linea) {
+  if (!linea) return false;
+  if (linea.Material_Comun === true || linea.Material_Comun === false) return linea.Material_Comun;
+  // Mismo criterio de búsqueda que _materialDeLinea / buscarMaterialPorNombre.
+  const mat = (linea.ID_Material && DATA.material.find(m => m.ID_Material === linea.ID_Material))
+           || DATA.material.find(m => m.Nombre === linea.Material || (linea.Material || '').startsWith(m.Nombre));
+  return !!(mat && mat.Material_Comun === true);
+}
+
 /**
  * Nombre y primer apellido, que es como consta el profesorado en los registros
  * ("Paloma Fernández"). Se quita el último apellido en vez de coger las dos

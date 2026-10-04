@@ -282,6 +282,19 @@ Deno.serve(async (req) => {
     return jsonOk({ linea: data });
   }
 
+  if (accion === "imputacion") {
+    // Material común o del laboratorio, solo en esta línea. Va aparte de
+    // "editar" porque se puede cambiar con la línea ya recibida: es contable,
+    // no toca ni cantidades ni stock. null = volver a heredar de la ficha.
+    const idLinea = String(body.id_linea || "").trim();
+    if (!idLinea) return jsonError("id_linea es obligatorio", 400);
+    const valor = body.material_comun === true ? true : body.material_comun === false ? false : null;
+    const { data, error } = await supabaseAdmin.from("lineas_pedido")
+      .update({ material_comun: valor }).eq("id_linea", idLinea).select().single();
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    return jsonOk({ linea: data });
+  }
+
   if (accion === "recepcion") {
     const idLinea = String(body.id_linea || "").trim();
     const cantRec = Number(body.cantidad);

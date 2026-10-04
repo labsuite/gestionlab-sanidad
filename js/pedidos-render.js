@@ -629,14 +629,18 @@ function _filaLineaPedido(l, p, puedeEditar) {
   const estadoLinea = {'Pendiente':'badge-orange','Recibido parcialmente':'badge-blue','Recibido':'badge-green'}[l.Estado_Linea] || 'badge-gray';
   const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
   const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
+  // Material común: lo hereda de la ficha; el 🤝 de la línea lo cambia solo aquí.
+  const esComun = p.Tipo !== 'Servicio' && lineaEsComun(l);
   return `<div class="linea-row">
     <div class="linea-nombre">${l.Material}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
     <div class="linea-meta">
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
       <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
       <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
+      ${esComun ? `<span class="badge badge-purple" style="font-size:10px" title="Va a la partida &quot;${CICLO_MATERIAL_COMUN}&quot; y, en Trebello, a su propia hoja">🤝 Común</span>` : ''}
     </div>
     <div class="linea-actions">
+      ${puedeEditar && p.Tipo !== 'Servicio' ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
       ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
       ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
@@ -684,7 +688,7 @@ function verDetallePedido(pedidoId) {
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
-            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${p.Trebello_Pedido_Id ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
+            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -693,10 +697,10 @@ function verDetallePedido(pedidoId) {
             <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>
             ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir</button>` : ''}
           </div>
-          ${p.Trebello_Pedido_Id ? `
+          ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? `
           <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap">
             <input type="checkbox" checked disabled style="width:16px;height:16px">
-            <span style="color:var(--success);font-weight:500">📬 Enviado a Trebello${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
+            <span style="color:var(--success);font-weight:500">📬 Enviado a Trebello${p.Trebello_Pedido_Id && p.Trebello_Pedido_Comun_Id ? ' (2 hojas)' : ''}${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
             <a href="${TREBELLO_URL}/gl/compras?tab=pedidos" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:11px;padding:2px 10px;text-decoration:none">↗ Ver en Trebello</a>
           </div>` : `
           <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Generada==='TRUE' ? 'pointer' : 'not-allowed'}">

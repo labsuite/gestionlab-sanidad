@@ -245,6 +245,7 @@ function _materialSbToObj(m) {
     Stock_Optimo: m.stock_optimo != null ? String(m.stock_optimo) : '0',
     Observaciones: m.observaciones || '',
     Gestion_Automatica: m.gestion_automatica ? 'TRUE' : 'FALSE',
+    Material_Comun: m.material_comun === true,
   };
 }
 
@@ -289,6 +290,7 @@ function _pedidoSbToObj(p) {
     Token_Publico: p.token_publico || '',
     Trebello_Pedido_Id: p.trebello_pedido_id || '',
     Fecha_Envio_Trebello: p.fecha_envio_trebello || '',
+    Trebello_Pedido_Comun_Id: p.trebello_pedido_comun_id || '',
   };
 }
 
@@ -321,6 +323,9 @@ function _lineaPedidoSbToObj(l) {
     // 'Sí' = línea metida con el presupuesto ya solicitado; va en su propio
     // apartado del detalle hasta que se le pida presupuesto a la casa comercial.
     Presupuesto_Pendiente: l.presupuesto_pendiente ? 'Sí' : 'No',
+    // null = hereda de la ficha del material; true/false = forzado en esta
+    // línea. Usar lineaEsComun() (js/config.js), no leerlo a mano.
+    Material_Comun: l.material_comun === true ? true : l.material_comun === false ? false : null,
   };
 }
 

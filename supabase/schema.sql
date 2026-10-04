@@ -804,3 +804,15 @@ create table if not exists propuestas_material (
 create index if not exists idx_propuestas_material_estado on propuestas_material (estado);
 alter table propuestas_material enable row level security;
 create policy "propuestas_material_select_anon" on propuestas_material for select to anon, authenticated using (true);
+
+-- ── Material común (2026-10-04) ──────────────────────────────────────────
+-- Guantes, papel secante, EPI…: se compran desde los laboratorios, en la misma
+-- factura que lo demás, pero los usa todo el departamento. Se marca UNA vez en
+-- la ficha del material y cada línea de pedido lo hereda; en contabilidad va a
+-- una partida "Material común" y al enviar a Trebello sale en una hoja aparte
+-- (misma factura). Ver "Material común" en docs/modulo-pedidos.md.
+alter table material      add column if not exists material_comun boolean not null default false;
+-- null = hereda de material.material_comun; true/false = forzado en esta línea.
+alter table lineas_pedido add column if not exists material_comun boolean;
+-- uuid de la segunda hoja en Trebello (la de material común), igual que trebello_pedido_id.
+alter table pedidos       add column if not exists trebello_pedido_comun_id text;

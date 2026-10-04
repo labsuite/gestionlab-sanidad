@@ -225,6 +225,11 @@ Deno.serve(async (req) => {
         stock_optimo: numField(body.stock_optimo) || 0,
         observaciones: strField(body.observaciones),
         gestion_automatica: body.gestion_automatica === true || body.gestion_automatica === "TRUE",
+        // Solo si llega: otros sitios llaman a "actualizar" sin conocer el
+        // campo y no deben desmarcar un material común sin querer.
+        ...(body.material_comun !== undefined
+          ? { material_comun: body.material_comun === true || body.material_comun === "TRUE" }
+          : {}),
       };
 
       let matFinal;

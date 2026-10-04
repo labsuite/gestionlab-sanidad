@@ -412,6 +412,30 @@ async function eliminarLineaPedido(lineaId, pedidoId) {
   hideLoading();
 }
 
+// Cambia una sola línea entre material común y del laboratorio. Si el valor
+// nuevo coincide con lo que dice la ficha del material, se guarda null para
+// que la línea vuelva a heredar (y siga a la ficha si esta cambia).
+async function toggleLineaComun(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  const nuevo = !lineaEsComun(l);
+  const mat = _materialDeLinea(l);
+  const heredado = !!(mat && mat.Material_Comun === true);
+  showLoading('Guardando...');
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'imputacion', id_linea: lineaId, material_comun: nuevo === heredado ? null : nuevo,
+    });
+    const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
+    if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+    const aviso = (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que allí cambie también.' : '';
+    showToast((nuevo ? 'Línea marcada como material común.' : 'Línea imputada al laboratorio.') + aviso, 'success');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
 // ============================================================
 // AVANCE SECUENCIAL DE ESTADO DE PEDIDO
 // ============================================================
@@ -484,7 +508,7 @@ async function enviarPedidoATrebello(pedidoId) {
 
   // Reenviar actualiza el pedido que ya está en Trebello; se avisa porque si la
   // jefa ya firmó la hoja con los datos viejos, esa firma deja de valer.
-  if (p.Trebello_Pedido_Id && !confirm(
+  if ((p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) && !confirm(
     'Este pedido ya se envió a Trebello.\n\n' +
     'Volver a enviarlo actualiza el que hay allí con los datos actuales. ' +
     'Si la jefa ya firmó la hoja, tendrá que volver a generarla y firmarla.\n\n' +
@@ -495,19 +519,24 @@ async function enviarPedidoATrebello(pedidoId) {
   try {
     const r = await callEdgeFunction('enviar-a-trebello', { id_pedido: pedidoId });
     p.Trebello_Pedido_Id   = r.trebello_pedido_id || p.Trebello_Pedido_Id || '';
+    p.Trebello_Pedido_Comun_Id = r.trebello_pedido_comun_id || p.Trebello_Pedido_Comun_Id || '';
     p.Fecha_Envio_Trebello = new Date().toISOString();
     p.Doc_Enviada_Jefatura = 'TRUE';
 
     // Las que no viajaron no son un error del envío: el pedido ya está allí y
     // la factura se puede subir a mano. Pero hay que decirlo, no tragárselo.
+    // Con material común el pedido llega a Trebello como dos hojas (misma factura).
+    const hojas = r.hojas > 1 ? ' en dos hojas (laboratorio + material común)' : (r.lineas_comunes ? ' como material común' : '');
     const problemas = [...(r.facturas_no_enviadas || []), ...(r.facturas_rechazadas || [])];
-    if (problemas.length) {
+    if (r.avisos?.length) {
+      showToast(`Pedido enviado${hojas}. Ojo: ${r.avisos.join('; ')}.`, 'warning');
+    } else if (problemas.length) {
       showToast(`Pedido enviado, pero ${problemas.length} archivo(s) no: ${problemas.join('; ')}`, 'warning');
     } else {
       const n = r.facturas_enviadas || 0;
       showToast(r.nuevo
-        ? `Pedido enviado a Trebello${n ? ` con ${n} factura(s)` : ' (sin facturas)'}`
-        : 'Pedido actualizado en Trebello', 'success');
+        ? `Pedido enviado a Trebello${hojas}${n ? ` con ${n} factura(s)` : ' (sin facturas)'}`
+        : `Pedido actualizado en Trebello${hojas}`, 'success');
     }
     verDetallePedido(pedidoId);
     if (typeof renderPedidos === 'function') renderPedidos();
