@@ -343,6 +343,9 @@ function _solicitudSbToObj(s) {
     Lista_Pedido: s.lista_pedido || '',
     Observaciones: s.observaciones || '',
     Snooze_Hasta: s.snooze_hasta || '',
+    Compra_Fecha: s.compra_fecha || '',
+    Compra_Importe: s.compra_importe != null ? String(s.compra_importe) : '',
+    Compra_Nota: s.compra_nota || '',
   };
 }
 

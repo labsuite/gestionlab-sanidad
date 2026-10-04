@@ -627,6 +627,56 @@
   </div>
 </div>
 
+<!-- Modal Comprado aparte: la solicitud se compra por cuenta propia, sin pedido -->
+<div class="modal-overlay" id="modal-compra-aparte">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">🛍️ Comprado aparte</div>
+      <button class="modal-close" onclick="closeModal('modal-compra-aparte')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ca-sol-id">
+      <div id="ca-material" style="font-weight:500;font-size:13px;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm);margin-bottom:6px"></div>
+      <div class="text-muted" style="font-size:11px;margin-bottom:14px">No pasa por ningún pedido: la solicitud se cierra como «Comprado aparte».</div>
+      <div class="form-grid form-grid-2" style="gap:14px">
+        <div class="form-group">
+          <label>Fecha de compra</label>
+          <input id="ca-fecha" type="date">
+        </div>
+        <div class="form-group">
+          <label>Importe (€, IVA incl.)</label>
+          <input id="ca-importe" type="number" min="0" step="0.01" placeholder="Opcional">
+        </div>
+        <div class="form-group full">
+          <label>Nota</label>
+          <input id="ca-nota" placeholder="Opcional — p.ej. comprado en el súper">
+        </div>
+      </div>
+      <div id="ca-stock-group" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="ca-stock-check" onchange="document.getElementById('ca-stock-campos').style.display = this.checked ? '' : 'none'">
+          Dar entrada en el inventario
+        </label>
+        <div id="ca-stock-campos" class="form-grid form-grid-2" style="gap:14px;margin-top:10px;display:none">
+          <div class="form-group">
+            <label>Cantidad</label>
+            <input id="ca-stock-cantidad" type="number" min="0.01" step="0.01">
+          </div>
+          <div class="form-group">
+            <label>Ubicación</label>
+            <select id="ca-stock-ubicacion"></select>
+          </div>
+        </div>
+      </div>
+      <div id="ca-sin-catalogo" class="text-muted" style="display:none;font-size:11px;margin-top:12px">Este material no está en el inventario, así que no se le da entrada de stock.</div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-compra-aparte')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarCompraAparte()">Marcar como comprado</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Editar Solicitud -->
 <div class="modal-overlay" id="modal-editar-solicitud">
   <div class="modal" style="max-width:520px">

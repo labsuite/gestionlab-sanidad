@@ -225,6 +225,13 @@ function _renderContabilidadConAnio(anio) {
     .flatMap(mods => Object.values(mods))
     .reduce((s, m) => s + m.subtotal, 0);
 
+  // Compras por cuenta propia (\uD83D\uDECD\uFE0F Comprado aparte en Solicitudes): no tienen
+  // pedido ni ciclo, y el importe es el del ticket, con el IVA ya dentro (y no
+  // siempre al 21 %), as\u00ED que van en su propia tarjeta y solo se suman al total.
+  const comprasAparte = DATA.solicitudes.filter(s => s.Estado === 'Comprado aparte' && parseFloat(s.Compra_Importe) > 0 &&
+    s.Compra_Fecha && new Date(s.Compra_Fecha).getFullYear() === anio);
+  const totalAparte = comprasAparte.reduce((sum, s) => sum + parseFloat(s.Compra_Importe), 0);
+
   const fmt  = n => n.toFixed(2).replace('.', ',') + ' \u20AC';
   const anos = [anio + 1, anio, anio - 1, anio - 2];
 
@@ -252,13 +259,13 @@ function _renderContabilidadConAnio(anio) {
       </div>
       <div class="stat-card" style="border:2px solid var(--accent)">
         <div class="stat-body">
-          <div class="stat-value" style="color:var(--accent)">${fmt(totalBase * 1.21)}</div>
-          <div class="stat-label">Total con IVA ${anio}</div>
+          <div class="stat-value" style="color:var(--accent)">${fmt(totalBase * 1.21 + totalAparte)}</div>
+          <div class="stat-label">Total con IVA ${anio}${totalAparte ? ` · incl. ${fmt(totalAparte)} comprado aparte` : ''}</div>
         </div>
       </div>
     </div>`;
 
-  if (!pedidosAnio.length || totalBase === 0) {
+  if ((!pedidosAnio.length || totalBase === 0) && !comprasAparte.length) {
     html += `<div class="empty-state">
       <div class="empty-state-icon">📊</div>
       <div class="empty-state-title">Sin datos para ${anio}</div>
@@ -309,6 +316,32 @@ function _renderContabilidadConAnio(anio) {
           </div>
         </div>`;
     }
+  }
+
+  if (comprasAparte.length) {
+    html += `
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <div class="card-title">🛍️ Comprado aparte</div>
+          <div style="font-size:14px;font-weight:600;color:var(--accent)">${fmt(totalAparte)}</div>
+        </div>
+        <div style="padding:0 20px 16px">
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <thead><tr style="border-bottom:1px solid var(--border)">
+              <th style="text-align:left;padding:8px 4px;color:var(--text-muted);font-weight:600">Material</th>
+              <th style="text-align:left;padding:8px 4px;color:var(--text-muted);font-weight:600">Fecha</th>
+              <th style="text-align:right;padding:8px 4px;color:var(--text-muted);font-weight:600">Total (IVA incl.)</th>
+            </tr></thead>
+            <tbody>${comprasAparte.sort((a, b) => a.Compra_Fecha.localeCompare(b.Compra_Fecha)).map(s => `
+              <tr style="border-bottom:1px solid #f5f5f5">
+                <td style="padding:8px 4px">${_escAttr(s.Material)}${s.Compra_Nota ? `<div class="text-muted" style="font-size:11px">${_escAttr(s.Compra_Nota)}</div>` : ''}</td>
+                <td style="padding:8px 4px;color:var(--text-soft)">${formatDate(s.Compra_Fecha)}</td>
+                <td style="text-align:right;padding:8px 4px;font-weight:600">${fmt(parseFloat(s.Compra_Importe))}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
   }
 
   cont.innerHTML = html;

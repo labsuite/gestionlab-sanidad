@@ -70,6 +70,60 @@ async function cancelarSolicitud(solId) {
   hideLoading();
 }
 
+// ============================================================
+// COMPRADO APARTE — lo pidieron por la app pero alguien lo compró por su
+// cuenta (gamuzas en el súper…). Cierra la solicitud sin pasar por un pedido.
+// ============================================================
+function openModalCompraAparte(solId) {
+  const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
+  if (!sol) return;
+  sv('ca-sol-id', solId);
+  document.getElementById('ca-material').textContent = `${sol.Material} · ${sol.Cantidad_Solicitada}`;
+  sv('ca-fecha', new Date().toISOString().split('T')[0]);
+  sv('ca-importe', ''); sv('ca-nota', '');
+  const mat = DATA.material.find(m => (sol.ID_Material && m.ID_Material === sol.ID_Material) || m.Nombre === sol.Material);
+  document.getElementById('ca-stock-group').style.display = mat ? '' : 'none';
+  document.getElementById('ca-sin-catalogo').style.display = mat ? 'none' : '';
+  document.getElementById('ca-stock-check').checked = false;
+  document.getElementById('ca-stock-campos').style.display = 'none';
+  if (mat) {
+    sv('ca-stock-cantidad', sol.Cantidad_Solicitada || '');
+    const sel = document.getElementById('ca-stock-ubicacion');
+    sel.innerHTML = _opcionesUbicacionRecepcion(mat.ID_Material, mat.Unidad);
+    const lotes = getMatUbics(mat.ID_Material);
+    if (lotes.length === 1) sel.value = lotes[0].ID_Ubicacion;
+    else if (mat.Ubicacion) sel.value = mat.Ubicacion;
+  }
+  openModal('modal-compra-aparte');
+}
+
+async function guardarCompraAparte() {
+  const solId = v('ca-sol-id');
+  const idx = DATA.solicitudes.findIndex(s => s.ID_Solicitud === solId);
+  if (idx === -1) return;
+  const conStock = document.getElementById('ca-stock-group').style.display !== 'none'
+    && document.getElementById('ca-stock-check').checked;
+  const body = { accion: 'comprado_aparte', id_solicitud: solId, fecha: v('ca-fecha'), importe: v('ca-importe'), nota: v('ca-nota') };
+  if (conStock) {
+    const cant = parseFloat(v('ca-stock-cantidad'));
+    if (!cant || cant <= 0) { showToast('Indica la cantidad que entra en el inventario', 'error'); return; }
+    body.cantidad_stock = cant;
+    body.id_ubicacion = v('ca-stock-ubicacion');
+  }
+  showLoading('Guardando...');
+  try {
+    const { solicitud, stock } = await callEdgeFunction('gestionar-solicitud', body);
+    DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
+    closeModal('modal-compra-aparte');
+    // El stock lo ha tocado el servidor (bote + total + movimiento): recargar
+    // para no reimplementar aquí esa cuenta.
+    if (stock) await loadAllData();
+    renderAll();
+    showToast(stock ? `Comprado aparte · +${stock.cantidad} en inventario` : 'Marcado como comprado aparte', 'success');
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
 // Pedidos a los que todavía se les puede añadir material. "Presupuesto
 // solicitado" también vale: en la práctica se siguen metiendo artículos
 // después de pedir el presupuesto, y a la casa comercial no le importa. Esas

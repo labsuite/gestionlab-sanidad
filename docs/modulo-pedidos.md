@@ -23,7 +23,7 @@
 - `openModalHistorialMaterial(idMaterial)` en `material.js`; filtra `DATA.movimientos` por nombre de material.
 
 ## Estados de solicitud (canónicos)
-`Pendiente` → `Añadida a pedido` → `En espera de recepción` → `Recibido` / `Rechazado` / `Cancelado`
+`Pendiente` → `Añadida a pedido` → `En espera de recepción` → `Recibido` / `Comprado aparte` / `Rechazado` / `Cancelado`
 - "En espera de recepción": automático al aprobar presupuesto del pedido vinculado
 - "Recibido": automático al registrar recepción completa de la línea
 
@@ -32,6 +32,14 @@
 - Antes solo el propio solicitante (Profesor/Alumno) podía editar su solicitud. Ahora Gestor/Administrador también pueden (`puedeEditarGestor` en `_renderFilaSolicitud`), para corregir cantidad (nombres mal escritos, ajustar lo que realmente se puede pedir...).
 - El **nombre del material solo es editable si el ítem todavía no está catalogado** (`!DATA.material.some(m => m.Nombre === sol.Material...)`) — si ya existe en `Material`, el nombre se muestra de solo lectura para no desincronizar la solicitud del ítem real del catálogo.
 - El botón 🗑️ "Cancelar solicitud" sigue siendo solo del solicitante — el Gestor ya tiene "✕ Rechazar" para el mismo efecto.
+
+## Comprado aparte (2026-10-04)
+Solicitudes que alguien compra por su cuenta (gamuzas, estropajos en el súper): no pasan por ningún pedido. Botón 🛍️ en la tarjeta de una solicitud `Pendiente` (Admin/Gestor) → `modal-compra-aparte` → `gestionar-solicitud` `comprado_aparte`.
+- Estado propio **`Comprado aparte`** (no `Recibido`, que implica un pedido; no `Rechazado`, que confundiría a quien lo pidió). Sección plegada por defecto, igual que Recibido.
+- Columnas `compra_fecha`, `compra_importe` (ticket, **IVA incluido**), `compra_nota` (texto libre opcional) en `solicitudes`.
+- Entrada de stock opcional, solo si el material está catalogado: cantidad + ubicación (`entradaStock()` en la Edge Function: suma al bote de esa ubicación o lo crea, materializa antes el stock legacy, recalcula el total y deja movimiento `Entrada` con motivo `Comprado aparte (SOL…)`).
+- Si la solicitud ya está en un pedido, primero se quita la línea (vuelve a `Pendiente`).
+- Contabilidad: tarjeta propia "🛍️ Comprado aparte" por año de `compra_fecha`; se suma solo al **Total con IVA** (no a base/IVA, porque el ticket ya trae el IVA y no siempre al 21 %).
 
 ## Renombrar una línea de pedido (2026-10-04)
 Una vez la solicitud está en un pedido ya no se edita como solicitud, así que el nombre se corrige en **✏️ Editar línea** del detalle (campo Material, solo con la línea `Pendiente`). Es el nombre que va a la casa comercial — p.ej. "bandexa branca" → "Bandeja de plástico blanca para muestras".

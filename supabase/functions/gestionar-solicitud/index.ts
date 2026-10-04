@@ -13,6 +13,54 @@ function genId(prefix: string): string {
 
 const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
 
+/**
+ * Suma `cant` al bote de `mat` en `idUbicacion` (o crea el bote) y deja un
+ * movimiento de Entrada. Si el material es "legacy" (sin botes y con
+ * stock_actual propio), antes materializa ese stock como bote en su ubicación,
+ * o se perdería al recalcular el total como suma de botes — mismo criterio que
+ * asegurarLoteLegacy en gestionar-propuesta-material. Devuelve un mensaje de
+ * error o null.
+ */
+async function entradaStock(supabaseAdmin: any, mat: any, cant: number, idUbicacion: string, usuario: string, motivo: string): Promise<string | null> {
+  const { data: lotesData } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", mat.id_material);
+  let lotes = lotesData || [];
+  const stockLegacy = Number(mat.stock_actual) || 0;
+  if (!lotes.length && stockLegacy > 0) {
+    if (!mat.ubicacion) {
+      return `"${mat.nombre}" tiene ${stockLegacy} de stock pero ninguna ubicación asignada. ` +
+        `Ponle su sitio desde el inventario antes, o se perdería ese stock.`;
+    }
+    const legacy = {
+      id: genId("LU"), id_material: mat.id_material, id_ubicacion: mat.ubicacion,
+      stock_local: stockLegacy, stock_minimo_local: Number(mat.stock_minimo) || 0,
+      stock_optimo_local: Number(mat.stock_optimo) || 0,
+    };
+    const { error } = await supabaseAdmin.from("material_ubicaciones").insert(legacy);
+    if (error) return `No se pudo preparar el material: ${error.message}`;
+    lotes = [legacy];
+  }
+  const lote = lotes.find((l: any) => l.id_ubicacion === idUbicacion);
+  if (lote) {
+    lote.stock_local = (Number(lote.stock_local) || 0) + cant;
+    await supabaseAdmin.from("material_ubicaciones").update({ stock_local: lote.stock_local }).eq("id", lote.id);
+  } else {
+    const nuevo = {
+      id: genId("LU"), id_material: mat.id_material, id_ubicacion: idUbicacion,
+      stock_local: cant, stock_minimo_local: 0, stock_optimo_local: 0,
+    };
+    const { error } = await supabaseAdmin.from("material_ubicaciones").insert(nuevo);
+    if (error) return `No se pudo guardar el stock: ${error.message}`;
+    lotes.push(nuevo);
+  }
+  const total = lotes.reduce((s: number, l: any) => s + (Number(l.stock_local) || 0), 0);
+  await supabaseAdmin.from("material").update({ stock_actual: total }).eq("id_material", mat.id_material);
+  await supabaseAdmin.from("movimientos").insert({
+    id_movimiento: genId("MOV"), material: mat.nombre, id_material: mat.id_material,
+    tipo: "Entrada", cantidad: cant, usuario, motivo,
+  });
+  return null;
+}
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -36,6 +84,47 @@ Deno.serve(async (req) => {
     if (error) return jsonError(`No se pudo rechazar: ${error.message}`, 400);
     if (!data) return jsonError(`No se encontró la solicitud "${idSolicitud}"`, 404);
     return jsonOk({ solicitud: data });
+  }
+
+  if (accion === "comprado_aparte") {
+    // Lo pidieron por la app pero alguien lo compró por su cuenta (gamuzas en
+    // el súper…): no pasa por ningún pedido. Se cierra la solicitud con estado
+    // propio, para que quien la pidió no vea "Rechazado" ni "Recibido" de un
+    // pedido que no existe. Importe y nota son opcionales; la entrada de stock
+    // solo si el material está catalogado y se elige ubicación.
+    const { error: authError, supabaseAdmin, user } = await requireAdminOrGestor(req);
+    if (authError) return authError;
+    const idSolicitud = String(body.id_solicitud || "").trim();
+    if (!idSolicitud) return jsonError("id_solicitud es obligatorio", 400);
+    const { data: sol } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", idSolicitud).maybeSingle();
+    if (!sol) return jsonError("Solicitud no encontrada", 404);
+    if (sol.estado !== "Pendiente") {
+      return jsonError("Solo se puede marcar como comprada aparte una solicitud Pendiente (si ya está en un pedido, quita antes la línea)", 400);
+    }
+    const importe = body.importe === "" || body.importe === null || body.importe === undefined ? null : Number(body.importe);
+    if (importe !== null && (isNaN(importe) || importe < 0)) return jsonError("Importe no válido", 400);
+    const fecha = String(body.fecha || "").trim() || new Date().toISOString().split("T")[0];
+
+    const cantStock = Number(body.cantidad_stock) || 0;
+    const idUbicacion = strField(body.id_ubicacion);
+    let stock: { material: string; cantidad: number } | null = null;
+    if (cantStock > 0) {
+      if (!idUbicacion) return jsonError("Elige en qué ubicación se guarda", 400);
+      const idMat = sol.id_material || await resolverIdMaterial(supabaseAdmin, sol.material);
+      if (!idMat) return jsonError("Este material no está en el inventario: no se le puede dar entrada de stock", 400);
+      const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMat).maybeSingle();
+      if (!mat) return jsonError("Material no encontrado", 404);
+      const problema = await entradaStock(supabaseAdmin, mat, cantStock, idUbicacion,
+        String(user?.nombre || user?.email || "Usuario"), `Comprado aparte (${idSolicitud})`);
+      if (problema) return jsonError(problema, 400);
+      stock = { material: mat.nombre, cantidad: cantStock };
+    }
+
+    const { data, error } = await supabaseAdmin.from("solicitudes").update({
+      estado: "Comprado aparte", compra_fecha: fecha, compra_importe: importe, compra_nota: strField(body.nota),
+    }).eq("id_solicitud", idSolicitud).select().single();
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    return jsonOk({ solicitud: data, stock });
   }
 
   const { error: authError, supabaseAdmin } = await requireStaff(req);

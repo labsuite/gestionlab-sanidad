@@ -816,3 +816,12 @@ alter table material      add column if not exists material_comun boolean not nu
 alter table lineas_pedido add column if not exists material_comun boolean;
 -- uuid de la segunda hoja en Trebello (la de material común), igual que trebello_pedido_id.
 alter table pedidos       add column if not exists trebello_pedido_comun_id text;
+
+-- ── Solicitudes compradas aparte (2026-10-04) ────────────────────────────
+-- Gamuzas, estropajos…: se piden por la app pero alguien los compra por su
+-- cuenta (supermercado). No pasan por ningún pedido: la solicitud se cierra con
+-- estado 'Comprado aparte' y, si se quiere, importe (ticket, IVA incluido) y
+-- entrada de stock. Ver "Comprado aparte" en docs/modulo-pedidos.md.
+alter table solicitudes add column if not exists compra_fecha   date;
+alter table solicitudes add column if not exists compra_importe numeric;
+alter table solicitudes add column if not exists compra_nota    text;
