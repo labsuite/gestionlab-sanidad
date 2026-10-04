@@ -348,3 +348,10 @@ departamento. La jefa no quería verlo imputado entero a "Laboratorios".
   dos hojas y cada una suma a lo suyo, sin que la casa comercial tenga que partir la factura.
 - Si al reenviar una de las dos partes se ha quedado vacía, la hoja que ya estaba en Trebello
   **no se borra** (el endpoint de Trebello no tiene baja): el envío avisa para borrarla allí.
+- **Lado Trebello (migración 075, 2026-10-04):** Contabilidade agrupa por `ciclo_id`, así que
+  "Laboratorios" y "Material común" existen como filas de `ciclos` con
+  `partida_contable = true` (ocultas en docencia/titoría/PCs/perfil/material). La ingesta
+  `POST /api/gestionlab/pedidos` casa el texto `ciclo` con el nombre y rellena `ciclo_id`, sin
+  pisarlo si la jefa ya lo reasignó a mano. ⚠ El `ciclo` que manda GestionLab tiene que
+  coincidir **literalmente** con un nombre de `ciclos` de Trebello, o el pedido cae en
+  "Sen ciclo asignado".
