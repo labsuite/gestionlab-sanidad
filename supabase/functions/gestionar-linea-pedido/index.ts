@@ -275,11 +275,45 @@ Deno.serve(async (req) => {
     }
     if (body.observaciones !== undefined) datos.observaciones = strField(body.observaciones);
     if (body.unidad !== undefined) datos.unidad = strField(body.unidad);
+
+    // Renombrar: las solicitudes llegan a veces con nombres poco claros
+    // ("bandexa branca") y el nombre de la línea es el que va a la casa
+    // comercial. Si el nombre nuevo es de catálogo se enlaza a ese material;
+    // si no, se conserva el enlace que tuviera (id_material sobrevive al
+    // renombrado: "Puntas" → "Puntas amarillas 200 µl" sigue siendo el mismo).
+    let nombreNuevo: string | null = null;
+    if (body.material !== undefined) {
+      const m = String(body.material || "").trim();
+      if (!m) return jsonError("Indica el material", 400);
+      if (m !== linea.material) {
+        nombreNuevo = m;
+        datos.material = m;
+        datos.id_material = (await resolverIdMaterial(supabaseAdmin, m)) || linea.id_material || null;
+      }
+    }
     if (!Object.keys(datos).length) return jsonError("Nada que actualizar", 400);
 
     const { data, error } = await supabaseAdmin.from("lineas_pedido").update(datos).eq("id_linea", idLinea).select().single();
     if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
-    return jsonOk({ linea: data });
+
+    // La solicitud de origen se renombra igual: así quien la pidió ve el
+    // nombre corregido y la recepción la sigue encontrando por nombre.
+    let solicitud = null;
+    if (nombreNuevo) {
+      const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL\S+)/);
+      let solId: string | null = solIdMatch ? solIdMatch[1] : null;
+      if (!solId) {
+        const { data: candidatas } = await supabaseAdmin.from("solicitudes").select("id_solicitud, material")
+          .eq("lista_pedido", linea.pedido).in("estado", ["Añadida a pedido", "En espera de recepción"]);
+        solId = (candidatas || []).find((s: any) => normNombre(s.material) === normNombre(linea.material))?.id_solicitud || null;
+      }
+      if (solId) {
+        const { data: sol } = await supabaseAdmin.from("solicitudes").update({ material: nombreNuevo })
+          .eq("id_solicitud", solId).select().maybeSingle();
+        solicitud = sol;
+      }
+    }
+    return jsonOk({ linea: data, solicitud });
   }
 
   if (accion === "imputacion") {

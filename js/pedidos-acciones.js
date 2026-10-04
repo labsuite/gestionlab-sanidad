@@ -705,7 +705,7 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-id', lineaId);
   sv('edlinea-pedido-id', pedidoId);
   const unidad = _unidadLineaPedido(l);
-  document.getElementById('edlinea-material-nombre').textContent = l.Material;
+  sv('edlinea-material', l.Material || '');
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
@@ -734,13 +734,19 @@ async function guardarEdicionLinea() {
   const precio = v('edlinea-precio');
   const obs = v('edlinea-obs');
   const unidad = v('edlinea-unidad').trim();
+  const material = v('edlinea-material').trim();
+  if (!material) { showToast('Indica el material', 'error'); return; }
   showLoading('Guardando...');
   try {
-    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
-      accion: 'editar', id_linea: lineaId,
+    const { linea, solicitud } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'editar', id_linea: lineaId, material,
       cantidad_pedida: cantidad, precio_unitario: precio, observaciones: obs, unidad,
     });
     DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+    if (solicitud) {
+      const iSol = DATA.solicitudes.findIndex(s => s.ID_Solicitud === solicitud.id_solicitud);
+      if (iSol !== -1) DATA.solicitudes[iSol] = { ...DATA.solicitudes[iSol], ..._solicitudSbToObj(solicitud) };
+    }
     showToast('Línea actualizada', 'success');
     closeModal('modal-editar-linea-pedido');
     verDetallePedido(pedidoId);

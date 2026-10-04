@@ -33,6 +33,11 @@
 - El **nombre del material solo es editable si el ítem todavía no está catalogado** (`!DATA.material.some(m => m.Nombre === sol.Material...)`) — si ya existe en `Material`, el nombre se muestra de solo lectura para no desincronizar la solicitud del ítem real del catálogo.
 - El botón 🗑️ "Cancelar solicitud" sigue siendo solo del solicitante — el Gestor ya tiene "✕ Rechazar" para el mismo efecto.
 
+## Renombrar una línea de pedido (2026-10-04)
+Una vez la solicitud está en un pedido ya no se edita como solicitud, así que el nombre se corrige en **✏️ Editar línea** del detalle (campo Material, solo con la línea `Pendiente`). Es el nombre que va a la casa comercial — p.ej. "bandexa branca" → "Bandeja de plástico blanca para muestras".
+- `gestionar-linea-pedido` `editar` acepta `material`: si el nombre nuevo es de catálogo enlaza a ese `id_material`; si no, conserva el enlace que tuviera.
+- Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
+
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
 - "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales
