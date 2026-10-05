@@ -362,6 +362,49 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   openModal('modal-planificar-intervencion');
 }
 
+// Editar una actuación que sigue planificada: por el camino a veces se decide
+// hacer otra cosa (otro tipo, otra fecha, otro técnico, otras tareas). Reutiliza
+// el modal de planificar ya apuntando a la intervención existente (plan-int-idx),
+// así que "Guardar" actualiza en vez de crear.
+function editarPlanificacion(intIdx) {
+  const i = DATA.intervenciones[intIdx];
+  if (!i) return;
+  const chainIds = getChainIntervencion(i.ID_Intervencion).map(c => c.ID_Intervencion);
+  const inc = DATA.incidencias.find(x => chainIds.includes(x.Intervencion_Generada));
+  abrirPlanificacion(inc ? inc.ID_Incidencia : '', i.Equipo || '');
+  sv('plan-int-idx', String(intIdx));
+
+  const titulo = document.getElementById('plan-modal-title');
+  if (titulo) titulo.textContent = '✏️ Editar planificación';
+  const intro = document.getElementById('plan-intro-texto');
+  if (intro) intro.textContent = 'Editando la actuación planificada';
+  const label = document.getElementById('plan-inc-label');
+  if (label) label.textContent = i.ID_Intervencion + (inc ? ' · ' + inc.ID_Incidencia : '') + ' (' + (i.Equipo || '') + ')';
+  const ayuda = document.getElementById('plan-ayuda-texto');
+  if (ayuda) ayuda.innerHTML = 'Cambia lo que haga falta si el plan ha cambiado: tipo, fecha, quién la hace o las tareas previstas. Cuando la actuación ocurra, regístrala desde <strong>🔧 Ejecutar</strong>.';
+
+  sv('plan-tipo', i.Tipo || 'Correctivo');
+  sv('plan-fecha', i.Fecha_Planificada ? String(i.Fecha_Planificada).slice(0, 10) : '');
+  sv('plan-descripcion', i.Descripcion_Actuacion || '');
+
+  const externa = !!i.Proveedor && !i.Realizado_Por;
+  const rad = document.getElementById(externa ? 'plan-ejec-externa' : 'plan-ejec-interna');
+  if (rad) { rad.checked = true; _toggleEjecucionPlan(externa ? 'Externa' : 'Interna'); }
+  if (externa) {
+    sv('plan-proveedor-ext', i.Proveedor);
+  } else if (i.Realizado_Por) {
+    const sel = document.getElementById('plan-realizado-por');
+    // Quien estaba asignado puede haber causado baja: se mantiene igualmente.
+    if (sel && ![...sel.options].some(o => o.value === i.Realizado_Por))
+      sel.insertAdjacentHTML('beforeend', `<option value="${i.Realizado_Por.replace(/"/g, '&quot;')}">${i.Realizado_Por}</option>`);
+    sv('plan-realizado-por', i.Realizado_Por);
+  }
+
+  _renderTareasPrevistasEnModal(i.ID_Intervencion);
+  const btnCrear = document.getElementById('plan-btn-crear');
+  if (btnCrear) btnCrear.textContent = 'Guardar cambios';
+}
+
 function _toggleEjecucionPlan(tipo) {
   const intGrp = document.getElementById('plan-interna-group');
   const extGrp = document.getElementById('plan-externa-group');
@@ -466,7 +509,8 @@ function abrirHiloIncidencia(incId) {
       accion += `<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');registrarDevolucionEquipo('${c.ID_Intervencion}')">📦 Devuelto</button>`;
     if (esActiva && puedeHacer('crearIntervenciones')) {
       if (c.Estado === 'Planificada')
-        accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
+        accion += `<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="editarPlanificacion(${cIdx});closeModal('modal-hilo-incidencia')">✏️ Editar planificación</button>
+          <button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
       else if (c.Estado === 'En gestión')
         accion += `<button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">✏️ Editar intervención</button>`;
       else if (c.Estado === 'Pendiente factura')
@@ -696,10 +740,61 @@ function _renderTareasPrevistasEnModal(intId) {
   if (!cont) return;
   const tareas = getTareasIntervencion(intId);
   if (!tareas.length) { cont.innerHTML = '<div style="font-size:12px;color:var(--text-muted)">Aún no hay tareas previstas.</div>'; return; }
-  cont.innerHTML = tareas.map(t => `<div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+  // Lo previsto se puede reescribir o quitar mientras la actuación no se ha hecho:
+  // si el plan cambia por el camino, no tiene sentido arrastrar tareas que ya no van.
+  cont.innerHTML = tareas.map(t => {
+    const editable = t.Resultado === 'Pendiente';
+    return `<div id="plan-tarea-${t.ID_Tarea}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
     <span style="flex:1">${t.Descripcion}</span>
     <span class="badge ${_RESULTADO_BADGE[t.Resultado]||'badge-gray'}" style="font-size:10px">${t.Resultado}</span>
-  </div>`).join('');
+    ${editable ? `<button type="button" class="icon-btn" title="Cambiar el texto" onclick="_editarTareaPrevista('${t.ID_Tarea}')">✏️</button>
+    <button type="button" class="icon-btn" title="Quitar esta tarea prevista" onclick="_quitarTareaPrevista('${t.ID_Tarea}')">🗑</button>` : ''}
+  </div>`;
+  }).join('');
+}
+
+function _editarTareaPrevista(idTarea) {
+  const t = DATA.tareasIntervencion.find(x => x.ID_Tarea === idTarea);
+  const fila = document.getElementById('plan-tarea-' + idTarea);
+  if (!t || !fila) return;
+  fila.innerHTML = `<input type="text" id="plan-tarea-edit-${idTarea}" style="flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px"
+      onkeydown="if(event.key==='Enter'){event.preventDefault();_guardarTextoTareaPrevista('${idTarea}');}else if(event.key==='Escape'){event.preventDefault();_renderTareasPrevistasEnModal('${t.ID_Intervencion}');}">
+    <button type="button" class="btn btn-primary" style="font-size:11px;padding:3px 8px" onclick="_guardarTextoTareaPrevista('${idTarea}')">Guardar</button>
+    <button type="button" class="btn btn-secondary" style="font-size:11px;padding:3px 8px" onclick="_renderTareasPrevistasEnModal('${t.ID_Intervencion}')">Cancelar</button>`;
+  const inp = document.getElementById('plan-tarea-edit-' + idTarea);
+  inp.value = t.Descripcion || '';
+  inp.focus();
+}
+
+async function _guardarTextoTareaPrevista(idTarea) {
+  const t = DATA.tareasIntervencion.find(x => x.ID_Tarea === idTarea);
+  if (!t) return;
+  const desc = (document.getElementById('plan-tarea-edit-' + idTarea)?.value || '').trim();
+  if (!desc) { showToast('Escribe la tarea (o quítala con 🗑)', 'error'); return; }
+  if (desc === t.Descripcion) { _renderTareasPrevistasEnModal(t.ID_Intervencion); return; }
+  showLoading('Guardando...');
+  try {
+    await _guardarTareaIntervencion(t.ID_Intervencion, desc, t.Resultado || 'Pendiente', t.Operativo, t.Observaciones, idTarea);
+    _renderTareasPrevistasEnModal(t.ID_Intervencion);
+    renderProximasVisitas();
+  } catch(e) { showToast(e.message || 'Error guardando la tarea', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function _quitarTareaPrevista(idTarea) {
+  const t = DATA.tareasIntervencion.find(x => x.ID_Tarea === idTarea);
+  if (!t) return;
+  if (!confirm(`¿Quitar la tarea prevista "${t.Descripcion}"?`)) return;
+  showLoading('Quitando...');
+  try {
+    const { intervencion } = await callEdgeFunction('gestionar-intervencion', { accion: 'eliminar_tarea', id_tarea: idTarea });
+    DATA.tareasIntervencion = DATA.tareasIntervencion.filter(x => x.ID_Tarea !== idTarea);
+    const intIdx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === t.ID_Intervencion);
+    if (intIdx !== -1 && intervencion) DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    _renderTareasPrevistasEnModal(t.ID_Intervencion);
+    renderProximasVisitas();
+  } catch(e) { showToast(e.message || 'Error quitando la tarea', 'error'); console.error(e); }
+  hideLoading();
 }
 
 // Añade una tarea prevista de inmediato (crea la intervención planificada si aún

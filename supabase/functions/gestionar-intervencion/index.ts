@@ -223,5 +223,31 @@ Deno.serve(async (req) => {
     return jsonOk({ tarea, intervencion: intervencionActualizada, resultadoAgg, estadoAgg });
   }
 
-  return jsonError("accion debe ser 'crear', 'actualizar' o 'guardar_tarea'", 400);
+  // Quitar una tarea PREVISTA: solo mientras la actuación sigue planificada (sin
+  // fecha de realización) y la tarea no tiene resultado. Al cambiar de idea antes
+  // de ir, lo previsto simplemente deja de estarlo; una vez hecha la actuación,
+  // lo que no se hizo se marca "Descartado" para que quede constancia.
+  if (accion === "eliminar_tarea") {
+    const idTarea = strField(body.id_tarea);
+    if (!idTarea) return jsonError("id_tarea es obligatorio", 400);
+    const { data: tarea } = await supabaseAdmin.from("tareas_intervencion").select("*").eq("id_tarea", idTarea).maybeSingle();
+    if (!tarea) return jsonError(`No se encontró la tarea "${idTarea}"`, 404);
+    const { data: intervencion } = await supabaseAdmin.from("intervenciones").select("*").eq("id_intervencion", tarea.id_intervencion).maybeSingle();
+    if (!intervencion) return jsonError(`No se encontró la intervención "${tarea.id_intervencion}"`, 404);
+    if (intervencion.fecha_realizacion || intervencion.actuacion_finalizada)
+      return jsonError("La actuación ya se ha realizado: en vez de quitar la tarea, márcala como «Descartado» para que quede constancia.", 400);
+    if (tarea.resultado && tarea.resultado !== "Pendiente")
+      return jsonError("Esta tarea ya tiene resultado; márcala como «Descartado» en vez de quitarla.", 400);
+
+    const { error } = await supabaseAdmin.from("tareas_intervencion").delete().eq("id_tarea", idTarea);
+    if (error) return jsonError(`No se pudo quitar la tarea: ${error.message}`, 400);
+
+    const { data: tareas } = await supabaseAdmin.from("tareas_intervencion").select("resultado").eq("id_intervencion", intervencion.id_intervencion);
+    const { data: intervencionActualizada } = await supabaseAdmin.from("intervenciones")
+      .update({ resultado: calcularResultadoAgregado(tareas || []) || null })
+      .eq("id_intervencion", intervencion.id_intervencion).select().single();
+    return jsonOk({ intervencion: intervencionActualizada });
+  }
+
+  return jsonError("accion debe ser 'crear', 'actualizar', 'guardar_tarea' o 'eliminar_tarea'", 400);
 });

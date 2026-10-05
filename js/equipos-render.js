@@ -453,7 +453,8 @@ function renderProximasVisitas() {
       <td>${inc ? `<span class="badge badge-orange" style="font-size:10px;cursor:pointer" onclick="abrirHiloIncidencia('${inc.ID_Incidencia}')" title="Ver hilo completo">🔗 ${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
       <td><div class="row-actions">
         <button class="icon-btn" onclick="openFichaIntervencion(${intIdx})" title="Ver ficha">🔍</button>
-        ${puedeEjecutar ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">🔧 Ejecutar</button>` : ''}
+        ${puedeEjecutar ? `<button class="icon-btn" onclick="editarPlanificacion(${intIdx})" title="Editar planificación">✏️</button>
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalActuacionDerivada(${intIdx})">🔧 Ejecutar</button>` : ''}
       </div></td>
     </tr>`;
   }).join('');
@@ -826,6 +827,8 @@ function openFichaIntervencion(intIdx) {
   const btnLabel = i.Estado === 'Planificada' && !actFinalizada ? '🔧 Ejecutar' : '✏️ Editar intervención';
   const acciones = document.getElementById('ficha-int-acciones');
   let btns = '';
+  if (puedeRegistrar && i.Estado === 'Planificada' && !actFinalizada)
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');editarPlanificacion(${intIdx})">✏️ Editar planificación</button>`;
   if (puedeRegistrar || puedeEditarFinalizada)
     btns += `<button class="btn ${actFinalizada ? 'btn-secondary' : 'btn-primary'}" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
   if (pendienteFactura && puedeHacer('crearIntervenciones'))

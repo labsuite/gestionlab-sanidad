@@ -223,6 +223,14 @@ cualquier acción acaba llamando a `renderIncidencias()` sin argumento y la list
   `programarOtraVisita`, que pasa un tercer argumento `origenIntId`) — mismo modal y misma
   operación de datos, pero framing distinto para no confundir "estoy respondiendo a algo
   recién abierto" con "ya llevo un rato gestionando este caso".
+- **Editar una actuación planificada** (2026-10-05): botón "✏️ Editar planificación" en la
+  fila del hilo (junto a 🔧 Ejecutar), ✏️ en "Próximas actuaciones" y en la ficha, solo
+  mientras está `Planificada`. `editarPlanificacion(intIdx)` abre el mismo modal con
+  `plan-int-idx` ya apuntando a la intervención, así que guardar hace `actualizar` (tipo,
+  fecha, quién, descripción). Las tareas previstas (`Pendiente`) se reescriben (✏️) o se
+  quitan (🗑, acción `eliminar_tarea` de `gestionar-intervencion`). El servidor solo deja
+  quitar mientras la actuación no tenga fecha de realización y la tarea siga sin resultado;
+  después, lo que no se hizo se marca «Descartado» para que quede constancia.
 
 ## Equipo retirado por el SAT (fuera del centro)
 
