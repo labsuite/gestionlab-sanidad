@@ -32,7 +32,8 @@ calcularResultadoAgregado(tareas):
   sin tareas               → ''
   alguna 'Pendiente'       → 'Pendiente'
   todas Resuelto/Descartado→ 'Resuelto' (si hay algún Resuelto) o 'Descartado' (si todas descartadas)
-  resto (mezcla con No resuelto, sin pendientes) → 'Resuelto parcialmente'
+  solo No resuelto/Descartado (ninguna arregló nada) → 'No resuelto'
+  resto (algo resuelto, del todo o en parte, mezclado con No resuelto) → 'Resuelto parcialmente'
 
 ```
 

@@ -25,6 +25,9 @@ function calcularResultadoAgregado(tareas: { resultado: string | null }[]): stri
   if (tareas.every(t => t.resultado === "Resuelto" || t.resultado === "Descartado")) {
     return tareas.some(t => t.resultado === "Resuelto") ? "Resuelto" : "Descartado";
   }
+  // Ninguna tarea arregló nada (solo "No resuelto", quizá con alguna descartada):
+  // no es un resultado parcial, es que el problema sigue igual.
+  if (tareas.every(t => t.resultado === "No resuelto" || t.resultado === "Descartado")) return "No resuelto";
   return "Resuelto parcialmente";
 }
 
