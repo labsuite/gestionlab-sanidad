@@ -251,7 +251,10 @@
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label>¿A dónde los llevas? *</label>
-        <select id="nfc-transfer-destino"></select>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+          <select id="nfc-transfer-destino-lab" onchange="_rellenarDestinoUbic('nfc-transfer-destino', v('nfc-transfer-origen-id'), this.value)"></select>
+          <select id="nfc-transfer-destino"></select>
+        </div>
       </div>
       <div class="form-footer" style="margin-top:16px">
         <button class="btn btn-secondary" onclick="closeModal('modal-nfc-transfer')">Cancelar</button>
@@ -282,7 +285,10 @@
       <div class="form-grid" style="gap:14px">
         <div class="form-group" id="traslado-destino-group">
           <label>Destino *</label>
-          <select id="traslado-destino"><option value="">Seleccionar destino...</option></select>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+            <select id="traslado-destino-lab" onchange="_rellenarDestinoUbic('traslado-destino', v('traslado-origen'), this.value)"></select>
+            <select id="traslado-destino"><option value="">Seleccionar destino...</option></select>
+          </div>
         </div>
         <div class="form-group" id="traslado-destino-fijo-group" style="display:none">
           <label>Destino</label>

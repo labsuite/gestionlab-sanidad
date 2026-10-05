@@ -1331,13 +1331,38 @@ function openModalTransferenciaArmario(ubicacionId) {
         </div>
       </div>`).join('');
   }
-  const selDest = document.getElementById('nfc-transfer-destino');
-  selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
-    DATA.ubicaciones
-      .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== ubicacionId)
-      .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
-      .join('');
+  _rellenarDestinoUbic('nfc-transfer-destino', ubicacionId);
   openModal('modal-nfc-transfer');
+}
+
+/**
+ * Destino de un traslado en dos pasos: primero el laboratorio (`<id>-lab`) y,
+ * dentro, el armario/cajón/estante agrupado por zona (`<id>`). Con decenas de
+ * ubicaciones por laboratorio, una lista plana de IDs es inmanejable.
+ * Sin `lab`, arranca en el laboratorio del origen (lo más habitual).
+ */
+function _rellenarDestinoUbic(idSelect, idOrigen, lab) {
+  const selLab  = document.getElementById(idSelect + '-lab');
+  const selDest = document.getElementById(idSelect);
+  const activas = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
+  const labDe   = u => u.Laboratorio_Aula || 'Otros';
+  const labs    = [...new Set(activas.map(labDe))].sort();
+  if (lab === undefined) {
+    const uOrigen = DATA.ubicaciones.find(u => u.ID_Ubicacion === idOrigen);
+    lab = uOrigen && labs.includes(labDe(uOrigen)) ? labDe(uOrigen) : '';
+  }
+  selLab.innerHTML = '<option value="">Laboratorio…</option>' +
+    labs.map(l => `<option value="${_escAttr(l)}" ${l === lab ? 'selected' : ''}>${_esc(l)}</option>`).join('');
+
+  const ubics = activas.filter(u => labDe(u) === lab);
+  const zonas = [...new Set(ubics.map(u => u.Zona || 'Sin zona'))].sort();
+  selDest.disabled = !lab;
+  selDest.innerHTML = `<option value="">${lab ? 'Armario, cajón o estante…' : 'Elige antes el laboratorio'}</option>` +
+    zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
+      ubics.filter(u => (u.Zona || 'Sin zona') === z)
+        .sort((a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }))
+        .map(u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc([u.Subzona, u.Descripcion_Completa].filter(Boolean)[0] || u.Zona || u.ID_Ubicacion)} · ${_esc(u.ID_Ubicacion)}</option>`)
+        .join('') + '</optgroup>').join('');
 }
 
 function _validarCantNfc(input, max) {
@@ -1403,6 +1428,7 @@ function openModalTrasladoLote(loteId) {
     // (no por ubicación: si hija y madre viven en el mismo sitio, buscar por
     // ubicación sería ambiguo entre las dos).
     sv('traslado-destino-lote-id', madre.ID);
+    selDest.disabled = false;
     selDest.innerHTML = `<option value="${madre.ID_Ubicacion}" selected>${getNombreUbicacion(madre.ID_Ubicacion)}</option>`;
     fijoLbl.textContent = getNombreUbicacion(madre.ID_Ubicacion);
     if (destGrp) destGrp.style.display = 'none';
@@ -1410,11 +1436,7 @@ function openModalTrasladoLote(loteId) {
   } else {
     // Bote madre o ítem sin subdividir: destino libre, como hasta ahora
     sv('traslado-destino-lote-id', '');
-    selDest.innerHTML = '<option value="">Seleccionar destino...</option>' +
-      DATA.ubicaciones
-        .filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== loteOrigen.ID_Ubicacion)
-        .map(u => `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`)
-        .join('');
+    _rellenarDestinoUbic('traslado-destino', loteOrigen.ID_Ubicacion);
     if (destGrp) destGrp.style.display = '';
     if (fijoGrp) fijoGrp.style.display = 'none';
   }
