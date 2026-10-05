@@ -1357,7 +1357,7 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab) {
   const ubics = activas.filter(u => labDe(u) === lab);
   const zonas = [...new Set(ubics.map(u => u.Zona || 'Sin zona'))].sort();
   selDest.disabled = !lab;
-  selDest.innerHTML = `<option value="">${lab ? 'Armario, cajón o estante…' : 'Elige antes el laboratorio'}</option>` +
+  selDest.innerHTML = `<option value="">${lab ? 'Sitio…' : '← Elige laboratorio'}</option>` +
     zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
       ubics.filter(u => (u.Zona || 'Sin zona') === z)
         .sort((a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }))
