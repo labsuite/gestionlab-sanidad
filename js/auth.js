@@ -99,7 +99,10 @@ async function signIn() {
 // ── signOut ──────────────────────────────────────────────────
 
 async function signOut() {
-  await _sbMigracion.auth.signOut();
+  // scope 'local': cierra solo ESTE dispositivo. Por defecto supabase-js revoca
+  // todas las sesiones de la cuenta, y en una cuenta de grupo eso deja sin
+  // sesión a toda la clase a la vez (siguen viendo datos, pero nada se guarda).
+  await _sbMigracion.auth.signOut({ scope: 'local' });
   currentUser = null;
   previewRole = null;
   previewUser = null;

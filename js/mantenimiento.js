@@ -541,6 +541,7 @@ async function guardarProgresoMant() {
       accion: 'guardar_progreso',
       id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
       pasos: _leerChecklist(), iniciado_por: _nombreUsuarioActual(),
+      observaciones: document.getElementById('mant-observaciones').value.trim(),
     });
     DATA.registroMantenimientos = DATA.registroMantenimientos.filter(r =>
       !(r.ID_Plan === idPlan && r.Curso_Academico === curso && r.Periodo === periodo &&
@@ -550,7 +551,7 @@ async function guardarProgresoMant() {
     showToast('Progreso guardado — puedes retomarlo más adelante', 'success');
     _refrescarTrasMant();
   } catch (e) {
-    showToast('Error guardando el progreso', 'error');
+    showToast(e.message || 'Error guardando el progreso', 'error');
     console.error(e);
   }
   hideLoading();
@@ -608,7 +609,7 @@ async function finalizarMant() {
       : 'Mantenimiento finalizado', 'success');
     _refrescarTrasMant();
   } catch (e) {
-    showToast('Error al finalizar el registro', 'error');
+    showToast(e.message || 'Error al finalizar el registro', 'error');
     console.error(e);
   }
   hideLoading();

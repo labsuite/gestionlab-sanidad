@@ -1550,7 +1550,7 @@ async function guardarIncidencia() {
     try { await actualizarEstadoEquipo(equipo, estadoXImpacto); } catch(e) { console.warn('No se pudo actualizar estado equipo', e); }
     showToast('Incidencia reportada', 'success');
     closeModal('modal-incidencia'); renderAll();
-  } catch(e) { showToast('Error guardando', 'error'); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 

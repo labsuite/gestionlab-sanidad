@@ -118,9 +118,10 @@ Deno.serve(async (req) => {
 
     if (accion === "guardar_progreso") {
       const ahora = new Date().toISOString();
+      const obsProgreso = body.observaciones ? String(body.observaciones) : null;
       if (enCurso) {
         const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
-          .update({ pasos, actualizado_en: ahora })
+          .update({ pasos, observaciones: obsProgreso, actualizado_en: ahora })
           .eq("id_registro", enCurso.id_registro as string).select().single();
         if (error) return jsonError(`No se pudo guardar el progreso: ${error.message}`, 400);
         return jsonOk({ registro: data });
@@ -136,7 +137,7 @@ Deno.serve(async (req) => {
       const datos = {
         id_registro: generarIdRegistro(), id_plan: idPlan, id_equipo: idEquipo,
         curso_academico: curso, periodo,
-        estado: "en_curso", pasos,
+        estado: "en_curso", pasos, observaciones: obsProgreso,
         fecha_inicio: ahora.slice(0, 10),
         iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : firmaGrupo,
         actualizado_en: ahora,
