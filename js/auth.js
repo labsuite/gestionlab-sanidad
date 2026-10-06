@@ -99,6 +99,10 @@ async function signIn() {
 // ── signOut ──────────────────────────────────────────────────
 
 async function signOut() {
+  // Las etiquetas NFC/QR solo registran solas si el móvil tiene la sesión abierta.
+  if (!confirm('¿Cerrar sesión en este dispositivo?\n\n' +
+      'Si cierras sesión, al acercar el móvil a una etiqueta NFC no se registrará ' +
+      'nada automáticamente: habrá que volver a entrar con usuario y contraseña.')) return;
   // scope 'local': cierra solo ESTE dispositivo. Por defecto supabase-js revoca
   // todas las sesiones de la cuenta, y en una cuenta de grupo eso deja sin
   // sesión a toda la clase a la vez (siguen viendo datos, pero nada se guarda).
