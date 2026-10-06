@@ -327,7 +327,46 @@ function showPage(page) {
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
   if (page === 'inventariar-material' && typeof _invMatAlEntrar === 'function') _invMatAlEntrar();
+  // Cada cambio de sección es una entrada del historial, para que el «atrás»
+  // del móvil vuelva a la sección anterior en vez de salir de la app.
+  if (!_navDesdeHistorial) {
+    if (!history.state?.page) history.replaceState({ page }, '');
+    else if (history.state.page !== page) history.pushState({ page }, '');
+  }
 }
+
+// ============================================================
+// BOTÓN «ATRÁS» DEL MÓVIL
+// Orden: cierra la ventana abierta → cierra el menú lateral → vuelve a la
+// sección anterior. Solo sale de la app desde la primera sección.
+// ============================================================
+let _navDesdeHistorial = false;
+
+window.addEventListener('popstate', e => {
+  const actual = document.querySelector('.page.active')?.id.replace(/^page-/, '');
+  if (!actual) return;   // aún en login
+
+  const modales = document.querySelectorAll('.modal-overlay.open');
+  const menuAbierto = document.querySelector('.sidebar.open');
+  if (modales.length || menuAbierto) {
+    if (modales.length) {
+      // El botón ✕ de cada modal ya sabe limpiar lo suyo (chat, hilo…)
+      const m = modales[modales.length - 1];
+      const cerrar = m.querySelector('.modal-close');
+      if (cerrar) cerrar.click(); else m.classList.remove('open');
+    } else {
+      closeSidebar();
+    }
+    // Deshacer el retroceso: seguimos en la misma sección
+    history.pushState({ page: actual }, '');
+    return;
+  }
+
+  const destino = e.state?.page;
+  if (!destino || destino === actual) return;
+  _navDesdeHistorial = true;
+  try { showPage(destino); } finally { _navDesdeHistorial = false; }
+});
 
 function showApp() {
   // ── Bloqueo estricto: email no registrado → pantalla no autorizado ──────
@@ -478,7 +517,7 @@ function _checkPendingNfcAction() {
   const params = new URLSearchParams(window.location.search);
   const action = params.get('action');
   if (!action) return;
-  history.replaceState({}, '', window.location.pathname);
+  history.replaceState(history.state, '', window.location.pathname);
 
   if (action === 'transfer') {
     const armario = params.get('armario');
