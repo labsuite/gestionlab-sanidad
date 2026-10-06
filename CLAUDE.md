@@ -236,6 +236,12 @@ módulo traducía a su toast genérico ("Error al iniciar la sesión"…). Ahora
 el servidor responde 401. No reintroducir el `|| SUPABASE_MIGRACION_ANON` de la cabecera
 `Authorization`.
 
+⚠ Segunda causa, la más frecuente en clase: que **otro alumno del grupo cierre sesión**.
+`signOut()` de supabase-js revoca por defecto **todas** las sesiones de la cuenta, y en una
+cuenta de grupo eso deja a toda la clase con 401 "Session not found" a la vez (visto el
+2026-10-06 con 1º CS APC). Por eso `signOut()` en `js/auth.js` usa `{ scope: 'local' }` —
+no quitarlo.
+
 En los `catch` usar `showToast(e.message || '<texto de respaldo>', 'error')` — patrón ya
 habitual en residuos, material y mantenimiento — para que el mensaje real del servidor
 llegue a la pantalla en vez de quedar solo en la consola.
