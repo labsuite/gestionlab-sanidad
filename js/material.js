@@ -1326,12 +1326,12 @@ function openModalTransferenciaArmario(ubicacionId) {
           <input type="number" class="nfc-item-cant"
                  min="0" max="${stockOrigen}" step="1" value="0"
                  style="width:72px;font-size:15px;padding:6px 8px;text-align:center;border-radius:var(--radius-sm);border:1px solid var(--border)"
-                 oninput="_validarCantNfc(this,${stockOrigen})">
+                 oninput="_validarCantNfc(this,${stockOrigen}); _actualizarSugerenciasNfc()">
           <span style="font-size:12px;color:var(--text-muted);min-width:32px">${mat.Unidad || ''}</span>
         </div>
       </div>`).join('');
   }
-  _rellenarDestinoUbic('nfc-transfer-destino', ubicacionId);
+  _rellenarDestinoUbic('nfc-transfer-destino', ubicacionId, undefined, []);
   openModal('modal-nfc-transfer');
 }
 
@@ -1341,7 +1341,36 @@ function openModalTransferenciaArmario(ubicacionId) {
  * ubicaciones por laboratorio, una lista plana de IDs es inmanejable.
  * Sin `lab`, arranca en el laboratorio del origen (lo más habitual).
  */
-function _rellenarDestinoUbic(idSelect, idOrigen, lab) {
+// Materiales que se están trasladando, por select de destino — para sugerir los
+// sitios donde ya tienen bote. Se guarda aparte porque el onchange del select de
+// laboratorio vuelve a llamar a _rellenarDestinoUbic solo con (id, origen, lab).
+const _destinoMatIds = {};
+
+/** Sitios activos (≠ origen) donde ya hay bote de alguno de `matIds` → Map(idUbic → [nombres]). */
+function _ubicsConMaterial(matIds, idOrigen) {
+  const res = new Map();
+  const add = (idUbic, matId) => {
+    if (!idUbic || idUbic === idOrigen) return;
+    const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbic);
+    if (!u || u.Activa === 'FALSE') return;
+    const nombre = DATA.material.find(m => m.ID_Material === matId)?.Nombre || matId;
+    if (!res.has(idUbic)) res.set(idUbic, []);
+    if (!res.get(idUbic).includes(nombre)) res.get(idUbic).push(nombre);
+  };
+  (matIds || []).forEach(matId => {
+    const lotes = getMatUbics(matId);
+    if (lotes.length) lotes.forEach(l => add(l.ID_Ubicacion, matId));
+    else add(DATA.material.find(m => m.ID_Material === matId)?.Ubicacion, matId);  // legacy
+  });
+  return res;
+}
+
+function _nombreSitio(u) {
+  return [u.Subzona, u.Descripcion_Completa].filter(Boolean)[0] || u.Zona || u.ID_Ubicacion;
+}
+
+function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
+  if (matIds !== undefined) _destinoMatIds[idSelect] = matIds;
   const selLab  = document.getElementById(idSelect + '-lab');
   const selDest = document.getElementById(idSelect);
   const activas = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
@@ -1354,15 +1383,53 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab) {
   selLab.innerHTML = '<option value="">Laboratorio…</option>' +
     labs.map(l => `<option value="${_escAttr(l)}" ${l === lab ? 'selected' : ''}>${_esc(l)}</option>`).join('');
 
-  const ubics = activas.filter(u => labDe(u) === lab);
-  const zonas = [...new Set(ubics.map(u => u.Zona || 'Sin zona'))].sort();
+  const yaHay  = _ubicsConMaterial(_destinoMatIds[idSelect], idOrigen);
+  const opt    = u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(_nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
+  const porId  = (a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true });
+  const ubics  = activas.filter(u => labDe(u) === lab);
+  const conMat = ubics.filter(u => yaHay.has(u.ID_Ubicacion)).sort(porId);
+  const resto  = ubics.filter(u => !yaHay.has(u.ID_Ubicacion));
+  const zonas  = [...new Set(resto.map(u => u.Zona || 'Sin zona'))].sort();
   selDest.disabled = !lab;
   selDest.innerHTML = `<option value="">${lab ? 'Sitio…' : '← Elige laboratorio'}</option>` +
+    (conMat.length ? `<optgroup label="★ Ya hay de este material">${conMat.map(opt).join('')}</optgroup>` : '') +
     zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
-      ubics.filter(u => (u.Zona || 'Sin zona') === z)
-        .sort((a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }))
-        .map(u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc([u.Subzona, u.Descripcion_Completa].filter(Boolean)[0] || u.Zona || u.ID_Ubicacion)} · ${_esc(u.ID_Ubicacion)}</option>`)
-        .join('') + '</optgroup>').join('');
+      resto.filter(u => (u.Zona || 'Sin zona') === z).sort(porId).map(opt).join('') + '</optgroup>').join('');
+
+  // Atajos: un toque elige laboratorio y sitio a la vez (acordarse del armarito exacto cuesta)
+  const cont = document.getElementById(idSelect + '-sugerencias');
+  if (!cont) return;
+  const varios = (_destinoMatIds[idSelect] || []).length > 1;
+  const chips = [...yaHay.entries()]
+    .map(([id, nombres]) => ({ u: DATA.ubicaciones.find(x => x.ID_Ubicacion === id), nombres }))
+    .sort((a, b) => labDe(a.u).localeCompare(labDe(b.u), 'es', { numeric: true }) || porId(a.u, b.u));
+  cont.style.display = chips.length ? '' : 'none';
+  cont.innerHTML = chips.length ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📍 Ya hay en… (toca para elegirlo)</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">${chips.map(({ u, nombres }) => `
+      <button type="button" class="btn btn-secondary btn-sm" style="text-align:left;line-height:1.3"
+              title="${_escAttr(nombres.join(', '))}"
+              data-origen="${_escAttr(idOrigen)}" data-ubic="${_escAttr(u.ID_Ubicacion)}"
+              onclick="_elegirDestinoSugerido('${idSelect}', this.dataset.origen, this.dataset.ubic)">
+        <strong>${_esc(labDe(u))}</strong> · ${_esc(_nombreSitio(u))}
+        ${varios ? `<div style="font-size:10px;color:var(--text-muted);font-weight:400">${_esc(nombres.join(', '))}</div>` : ''}
+      </button>`).join('')}</div>` : '';
+}
+
+function _elegirDestinoSugerido(idSelect, idOrigen, idUbic) {
+  const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbic);
+  if (!u) return;
+  _rellenarDestinoUbic(idSelect, idOrigen, u.Laboratorio_Aula || 'Otros');
+  sv(idSelect, idUbic);
+}
+
+/** Traslado masivo: sugerir solo los sitios de lo que de verdad se lleva (cantidad > 0). */
+function _actualizarSugerenciasNfc() {
+  const matIds = [...document.querySelectorAll('#nfc-transfer-items .nfc-item-row')]
+    .filter(r => (parseFloat(r.querySelector('.nfc-item-cant').value) || 0) > 0)
+    .map(r => r.dataset.matId);
+  const elegido = v('nfc-transfer-destino');
+  _rellenarDestinoUbic('nfc-transfer-destino', v('nfc-transfer-origen-id'), v('nfc-transfer-destino-lab'), matIds);
+  if (elegido) sv('nfc-transfer-destino', elegido);
 }
 
 function _validarCantNfc(input, max) {
@@ -1436,7 +1503,7 @@ function openModalTrasladoLote(loteId) {
   } else {
     // Bote madre o ítem sin subdividir: destino libre, como hasta ahora
     sv('traslado-destino-lote-id', '');
-    _rellenarDestinoUbic('traslado-destino', loteOrigen.ID_Ubicacion);
+    _rellenarDestinoUbic('traslado-destino', loteOrigen.ID_Ubicacion, undefined, [matId]);
     if (destGrp) destGrp.style.display = '';
     if (fijoGrp) fijoGrp.style.display = 'none';
   }
