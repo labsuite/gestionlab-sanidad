@@ -51,7 +51,7 @@ async function rechazarSolicitud(solId) {
     const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'rechazar', id_solicitud: solId });
     DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
     showToast('Solicitud rechazada', 'success'); renderSolicitudes();
-  } catch(e) { showToast('Error', 'error'); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); }
   hideLoading();
 }
 
@@ -66,7 +66,7 @@ async function cancelarSolicitud(solId) {
     const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'cancelar', id_solicitud: solId });
     DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
     showToast('Solicitud cancelada', 'success'); renderSolicitudes();
-  } catch(e) { showToast('Error', 'error'); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); }
   hideLoading();
 }
 
@@ -173,7 +173,7 @@ async function confirmarSolicitudAPedido(pedidoId) {
     if (typeof mostrarToastConAccion === 'function') {
       mostrarToastConAccion(`✓ Añadido a "${pedido.Nombre_Lista}"`, 'Ver pedido', () => verDetallePedido(pedidoId));
     }
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -205,7 +205,7 @@ async function confirmarStockAPedido(pedidoId, matNombre, cantidad) {
     DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
     showToast(`"${matNombre}" añadido al pedido`, 'success'); renderAll();
   }
-  catch(e) { showToast('Error', 'error'); }
+  catch(e) { showToast(e.message || 'Error', 'error'); }
   hideLoading();
 }
 
@@ -239,7 +239,7 @@ async function guardarNuevoPedido() {
       showToast(`Lista creada y "${matNombre}" añadido`, 'success');
     } else { showToast('Lista creada', 'success'); }
     renderPedidos(); renderSolicitudes(); renderDashboard(); updateBadges();
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -313,7 +313,7 @@ async function guardarLineaPedido() {
     verDetallePedido(pedidoId);
     showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
   } catch(e) {
-    showToast('Error al guardar la línea. Vuelve a intentarlo.', 'error');
+    showToast(e.message || 'Error al guardar la línea. Vuelve a intentarlo.', 'error');
     console.error(e);
   }
   hideLoading();
@@ -333,7 +333,7 @@ async function marcarPresupuestoSolicitado(pedidoId) {
     pendientes.forEach(l => { l.Presupuesto_Pendiente = 'No'; });
     showToast('Presupuesto marcado como solicitado', 'success');
     verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -359,7 +359,7 @@ async function guardarEstadoPedido() {
     showToast('Estado actualizado', 'success');
     closeModal('modal-estado-pedido'); renderPedidos(); renderSolicitudes();
     if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -387,7 +387,7 @@ async function guardarRecepcionMasiva() {
     }
     renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
     verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error registrando el albarán', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error registrando el albarán', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -442,7 +442,7 @@ async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbica
     renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
     verDetallePedido(pedidoId);
   } catch(e) {
-    showToast('Error al guardar la recepción. No se modificó nada.', 'error');
+    showToast(e.message || 'Error al guardar la recepción.', 'error');
     console.error('[recepción]', e);
   }
   hideLoading();
@@ -462,7 +462,7 @@ async function eliminarLineaPedido(lineaId, pedidoId) {
     verDetallePedido(pedidoId);
     renderSolicitudes();
   }
-  catch(e) { showToast('Error eliminando', 'error'); console.error(e); }
+  catch(e) { showToast(e.message || 'Error eliminando', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -509,7 +509,7 @@ async function avanceEstadoPedido(pedidoId) {
     showToast(`Estado: ${nuevoEstado}`, 'success');
     renderPedidos();
     if (document.getElementById('page-pedido-detalle').classList.contains('active')) verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -529,7 +529,7 @@ async function eliminarPedido(pedidoId) {
     showToast('Pedido eliminado', 'success');
     showPage('pedidos');
     renderPedidos();
-  } catch(e) { showToast('Error al eliminar', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error al eliminar', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -547,7 +547,7 @@ async function toggleDocPedido(pedidoId, campo, valor) {
     p[campo] = valor ? 'TRUE' : '';
     showToast('Documentación actualizada', 'success');
     verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error guardando', 'error'); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); }
   hideLoading();
 }
 
@@ -612,7 +612,7 @@ async function archivarPedido(pedidoId) {
     showToast('Pedido archivado', 'success');
     showPage('pedidos');
     renderPedidos();
-  } catch(e) { showToast('Error archivando', 'error'); }
+  } catch(e) { showToast(e.message || 'Error archivando', 'error'); }
   hideLoading();
 }
 
