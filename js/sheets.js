@@ -21,7 +21,7 @@ async function callEdgeFunction(nombre, body) {
     if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
     throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');
   }
-  const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
+  const enviar = () => fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
@@ -29,6 +29,20 @@ async function callEdgeFunction(nombre, body) {
     },
     body: JSON.stringify(body),
   });
+  // Safari (Mac/iPad) reutiliza tras unos minutos sin actividad una conexión
+  // que el servidor ya cerró: el POST falla con "Load failed" (TypeError, sin
+  // respuesta) sin haber salido, y al segundo clic va bien. Visto 2026-10-08
+  // con las solicitudes de compra: el rato de rellenar el formulario basta.
+  // Se reintenta UNA vez y solo si no hubo respuesta; un error del servidor
+  // (4xx/5xx) no se repite.
+  let r;
+  try {
+    r = await enviar();
+  } catch (e) {
+    if (!(e instanceof TypeError)) throw e;
+    try { r = await enviar(); }
+    catch { throw new Error('No hay conexión con el servidor. Comprueba la red y vuelve a intentarlo.'); }
+  }
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) {
     if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();

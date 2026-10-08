@@ -38,7 +38,7 @@ async function guardarSolicitud() {
     DATA.solicitudes.push(objLocal);
     showToast('Solicitud enviada', 'success');
     closeModal('modal-solicitud'); renderSolicitudes(); updateBadges();
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -717,7 +717,7 @@ async function guardarProveedorPedido() {
     closeModal('modal-editar-proveedor');
     verDetallePedido(pedidoId);
     renderPedidos();
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -749,7 +749,7 @@ async function guardarGastoExtraPedido() {
     showToast('Gasto extra actualizado', 'success');
     closeModal('modal-gasto-extra');
     verDetallePedido(pedidoId);
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -871,6 +871,6 @@ async function guardarEdicionSolicitud() {
     showToast('Solicitud actualizada', 'success');
     closeModal('modal-editar-solicitud');
     renderSolicitudes();
-  } catch(e) { showToast('Error guardando', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
