@@ -252,9 +252,9 @@
       <div class="form-group" style="margin-bottom:0">
         <label>¿A dónde los llevas? *</label>
         <div id="nfc-transfer-destino-sugerencias" style="display:none;margin-bottom:8px"></div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+        <div id="nfc-transfer-destino-manual" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
           <select id="nfc-transfer-destino-lab" onchange="_rellenarDestinoUbic('nfc-transfer-destino', v('nfc-transfer-origen-id'), this.value)"></select>
-          <select id="nfc-transfer-destino"></select>
+          <select id="nfc-transfer-destino" onchange="_pintarSugerencias('nfc-transfer-destino', v('nfc-transfer-origen-id'))"></select>
         </div>
       </div>
       <div class="form-footer" style="margin-top:16px">
@@ -287,9 +287,9 @@
         <div class="form-group" id="traslado-destino-group">
           <label>Destino *</label>
           <div id="traslado-destino-sugerencias" style="display:none;margin-bottom:8px"></div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+          <div id="traslado-destino-manual" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
             <select id="traslado-destino-lab" onchange="_rellenarDestinoUbic('traslado-destino', v('traslado-origen'), this.value)"></select>
-            <select id="traslado-destino"><option value="">Seleccionar destino...</option></select>
+            <select id="traslado-destino" onchange="_pintarSugerencias('traslado-destino', v('traslado-origen'))"><option value="">Seleccionar destino...</option></select>
           </div>
         </div>
         <div class="form-group" id="traslado-destino-fijo-group" style="display:none">

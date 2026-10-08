@@ -1371,6 +1371,7 @@ function _nombreSitio(u) {
 
 function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
   if (matIds !== undefined) _destinoMatIds[idSelect] = matIds;
+  if (lab === undefined) _destinoManual[idSelect] = false;
   const selLab  = document.getElementById(idSelect + '-lab');
   const selDest = document.getElementById(idSelect);
   const activas = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
@@ -1396,30 +1397,56 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
     zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
       resto.filter(u => (u.Zona || 'Sin zona') === z).sort(porId).map(opt).join('') + '</optgroup>').join('');
 
-  // Atajos: un toque elige laboratorio y sitio a la vez (acordarse del armarito exacto cuesta)
-  const cont = document.getElementById(idSelect + '-sugerencias');
+  _pintarSugerencias(idSelect, idOrigen);
+}
+
+// Si hay sitios con ese material, son lo principal: botones grandes, y los
+// desplegables quedan plegados tras «Otro sitio…» (lo que el usuario abrió se recuerda
+// hasta que se vuelve a abrir el modal).
+const _destinoManual = {};
+
+function _pintarSugerencias(idSelect, idOrigen) {
+  const cont   = document.getElementById(idSelect + '-sugerencias');
+  const manual = document.getElementById(idSelect + '-manual');
   if (!cont) return;
+  const labDe  = u => u.Laboratorio_Aula || 'Otros';
+  const porId  = (a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true });
+  const yaHay  = _ubicsConMaterial(_destinoMatIds[idSelect], idOrigen);
   const varios = (_destinoMatIds[idSelect] || []).length > 1;
+  const elegido = v(idSelect);
   const chips = [...yaHay.entries()]
     .map(([id, nombres]) => ({ u: DATA.ubicaciones.find(x => x.ID_Ubicacion === id), nombres }))
     .sort((a, b) => labDe(a.u).localeCompare(labDe(b.u), 'es', { numeric: true }) || porId(a.u, b.u));
+  const verManual = !chips.length || _destinoManual[idSelect];
+  if (manual) manual.style.display = verManual ? 'grid' : 'none';
   cont.style.display = chips.length ? '' : 'none';
-  cont.innerHTML = chips.length ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">📍 Ya hay en… (toca para elegirlo)</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px">${chips.map(({ u, nombres }) => `
-      <button type="button" class="btn btn-secondary btn-sm" style="text-align:left;line-height:1.3"
+  if (!chips.length) { cont.innerHTML = ''; return; }
+  cont.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">📍 Donde ya hay — toca para elegirlo</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${chips.map(({ u, nombres }) => {
+      const sel = u.ID_Ubicacion === elegido;
+      return `<button type="button" class="btn btn-secondary"
+              style="width:100%;justify-content:flex-start;text-align:left;line-height:1.3;padding:10px 12px;font-size:14px;${sel ? 'border:2px solid var(--accent);background:var(--accent-light);color:var(--accent)' : ''}"
               title="${_escAttr(nombres.join(', '))}"
               data-origen="${_escAttr(idOrigen)}" data-ubic="${_escAttr(u.ID_Ubicacion)}"
               onclick="_elegirDestinoSugerido('${idSelect}', this.dataset.origen, this.dataset.ubic)">
-        <strong>${_esc(labDe(u))}</strong> · ${_esc(_nombreSitio(u))}
-        ${varios ? `<div style="font-size:10px;color:var(--text-muted);font-weight:400">${_esc(nombres.join(', '))}</div>` : ''}
-      </button>`).join('')}</div>` : '';
+        <span>${sel ? '✓ ' : ''}<strong>${_esc(labDe(u))}</strong> · ${_esc(_nombreSitio(u))}
+        ${varios ? `<span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400">${_esc(nombres.join(', '))}</span>` : ''}</span>
+      </button>`; }).join('')}</div>
+    ${verManual
+      ? `<div style="font-size:11px;color:var(--text-muted);margin-top:10px">O elige otro sitio — si ahí aún no había, se crea el bote con lo que lleves:</div>`
+      : `<button type="button" data-origen="${_escAttr(idOrigen)}"
+              onclick="_destinoManual['${idSelect}']=true; _pintarSugerencias('${idSelect}', this.dataset.origen)"
+              style="background:none;border:none;padding:8px 0 0;font-size:12px;color:var(--text-muted);text-decoration:underline;cursor:pointer">
+          ➕ Otro sitio (donde aún no hay)</button>`}`;
 }
 
 function _elegirDestinoSugerido(idSelect, idOrigen, idUbic) {
   const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbic);
   if (!u) return;
+  _destinoManual[idSelect] = false;
   _rellenarDestinoUbic(idSelect, idOrigen, u.Laboratorio_Aula || 'Otros');
   sv(idSelect, idUbic);
+  _pintarSugerencias(idSelect, idOrigen);
 }
 
 /** Traslado masivo: sugerir solo los sitios de lo que de verdad se lleva (cantidad > 0). */
@@ -1429,7 +1456,7 @@ function _actualizarSugerenciasNfc() {
     .map(r => r.dataset.matId);
   const elegido = v('nfc-transfer-destino');
   _rellenarDestinoUbic('nfc-transfer-destino', v('nfc-transfer-origen-id'), v('nfc-transfer-destino-lab'), matIds);
-  if (elegido) sv('nfc-transfer-destino', elegido);
+  if (elegido) { sv('nfc-transfer-destino', elegido); _pintarSugerencias('nfc-transfer-destino', v('nfc-transfer-origen-id')); }
 }
 
 function _validarCantNfc(input, max) {
