@@ -5,9 +5,28 @@ let _mostrarSolicitudesArchivadas = false;
 let _mostrarSnoozed = false;
 
 // Snooze de solicitudes (col K de Solicitudes — compartido entre dispositivos)
+// Una solicitud Pendiente con fecha de necesidad lejana se oculta sola hasta
+// _DIAS_AVISO_NECESARIO días antes de esa fecha, sin que nadie pulse 🕐: si se
+// queda a la vista meses, se acaba ignorando y se olvida. Un Snooze_Hasta
+// explícito manda siempre (por eso «Mostrar ya» guarda hoy, no lo vacía).
+const _DIAS_AVISO_NECESARIO = 30;
+function _fechaNecesariaSolicitud(s) {
+  return (s.Motivo || '').match(/Necesario:\s*(\d{4}-\d{2}-\d{2})/)?.[1] || '';
+}
+function _snoozeAutomatico(s) {
+  if (s.Snooze_Hasta || s.Estado !== 'Pendiente') return '';
+  const nec = _fechaNecesariaSolicitud(s);
+  if (!nec) return '';
+  const d = new Date(nec + 'T12:00:00');
+  d.setDate(d.getDate() - _DIAS_AVISO_NECESARIO);
+  return d.toISOString().split('T')[0];
+}
 function _getSnoozes() {
   const map = {};
-  DATA.solicitudes.forEach(s => { if (s.Snooze_Hasta) map[s.ID_Solicitud] = s.Snooze_Hasta; });
+  DATA.solicitudes.forEach(s => {
+    const hasta = s.Snooze_Hasta || _snoozeAutomatico(s);
+    if (hasta) map[s.ID_Solicitud] = hasta;
+  });
   return map;
 }
 async function aplicarSnooze(solId) {
@@ -29,10 +48,13 @@ async function cancelarSnooze(solId) {
   const sol = DATA.solicitudes.find(s => s.ID_Solicitud === solId);
   if (!sol) return;
   const anterior = sol.Snooze_Hasta;
-  sol.Snooze_Hasta = '';
+  // Se guarda la fecha de hoy en vez de vaciarla: vacía, el ocultado automático
+  // por fecha de necesidad la volvería a esconder.
+  const hoy = new Date().toISOString().split('T')[0];
+  sol.Snooze_Hasta = hoy;
   showLoading('Guardando...');
   try {
-    await callEdgeFunction('gestionar-solicitud', { accion: 'unsnooze', id_solicitud: solId });
+    await callEdgeFunction('gestionar-solicitud', { accion: 'snooze', id_solicitud: solId, fecha: hoy });
     renderSolicitudes();
   } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
@@ -73,7 +95,7 @@ function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
   const puedeEditarGestor   = puedeGestionar && s.Estado === 'Pendiente';
   const puedeEditar = puedeEditarProfesor || puedeEditarGestor;
 
-  const fechaNecesariaRaw = (s.Motivo || '').match(/Necesario:\s*(\d{4}-\d{2}-\d{2})/)?.[1];
+  const fechaNecesariaRaw = _fechaNecesariaSolicitud(s);
   const fechaNecesaria = fechaNecesariaRaw
     ? `<span class="sol-card-necesario"> · 📅 ${formatDate(fechaNecesariaRaw)}</span>`
     : '';
@@ -91,7 +113,7 @@ function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
   if (puedeSnooze) {
     if (snoozeHasta) {
       snoozePanel = `<div class="sol-card-snooze" id="snooze-panel-${s.ID_Solicitud}" style="display:flex">
-        <span>😴 Oculta hasta ${formatDate(snoozeHasta)}</span>
+        <span>😴 Oculta hasta ${formatDate(snoozeHasta)}${!s.Snooze_Hasta ? ` · un mes antes de la fecha prevista` : ''}</span>
         <input type="date" id="snooze-date-${s.ID_Solicitud}" min="${hoy}" value="${snoozeHasta}">
         <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="aplicarSnooze('${s.ID_Solicitud}')">Cambiar</button>
         <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="cancelarSnooze('${s.ID_Solicitud}')">Mostrar ya</button>
