@@ -603,6 +603,10 @@ function renderIncidencias(filtroEstado) {
           // puede acumular varias actuaciones, así que un botón "Editar actuación" aquí
           // sería ambiguo (¿cuál se edita?). El botón "🔗 Hilo" ya da acceso a todas.
           btnAccion = '';
+        } else if (intEnl && intEnl.Estado === 'Planificada' && intIdx >= 0) {
+          // Hay una actuación planificada: ejecutarla desde aquí, para que no se
+          // registre otra nueva por haberla olvidado.
+          btnAccion = `<button class="btn btn-primary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">🔧 Ejecutar lo planificado</button>`;
         } else {
           btnAccion = intIdx >= 0
             ? `<button class="btn btn-secondary btn-sm" onclick="openModalActuacionDerivada(${intIdx})">Ver / Actuar</button>`

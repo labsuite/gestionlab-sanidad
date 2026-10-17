@@ -555,6 +555,19 @@ function _renderAccionesHilo(inc, chain) {
   if (!activa || ['Resuelta', 'Descartada'].includes(inc.Estado)) return;
   const eqId  = (inc.Equipo || '').split(' – ')[0].trim();
   const cIdx  = DATA.intervenciones.indexOf(activa);
+  // Con una actuación ya planificada, lo normal es ejecutarla, no registrar otra:
+  // se ofrece eso en lugar de «Registrar otra actuación».
+  if (activa.Estado === 'Planificada' && activa.Actuacion_Finalizada !== 'Sí') {
+    const fecha = activa.Fecha_Planificada ? ' para el ' + formatDate(activa.Fecha_Planificada) : '';
+    cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
+      <div style="font-size:12px;color:var(--text-soft);margin-bottom:8px">Ya hay una actuación planificada (<strong>${activa.ID_Intervencion}</strong>${fecha}). Cuando se haga, regístrala ejecutándola.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar lo planificado</button>
+        <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Planificar otra actuación</button>
+      </div>
+    </div>`;
+    return;
+  }
   cont.innerHTML = `<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
     <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}', origenIntId:'${activa.ID_Intervencion}'});closeModal('modal-hilo-incidencia')">🔧 Registrar otra actuación</button>
     <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="programarOtraVisita(${cIdx});closeModal('modal-hilo-incidencia')">📅 Planificar otra actuación</button>
@@ -986,6 +999,8 @@ function _aplicarModoModalActuacion(i) {
   const bNueva  = document.getElementById('act-modo-nueva-banner');
   const btnReab = document.getElementById('act-btn-reabrir');
   const btnFin  = document.getElementById('act-btn-finalizar');
+  const avisoPlan = document.getElementById('act-planificada-aviso');
+  if (avisoPlan) avisoPlan.style.display = 'none';
 
   const finalizada   = !!i && i.Actuacion_Finalizada === 'Sí';
   const yaRegistrada = !!i && !!i.Fecha_Realizacion;
@@ -1632,7 +1647,30 @@ function openModalRegistrarActuacionDirecta(equipoId, ctx) {
   toggleActEjecucion('Interna');
 
   _aplicarModoModalActuacion(null);
+  _avisarActuacionPlanificada(equipoId);
   openModal('modal-registrar-actuacion');
+}
+
+// Si el equipo ya tiene una actuación planificada sin ejecutar, lo más probable es
+// que lo que se va a registrar sea ESA: se avisa y se ofrece ejecutarla, para no
+// acabar con una intervención duplicada y la planificada colgando.
+function _avisarActuacionPlanificada(equipoId) {
+  const aviso = document.getElementById('act-planificada-aviso');
+  if (!aviso) return;
+  const planificadas = DATA.intervenciones.filter(x =>
+    (x.Equipo || '').split(' – ')[0].trim() === equipoId &&
+    x.Estado === 'Planificada' && x.Actuacion_Finalizada !== 'Sí');
+  if (!planificadas.length) { aviso.style.display = 'none'; return; }
+  aviso.innerHTML = `<strong>Este equipo ya tiene ${planificadas.length === 1 ? 'una actuación planificada' : 'actuaciones planificadas'}.</strong> Si lo que vas a registrar es eso, ejecútala en vez de crear una nueva:` +
+    planificadas.map(x => {
+      const idx = DATA.intervenciones.indexOf(x);
+      const fecha = x.Fecha_Planificada ? formatDate(x.Fecha_Planificada) : 'sin fecha';
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:6px">
+        <span><strong>${x.ID_Intervencion}</strong> · ${x.Tipo || '—'} · ${fecha}</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="closeModal('modal-registrar-actuacion');openModalActuacionDerivada(${idx})">🔧 Ejecutar lo planificado</button>
+      </div>`;
+    }).join('');
+  aviso.style.display = '';
 }
 
 // ============================================================
