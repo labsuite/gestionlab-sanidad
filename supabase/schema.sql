@@ -258,7 +258,7 @@ create table registro_mantenimientos (
   realizado_por       text,
   supervisado_por     text,
   observaciones       text,
-  estado              text not null default 'finalizado',  -- 'en_curso' | 'finalizado' | 'no_aplica' | 'aplazado'
+  estado              text not null default 'finalizado',  -- 'en_curso' | 'pendiente_vb' (registrado por alumnado, falta la firma) | 'finalizado' | 'no_aplica' | 'aplazado'
   pasos               jsonb,                                -- [{texto, hecho}] checklist de la ejecución
   fecha_inicio        date,                                 -- cuándo se empezó (ejecución a medias)
   iniciado_por        text,
