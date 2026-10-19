@@ -1323,10 +1323,13 @@ function openModalTransferenciaArmario(ubicacionId) {
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <input type="number" class="nfc-item-cant"
-                 min="0" max="${stockOrigen}" step="1" value="0"
-                 style="width:72px;font-size:15px;padding:6px 8px;text-align:center;border-radius:var(--radius-sm);border:1px solid var(--border)"
-                 oninput="_validarCantNfc(this,${stockOrigen}); _actualizarSugerenciasNfc()">
+          <div class="stepper">
+            <button type="button" aria-label="Uno menos" disabled onclick="_pasoCant(this,-1)">−</button>
+            <input type="number" class="nfc-item-cant" inputmode="numeric"
+                   min="0" max="${stockOrigen}" step="1" value="0"
+                   oninput="_validarCantNfc(this,${stockOrigen}); _actualizarSugerenciasNfc()">
+            <button type="button" aria-label="Uno más" onclick="_pasoCant(this,1)">+</button>
+          </div>
           <span style="font-size:12px;color:var(--text-muted);min-width:32px">${mat.Unidad || ''}</span>
         </div>
       </div>`).join('');
@@ -1461,8 +1464,29 @@ function _actualizarSugerenciasNfc() {
 
 function _validarCantNfc(input, max) {
   const val = parseFloat(input.value);
-  if (isNaN(val) || val < 0) { input.value = 0; return; }
-  if (val > max) input.value = max;
+  if (isNaN(val) || val < 0) input.value = 0;
+  else if (val > max) input.value = max;
+  _estadoStepper(input);
+}
+
+/** Botones − / + de un `.stepper`: suben o bajan 1 sin salirse de min/max del input. */
+function _pasoCant(btn, delta) {
+  const input = btn.parentElement.querySelector('input');
+  const min = parseFloat(input.min) || 0, max = parseFloat(input.max);
+  let val = (parseFloat(input.value) || 0) + delta;
+  if (val < min) val = min;
+  if (!isNaN(max) && val > max) val = max;
+  input.value = val;
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  _estadoStepper(input);
+}
+
+function _estadoStepper(input) {
+  const [menos, mas] = input.parentElement.querySelectorAll('button');
+  if (!menos || !mas) return;
+  const val = parseFloat(input.value) || 0, max = parseFloat(input.max);
+  menos.disabled = val <= (parseFloat(input.min) || 0);
+  mas.disabled = !isNaN(max) && val >= max;
 }
 
 async function confirmarTransferenciaArmario() {
@@ -1505,7 +1529,11 @@ function openModalTrasladoLote(loteId) {
   sv('traslado-mat-id', matId);
   sv('traslado-lote-origen-id', loteId);
   sv('traslado-origen', loteOrigen.ID_Ubicacion);
-  sv('traslado-cantidad', '');
+  const inpCant = document.getElementById('traslado-cantidad');
+  const stockLote = parseFloat(loteOrigen.Stock_Local) || 0;
+  inpCant.max = stockLote;
+  inpCant.value = Math.min(1, stockLote);
+  _estadoStepper(inpCant);
   document.getElementById('traslado-mat-nombre').textContent = mat.Nombre;
   document.getElementById('traslado-stock-origen').textContent =
     (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');

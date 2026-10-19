@@ -244,7 +244,7 @@
         📍 <span id="nfc-transfer-nombre-ubi"></span>
       </div>
       <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">
-        Introduce la cantidad que te llevas (deja en 0 lo que no cojas)
+        Pulsa + en lo que te llevas (deja en 0 lo que no cojas)
       </div>
       <div id="nfc-transfer-items"
            style="max-height:42vh;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:16px">
@@ -301,7 +301,12 @@
         </div>
         <div class="form-group">
           <label>Cantidad a trasladar *</label>
-          <input id="traslado-cantidad" type="number" min="1" placeholder="Ej: 10">
+          <div class="stepper" style="align-self:flex-start">
+            <button type="button" aria-label="Uno menos" onclick="_pasoCant(this,-1)">−</button>
+            <input id="traslado-cantidad" type="number" inputmode="numeric" min="1" step="1" value="1"
+                   oninput="_validarCantNfc(this, parseFloat(this.max))">
+            <button type="button" aria-label="Uno más" onclick="_pasoCant(this,1)">+</button>
+          </div>
         </div>
       </div>
       <div class="form-footer">

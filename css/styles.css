@@ -1719,3 +1719,12 @@
 @media (max-width: 640px) {
   .mis-grupos-acciones { margin-left: 0; width: 100%; }
 }
+
+/* Cantidad con botones − / + (traslados). Botones grandes para el dedo; el
+   número se puede seguir tecleando para cantidades grandes. */
+.stepper { display: inline-flex; align-items: stretch; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); }
+.stepper button { width: 40px; min-height: 40px; border: none; background: var(--surface2); color: var(--accent); font-size: 20px; font-weight: 600; line-height: 1; cursor: pointer; touch-action: manipulation; }
+.stepper button:active { background: var(--accent-light); }
+.stepper button:disabled { color: var(--text-muted); opacity: .45; cursor: default; }
+.stepper input { width: 56px; border: none; border-left: 1px solid var(--border); border-right: 1px solid var(--border); border-radius: 0; text-align: center; font-size: 16px; padding: 0 4px; -moz-appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
