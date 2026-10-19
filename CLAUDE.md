@@ -24,6 +24,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
 - `docs/patrones-ui.md` — autocomplete incidencias, tablas/líneas responsive, alertas stock dashboard
+- `docs/modulo-pendientes.md` — `pendientes.html`: lista pública (sin login, enlace con token) de pendientes de los protocolos de equipos, con hilo de notas, adjuntos y respuestas de Claude. ⚠ Sus datos y su Edge Function `lab-pendientes` viven en el proyecto compartido `sanidade-cma`, no en el de GestionLab; fuentes en `supabase/sanidade-cma/lab-pendientes/`
 - `docs/proteccion-datos.md` — **qué datos personales guarda la app y por qué**; el alumnado entra por cuentas de grupo y firma con el nombre del grupo (lo impone el servidor con `autorRegistro()`). Leerlo antes de añadir cualquier campo de "quién hizo esto".
 
 ---

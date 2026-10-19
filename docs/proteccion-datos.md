@@ -55,6 +55,7 @@ registros que gestionan. Es personal del centro actuando en su puesto de trabajo
 | `usuarios` / `public.users` (profesorado) | nombre, email, módulos, labs | Base del servicio: login, permisos, responsabilidad sobre equipos. |
 | `registro_mantenimientos.supervisado_por` | nombre y primer apellido del docente | Es la firma que da validez al mantenimiento hecho por alumnado. |
 | `intervenciones.realizado_por`, `incidencias.reportado_por` (staff) | nombre y primer apellido | Trazabilidad de la gestión del equipo. |
+| `lab_pendientes_notas.autor`, `lab_pendientes.creado_por` (proyecto `sanidade-cma`) | lo que la persona escriba en «Firmas como»; **opcional** | Página pública de pendientes (`pendientes.html`, sin login): saber quién aportó un dato sobre un equipo para poder preguntarle. Se pide nombre y primer apellido o el nombre del grupo; no hay sesión, así que no se puede imponer `nombreCorto()`. Anonimizable al cerrar el curso (ver `docs/modulo-pendientes.md`). |
 
 El profesorado consta como **nombre y primer apellido** ("Paloma Fernández"),
 nunca con el nombre completo: lo impone `nombreCorto()` en el servidor. Ver
