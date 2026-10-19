@@ -1349,13 +1349,20 @@ function openModalTransferenciaArmario(ubicacionId) {
 // laboratorio vuelve a llamar a _rellenarDestinoUbic solo con (id, origen, lab).
 const _destinoMatIds = {};
 
-/** Sitios activos (≠ origen) donde ya hay bote de alguno de `matIds` → Map(idUbic → [nombres]). */
+/** ¿Se puede llevar a `u` lo que sale de `idOrigen`? Nunca al mismo sitio, y lo que
+ *  sale de la zona común va a un laboratorio, no a otro hueco de la zona común. */
+function _destinoValido(u, idOrigen) {
+  if (!u || u.Activa === 'FALSE' || u.ID_Ubicacion === idOrigen) return false;
+  return !(esZonaComun(idOrigen) && esZonaComun(u.ID_Ubicacion));
+}
+
+/** Sitios a los que se puede llevar (ver _destinoValido) donde ya hay bote de alguno de `matIds` → Map(idUbic → [nombres]). */
 function _ubicsConMaterial(matIds, idOrigen) {
   const res = new Map();
   const add = (idUbic, matId) => {
-    if (!idUbic || idUbic === idOrigen) return;
+    if (!idUbic) return;
     const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbic);
-    if (!u || u.Activa === 'FALSE') return;
+    if (!_destinoValido(u, idOrigen)) return;
     const nombre = DATA.material.find(m => m.ID_Material === matId)?.Nombre || matId;
     if (!res.has(idUbic)) res.set(idUbic, []);
     if (!res.get(idUbic).includes(nombre)) res.get(idUbic).push(nombre);
@@ -1377,7 +1384,7 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
   if (lab === undefined) _destinoManual[idSelect] = false;
   const selLab  = document.getElementById(idSelect + '-lab');
   const selDest = document.getElementById(idSelect);
-  const activas = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE' && u.ID_Ubicacion !== idOrigen);
+  const activas = DATA.ubicaciones.filter(u => _destinoValido(u, idOrigen));
   const labDe   = u => u.Laboratorio_Aula || 'Otros';
   const labs    = [...new Set(activas.map(labDe))].sort();
   if (lab === undefined) {
@@ -1493,6 +1500,9 @@ async function confirmarTransferenciaArmario() {
   const destino = v('nfc-transfer-destino');
   if (!destino) { showToast('Selecciona el destino', 'error'); return; }
   const origen = document.getElementById('nfc-transfer-origen-id').value;
+  if (!_destinoValido(DATA.ubicaciones.find(u => u.ID_Ubicacion === destino), origen)) {
+    showToast('Desde la zona común solo se puede llevar a un laboratorio', 'error'); return;
+  }
   const items = [];
   document.querySelectorAll('#nfc-transfer-items .nfc-item-row').forEach(row => {
     const cant = parseFloat(row.querySelector('.nfc-item-cant').value) || 0;
@@ -1580,6 +1590,10 @@ async function guardarTraslado() {
   const unidadOrigen = DATA.materialUbicaciones[loteOrigenIdx].Unidad_Lote || mat.Unidad || '';
   const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
   if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
+  // La vuelta de un bote hija a su madre va fija al bote madre, esté donde esté
+  if (!v('traslado-destino-lote-id') && !_destinoValido(DATA.ubicaciones.find(u => u.ID_Ubicacion === idDestino), idOrigen)) {
+    showToast('Desde la zona común solo se puede llevar a un laboratorio', 'error'); return;
+  }
   showLoading('Trasladando...');
   try {
     // Si el destino es un bote concreto (vuelta a la madre), se apunta por ID — sin ambigüedad
