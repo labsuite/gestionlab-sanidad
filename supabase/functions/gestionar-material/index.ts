@@ -196,8 +196,56 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── traslado de varios materiales de un armario a otro (NFC) ──
+  // Igual que "traslado": lo puede hacer cualquier sesión, alumnado incluido
+  // (llevar material de la zona común a su sitio). Firma según el rol.
+  if (accion === "transferencia_masiva") {
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
+    if (authError) return authError;
+    const { autor: usuarioNombre } = await autorRegistro(supabaseAdmin, email, body.usuario);
+    const idOrigen = String(body.id_origen_ubicacion || "").trim();
+    const idDestino = String(body.id_destino_ubicacion || "").trim();
+    const items = Array.isArray(body.items) ? body.items as Record<string, unknown>[] : [];
+    if (!idOrigen || !idDestino) return jsonError("Origen y destino son obligatorios", 400);
+    if (idOrigen === idDestino) return jsonError("El destino es el mismo sitio que el origen", 400);
+    if (!items.length) return jsonError("Introduce la cantidad de al menos un material", 400);
+    let procesados = 0;
+    for (const item of items) {
+      const idMaterial = String(item.id_material || "");
+      const cant = Number(item.cantidad) || 0;
+      if (!idMaterial || cant <= 0) continue;
+      const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+      if (!mat) continue;
+      if (item.es_lote) {
+        const { data: loteOrigen } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idOrigen).maybeSingle();
+        if (!loteOrigen) continue;
+        const stockOrigen = Number(loteOrigen.stock_local) || 0;
+        if (cant > stockOrigen) return jsonError(`${mat.nombre}: solo quedan ${stockOrigen} en origen`, 400);
+        await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stockOrigen - cant }).eq("id", loteOrigen.id);
+      } else {
+        const stockLegacy = Number(mat.stock_actual) || 0;
+        if (cant > stockLegacy) return jsonError(`${mat.nombre}: solo quedan ${stockLegacy} en origen`, 400);
+        await supabaseAdmin.from("material").update({ stock_actual: 0 }).eq("id_material", idMaterial);
+        const restante = stockLegacy - cant;
+        if (restante > 0) {
+          await supabaseAdmin.from("material_ubicaciones").insert({ id: genId("LU"), id_material: idMaterial, id_ubicacion: idOrigen, stock_local: restante, stock_minimo_local: 0, stock_optimo_local: 0 });
+        }
+      }
+      const { data: loteDestino } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idDestino).maybeSingle();
+      if (loteDestino) {
+        await supabaseAdmin.from("material_ubicaciones").update({ stock_local: (Number(loteDestino.stock_local) || 0) + cant }).eq("id", loteDestino.id);
+      } else {
+        await supabaseAdmin.from("material_ubicaciones").insert({ id: genId("LU"), id_material: idMaterial, id_ubicacion: idDestino, stock_local: cant, stock_minimo_local: 0, stock_optimo_local: 0 });
+      }
+      await sincronizarStockMaterial(supabaseAdmin, idMaterial);
+      await registrarMovimiento(supabaseAdmin, mat, "Traslado", cant, usuarioNombre, `NFC · De: ${idOrigen} → ${idDestino}`);
+      procesados++;
+    }
+    return jsonOk({ procesados });
+  }
+
   // ── acciones de Admin/Gestor ──
-  if (accion === "crear" || accion === "actualizar" || accion === "entrada" || accion === "subdivision" || accion === "eliminar_lote" || accion === "transferencia_masiva") {
+  if (accion === "crear" || accion === "actualizar" || accion === "entrada" || accion === "subdivision" || accion === "eliminar_lote") {
     const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
     if (authError) return authError;
 
@@ -373,42 +421,6 @@ Deno.serve(async (req) => {
       return jsonOk({ eliminado: loteId });
     }
 
-    if (accion === "transferencia_masiva") {
-      const idOrigen = String(body.id_origen_ubicacion || "").trim();
-      const idDestino = String(body.id_destino_ubicacion || "").trim();
-      const items = Array.isArray(body.items) ? body.items as Record<string, unknown>[] : [];
-      if (!idOrigen || !idDestino) return jsonError("Origen y destino son obligatorios", 400);
-      if (!items.length) return jsonError("Introduce la cantidad de al menos un material", 400);
-      let procesados = 0;
-      for (const item of items) {
-        const idMaterial = String(item.id_material || "");
-        const cant = Number(item.cantidad) || 0;
-        if (!idMaterial || cant <= 0) continue;
-        const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
-        if (!mat) continue;
-        if (item.es_lote) {
-          const { data: loteOrigen } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idOrigen).maybeSingle();
-          if (!loteOrigen) continue;
-          const stockOrigen = Number(loteOrigen.stock_local) || 0;
-          await supabaseAdmin.from("material_ubicaciones").update({ stock_local: Math.max(0, stockOrigen - cant) }).eq("id", loteOrigen.id);
-        } else {
-          await supabaseAdmin.from("material").update({ stock_actual: 0 }).eq("id_material", idMaterial);
-          const restante = (Number(mat.stock_actual) || 0) - cant;
-          if (restante > 0) {
-            await supabaseAdmin.from("material_ubicaciones").insert({ id: genId("LU"), id_material: idMaterial, id_ubicacion: idOrigen, stock_local: restante, stock_minimo_local: 0, stock_optimo_local: 0 });
-          }
-        }
-        const { data: loteDestino } = await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idDestino).maybeSingle();
-        if (loteDestino) {
-          await supabaseAdmin.from("material_ubicaciones").update({ stock_local: (Number(loteDestino.stock_local) || 0) + cant }).eq("id", loteDestino.id);
-        } else {
-          await supabaseAdmin.from("material_ubicaciones").insert({ id: genId("LU"), id_material: idMaterial, id_ubicacion: idDestino, stock_local: cant, stock_minimo_local: 0, stock_optimo_local: 0 });
-        }
-        await registrarMovimiento(supabaseAdmin, mat, "Traslado", cant, String(body.usuario || "Usuario"), `NFC · De: ${idOrigen} → ${idDestino}`);
-        procesados++;
-      }
-      return jsonOk({ procesados });
-    }
   }
 
   // ── eliminar material del catálogo: solo Administrador ──

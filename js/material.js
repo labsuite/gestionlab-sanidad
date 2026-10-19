@@ -1489,7 +1489,7 @@ async function confirmarTransferenciaArmario() {
     showToast(`${procesados} ítem${procesados>1?'s':''} trasladado${procesados>1?'s':''} → ${getNombreUbicacion(destino)}`, 'success');
     closeModal('modal-nfc-transfer');
     renderMaterial(); renderDashboard(); updateBadges();
-  } catch(e) { showToast('Error en el traslado. Revisa la consola.', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error en el traslado', 'error'); console.error(e); }
   hideLoading();
 }
 
