@@ -99,7 +99,66 @@ update lab_pendientes set creado_por = '' where creado < '<fecha de cierre>';
 ## Cómo trabaja Claude con la lista
 
 Claude (chat) lee `lab_pendientes_notas` con la conexión de Supabase (por ejemplo, las notas
-de `tipo = 'nota'` posteriores a su última respuesta), descarga los adjuntos del bucket,
-actualiza protocolos e inventario en la carpeta `Protocolos/GestionLab` y escribe su
-respuesta como nota `tipo = 'respuesta'`, `autor = 'Claude'`. También puede cambiar estados
-y añadir tareas nuevas con `origen = 'claude'`.
+de `tipo = 'nota'` posteriores a su última respuesta), actualiza protocolos e inventario en
+la carpeta `Protocolos/GestionLab` y escribe su respuesta como nota `tipo = 'respuesta'`,
+`autor = 'Claude'`. También puede cambiar estados y añadir tareas nuevas con
+`origen = 'claude'`.
+
+Los **adjuntos** no los puede abrir desde su entorno (no llega a `*.supabase.co/storage`):
+los descarga a `Protocolos/GestionLab/Pendientes_archivo/adjuntos/` a través del ordenador de
+Paloma cuando la conversación está enlazada a él (o lo hace Claude Code). Esa carpeta es a
+la vez el archivo que pide el paso 1 del desmontaje.
+
+## Desmontaje al terminar (dejar `sanidade-cma` sin restos)
+
+Cuando todo esté resuelto, el módulo se retira entero. Los borrados piden confirmación
+explícita de Paloma (en el chat de Claude aparece un aviso de aprobación; si se cancela, no
+se borra nada). Orden:
+
+1. **Comprobar que no queda nada abierto ni sin trasladar.**
+   ```sql
+   select id, titulo, estado from lab_pendientes
+   where not archivada and estado in ('pendiente', 'en_curso');   -- debe salir vacío
+   ```
+   Y que lo aportado en cada hilo ya está en los protocolos o el inventario.
+2. **Archivar en local** (`B. Laboratorio/Protocolos/GestionLab/Pendientes_archivo/`):
+   - `pendientes_AAAA-MM-DD.json` con todas las tareas y todas las notas (incluidas las
+     borradas, con su marca), exportado con `select … from lab_pendientes` y
+     `lab_pendientes_notas`;
+   - `pendientes_AAAA-MM-DD.md` legible: tarea, estado final, hilo con autor y fecha;
+   - `adjuntos/<id_tarea>/…` con todos los archivos del bucket. Comprobar que el número de
+     archivos coincide con el de adjuntos del JSON antes de seguir.
+   - Si se quiere quitar los nombres del archivo, anonimizar antes (`autor`, `creado_por`,
+     ver «Protección de datos»).
+3. **Revocar los enlaces** para que nadie escriba durante el desmontaje:
+   `update lab_pendientes_enlaces set activo = false, revocado = now();`
+4. **Vaciar y borrar el bucket `lab-pendientes`.** No se puede con SQL (Supabase bloquea el
+   borrado directo en `storage.objects`): desde el panel de Supabase → Storage →
+   `lab-pendientes` → seleccionar todo → Delete, y después borrar el bucket (menú del bucket →
+   Delete bucket).
+5. **Borrar la Edge Function** `lab-pendientes`: panel → Edge Functions → `lab-pendientes` →
+   Delete, o `supabase functions delete lab-pendientes --project-ref clxcjsvkmaydpxvtqesv`.
+6. **Borrar las tablas y la extensión temporal** (SQL del proyecto `sanidade-cma`):
+   ```sql
+   drop table if exists public.lab_pendientes_notas, public.lab_pendientes,
+     public.lab_pendientes_config, public.lab_pendientes_enlaces;
+   drop extension if exists http;   -- se activó el 2026-10-19 solo para probar la función
+   ```
+   Con esto desaparecen también los restos de las pruebas del 2026-10-19 (una tarea
+   archivada, dos notas borradas, un enlace de prueba desactivado y un archivo de texto en el
+   bucket, `inv-pla06/…-Prueba_nandu.txt`).
+7. **Comprobar** que no queda nada:
+   ```sql
+   select to_regclass('public.lab_pendientes') is null as sin_tablas,
+          not exists (select 1 from storage.buckets where id = 'lab-pendientes') as sin_bucket,
+          not exists (select 1 from pg_extension where extname = 'http') as sin_http;
+   ```
+   (las tres a `true`) y que la función ya no aparece en la lista de Edge Functions.
+8. **Quitar la página del repositorio de GestionLab**: borrar `pendientes.html`,
+   `supabase/sanidade-cma/` y este documento; quitar su línea de la lista de documentación de
+   `CLAUDE.md` y su fila en `docs/proteccion-datos.md`; commit y push (GitHub Pages deja de
+   servirla en uno o dos minutos).
+9. **Cerrar en local**: en `Protocolos/GestionLab/PENDIENTES.md` y `CLAUDE.md`, sustituir el
+   enlace por «Lista cerrada el AAAA-MM-DD; archivo en `Pendientes_archivo/`». El antiguo
+   artefacto de Claude con el aviso de traslado (`claude.ai/artifact/KNtb3pokLAATXANAyF6NC6`)
+   también se puede borrar.
