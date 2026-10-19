@@ -141,12 +141,31 @@ Deno.serve(async (req) => {
       const loteDestinoId = strField(body.lote_destino_id);
       const idDestinoUbicacion = String(body.id_destino_ubicacion || "").trim();
       if (!loteDestinoId && !idDestinoUbicacion) return jsonError("Selecciona el destino", 400);
+      if (!loteDestinoId && idDestinoUbicacion === loteOrigen.id_ubicacion) return jsonError("El destino es el mismo sitio que el origen", 400);
+
+      // Una alícuota (bote hija) llevada a otro sitio sigue siendo alícuota de su
+      // madre: entera, se mueve el propio bote; una parte, se reparte en otra hija.
+      // No se funde con lo que haya en el destino (eso es "devolver a la madre").
+      if (loteOrigen.id_lote_padre && !loteDestinoId) {
+        if (cantidad === stockOrigen) {
+          await supabaseAdmin.from("material_ubicaciones").update({ id_ubicacion: idDestinoUbicacion }).eq("id", loteOrigenId);
+        } else {
+          await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stockOrigen - cantidad }).eq("id", loteOrigenId);
+          await supabaseAdmin.from("material_ubicaciones").insert({
+            id: genId("LU"), id_material: idMaterial, id_ubicacion: idDestinoUbicacion, stock_local: cantidad,
+            stock_minimo_local: 0, stock_optimo_local: 0, id_lote_padre: loteOrigen.id_lote_padre, unidad_lote: loteOrigen.unidad_lote,
+          });
+        }
+        await registrarMovimiento(supabaseAdmin, mat, "Traslado", cantidad, usuarioNombre, String(body.motivo || "Traslado de alícuota"));
+        return jsonOk({ lotes: await getLotes(supabaseAdmin, idMaterial) });
+      }
 
       await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stockOrigen - cantidad }).eq("id", loteOrigenId);
 
+      // Por ubicación se suma al bote "normal" de ese sitio, nunca a una alícuota que viva ahí
       let loteDestino = loteDestinoId
         ? (await supabaseAdmin.from("material_ubicaciones").select("*").eq("id", loteDestinoId).maybeSingle()).data
-        : (await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idDestinoUbicacion).maybeSingle()).data;
+        : (await supabaseAdmin.from("material_ubicaciones").select("*").eq("id_material", idMaterial).eq("id_ubicacion", idDestinoUbicacion).is("id_lote_padre", null).limit(1).maybeSingle()).data;
       if (loteDestino) {
         const nuevoStockDest = (Number(loteDestino.stock_local) || 0) + cantidad;
         await supabaseAdmin.from("material_ubicaciones").update({ stock_local: nuevoStockDest }).eq("id", loteDestino.id);

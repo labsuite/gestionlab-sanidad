@@ -286,17 +286,16 @@
       <div class="form-grid" style="gap:14px">
         <div class="form-group" id="traslado-destino-group">
           <label>Destino *</label>
+          <!-- Solo para una alícuota (bote hija): devolver lo que queda a su bote madre -->
+          <button type="button" id="traslado-destino-madre" class="btn btn-secondary" onclick="_marcarDestinoMadre(true)"
+                  style="display:none;width:100%;justify-content:flex-start;text-align:left;line-height:1.3;padding:10px 12px;font-size:14px;margin-bottom:8px">
+            <span>↩︎ Devolver al bote madre · <strong id="traslado-destino-madre-label"></strong>
+            <span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400">Lo que quede se junta con el bote del que se sacó. O llévala a otro sitio:</span></span>
+          </button>
           <div id="traslado-destino-sugerencias" style="display:none;margin-bottom:8px"></div>
           <div id="traslado-destino-manual" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
             <select id="traslado-destino-lab" onchange="_rellenarDestinoUbic('traslado-destino', v('traslado-origen'), this.value)"></select>
-            <select id="traslado-destino" onchange="_pintarSugerencias('traslado-destino', v('traslado-origen'))"><option value="">Seleccionar destino...</option></select>
-          </div>
-        </div>
-        <div class="form-group" id="traslado-destino-fijo-group" style="display:none">
-          <label>Destino</label>
-          <div style="padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent)">
-            📍 <strong id="traslado-destino-fijo-label"></strong>
-            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;font-weight:400">Este bote es una subdivisión — siempre vuelve a la ubicación de su bote madre.</div>
+            <select id="traslado-destino" onchange="_marcarDestinoMadre(false); _pintarSugerencias('traslado-destino', v('traslado-origen'))"><option value="">Seleccionar destino...</option></select>
           </div>
         </div>
         <div class="form-group">

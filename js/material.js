@@ -1454,6 +1454,7 @@ function _elegirDestinoSugerido(idSelect, idOrigen, idUbic) {
   const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbic);
   if (!u) return;
   _destinoManual[idSelect] = false;
+  if (idSelect === 'traslado-destino') _marcarDestinoMadre(false);
   _rellenarDestinoUbic(idSelect, idOrigen, u.Laboratorio_Aula || 'Otros');
   sv(idSelect, idUbic);
   _pintarSugerencias(idSelect, idOrigen);
@@ -1549,36 +1550,40 @@ function openModalTrasladoLote(loteId) {
     (parseFloat(loteOrigen.Stock_Local) || 0) + ' ' + (loteOrigen.Unidad_Lote || mat.Unidad || '');
   document.getElementById('traslado-origen-label').textContent = getNombreUbicacion(loteOrigen.ID_Ubicacion);
 
-  const selDest  = document.getElementById('traslado-destino');
-  const destGrp  = document.getElementById('traslado-destino-group');
-  const fijoGrp  = document.getElementById('traslado-destino-fijo-group');
-  const fijoLbl  = document.getElementById('traslado-destino-fijo-label');
-  const madre    = loteOrigen.ID_Lote_Padre ? DATA.materialUbicaciones.find(l => l.ID === loteOrigen.ID_Lote_Padre) : null;
-
-  if (madre) {
-    // Bote hija: el destino siempre es el bote madre — se apunta por su ID
-    // (no por ubicación: si hija y madre viven en el mismo sitio, buscar por
-    // ubicación sería ambiguo entre las dos).
-    sv('traslado-destino-lote-id', madre.ID);
-    selDest.disabled = false;
-    selDest.innerHTML = `<option value="${madre.ID_Ubicacion}" selected>${getNombreUbicacion(madre.ID_Ubicacion)}</option>`;
-    fijoLbl.textContent = getNombreUbicacion(madre.ID_Ubicacion);
-    if (destGrp) destGrp.style.display = 'none';
-    if (fijoGrp) fijoGrp.style.display = '';
-  } else {
-    // Bote madre o ítem sin subdividir: destino libre, como hasta ahora
-    sv('traslado-destino-lote-id', '');
-    _rellenarDestinoUbic('traslado-destino', loteOrigen.ID_Ubicacion, undefined, [matId]);
-    if (destGrp) destGrp.style.display = '';
-    if (fijoGrp) fijoGrp.style.display = 'none';
-  }
+  // Una alícuota (bote hija) puede ir a cualquier sitio, como cualquier bote, o
+  // devolverse a su madre con el botón ↩︎ — que apunta al bote madre por su ID
+  // (no por ubicación: si hija y madre viven en el mismo sitio, buscar por
+  // ubicación sería ambiguo entre las dos).
+  const madre   = loteOrigen.ID_Lote_Padre ? DATA.materialUbicaciones.find(l => l.ID === loteOrigen.ID_Lote_Padre) : null;
+  const btnMadre = document.getElementById('traslado-destino-madre');
+  btnMadre.style.display = madre ? '' : 'none';
+  btnMadre.dataset.loteId = madre ? madre.ID : '';
+  btnMadre.dataset.ubic   = madre ? madre.ID_Ubicacion : '';
+  document.getElementById('traslado-destino-madre-label').textContent = madre ? getNombreUbicacion(madre.ID_Ubicacion) : '';
+  _rellenarDestinoUbic('traslado-destino', loteOrigen.ID_Ubicacion, undefined, [matId]);
+  _marcarDestinoMadre(false);
   openModal('modal-traslado');
+}
+
+/** Elegir (o dejar de elegir) «devolver al bote madre» como destino de una alícuota. */
+function _marcarDestinoMadre(on) {
+  const btn = document.getElementById('traslado-destino-madre');
+  const activo = on && !!btn.dataset.loteId;
+  sv('traslado-destino-lote-id', activo ? btn.dataset.loteId : '');
+  btn.style.border     = activo ? '2px solid var(--accent)' : '';
+  btn.style.background = activo ? 'var(--accent-light)' : '';
+  btn.style.color      = activo ? 'var(--accent)' : '';
+  if (activo) {
+    sv('traslado-destino', '');
+    _pintarSugerencias('traslado-destino', v('traslado-origen'));
+  }
 }
 
 async function guardarTraslado() {
   const matId          = v('traslado-mat-id');
   const loteOrigenId   = v('traslado-lote-origen-id');
-  const idDestino      = v('traslado-destino');
+  const destinoLoteId  = v('traslado-destino-lote-id');   // vuelta a la madre
+  const idDestino      = destinoLoteId ? document.getElementById('traslado-destino-madre').dataset.ubic : v('traslado-destino');
   const cant           = parseFloat(v('traslado-cantidad'));
   if (!idDestino) { showToast('Selecciona el destino', 'error'); return; }
   if (!cant || cant <= 0) { showToast('Indica una cantidad válida', 'error'); return; }
@@ -1590,15 +1595,14 @@ async function guardarTraslado() {
   const unidadOrigen = DATA.materialUbicaciones[loteOrigenIdx].Unidad_Lote || mat.Unidad || '';
   const stockOrigen = parseFloat(DATA.materialUbicaciones[loteOrigenIdx].Stock_Local) || 0;
   if (cant > stockOrigen) { showToast(`Stock insuficiente en origen (${stockOrigen} ${unidadOrigen})`, 'error'); return; }
-  // La vuelta de un bote hija a su madre va fija al bote madre, esté donde esté
-  if (!v('traslado-destino-lote-id') && !_destinoValido(DATA.ubicaciones.find(u => u.ID_Ubicacion === idDestino), idOrigen)) {
+  // La vuelta de un bote hija a su madre va al bote madre, esté donde esté
+  if (!destinoLoteId && !_destinoValido(DATA.ubicaciones.find(u => u.ID_Ubicacion === idDestino), idOrigen)) {
     showToast('Desde la zona común solo se puede llevar a un laboratorio', 'error'); return;
   }
   showLoading('Trasladando...');
   try {
     // Si el destino es un bote concreto (vuelta a la madre), se apunta por ID — sin ambigüedad
     // aunque comparta ubicación con el origen. Si no, se busca/crea por ubicación server-side.
-    const destinoLoteId = v('traslado-destino-lote-id');
     await callEdgeFunction('gestionar-material', {
       accion: 'traslado', id_material: matId, lote_origen_id: loteOrigenId, cantidad: cant,
       lote_destino_id: destinoLoteId || undefined, id_destino_ubicacion: destinoLoteId ? undefined : idDestino,
