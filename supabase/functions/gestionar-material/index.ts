@@ -228,6 +228,21 @@ Deno.serve(async (req) => {
     if (!idOrigen || !idDestino) return jsonError("Origen y destino son obligatorios", 400);
     if (idOrigen === idDestino) return jsonError("El destino es el mismo sitio que el origen", 400);
     if (!items.length) return jsonError("Introduce la cantidad de al menos un material", 400);
+    // Se comprueba todo antes de mover nada: si un material no tiene bastante, no
+    // se queda el traslado a medias con los anteriores ya movidos.
+    for (const item of items) {
+      const idMaterial = String(item.id_material || "");
+      const cant = Number(item.cantidad) || 0;
+      if (!idMaterial || cant <= 0) continue;
+      const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+      if (!mat) continue;
+      let disponible = Number(mat.stock_actual) || 0;
+      if (item.es_lote) {
+        const { data: lo } = await supabaseAdmin.from("material_ubicaciones").select("stock_local").eq("id_material", idMaterial).eq("id_ubicacion", idOrigen).maybeSingle();
+        disponible = Number(lo?.stock_local) || 0;
+      }
+      if (cant > disponible) return jsonError(`${mat.nombre}: solo quedan ${disponible} en origen. No se ha trasladado nada.`, 400);
+    }
     let procesados = 0;
     for (const item of items) {
       const idMaterial = String(item.id_material || "");
