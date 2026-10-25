@@ -501,7 +501,7 @@ function abrirModalEmailPedido(pedidoId, modo) {
   document.getElementById('email-ped-copiar-para').style.display = email ? '' : 'none';
   document.getElementById('email-ped-texto').value = generarTextoEmailPedido(pedidoId, modo);
   document.getElementById('email-ped-asunto').textContent =
-    `${modo === 'pendientes' ? 'Ampliación del pedido' : 'Pedido'} «${p.Nombre_Lista}» — CIFP Manuel Antonio, departamento de Sanidade`;
+    `${p.Nombre_Lista}${modo === 'pendientes' ? ' (ampliación)' : ''} — CIFP Manuel Antonio, departamento de Sanidade`;
   openModal('modal-email-pedido');
 }
 
