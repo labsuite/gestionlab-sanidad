@@ -265,3 +265,15 @@ arreglarlo y se lo llevan.
 Ejecutar una vez `scripts/preparar_hoja_tareas_intervencion.py` — crea la hoja
 `Tareas_Intervencion` con su cabecera y añade la columna `Relacionada_Con` a `Incidencias` si
 no existen ya. Es idempotente.
+
+## Equipo dado de baja (desde 2026-10-25)
+
+Una baja **no borra la fila** de `equipos`: se pone `estado_operativo = 'Dado de baja'`
+(opción añadida al desplegable `eq-estado` de `html/modales-equipos.html`), la fecha y el
+motivo van a `observaciones`, sus planes de mantenimiento pasan a `activo = false` y su
+incidencia abierta se cierra como `Descartada` (las incidencias no tienen campo de motivo).
+Así se conservan incidencias, intervenciones y registros de mantenimiento. `exportarInventario`
+(`js/mantenimiento.js`) excluye los equipos dados de baja del inventario del curso.
+Primeros casos: CEN-07, PIP-102 e INC-04 (carga del 25/10/2026). Solo se borra la fila de un
+equipo que nunca llegó a existir y que ninguna tabla referencia (la «CEN-», Eppendorf 5425 R,
+que no se llegó a comprar).
