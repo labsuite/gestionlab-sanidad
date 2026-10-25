@@ -1794,7 +1794,9 @@ async function exportarModeloCalidad(cursoAcademico) {
 async function exportarInventario(cursoAcademico) {
   const curso = cursoAcademico || getCursoAcademico();
 
-  const equipos = [...DATA.equipos].sort((a, b) => {
+  // Los equipos dados de baja se conservan en la app (incidencias e historial),
+  // pero ya no forman parte del inventario del curso.
+  const equipos = DATA.equipos.filter(e => e.Estado_Operativo !== 'Dado de baja').sort((a, b) => {
     const ua = a.Ubicacion || '', ub = b.Ubicacion || '';
     if (ua !== ub) return ua.localeCompare(ub, 'es');
     return (a.Tipo_Equipo || '').localeCompare(b.Tipo_Equipo || '', 'es');
