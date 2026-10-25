@@ -473,7 +473,10 @@ function generarTextoEmailPedido(pedidoId, modo) {
   const soloPendientes = modo === 'pendientes';
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && (l.Presupuesto_Pendiente === 'Sí') === soloPendientes);
   const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
-  const saludo = prov?.Persona_Contacto ? `Hola ${prov.Persona_Contacto},` : 'Buenos días,';
+  // Nos tuteamos con las comerciales: solo el nombre de pila, sin apellido.
+  // Y saludo a la española: coma vocativa y punto al final, no coma.
+  const nombrePila = (prov?.Persona_Contacto || '').trim().split(/\s+/)[0];
+  const saludo = nombrePila ? `Hola, ${nombrePila}.` : 'Buenos días.';
   const cuerpoLineas = lineas.map(l => {
     const unidad = _unidadLineaPedido(l);
     return `- ${l.Material}: ${l.Cantidad_Pedida}${unidad ? ' ' + unidad : ''}`;
@@ -484,29 +487,44 @@ function generarTextoEmailPedido(pedidoId, modo) {
   const cierre = soloPendientes
     ? 'Quedo a la espera de presupuesto/confirmación de estos artículos, que podéis sumar al pedido anterior.'
     : 'Quedo a la espera de presupuesto/confirmación.';
-  return `${saludo}\n\n${intro}\n\n${cuerpoLineas}\n\n${cierre}`;
+  return `${saludo}\n\n${intro}\n\n${cuerpoLineas}\n\n${cierre}\n\nMuchas gracias.`;
 }
 
 function abrirModalEmailPedido(pedidoId, modo) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
   sv('email-ped-id', pedidoId);
+  const prov = DATA.proveedores.find(x => x.Nombre_Proveedor === p.Proveedor);
+  const email = (prov?.Email_Contacto || '').trim();
+  document.getElementById('email-ped-para').textContent = email || 'Sin correo — añádelo en la ficha de la casa comercial';
+  document.getElementById('email-ped-para').style.color = email ? '' : 'var(--text-muted)';
+  document.getElementById('email-ped-copiar-para').style.display = email ? '' : 'none';
   document.getElementById('email-ped-texto').value = generarTextoEmailPedido(pedidoId, modo);
-  document.getElementById('email-ped-asunto').textContent = modo === 'pendientes'
-    ? `Ampliación del pedido — ${p.Nombre_Lista}`
-    : `Pedido — ${p.Nombre_Lista}`;
+  document.getElementById('email-ped-asunto').textContent =
+    `${modo === 'pendientes' ? 'Ampliación del pedido' : 'Pedido'} «${p.Nombre_Lista}» — CIFP Manuel Antonio, departamento de Sanidade`;
   openModal('modal-email-pedido');
 }
 
-async function copiarTextoEmailPedido() {
-  const ta = document.getElementById('email-ped-texto');
+async function _copiarAlPortapapeles(texto, aviso) {
   try {
-    await navigator.clipboard.writeText(ta.value);
+    await navigator.clipboard.writeText(texto);
   } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    document.body.appendChild(ta);
     ta.select();
     document.execCommand('copy');
+    ta.remove();
   }
-  showToast('Texto copiado al portapapeles', 'success');
+  showToast(aviso, 'success');
+}
+
+function copiarTextoEmailPedido() {
+  _copiarAlPortapapeles(document.getElementById('email-ped-texto').value, 'Texto copiado al portapapeles');
+}
+
+function copiarCampoEmailPedido(id, aviso) {
+  _copiarAlPortapapeles(document.getElementById(id).textContent, aviso);
 }
 
 async function abrirModalLinkProveedor(pedidoId) {

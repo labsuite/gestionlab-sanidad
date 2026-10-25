@@ -552,8 +552,18 @@
     <div class="modal-body">
       <input type="hidden" id="email-ped-id">
       <div class="form-group">
+        <label>Para</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="email-ped-para" style="font-weight:500;font-size:13px;padding:6px 0;flex:1;min-width:0;overflow-wrap:anywhere"></div>
+          <button class="btn btn-secondary btn-sm" id="email-ped-copiar-para" onclick="copiarCampoEmailPedido('email-ped-para', 'Correo copiado')">📋 Copiar</button>
+        </div>
+      </div>
+      <div class="form-group">
         <label>Asunto</label>
-        <div id="email-ped-asunto" style="font-weight:500;font-size:13px;padding:6px 0"></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div id="email-ped-asunto" style="font-weight:500;font-size:13px;padding:6px 0;flex:1;min-width:0;overflow-wrap:anywhere"></div>
+          <button class="btn btn-secondary btn-sm" onclick="copiarCampoEmailPedido('email-ped-asunto', 'Asunto copiado')">📋 Copiar</button>
+        </div>
       </div>
       <div class="form-group">
         <label>Mensaje (listo para copiar y pegar)</label>

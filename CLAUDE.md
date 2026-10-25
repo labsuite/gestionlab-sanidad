@@ -160,8 +160,8 @@ Una fila por equipo, ordenados por ubicación y tipo. Columnas:
 
 Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `verDetallePedido` (`js/pedidos-render.js`), visible para Administrador/Gestor cuando el pedido tiene al menos una línea. Abre el modal `modal-email-pedido` (`html/modales-pedidos.html`).
 
-- `generarTextoEmailPedido(pedidoId)` construye el texto: saludo (usa `Persona_Contacto` del proveedor si existe, si no genérico "Buenos días,"), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre sin firma — la firma la añade el cliente de correo de la usuaria.
-- Solo tiene botón **📋 Copiar texto** (`copiarTextoEmailPedido`, vía `navigator.clipboard`). No hay envío ni apertura directa del cliente de correo: la usuaria prefiere copiar, pegar y revisar antes de enviar.
+- `generarTextoEmailPedido(pedidoId)` construye el texto: saludo "Hola, Krystal." (solo el **nombre de pila** de `Persona_Contacto` — se tutea a las comerciales; si no hay contacto, "Buenos días."), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre con "Muchas gracias." sin firma — la firma la añade el cliente de correo de la usuaria. ⚠ Saludo a la española: coma vocativa y **punto** al final, nunca coma.
+- Encima del texto, **Para** (`Email_Contacto` del proveedor) y **Asunto** (`Pedido «Nombre» — CIFP Manuel Antonio, departamento de Sanidade`), cada uno con su botón 📋 (`copiarCampoEmailPedido`). Más **📋 Copiar texto** (`copiarTextoEmailPedido`). No hay envío ni apertura directa del cliente de correo: la usuaria prefiere copiar, pegar y revisar antes de enviar.
 
 ---
 
