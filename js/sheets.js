@@ -637,6 +637,28 @@ function _usuarioSbToObj(u) {
 // ============================================================
 // CARGAR TODOS LOS DATOS
 // ============================================================
+// Supabase (PostgREST) devuelve como máximo 1000 filas por consulta y corta el resto
+// sin avisar: con la carga de protocolos del 25/10/2026, planes_mantenimiento pasó de
+// 1000 filas y la app dejó de ver ~360 planes activos. Si una tabla llega al límite,
+// se vuelve a leer entera por páginas, ordenada por su clave primaria para que las
+// páginas no se solapen ni dejen huecos. Las tablas pequeñas se leen como siempre.
+const _SB_MAX_FILAS = 1000;
+async function _leerTablaCompleta(tabla, pk) {
+  const primera = await _sbMigracion.from(tabla).select('*');
+  if (primera.error || (primera.data || []).length < _SB_MAX_FILAS) return primera;
+  let data = [];
+  for (let desde = 0; ; desde += _SB_MAX_FILAS) {
+    const pagina = await _sbMigracion.from(tabla).select('*').order(pk).range(desde, desde + _SB_MAX_FILAS - 1);
+    if (pagina.error) {
+      // Mejor las primeras 1000 filas que una tabla vacía.
+      console.warn(`[loadAllData] ${tabla}: fallo al paginar, se usan solo las primeras ${_SB_MAX_FILAS} filas`, pagina.error);
+      return primera;
+    }
+    data = data.concat(pagina.data || []);
+    if ((pagina.data || []).length < _SB_MAX_FILAS) return { data, error: null };
+  }
+}
+
 async function loadAllData() {
   showLoading('Cargando datos...');
   try {
@@ -663,38 +685,38 @@ async function loadAllData() {
       // así que este bloque queda inerte hasta averiguar el nombre real de la columna con quien
       // mantenga ese proyecto (Sanidad CMA / app de Vercel). La tabla devuelve 0 filas hoy.
       _sb.from('users').select('id,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('proveedores').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('ubicaciones').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('equipos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('intervenciones').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('incidencias').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('tareas_intervencion').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('planes_mantenimiento').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registro_mantenimientos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('material').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('material_ubicaciones').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('pedidos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('lineas_pedido').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('documentos_proveedor').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('solicitudes').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('historico_precio').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('movimientos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('revisiones_inventario').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('config_reservas').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('reservas_equipos').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registros_cabina').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registros_autoclave').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('registros_vitrina').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('usuarios').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('tipos_residuo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('contenedores_residuo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('adiciones_residuo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('consultas_residuo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('excepciones_residuo_ia').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('propuestas_ubicacion_equipo').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('propuestas_material').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('atributos_material').select('*').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('tareas_personales').select('*').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('proveedores', 'id_proveedor').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('ubicaciones', 'id_ubicacion').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('equipos', 'id_activo').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('intervenciones', 'id_intervencion').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('incidencias', 'id_incidencia').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('tareas_intervencion', 'id_tarea').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('planes_mantenimiento', 'id_plan').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('registro_mantenimientos', 'id_registro').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('material', 'id_material').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('material_ubicaciones', 'id').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('pedidos', 'id_pedido').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('lineas_pedido', 'id_linea').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('documentos_proveedor', 'id_documento').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('solicitudes', 'id_solicitud').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('historico_precio', 'id_historico').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('movimientos', 'id_movimiento').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('revisiones_inventario', 'id_revision').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('config_reservas', 'id_equipo').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('reservas_equipos', 'id_reserva').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('registros_cabina', 'id_registro').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('registros_autoclave', 'id_registro').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('registros_vitrina', 'id_registro').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('usuarios', 'id_usuario').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('tipos_residuo', 'id_residuo').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('contenedores_residuo', 'id_contenedor').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('adiciones_residuo', 'id_adicion').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('consultas_residuo', 'id_consulta').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('excepciones_residuo_ia', 'id_excepcion').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('propuestas_ubicacion_equipo', 'id_propuesta').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('propuestas_material', 'id_propuesta').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('atributos_material', 'id_ficha').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] }))
     ]);
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
