@@ -3,7 +3,7 @@
 generar_modelo_calidad.py
 Rellena los dos documentos del modelo de calidad con datos en tiempo real de Supabase:
   1. Inventarios_Sanidade_XXXX_XX.xlsx  — hoja "Sanidade" con todos los equipos
-  2. Plan_Mantemento_Sanidade_XXXX_XX.xlsx — hojas LAB 201/203/205/207 con planes activos
+  2. Plan_Mantemento_Sanidade_XXXX_XX.xlsx — hojas LAB 201/203/205/207/209 con planes activos
 
 Con DRY_RUN=True solo muestra estadísticas; cambia a False para generar los archivos.
 """
@@ -39,6 +39,7 @@ LAB_MAPPING = {
     'Lab 203': 'LAB 203',
     'Lab 205': 'LAB 205',
     'Lab 207': 'LAB 207',
+    'Lab 209': 'LAB 209',
 }
 
 # Primer día de cada periodo del curso 2025-2026
@@ -62,7 +63,7 @@ def ubicacion_to_lab(ubicacion):
         return None
     if ubicacion in LAB_MAPPING:
         return LAB_MAPPING[ubicacion]
-    for num in ['201', '203', '205', '207']:
+    for num in ['201', '203', '205', '207', '209']:
         if num in ubicacion:
             return f'LAB {num}'
     return None
@@ -183,7 +184,7 @@ def generar_plan_mantenimiento(conn, dry_run=True):
             reg_idx[key] = r
 
     # Agrupar planes activos por lab
-    lab_planes = {'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': []}
+    lab_planes = {'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [], 'LAB 209': []}
     sin_lab    = []
 
     for p in planes_list:

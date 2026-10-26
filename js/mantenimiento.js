@@ -1018,6 +1018,7 @@ function _detectarLabEquipo(eq) {
   // Fallback: buscar el número de lab en cualquier parte del campo Ubicacion
   // (cubre "Laboratorio 205", "Lab-207", "205 - Zona común", "207", etc.)
   const id = String(eq.Ubicacion || '').toLowerCase();
+  if (id.includes('209')) return '209';
   if (id.includes('207')) return '207';
   if (id.includes('205')) return '205';
   if (id.includes('203')) return '203';
@@ -1028,6 +1029,7 @@ function _detectarLabEquipo(eq) {
 // Mapea el valor real de Laboratorio_Aula a la hoja Excel correspondiente
 function _labAHoja(labAula) {
   const s = String(labAula || '');
+  if (s.includes('209')) return 'LAB 209';
   if (s.includes('207')) return 'LAB 207';
   if (s.includes('205')) return 'LAB 205'; // incluye "205 - Zona común"
   if (s.includes('203')) return 'LAB 203';
@@ -1618,7 +1620,7 @@ async function exportarModeloCalidad(cursoAcademico) {
   }
 
   // Una fila por plan (cada plan tiene su propia fila con su ID_Plan en la denominación)
-  const porLab = { 'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [] };
+  const porLab = { 'LAB 201': [], 'LAB 203': [], 'LAB 205': [], 'LAB 207': [], 'LAB 209': [] };
 
   DATA.equipos.forEach(eq => {
     const hoja = _labAHoja(_detectarLabEquipo(eq));
@@ -1695,12 +1697,14 @@ async function exportarModeloCalidad(cursoAcademico) {
     return;
   }
 
-  // Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5
+  // Portada=sheet1, LAB201=sheet2, LAB203=sheet3, LAB205=sheet4, LAB207=sheet5,
+  // LAB209=sheet6 (hoja añadida a la plantilla el 26/10/2026 como copia de LAB 207)
   const SHEET_FILES = {
     'LAB 201': 'xl/worksheets/sheet2.xml',
     'LAB 203': 'xl/worksheets/sheet3.xml',
     'LAB 205': 'xl/worksheets/sheet4.xml',
     'LAB 207': 'xl/worksheets/sheet5.xml',
+    'LAB 209': 'xl/worksheets/sheet6.xml',
   };
 
   function xmlEsc(s) {

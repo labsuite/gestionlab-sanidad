@@ -137,6 +137,7 @@ Salida: `MD84MAN01_Plan_mantemento_YYYY-YYYY.xlsx`
 - Los periodos se calculan con `getPeriodosCursoCompleto` (incluye futuros; los diez meses del curso, septiembre incluido, igual que el script Python).
 - Al generar el XLSX se normalizan todas las fuentes del `xl/styles.xml`: Arial→Xunta Sans, `color theme="1"` (negro)→`#002B4A`, fuentes sin color→`#002B4A`, 8pt→10pt. El template tiene zonas de estilos que degeneran a negro a partir de la fila ~33-66 según hoja.
 - Para eliminar los Externos del documento ya generado: usar `scripts/quitar_externos_excel.py`.
+- La plantilla tiene una hoja por laboratorio: `LAB 201`…`LAB 207` y, desde el 26/10/2026, **`LAB 209`** (`xl/worksheets/sheet6.xml`, copia a nivel XML de la hoja del 207 con su `drawing6.xml`); hasta entonces los planes del 209 no salían en el documento. Si se cambia la plantilla, mantener la correspondencia hoja ↔ `sheetN.xml` de `SHEET_FILES` en `exportarModeloCalidad` y `LAB_MAPPING` en `scripts/generar_modelo_calidad.py`.
 
 ### 📋 Exportar inventario (`exportarInventario`)
 Plantilla: `assets/templates/CIFP Manuel Antonio_Inventarios_Curso 2025-26.xlsx` (hoja `Sanidade`)
