@@ -20,6 +20,19 @@
 - Pretemporada: "pretemporada-YYYY-YYYY" (si hoy ≥ Mes_Inicio_Temporada)
 - Posttemporada: "posttemporada-YYYY-YYYY" (si hoy ≥ Mes_Fin_Temporada)
 
+### Temporada por defecto: el curso escolar (desde 2026-10-26)
+
+Desde la carga de protocolos del 25/10/2026, **todos** los equipos tienen planes
+Pretemporada y Posttemporada (puesta en marcha y cierre del curso), no solo los
+estacionales. En los equipos de uso general la temporada es el **curso escolar**:
+`mes_inicio_temporada = 9` y `mes_fin_temporada = 6` (septiembre–junio), puestos en bloque
+con `scripts/actualizar_equipos.py` en los equipos que tenían los dos campos vacíos. Los
+**15 estacionales** (criostatos, microtomos, procesadores, estaciones de parafina,
+coagulómetros, citómetro, densitómetro, lámpara de hemaglutinación) llevan de momento ese
+mismo valor y recibirán sus meses reales cuando se anoten, desde el modal del plan
+Pre/Posttemporada. ⚠ Sin meses, el código cae en septiembre y **mayo** (`|| 9` / `|| 5` en
+`getPeriodosEsperados`), no en junio: no dejar campos vacíos al dar de alta un equipo.
+
 ## Dónde se gestiona cada cosa (centralizado 2026-09-06)
 
 Toda la **configuración** de mantenimiento vive en la sección **Mantenimiento**; la tarjeta
