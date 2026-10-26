@@ -333,16 +333,8 @@ function buildMantenimientoEquipo(equipoId) {
 
   const secciones = [];
 
-  // Protocolo de uso
-  if (equipo.Protocolo_Uso) {
-    secciones.push(`
-      <div style="margin-bottom:14px">
-        <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">
-          Protocolo de uso
-        </div>
-        <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;white-space:pre-line;line-height:1.5;overflow-wrap:break-word">${equipo.Protocolo_Uso}</div>
-      </div>`);
-  }
+  // Protocolo de uso (Markdown → visor plegable con índice y buscador, js/protocolo.js)
+  if (equipo.Protocolo_Uso) secciones.push(buildProtocoloUso(equipo.Protocolo_Uso));
 
   // Planes de mantenimiento
   const planes = DATA.planesMantenimiento.filter(p => p.ID_Equipo === equipoId && p.Activo !== 'FALSE');

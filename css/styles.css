@@ -1728,3 +1728,52 @@
 .stepper button:disabled { color: var(--text-muted); opacity: .45; cursor: default; }
 .stepper input { width: 56px; border: none; border-left: 1px solid var(--border); border-right: 1px solid var(--border); border-radius: 0; text-align: center; font-size: 16px; padding: 0 4px; -moz-appearance: textfield; }
 .stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── Protocolo de uso (js/protocolo.js) ───────────────────── */
+.proto { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); margin-bottom: 14px; font-size: 13px; color: var(--text); }
+.proto > summary { cursor: pointer; padding: 10px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; list-style: none; }
+.proto > summary::-webkit-details-marker { display: none; }
+.proto > summary::before { content: '▸'; color: var(--accent); transition: transform .15s; }
+.proto[open] > summary::before { transform: rotate(90deg); }
+.proto[open] > summary { border-bottom: 1px solid var(--border); }
+.proto-titulo { font-weight: 600; flex: 1 1 auto; min-width: 0; }
+.proto-meta { font-size: 11px; color: var(--text-muted); }
+.proto-barra { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 14px 4px; }
+.proto-buscar { flex: 1 1 240px; min-width: 0; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+.proto-res { font-size: 11px; color: var(--text-soft); }
+.proto-btn { padding: 4px 10px; font-size: 11px; }
+.proto-indice { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 14px 10px; }
+.proto-chip { border: 1px solid var(--border); background: var(--bg); color: var(--text-soft); border-radius: 999px; padding: 3px 10px; font-size: 11px; cursor: pointer; }
+.proto-chip:hover { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+.proto [hidden] { display: none !important; }
+.proto-intro { padding: 0 14px 6px; }
+.proto-secs { padding: 0 14px 12px; }
+.proto-sec { border-top: 1px solid var(--border); scroll-margin-top: 70px; }
+.proto-sec > summary { cursor: pointer; padding: 9px 2px; font-weight: 600; color: var(--accent); }
+.proto-sec[open] > summary { margin-bottom: 2px; }
+.proto-sec > .proto-cuerpo { padding: 0 2px 12px 18px; }
+.proto-cuerpo { line-height: 1.55; overflow-wrap: break-word; }
+.proto-cuerpo p { margin: 6px 0; }
+.proto-cuerpo h3, .proto-cuerpo h4, .proto-cuerpo h5 { font-size: 13px; margin: 14px 0 4px; color: var(--text); }
+.proto-cuerpo h4, .proto-cuerpo h5 { font-size: 12px; color: var(--text-soft); }
+.proto-cuerpo ul, .proto-cuerpo ol { margin: 4px 0; padding-left: 22px; }
+.proto-cuerpo li { margin: 3px 0; }
+.proto-cuerpo li.proto-check { list-style: none; margin-left: -18px; }
+.proto-casilla { color: var(--accent); font-size: 14px; }
+.proto-cuerpo blockquote { margin: 8px 0; padding: 6px 12px; border-left: 3px solid var(--accent); background: var(--accent-light); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+.proto-cuerpo blockquote p { margin: 2px 0; }
+.proto-cuerpo hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.proto-cuerpo code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: 12px; }
+.proto-cuerpo a { color: var(--accent); word-break: break-all; }
+.proto-tabla { overflow-x: auto; margin: 6px 0; }
+.proto-tabla table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.proto-tabla th, .proto-tabla td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; vertical-align: top; }
+.proto-tabla th { background: var(--bg); font-weight: 600; }
+.proto-tabla tbody tr:nth-child(even) td { background: var(--surface2, #faf8f5); }
+.proto-intro .proto-tabla td:first-child { width: 28%; color: var(--text-soft); font-weight: 600; }
+mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radius: 2px; }
+.proto.proto-ampliado { position: fixed; inset: 0; z-index: 2000; margin: 0; border-radius: 0; overflow-y: auto; font-size: 14px; }
+.proto.proto-ampliado > summary { cursor: default; }
+.proto.proto-ampliado .proto-intro, .proto.proto-ampliado .proto-secs, .proto.proto-ampliado .proto-indice { max-width: 960px; margin: 0 auto; }
+.proto.proto-ampliado .proto-sec { scroll-margin-top: 10px; }
+.proto.proto-ampliado .proto-btn-ampliar { position: fixed; top: 10px; right: 14px; z-index: 2001; box-shadow: var(--shadow); background: var(--surface); }

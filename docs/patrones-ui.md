@@ -72,3 +72,19 @@ En portrait móvil (`@media (max-width:768px) and (orientation:portrait)`):
 - Zona común: solo alerta si algún lote de zona común tiene `Stock_Local === 0`.
 - Profesor ve incidencias de sus equipos: `DATA.equipos.find(e => i.Equipo.startsWith(e.ID_Activo))` + `esResponsableDeEquipo()`
 - Preventivos del Profesor filtrados por `misEquipos` (col G de Equipos)
+
+---
+
+## Protocolos de uso de equipos (`js/protocolo.js`)
+
+`equipos.protocolo_uso` guarda el protocolo en **Markdown** (título `#`, tabla de datos, resumen en
+cita `>` y apartados `##` numerados). `buildProtocoloUso(md)` lo pinta en la ficha desplegada del
+equipo (lo llama `buildMantenimientoEquipo` en `js/mantenimiento.js`):
+
+- Plegado por defecto; cada apartado `##` es un `<details>` cerrado, con un índice de "chips" para saltar.
+- Buscador sin tildes ni mayúsculas: oculta los apartados sin coincidencias, abre los demás y resalta con `<mark>`.
+- "⤢ Ampliar" lo pasa a pantalla completa (Esc o "✕ Cerrar" para salir).
+- El renderizador Markdown es propio y mínimo (encabezados, tablas, citas, listas con `- [ ]`, `---`,
+  negrita/cursiva/código, enlaces y URLs sueltas); escapa todo el texto antes de dar formato. Si un
+  protocolo nuevo usa algo más (imágenes, bloques de código ```), hay que añadirlo en `_mdRender`.
+- `position: sticky` no funciona dentro del `<details>` en Chrome: por eso la barra de búsqueda no se queda fija al hacer scroll.
