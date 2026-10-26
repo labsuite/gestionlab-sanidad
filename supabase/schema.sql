@@ -178,7 +178,8 @@ create table equipos (
   protocolo_uso                   text,
   tipo_mantenimiento              text,
   mes_inicio_temporada            integer,
-  mes_fin_temporada               integer
+  mes_fin_temporada               integer,  -- ⚠ sin uso desde 2026-10-26: la temporada sale de evaluaciones_uso
+  evaluaciones_uso                text      -- evaluaciones en que se usa: "1", "1,3", "1,2,3"…; vacío = todo el curso
 );
 
 create table intervenciones (
@@ -265,6 +266,23 @@ create table registro_mantenimientos (
   aplazado_a          date,                                 -- estado 'aplazado': mes destino (día 1)
   actualizado_en      timestamptz not null default now()
 );
+
+-- Fechas de las tres evaluaciones de cada curso (desde 2026-10-26). De aquí salen
+-- los vencimientos de la revisión de arranque (Pretemporada: inicio de la primera
+-- evaluación en que se usa el equipo), de cierre (Posttemporada: fin de la última)
+-- y de los trimestrales (inicio de cada evaluación en que se usa). Las escribe
+-- gestionar-mantenimiento (accion evaluaciones_curso, Admin/Gestor).
+create table evaluaciones_curso (
+  curso_academico text not null,
+  numero          integer not null check (numero between 1 and 3),
+  fecha_inicio    date not null,
+  fecha_fin       date not null,
+  actualizado_en  timestamptz not null default now(),
+  primary key (curso_academico, numero),
+  check (fecha_fin >= fecha_inicio)
+);
+alter table evaluaciones_curso enable row level security;
+create policy evaluaciones_curso_select_anon on evaluaciones_curso for select to anon, authenticated using (true);
 
 -- Migración: ejecución de mantenimientos por pasos, con guardado a medias.
 -- Una fila puede quedar 'en_curso' (checklist a medias, sin fecha_realizacion) y pasar a

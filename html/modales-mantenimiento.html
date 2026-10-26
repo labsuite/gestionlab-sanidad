@@ -155,22 +155,13 @@
             <option>Anual</option>
             <option>Bianual</option>
             <option>Trianual</option>
-            <option>Pretemporada</option>
-            <option>Posttemporada</option>
+            <option value="Pretemporada">Revisión anual de arranque</option>
+            <option value="Posttemporada">Revisión anual de cierre</option>
           </select>
         </div>
         <div class="form-group full" id="plan-temporada-wrap" style="display:none">
-          <label>Temporada del equipo <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">— meses en que el equipo está en uso; define cuándo vence este plan. Se guarda en el equipo y afecta a todos sus planes estacionales.</span></label>
-          <div style="display:flex;gap:8px;align-items:flex-end">
-            <div style="flex:1">
-              <label style="font-size:11px;color:var(--text-muted)">Mes inicio (1-12)</label>
-              <input id="plan-mes-inicio" type="number" min="1" max="12" placeholder="Ej: 9 (sep)">
-            </div>
-            <div style="flex:1">
-              <label style="font-size:11px;color:var(--text-muted)">Mes fin (1-12)</label>
-              <input id="plan-mes-fin" type="number" min="1" max="12" placeholder="Ej: 5 (may)">
-            </div>
-          </div>
+          <label>Cuándo vence <span class="label-hint" style="display:inline;font-style:normal;color:var(--text-muted)">— según las evaluaciones en que se usa el equipo (se marcan en su ficha) y las fechas de evaluación del curso.</span></label>
+          <div id="plan-temporada-texto" style="font-size:13px;line-height:1.5"></div>
         </div>
         <div class="form-group full">
           <label>Título de la operación *</label>
@@ -195,6 +186,57 @@
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-gestionar-plan')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarPlan()">Guardar plan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Evaluaciones en que se usa un equipo (desde 2026-10-26) -->
+<div class="modal-overlay" id="modal-evaluaciones-equipo">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">📅 Evaluaciones en que se usa</div>
+      <button class="modal-close" onclick="closeModal('modal-evaluaciones-equipo')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+        Equipo: <strong id="evaleq-nombre"></strong>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:12px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="evaleq-1" style="width:16px;height:16px;accent-color:var(--accent)"> 1ª evaluación</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="evaleq-2" style="width:16px;height:16px;accent-color:var(--accent)"> 2ª evaluación</label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="evaleq-3" style="width:16px;height:16px;accent-color:var(--accent)"> 3ª evaluación</label>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        Sin marcar ninguna se entiende que se usa <strong>todo el curso</strong>. La revisión de
+        arranque vence al empezar la primera evaluación marcada, la de cierre al acabar la
+        última, y las lecturas trimestrales al empezar cada una.
+      </div>
+      <div id="evaleq-fechas" style="font-size:12px;margin-top:10px"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-evaluaciones-equipo')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarEvaluacionesEquipo()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Fechas de las evaluaciones del curso (Admin/Gestor, desde 2026-10-26) -->
+<div class="modal-overlay" id="modal-evaluaciones-curso">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">📅 Fechas de las evaluaciones — <span id="evalcurso-curso"></span></div>
+      <button class="modal-close" onclick="closeModal('modal-evaluaciones-curso')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+        Se fijan una vez por curso. De aquí salen las fechas de las revisiones de arranque y
+        de cierre y de las lecturas trimestrales, en el panel y en el Excel del plan de calidad.
+      </div>
+      <div class="form-grid form-grid-2" id="evalcurso-filas"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-evaluaciones-curso')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarEvaluacionesCurso()">Guardar fechas</button>
       </div>
     </div>
   </div>

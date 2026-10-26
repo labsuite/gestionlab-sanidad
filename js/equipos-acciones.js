@@ -1497,8 +1497,9 @@ async function guardarEquipo() {
   // Periodicidad_Mantenimiento/Periodicidad_Custom/Fecha_Ultimo_Preventivo/Fecha_Proximo_Preventivo
   // (legado) gestionadas ahora por Planes_Mantenimiento + Registro_Mantenimientos — no se envían.
   // Tipo_Mantenimiento eliminado del modal — tampoco se envía, se queda vacío.
-  // Mes_Inicio_Temporada / Mes_Fin_Temporada: se editan desde el modal del plan
-  // (solo planes Pretemporada/Posttemporada), no aquí — gestionar-equipo ya no los toca.
+  // Mes_Inicio_Temporada / Mes_Fin_Temporada: sin uso desde 2026-10-26. La temporada
+  // sale de Evaluaciones_Uso, que se marca con su propio botón en la ficha
+  // (openModalEvaluacionesEquipo) — gestionar-equipo no toca ninguno de los dos.
   const datos = {
     id_activo: id, tipo_equipo: tipo, marca,
     modelo: v('eq-modelo'), numero_serie: v('eq-serie'), ubicacion: v('eq-ubicacion'),

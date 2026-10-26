@@ -350,6 +350,8 @@ function buildIntervencionesEquipo(equipoId) {
       ${detalle('Proveedor compra', equipo.Proveedor_Compra)}
       ${detalle('Servicio técnico', equipo.Proveedor_Servicio_Tecnico)}
       <div>${detalle('Manual / Ficha técnica', '')}<div style="margin-top:2px">${manualBtn}</div></div>
+      <div>${detalle('Se usa en', textoEvaluacionesUso(equipo))}${puedeMarcarEvaluacionesEquipo(equipo)
+        ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;margin-top:3px" onclick="event.stopPropagation();openModalEvaluacionesEquipo('${equipo.ID_Activo}')">📅 Evaluaciones</button>` : ''}</div>
     </div>`;
   const ints = DATA.intervenciones
     .filter(i => i.Equipo && i.Equipo.startsWith(equipoId))

@@ -19,6 +19,74 @@ function getMesesCurso(cursoAcademico) {
   return meses; // 10 meses: Sep–Jun
 }
 
+// --- Evaluaciones: la temporada de un equipo (desde 2026-10-26) ---
+// Cada equipo marca en qué evaluaciones se usa (Evaluaciones_Uso: "1,3"; vacío =
+// todo el curso) y cada curso guarda las fechas de sus tres evaluaciones
+// (DATA.evaluacionesCurso). De ahí salen los vencimientos:
+//   Pretemporada (revisión de arranque) → inicio de la primera evaluación en que se usa
+//   Posttemporada (revisión de cierre)  → fin de la última; se pide desde
+//                                          _DIAS_AVISO_CIERRE días antes
+//   Trimestral                          → inicio de cada evaluación en que se usa
+// Mes_Inicio/Fin_Temporada ya no cuentan. Si el curso no tiene fechas guardadas se
+// usan unas aproximadas (sep–dic, ene–mar, abr–jun) y el panel lo avisa.
+const _DIAS_AVISO_CIERRE = 14;
+
+function _fechaLocal(iso) {
+  const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function evaluacionesDelCurso(curso) {
+  const guardadas = (DATA.evaluacionesCurso || []).filter(e => e.Curso_Academico === curso);
+  if (guardadas.length === 3) {
+    return guardadas.slice().sort((a, b) => a.Numero - b.Numero).map(e => ({
+      numero: e.Numero, inicio: _fechaLocal(e.Fecha_Inicio), fin: _fechaLocal(e.Fecha_Fin), configurada: true,
+    }));
+  }
+  const [añoInicio, añoFin] = curso.split('-').map(Number);
+  return [
+    { numero: 1, inicio: new Date(añoInicio, 8, 1), fin: new Date(añoInicio, 11, 31), configurada: false },
+    { numero: 2, inicio: new Date(añoFin, 0, 1),    fin: new Date(añoFin, 2, 31),     configurada: false },
+    { numero: 3, inicio: new Date(añoFin, 3, 1),    fin: new Date(añoFin, 5, 30),     configurada: false },
+  ];
+}
+
+// Evaluaciones en que se usa el equipo: [1, 2, 3] si no tiene ninguna marcada.
+function evaluacionesUsoEquipo(equipo) {
+  const n = String(equipo?.Evaluaciones_Uso || '').split(',')
+    .map(x => parseInt(x, 10)).filter(x => [1, 2, 3].includes(x));
+  return n.length ? [...new Set(n)].sort() : [1, 2, 3];
+}
+
+function textoEvaluacionesUso(equipo) {
+  const usadas = evaluacionesUsoEquipo(equipo);
+  if (usadas.length === 3) return 'Todo el curso';
+  return usadas.map(n => `${n}ª`).join(', ').replace(/, ([^,]*)$/, ' y $1') + (usadas.length > 1 ? ' evaluaciones' : ' evaluación');
+}
+
+// Periodos de un plan que depende de las evaluaciones (Pretemporada, Posttemporada,
+// Trimestral), con su fecha prevista y desde cuándo se pide. [] para el resto.
+function periodosPorEvaluacion(plan, equipo, curso) {
+  const usadas = evaluacionesUsoEquipo(equipo);
+  const evals = evaluacionesDelCurso(curso).filter(e => usadas.includes(e.numero));
+  if (!evals.length) return [];
+  switch (plan.Periodicidad) {
+    case 'Pretemporada':
+      return [{ periodo: `pretemporada-${curso}`, fecha: evals[0].inicio, desde: evals[0].inicio }];
+    case 'Posttemporada': {
+      const ultima = evals[evals.length - 1];
+      const desde = new Date(ultima.fin);
+      desde.setDate(desde.getDate() - _DIAS_AVISO_CIERRE);
+      return [{ periodo: `posttemporada-${curso}`, fecha: ultima.fin, desde }];
+    }
+    case 'Trimestral':
+      return evals.map(e => ({ periodo: `evaluacion${e.numero}-${curso}`, fecha: e.inicio, desde: e.inicio }));
+    default:
+      return [];
+  }
+}
+const _PERIODICIDADES_POR_EVALUACION = ['Pretemporada', 'Posttemporada', 'Trimestral'];
+
 // Normaliza Solo_Profesorado: acepta 'Sí', '1', '1.0', 'TRUE', 'Yes'
 function _esSoloProfesorado(plan) {
   const v = (plan.Solo_Profesorado || '').toString().trim();
@@ -66,7 +134,6 @@ function _esCursoDebidoMultianual(plan, cursoAcademico) {
 }
 
 function getPeriodosEsperados(plan, equipo, cursoAcademico) {
-  const [añoInicio, añoFin] = cursoAcademico.split('-').map(Number);
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
   const mesesBase = getMesesCurso(cursoAcademico);
   const mesesPasados = mesesBase.filter(({ año, mes }) => new Date(año, mes - 1, 1) <= hoy);
@@ -74,11 +141,12 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
   switch (plan.Periodicidad) {
     case 'Mensual':
       return mesesPasados.map(m => m.str);
-    case 'Trimestral': {
-      // T1: Sep(0)–Dic(3), T2: Ene(4)–Mar(6), T3: Abr(7)–Jun(9)
-      const idx = _esMomentoFin(plan) ? [3, 6, 9] : [0, 4, 7];
-      return mesesPasados.filter((_, i) => idx.includes(i)).map(m => m.str);
-    }
+    // Arranque, cierre y trimestrales siguen las evaluaciones en que se usa el equipo.
+    case 'Trimestral':
+    case 'Pretemporada':
+    case 'Posttemporada':
+      return periodosPorEvaluacion(plan, equipo, cursoAcademico)
+        .filter(p => hoy >= p.desde).map(p => p.periodo);
     case 'Semestral': {
       const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
       return mesesPasados.filter((_, i) => idx.includes(i)).map(m => m.str);
@@ -90,18 +158,6 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
       if (!_esCursoDebidoMultianual(plan, cursoAcademico)) return [];
       const mes = _esMomentoFin(plan) ? mesesBase[mesesBase.length - 1] : mesesBase[0];
       return mesesPasados.some(m => m.str === mes.str) ? [mes.str] : [];
-    }
-    case 'Pretemporada': {
-      const mesInicio = parseInt(equipo.Mes_Inicio_Temporada) || 9;
-      const dueYear = mesInicio >= 9 ? añoInicio : añoFin;
-      const dueDate = new Date(dueYear, mesInicio - 1, 1);
-      return hoy >= dueDate ? [`pretemporada-${cursoAcademico}`] : [];
-    }
-    case 'Posttemporada': {
-      const mesFin = parseInt(equipo.Mes_Fin_Temporada) || 5;
-      const dueYear = mesFin >= 9 ? añoInicio : añoFin;
-      const dueDate = new Date(dueYear, mesFin - 1, 1);
-      return hoy >= dueDate ? [`posttemporada-${cursoAcademico}`] : [];
     }
     default:
       return [];
@@ -248,8 +304,10 @@ function getPlanStatusParaEquipo(equipoId) {
 
 function labelPeriodo(periodo) {
   if (!periodo) return '—';
-  if (periodo.startsWith('pretemporada')) return 'Pre-temporada';
-  if (periodo.startsWith('posttemporada')) return 'Post-temporada';
+  if (periodo.startsWith('pretemporada')) return 'Revisión de arranque';
+  if (periodo.startsWith('posttemporada')) return 'Revisión de cierre';
+  const ev = /^evaluacion(\d)-/.exec(periodo);
+  if (ev) return `${ev[1]}ª evaluación`;
   const [y, m] = periodo.split('-');
   // Ojo: con una fecha inválida toLocaleDateString NO lanza, devuelve la cadena
   // "Invalid Date" — el try/catch no basta, hay que comprobar el valor.
@@ -822,14 +880,104 @@ async function revertirMarcadorMant(idRegistro) {
 }
 
 // ============================================================
+// EVALUACIONES — en cuáles se usa cada equipo y fechas de cada curso
+// ============================================================
+// El profesorado responsable las marca en sus equipos; Admin/Gestor, en todos
+// (el servidor lo revalida). Las fechas del curso, solo Admin/Gestor.
+function puedeMarcarEvaluacionesEquipo(equipo) {
+  if (!equipo) return false;
+  if (puedeHacer('editarEquipos')) return true;
+  return getUserRole() === 'Profesor' && esResponsableDeEquipo(equipo);
+}
+
+let _evalEquipoId = null;
+
+function openModalEvaluacionesEquipo(idEquipo) {
+  const eq = DATA.equipos.find(e => e.ID_Activo === idEquipo);
+  if (!puedeMarcarEvaluacionesEquipo(eq)) { showToast('Solo el profesorado responsable del equipo puede cambiarlo', 'error'); return; }
+  _evalEquipoId = idEquipo;
+  document.getElementById('evaleq-nombre').textContent = `${eq.ID_Activo} – ${[eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ')}`;
+  const marcadas = String(eq.Evaluaciones_Uso || '').split(',').map(x => parseInt(x, 10));
+  [1, 2, 3].forEach(n => { document.getElementById(`evaleq-${n}`).checked = marcadas.includes(n); });
+  const evals = evaluacionesDelCurso(getCursoAcademico());
+  document.getElementById('evaleq-fechas').innerHTML = evals.map(e =>
+    `${e.numero}ª: ${_fmtFechaCorta(e.inicio)} – ${_fmtFechaCorta(e.fin)}`).join('<br>') +
+    (evals[0].configurada ? '' : '<br><span style="color:var(--warning)">⚠ Fechas aproximadas: aún no se han fijado las de este curso.</span>');
+  openModal('modal-evaluaciones-equipo');
+}
+
+async function guardarEvaluacionesEquipo() {
+  const evaluaciones = [1, 2, 3].filter(n => document.getElementById(`evaleq-${n}`).checked);
+  showLoading('Guardando...');
+  try {
+    const { equipo } = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'evaluaciones_equipo', id_equipo: _evalEquipoId, evaluaciones,
+    });
+    const eq = DATA.equipos.find(e => e.ID_Activo === _evalEquipoId);
+    if (eq) eq.Evaluaciones_Uso = equipo?.evaluaciones_uso || '';
+    closeModal('modal-evaluaciones-equipo');
+    showToast('Evaluaciones guardadas', 'success');
+    renderEquipos();
+    if (document.getElementById('page-mantenimiento').classList.contains('active')) renderMantenimiento();
+    if (document.getElementById('modal-gestionar-plan')?.classList.contains('open')) _togglePlanTemporada();
+  } catch (e) {
+    showToast(e.message || 'No se pudieron guardar las evaluaciones', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function _isoLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+let _evalCurso = null;
+
+function openModalEvaluacionesCurso(curso = getCursoAcademico()) {
+  _evalCurso = curso;
+  document.getElementById('evalcurso-curso').textContent = curso;
+  const evals = evaluacionesDelCurso(curso);
+  document.getElementById('evalcurso-filas').innerHTML = evals.map(e => `
+    <div class="form-group"><label>${e.numero}ª evaluación — inicio</label>
+      <input type="date" id="evalcurso-${e.numero}-ini" value="${e.configurada ? _isoLocal(e.inicio) : ''}"></div>
+    <div class="form-group"><label>${e.numero}ª evaluación — fin</label>
+      <input type="date" id="evalcurso-${e.numero}-fin" value="${e.configurada ? _isoLocal(e.fin) : ''}"></div>`).join('');
+  openModal('modal-evaluaciones-curso');
+}
+
+async function guardarEvaluacionesCurso() {
+  const evaluaciones = [1, 2, 3].map(n => ({
+    numero: n,
+    fecha_inicio: document.getElementById(`evalcurso-${n}-ini`).value,
+    fecha_fin: document.getElementById(`evalcurso-${n}-fin`).value,
+  }));
+  if (evaluaciones.some(e => !e.fecha_inicio || !e.fecha_fin)) {
+    showToast('Faltan fechas: hacen falta el inicio y el fin de las tres evaluaciones', 'error'); return;
+  }
+  showLoading('Guardando...');
+  try {
+    const res = await callEdgeFunction('gestionar-mantenimiento', {
+      accion: 'evaluaciones_curso', curso_academico: _evalCurso, evaluaciones,
+    });
+    DATA.evaluacionesCurso = (DATA.evaluacionesCurso || []).filter(e => e.Curso_Academico !== _evalCurso)
+      .concat((res.evaluaciones || []).map(_evaluacionCursoSbToObj));
+    closeModal('modal-evaluaciones-curso');
+    showToast('Fechas de evaluación guardadas', 'success');
+    renderMantenimiento();
+  } catch (e) {
+    showToast(e.message || 'No se pudieron guardar las fechas', 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+// ============================================================
 // MODAL GESTIONAR PLANES — alta/edición/borrado solo desde la
 // sección Mantenimiento. Admin/Gestor: cualquier equipo.
 // Profesor: solo equipos de los que es responsable.
 // ============================================================
 let _planEditingId = null;
 let _planEditingEquipoId = null;
-
-const _PERIODICIDADES_ESTACIONALES = ['Pretemporada', 'Posttemporada'];
 
 // Equipos sobre los que el usuario actual puede gestionar planes.
 function _equiposGestionablesPlan() {
@@ -838,14 +986,14 @@ function _equiposGestionablesPlan() {
   return [];
 }
 
-// Muestra/oculta el bloque de meses de temporada según la periodicidad elegida
-// y, si procede, precarga los meses del equipo seleccionado.
+// Muestra, en los planes que dependen de las evaluaciones (arranque, cierre,
+// trimestral), en qué evaluaciones se usa el equipo y cuándo vence el plan.
 function _togglePlanTemporada() {
   const period = document.getElementById('plan-periodicidad').value;
   const wrap = document.getElementById('plan-temporada-wrap');
-  const estacional = _PERIODICIDADES_ESTACIONALES.includes(period);
-  if (wrap) wrap.style.display = estacional ? '' : 'none';
-  if (estacional) _cargarMesesTemporadaEnPlan();
+  const porEval = _PERIODICIDADES_POR_EVALUACION.includes(period);
+  if (wrap) wrap.style.display = porEval ? '' : 'none';
+  if (porEval) _pintarVencimientoPlan(period);
 }
 
 function _equipoActualPlan() {
@@ -854,12 +1002,23 @@ function _equipoActualPlan() {
   return DATA.equipos.find(e => e.ID_Activo === id) || null;
 }
 
-function _cargarMesesTemporadaEnPlan() {
+function _fmtFechaCorta(d) {
+  return d.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function _pintarVencimientoPlan(periodicidad) {
+  const caja = document.getElementById('plan-temporada-texto');
+  if (!caja) return;
   const eq = _equipoActualPlan();
-  const mi = document.getElementById('plan-mes-inicio');
-  const mf = document.getElementById('plan-mes-fin');
-  if (mi) mi.value = eq?.Mes_Inicio_Temporada || '';
-  if (mf) mf.value = eq?.Mes_Fin_Temporada || '';
+  if (!eq) { caja.textContent = 'Elige primero el equipo.'; return; }
+  const curso = getCursoAcademico();
+  const periodos = periodosPorEvaluacion({ Periodicidad: periodicidad }, eq, curso);
+  const fechas = periodos.map(p => `${labelPeriodo(p.periodo)}: ${_fmtFechaCorta(p.fecha)}`).join(' · ');
+  const aviso = evaluacionesDelCurso(curso)[0].configurada ? '' :
+    `<div style="color:var(--warning);font-size:12px">⚠ Las fechas de evaluación de ${curso} aún no están fijadas: son aproximadas.</div>`;
+  const btn = puedeMarcarEvaluacionesEquipo(eq)
+    ? ` <button type="button" class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalEvaluacionesEquipo('${eq.ID_Activo}')">📅 Cambiar</button>` : '';
+  caja.innerHTML = `Se usa en: <strong>${textoEvaluacionesUso(eq)}</strong>${btn}<br>${fechas || '—'}${aviso}`;
 }
 
 // El interruptor "solo profesorado" solo tiene sentido en los planes internos:
@@ -946,11 +1105,6 @@ async function guardarPlan() {
     id_equipo: idEquipo,
     tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, solo_profesorado: soloProf,
   };
-  const estacional = _PERIODICIDADES_ESTACIONALES.includes(period);
-  if (estacional) {
-    payload.mes_inicio_temporada = document.getElementById('plan-mes-inicio').value.trim();
-    payload.mes_fin_temporada    = document.getElementById('plan-mes-fin').value.trim();
-  }
 
   showLoading('Guardando...');
   try {
@@ -965,15 +1119,6 @@ async function guardarPlan() {
         accion: 'crear_plan', ...payload,
       });
       DATA.planesMantenimiento.push(_planMantenimientoSbToObj(plan));
-    }
-    // Los meses de temporada se guardan en el equipo: reflejarlo en memoria
-    // para que el cálculo de periodos no espere a un recargado completo.
-    if (estacional) {
-      const eq = DATA.equipos.find(e => e.ID_Activo === idEquipo);
-      if (eq) {
-        eq.Mes_Inicio_Temporada = payload.mes_inicio_temporada || '';
-        eq.Mes_Fin_Temporada    = payload.mes_fin_temporada || '';
-      }
     }
     closeModal('modal-gestionar-plan');
     showToast('Plan guardado', 'success');
@@ -1141,7 +1286,18 @@ function renderMantenimiento() {
     ? DATA.planesMantenimiento.length
     : DATA.planesMantenimiento.filter(p => equiposScope.some(e => e.ID_Activo === p.ID_Equipo)).length;
 
-  container.innerHTML = `
+  // Fechas de evaluación del curso: de ellas dependen arranque, cierre y trimestrales.
+  const evalsCurso = evaluacionesDelCurso(curso);
+  const puedeFechasEval = puedeHacer('editarEquipos');
+  const btnFechasEval = puedeFechasEval
+    ? `<button class="btn btn-secondary" style="padding:3px 10px;font-size:12px" onclick="openModalEvaluacionesCurso('${curso}')">📅 ${evalsCurso[0].configurada ? 'Cambiar fechas' : 'Fijar fechas'}</button>` : '';
+  const bloqueEvaluaciones = evalsCurso[0].configurada
+    ? `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--text-muted);margin-bottom:12px">
+         <span>📅 Evaluaciones ${curso}: ${evalsCurso.map(e => `<strong>${e.numero}ª</strong> ${e.inicio.toLocaleDateString('es-ES')}–${e.fin.toLocaleDateString('es-ES')}`).join(' · ')}</span>${btnFechasEval}</div>`
+    : `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--warning);border-radius:var(--radius-sm);font-size:12px;margin-bottom:12px">
+         <span>⚠ <strong>Faltan las fechas de las evaluaciones de ${curso}.</strong> Las revisiones de arranque y cierre y las lecturas trimestrales usan, mientras tanto, fechas aproximadas (sep–dic, ene–mar, abr–jun).</span>${btnFechasEval}</div>`;
+
+  container.innerHTML = bloqueEvaluaciones + `
     <!-- Resumen -->
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">
       <div class="stat-card"><div class="stat-value">${pct}%</div><div class="stat-label">Completado curso ${curso}</div></div>
@@ -1571,10 +1727,9 @@ async function exportarModeloCalidad(cursoAcademico) {
     const meses = getMesesCurso(curso);
     switch (plan.Periodicidad) {
       case 'Mensual':    return meses.map(m => m.str);
-      case 'Trimestral': {
-        const idx = _esMomentoFin(plan) ? [3, 6, 9] : [0, 4, 7];
-        return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
-      }
+      // Por evaluaciones: ya vienen en orden cronológico (ver periodosPorEvaluacion).
+      case 'Trimestral': case 'Pretemporada': case 'Posttemporada':
+        return periodosPorEvaluacion(plan, equipo, curso).map(p => p.periodo);
       case 'Semestral': {
         const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
         return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
@@ -1584,8 +1739,6 @@ async function exportarModeloCalidad(cursoAcademico) {
         const mes = _esMomentoFin(plan) ? meses[meses.length - 1] : meses[0];
         return [mes.str];
       }
-      case 'Pretemporada':  return [`pretemporada-${curso}`];
-      case 'Posttemporada': return [`posttemporada-${curso}`];
       default: return [];
     }
   }
@@ -1605,15 +1758,13 @@ async function exportarModeloCalidad(cursoAcademico) {
     return VALID_PERIODICIDADES.has(p) ? p : 'Anual';
   }
 
-  function periodoAFecha(periodo, equipo) {
-    const [añoInicio, añoFin] = curso.split('-').map(Number);
-    if (periodo.startsWith('pretemporada')) {
-      const m = parseInt(equipo.Mes_Inicio_Temporada) || 9;
-      return `01/${String(m).padStart(2,'0')}/${m >= 9 ? añoInicio : añoFin}`;
-    }
-    if (periodo.startsWith('posttemporada')) {
-      const m = parseInt(equipo.Mes_Fin_Temporada) || 5;
-      return `01/${String(m).padStart(2,'0')}/${m >= 9 ? añoInicio : añoFin}`;
+  // Arranque, cierre y trimestrales: la fecha exacta de la evaluación (inicio, o fin
+  // en la revisión de cierre). El resto, el día 1 de su mes.
+  function periodoAFecha(periodo, plan, equipo) {
+    const porEval = periodosPorEvaluacion(plan, equipo, curso).find(p => p.periodo === periodo);
+    if (porEval) {
+      const f = porEval.fecha;
+      return `${String(f.getDate()).padStart(2,'0')}/${String(f.getMonth() + 1).padStart(2,'0')}/${f.getFullYear()}`;
     }
     const [y, m] = periodo.split('-');
     return `01/${m}/${y}`;
@@ -1632,10 +1783,12 @@ async function exportarModeloCalidad(cursoAcademico) {
       const tipo = plan.Tipo_Intervencion;
       if (!tipo) return;
 
-      const periodosUnicos = [...new Set(getPeriodosCursoCompleto(plan, eq))].sort();
+      // Sin .sort(): las claves por evaluación ("evaluacion1-…") no ordenan bien como
+      // texto, y getPeriodosCursoCompleto ya las devuelve en orden.
+      const periodosUnicos = [...new Set(getPeriodosCursoCompleto(plan, eq))];
       if (!periodosUnicos.length) return;
 
-      const previstas  = periodosUnicos.map(p => periodoAFecha(p, eq)).join(', ');
+      const previstas  = periodosUnicos.map(p => periodoAFecha(p, plan, eq)).join(', ');
       // Nota "no aplica"/"aplazado" por periodo, para volcarla a observaciones (col. J).
       const notasMarcador = [];
       const realizadas = periodosUnicos

@@ -138,6 +138,8 @@ function _equipoSbToObj(e) {
     Tipo_Mantenimiento: e.tipo_mantenimiento || '',
     Mes_Inicio_Temporada: e.mes_inicio_temporada != null ? String(e.mes_inicio_temporada) : '',
     Mes_Fin_Temporada: e.mes_fin_temporada != null ? String(e.mes_fin_temporada) : '',
+    // Evaluaciones en que se usa ("1,3"); vacío = todo el curso. Ver evaluacionesDelCurso().
+    Evaluaciones_Uso: e.evaluaciones_uso || '',
   };
 }
 
@@ -196,6 +198,16 @@ function _incidenciaSbToObj(i) {
     Estado: i.estado || '',
     Intervencion_Generada: i.intervencion_generada || '',
     Relacionada_Con: i.relacionada_con || '',
+  };
+}
+
+// Fechas de una evaluación de un curso (tabla evaluaciones_curso, desde 2026-10-26).
+function _evaluacionCursoSbToObj(e) {
+  return {
+    Curso_Academico: e.curso_academico || '',
+    Numero: Number(e.numero),
+    Fecha_Inicio: e.fecha_inicio || '',
+    Fecha_Fin: e.fecha_fin || '',
   };
 }
 
@@ -673,7 +685,7 @@ async function loadAllData() {
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
-           sbTareasPersonalesRes] = await Promise.all([
+           sbTareasPersonalesRes, sbEvaluacionesCursoRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -716,7 +728,8 @@ async function loadAllData() {
       _leerTablaCompleta('propuestas_ubicacion_equipo', 'id_propuesta').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('propuestas_material', 'id_propuesta').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('atributos_material', 'id_ficha').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] })),
+      _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] }))
     ]);
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
@@ -737,6 +750,7 @@ async function loadAllData() {
     DATA.historicoPrecio         = (sbHistoricoPrecioRes?.data || []).map(_historicoPrecioSbToObj);
     DATA.tareas                  = (sbTareasPersonalesRes?.data || []).map(_tareaPersonalSbToObj);
     DATA.planesMantenimiento     = (sbPlanesRes?.data || []).map(_planMantenimientoSbToObj);
+    DATA.evaluacionesCurso       = (sbEvaluacionesCursoRes?.data || []).map(_evaluacionCursoSbToObj);
     DATA.registroMantenimientos  = (sbRegistroMantRes?.data || []).map(_registroMantSbToObj);
     DATA.tiposResiduo            = (sbTiposResiduoRes?.data || []).map(_tipoResiduoSbToObj);
     DATA.contenedoresResiduo     = (sbContenedoresResiduoRes?.data || []).map(_contenedorResiduoSbToObj);

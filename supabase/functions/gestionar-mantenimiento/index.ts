@@ -4,6 +4,10 @@
 // "crear_plan"/"actualizar_plan"/"eliminar_plan": Admin/Gestor cualquier equipo,
 // Profesor solo los equipos de los que es responsable (campo `responsable`).
 // "editar_registro" (corregir un mantenimiento ya finalizado): solo Admin/Gestor.
+// "evaluaciones_equipo" (en qué evaluaciones se usa un equipo): Admin/Gestor cualquier
+// equipo, Profesor solo los suyos. "evaluaciones_curso" (fechas de las tres
+// evaluaciones de un curso): solo Admin/Gestor. Desde 2026-10-26 la temporada de un
+// equipo sale de ahí, no de mes_inicio/fin_temporada.
 import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 // Parsea el checklist [{texto, hecho}] recibido en el cuerpo.
@@ -15,10 +19,15 @@ function parsePasos(v: unknown): { texto: string; hecho: boolean }[] | null {
   });
 }
 
-// Meses de temporada: "" o ausente → null; si no, número.
-function numOrNull(v: unknown): number | null {
-  return (v === "" || v === null || v === undefined) ? null : Number(v);
+// Evaluaciones en que se usa un equipo: [1, 3] o "1,3" → "1,3". Sin ninguna → null
+// (= todo el curso). Ordenadas y sin repetir, solo 1–3.
+function evaluacionesUso(v: unknown): string | null {
+  const lista = Array.isArray(v) ? v : String(v ?? "").split(",");
+  const nums = [...new Set(lista.map((x) => Number(String(x).trim())).filter((n) => [1, 2, 3].includes(n)))].sort();
+  return nums.length ? nums.join(",") : null;
 }
+
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 function generarIdRegistro(): string {
   return "RM" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -366,6 +375,56 @@ Deno.serve(async (req) => {
     return jsonOk({ plan: data });
   }
 
+  // ── Evaluaciones en que se usa un equipo ─────────────────────────────
+  // Marcarlas cambia cuándo vencen sus revisiones de arranque y cierre y sus
+  // trimestrales (ver evaluacionesDelCurso() en js/mantenimiento.js).
+  if (accion === "evaluaciones_equipo") {
+    const idEquipo = String(body.id_equipo || "").trim();
+    if (!idEquipo) return jsonError("id_equipo es obligatorio", 400);
+    if (!(await profesorAutorizado(idEquipo))) {
+      return jsonError("Solo puedes marcar las evaluaciones de equipos de los que eres responsable", 403);
+    }
+    const { data, error } = await supabaseAdmin.from("equipos")
+      .update({ evaluaciones_uso: evaluacionesUso(body.evaluaciones) })
+      .eq("id_activo", idEquipo).select().single();
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    if (!data) return jsonError(`No se encontró el equipo "${idEquipo}"`, 404);
+    return jsonOk({ equipo: data });
+  }
+
+  // ── Fechas de las evaluaciones de un curso ───────────────────────────
+  if (accion === "evaluaciones_curso") {
+    if (!["Administrador", "Gestor"].includes(user.rol)) {
+      return jsonError("Las fechas de las evaluaciones solo las fija Administración o Gestión", 403);
+    }
+    const curso = String(body.curso_academico || "").trim();
+    const m = /^(\d{4})-(\d{4})$/.exec(curso);
+    if (!m || Number(m[2]) !== Number(m[1]) + 1) return jsonError("curso_academico debe tener la forma 2026-2027", 400);
+    const evals = Array.isArray(body.evaluaciones) ? body.evaluaciones as Record<string, unknown>[] : [];
+    if (evals.length !== 3) return jsonError("Hacen falta las fechas de las tres evaluaciones", 400);
+    const filas = evals.map((e) => ({
+      curso_academico: curso,
+      numero: Number(e.numero),
+      fecha_inicio: String(e.fecha_inicio || ""),
+      fecha_fin: String(e.fecha_fin || ""),
+      actualizado_en: new Date().toISOString(),
+    })).sort((a, b) => a.numero - b.numero);
+    for (const [i, f] of filas.entries()) {
+      if (f.numero !== i + 1) return jsonError("Las evaluaciones deben ser la 1ª, la 2ª y la 3ª", 400);
+      if (!FECHA_ISO.test(f.fecha_inicio) || !FECHA_ISO.test(f.fecha_fin)) {
+        return jsonError(`Faltan las fechas de la ${f.numero}ª evaluación`, 400);
+      }
+      if (f.fecha_fin < f.fecha_inicio) return jsonError(`La ${f.numero}ª evaluación termina antes de empezar`, 400);
+      if (i > 0 && f.fecha_inicio <= filas[i - 1].fecha_fin) {
+        return jsonError(`La ${f.numero}ª evaluación empieza antes de que acabe la ${f.numero - 1}ª`, 400);
+      }
+    }
+    const { data, error } = await supabaseAdmin.from("evaluaciones_curso")
+      .upsert(filas, { onConflict: "curso_academico,numero" }).select();
+    if (error) return jsonError(`No se pudieron guardar las fechas: ${error.message}`, 400);
+    return jsonOk({ evaluaciones: data });
+  }
+
   if (accion === "crear_plan" || accion === "actualizar_plan") {
     const operacion = String(body.operacion || "").trim();
     if (!operacion) return jsonError("El título de la operación es obligatorio", 400);
@@ -376,9 +435,6 @@ Deno.serve(async (req) => {
       instrucciones: body.instrucciones ? String(body.instrucciones) : null,
       solo_profesorado: body.solo_profesorado === true || body.solo_profesorado === "Sí",
     };
-    // Meses de temporada: se guardan en el equipo, no en el plan (llegan solo
-    // cuando la periodicidad es Pretemporada/Posttemporada).
-    const tocaTemporada = body.mes_inicio_temporada !== undefined || body.mes_fin_temporada !== undefined;
 
     if (accion === "crear_plan") {
       const idEquipo = String(body.id_equipo || "").trim();
@@ -389,12 +445,6 @@ Deno.serve(async (req) => {
       const { data, error } = await supabaseAdmin.from("planes_mantenimiento")
         .insert({ id_plan: generarIdPlan(), id_equipo: idEquipo, activo: true, ...datos }).select().single();
       if (error) return jsonError(`No se pudo crear el plan: ${error.message}`, 400);
-      if (tocaTemporada) {
-        await supabaseAdmin.from("equipos").update({
-          mes_inicio_temporada: numOrNull(body.mes_inicio_temporada),
-          mes_fin_temporada: numOrNull(body.mes_fin_temporada),
-        }).eq("id_activo", idEquipo);
-      }
       return jsonOk({ plan: data });
     } else {
       const idPlan = String(body.id_plan || "").trim();
@@ -409,12 +459,6 @@ Deno.serve(async (req) => {
       const { data, error } = await supabaseAdmin.from("planes_mantenimiento")
         .update(datos).eq("id_plan", idPlan).select().single();
       if (error) return jsonError(`No se pudo actualizar el plan: ${error.message}`, 400);
-      if (tocaTemporada) {
-        await supabaseAdmin.from("equipos").update({
-          mes_inicio_temporada: numOrNull(body.mes_inicio_temporada),
-          mes_fin_temporada: numOrNull(body.mes_fin_temporada),
-        }).eq("id_activo", idEquipo);
-      }
       return jsonOk({ plan: data });
     }
   }
@@ -433,5 +477,5 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idPlan });
   }
 
-  return jsonError("accion debe ser 'guardar_progreso', 'finalizar', 'registrar', 'descartar_ejecucion', 'marcar_periodo', 'revertir_periodo', 'editar_registro', 'crear_plan', 'actualizar_plan', 'alumnado_plan' o 'eliminar_plan'", 400);
+  return jsonError("accion debe ser 'guardar_progreso', 'finalizar', 'registrar', 'descartar_ejecucion', 'marcar_periodo', 'revertir_periodo', 'editar_registro', 'crear_plan', 'actualizar_plan', 'alumnado_plan', 'eliminar_plan', 'evaluaciones_equipo' o 'evaluaciones_curso'", 400);
 });
