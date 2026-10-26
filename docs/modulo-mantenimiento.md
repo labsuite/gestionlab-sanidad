@@ -20,18 +20,37 @@
 - Pretemporada: "pretemporada-YYYY-YYYY" (si hoy ≥ Mes_Inicio_Temporada)
 - Posttemporada: "posttemporada-YYYY-YYYY" (si hoy ≥ Mes_Fin_Temporada)
 
-### Temporada por defecto: el curso escolar (desde 2026-10-26)
+### Temporada por evaluaciones (desde 2026-10-26)
 
-Desde la carga de protocolos del 25/10/2026, **todos** los equipos tienen planes
-Pretemporada y Posttemporada (puesta en marcha y cierre del curso), no solo los
-estacionales. En los equipos de uso general la temporada es el **curso escolar**:
-`mes_inicio_temporada = 9` y `mes_fin_temporada = 6` (septiembre–junio), puestos en bloque
-con `scripts/actualizar_equipos.py` en los equipos que tenían los dos campos vacíos. Los
-**15 estacionales** (criostatos, microtomos, procesadores, estaciones de parafina,
-coagulómetros, citómetro, densitómetro, lámpara de hemaglutinación) llevan de momento ese
-mismo valor y recibirán sus meses reales cuando se anoten, desde el modal del plan
-Pre/Posttemporada. ⚠ Sin meses, el código cae en septiembre y **mayo** (`|| 9` / `|| 5` en
-`getPeriodosEsperados`), no en junio: no dejar campos vacíos al dar de alta un equipo.
+La temporada de un equipo ya **no se define por meses** sino por las **evaluaciones** en que
+se usa. `mes_inicio_temporada` / `mes_fin_temporada` siguen en la tabla, pero no los lee nada.
+
+- **`equipos.evaluaciones_uso`** (`Evaluaciones_Uso`): `"1"`, `"1,3"`, `"1,2,3"`… Vacío =
+  todo el curso. Se marca en la ficha del equipo (botón **📅 Evaluaciones**, modal
+  `modal-evaluaciones-equipo`) o desde el modal del plan. Lo puede cambiar el profesorado
+  **responsable** del equipo y Admin/Gestor en todos — `gestionar-mantenimiento`, acción
+  `evaluaciones_equipo`, con el mismo `profesorAutorizado()` que los planes.
+- **Tabla `evaluaciones_curso`** (`curso_academico`, `numero` 1–3, `fecha_inicio`,
+  `fecha_fin`): las fechas de las tres evaluaciones, una vez por curso. Las fija
+  Admin/Gestor desde el panel de Mantenimiento (**📅 Fijar fechas**, modal
+  `modal-evaluaciones-curso`; acción `evaluaciones_curso`, que exige las tres, en orden y sin
+  solaparse). Si un curso no tiene fechas, el panel lo avisa y se usan unas aproximadas
+  (1 sep–31 dic, 1 ene–31 mar, 1 abr–30 jun).
+
+Vencimientos (`periodosPorEvaluacion()` en `js/mantenimiento.js`, que usan a la vez el panel
+—`getPeriodosEsperados`— y el Excel del plan de calidad —`getPeriodosCursoCompleto` /
+`periodoAFecha`—):
+
+| Periodicidad | Vence | Periodo | Se pide desde |
+|---|---|---|---|
+| Pretemporada (revisión anual de **arranque**) | inicio de la primera evaluación en que se usa | `pretemporada-YYYY-YYYY` | ese día |
+| Posttemporada (revisión anual de **cierre**) | fin de la última evaluación en que se usa | `posttemporada-YYYY-YYYY` | 14 días antes (`_DIAS_AVISO_CIERRE`) |
+| Trimestral | inicio de cada evaluación en que se usa | `evaluacionN-YYYY-YYYY` | ese día |
+| Anual, Bianual, Trianual (incl. externos) | como antes: septiembre (o junio si la operación es de "fin") | `YYYY-MM` | — |
+
+En el Excel, la columna G lleva la **fecha exacta** de la evaluación (no el día 1 del mes).
+Los trimestrales anteriores a este cambio usaban periodos `YYYY-MM`; solo los hay en planes ya
+inactivos del curso 2025-2026.
 
 ## Dónde se gestiona cada cosa (centralizado 2026-09-06)
 

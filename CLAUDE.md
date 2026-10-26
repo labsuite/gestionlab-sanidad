@@ -318,12 +318,15 @@ config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-r
 id_activo, tipo_equipo, marca, modelo, numero_serie, ubicacion, responsable,
 modulos_responsables, fecha_adquisicion, origen_financiacion, proveedor_compra,
 proveedor_servicio_tecnico, estado_operativo, manual_ficha_tecnica, observaciones, coste,
-protocolo_uso, tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada.
+protocolo_uso, tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada, evaluaciones_uso.
 
-`mes_inicio_temporada` / `mes_fin_temporada` siguen en esta tabla, pero desde 2026-09-06 se
-editan **solo desde el modal del plan** (`Mantenimiento → Planes configurados`, planes
-Pretemporada/Posttemporada) — los escribe la Edge Function `gestionar-mantenimiento`.
-`gestionar-equipo` ya no los toca y se quitaron del modal de editar equipo. `tipo_mantenimiento`
+`evaluaciones_uso` (añadido 2026-10-26): en qué evaluaciones se usa el equipo (`"1,3"`;
+vacío = todo el curso). **Sustituye a los meses de temporada**, que ya no se leen: arranque,
+cierre y trimestrales vencen según estas evaluaciones y las fechas de la tabla
+`evaluaciones_curso`. Ver "Temporada por evaluaciones" en `docs/modulo-mantenimiento.md`.
+
+`mes_inicio_temporada` / `mes_fin_temporada` siguen en esta tabla **sin uso** desde
+2026-10-26 (sustituidos por `evaluaciones_uso`); ya no los escribe nadie. `tipo_mantenimiento`
 sigue sin uso (nunca se rellena). Ver `docs/modulo-mantenimiento.md`.
 
 `modulos_responsables` (añadido 2026-08-22): nombres de módulo separados por coma, texto
@@ -540,7 +543,7 @@ encaja de verdad en ESE contenedor con lo que ya lleva dentro. Ver `docs/modulo-
 *(Pendientes que requieren acceso físico al instituto)*
 
 ### Campos en equipos – pendiente
-- `Mes_Inicio_Temporada` / `Mes_Fin_Temporada` — **PENDIENTE (instituto)** para los 15 equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación)
+- `Evaluaciones_Uso` — **PENDIENTE (profesorado)**: marcar en qué evaluaciones se usan los equipos estacionales (criostatos, microtomos, procesadores, estaciones de parafina, coagulómetros, citómetro, densitómetro, lámpara hemaglutinación); sin marcar = todo el curso. Y fijar cada curso las fechas de las tres evaluaciones (Mantenimiento → 📅 Fijar fechas).
 - `Ubicacion` — **PENDIENTE (instituto)**: actualizar al ID correcto de la tabla Ubicaciones para coherencia interna. Los exports de calidad ya extraen el nº de lab por regex y funcionan con ambos formatos (`Lab 205` y `205-ZC-2.1`).
 
 ### Residuos
@@ -556,7 +559,7 @@ encaja de verdad en ESE contenedor con lo que ya lleva dentro. Ver `docs/modulo-
 ## Notas de diseño importantes
 
 - Los **protocolos de uso** NO generan alertas; se muestran solo al expandir la card del equipo.
-- Las **temporadas** (mes inicio/fin) son ajustables por Administrador y Gestor desde la app.
+- Las **temporadas** son las evaluaciones en que se usa cada equipo: las marca el profesorado responsable (o Admin/Gestor) en la ficha; las fechas de las evaluaciones, Admin/Gestor una vez por curso.
 - El **lavador de microplacas** tiene operación específica: limpieza periódica con disolución agua+lejía.
 - Equipos muy específicos de una especialidad → estacionales. Equipos de uso general → periódicos.
 - El modelo de calidad se entrega una vez al año; la app debe poder generarlo por curso académico.
