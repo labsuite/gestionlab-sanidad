@@ -348,6 +348,11 @@ Deno.serve(async (req) => {
     if (user?.rol === "Profesor" && filas.some((f: { rol: string }) => f.rol !== "Alumno")) {
       return jsonError("Solo puedes restablecer contraseñas de alumnado", 403);
     }
+    // Restablecer la contraseña de alguien es poder entrar como esa persona: un
+    // Gestor no puede hacerlo con una cuenta de Administrador.
+    if (user?.rol !== "Administrador" && filas.some((f: { rol: string }) => f.rol === "Administrador")) {
+      return jsonError("Solo un Administrador puede restablecer la contraseña de otro Administrador", 403);
+    }
 
     // Restablecer una cuenta de grupo la deja con contraseña nueva y refresca la
     // copia consultable: es la misma operación que cambiar_password_grupo por otra
@@ -391,10 +396,12 @@ Deno.serve(async (req) => {
         resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: "No tiene cuenta de acceso" });
         continue;
       }
-      // Las cuentas de grupo llevan contraseña aleatoria: derivarla del email
-      // sería publicarla (la parte local es el nombre del grupo).
+      // Las cuentas de grupo y las del personal llevan contraseña aleatoria y
+      // dictable: derivarla del email sería publicarla (la parte local es el nombre
+      // del grupo, o el usuario de la Xunta de la docente). La del personal es
+      // temporal: se la cambia ella misma desde "Mi perfil".
       const esGrupo = esCuentaDeGrupo(emailU);
-      const password = esGrupo ? passwordDeGrupo() : passwordDesdeEmail(emailU);
+      const password = (esGrupo || f.rol !== "Alumno") ? passwordDeGrupo() : passwordDesdeEmail(emailU);
       const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(authId, { password });
       if (updErr) {
         resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: updErr.message });

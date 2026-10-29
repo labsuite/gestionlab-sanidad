@@ -354,6 +354,13 @@ correo**: devuelve la contraseña para dictarla en clase (el alumnado no siempre
 buzón de la Xunta desde el aula). Por eso el resultado se enseña en un `alert`, no en un toast.
 Permisos: `requireStaff`, y un Profesor solo puede restablecer contraseñas de alumnado.
 
+**Profesorado y gestión (2026-10-29):** desde que se quitó «Olvidé mi contraseña» del login
+(el correo de Supabase no llegaba), Admin y Gestor tienen el 🔑 también en las pestañas de
+personal (`_botonPasswordPersonal`). A esas cuentas **no** se les pone la parte del email
+(sería adivinable): reciben una contraseña provisional aleatoria y dictable (`passwordDeGrupo()`),
+y la propia persona la cambia en «Mi perfil». La de un Administrador solo la restablece otro
+Administrador (lo impone el servidor); la propia no sale con 🔑, se cambia en «Mi perfil».
+
 ## Ciclos_Modulos — estructura crítica
 Varios módulos comparten nombre entre ciclos (ej. "Técnicas Xerais de Laboratorio" aparece en CS Lab Clínico, ZS Lab Clínico y CS Anatomía). Por eso el ciclo se guarda explícitamente en col H y **NO se infiere de los módulos**.
 
