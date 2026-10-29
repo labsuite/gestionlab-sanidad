@@ -26,7 +26,7 @@ async function initAuth() {
     _limpiarHashAuth();
     _mostrarPantallaLogin();
     const msg = (code === 'otp_expired' || code === 'access_denied')
-      ? 'El enlace de recuperación ya se usó o ha caducado. Pide uno nuevo con "Olvidé mi contraseña".'
+      ? 'El enlace de recuperación ya se usó o ha caducado. Pide a la gestión del laboratorio que te restablezca la contraseña.'
       : ((params.get('error_description') || '').replace(/\+/g, ' ') || 'No se pudo validar el enlace de recuperación');
     showToast(msg, 'error');
     return;
@@ -49,7 +49,7 @@ async function initAuth() {
     _limpiarHashAuth();
     if (!ok) {
       _mostrarPantallaLogin();
-      showToast('El enlace de recuperación ya no es válido. Pide uno nuevo con "Olvidé mi contraseña".', 'error');
+      showToast('El enlace de recuperación ya no es válido. Pide a la gestión del laboratorio que te restablezca la contraseña.', 'error');
       return;
     }
     _mostrarPantallaNuevaPassword();
@@ -111,19 +111,6 @@ async function signOut() {
   previewRole = null;
   previewUser = null;
   _mostrarPantallaLogin();
-}
-
-// ── Recuperar contraseña ─────────────────────────────────────
-
-async function recuperarPassword() {
-  const email = v('login-email').toLowerCase();
-  if (!email) { showToast('Escribe tu email arriba antes de pulsar "Olvidé mi contraseña"', 'error'); return; }
-  // redirectTo explícito: así el enlace del email vuelve SIEMPRE a esta app, sin
-  // depender del "Site URL" del proyecto de Supabase.
-  const redirectTo = window.location.origin + window.location.pathname;
-  const { error } = await _sbMigracion.auth.resetPasswordForEmail(email, { redirectTo });
-  if (error) { showToast(error.message, 'error'); return; }
-  showToast('Si el email existe, te hemos enviado un enlace (remitente Supabase) para restablecer la contraseña', 'success');
 }
 
 // ── Nueva contraseña tras el enlace de recuperación ──────────
