@@ -46,14 +46,15 @@ Una vez la solicitud está en un pedido ya no se edita como solicitud, así que 
 - `gestionar-linea-pedido` `editar` acepta `material`: si el nombre nuevo es de catálogo enlaza a ese `id_material`; si no, conserva el enlace que tuviera.
 - Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
 
-## Texto de la factura por línea — solo en la hoja (2026-11-03)
-A veces la factura describe una línea con otras palabras (marca, referencia, envase) que el nombre con que se pidió. Las dos son correctas, pero la **hoja de pedido** tiene que cuadrar con la factura, y **ningún otro sitio** debe cambiar (inventario, stock, solicitudes, contabilidad, email al proveedor siguen con `material`).
-- Columna `lineas_pedido.concepto_factura` (text, null = la hoja usa `material`). Cliente: `Concepto_Factura` en `_lineaPedidoSbToObj`.
-- Solo la leen la hoja `.docx` (`generarHojaPedido`, se usa tal cual, sin pegarle la unidad) y `enviar-a-trebello` (`concepto` del item → la hoja que firma la jefa). Si el pedido ya se envió, hay que **reenviar a Trebello**.
-- Se rellena de dos formas:
-  - **Revisión de la factura leída con IA** (`_celdaConceptoFactura`): si el texto de la factura no coincide con el nombre de la línea, aparece debajo, editable, con la casilla "🧾 En la hoja, como en la factura" (**desmarcada** por defecto: en las facturas reales casi todas las líneas llevan referencia/envase y solo algunas interesa cambiarlas). Se guarda con el mismo botón "Aplicar lo seleccionado" (`aplicarPreciosExtraccion`).
-  - **Botón 🧾 en cada línea** del detalle (Admin/Gestor) → `modal-concepto-factura`. Vale en cualquier estado de la línea (la factura suele llegar con la línea ya recibida). Vacío = quitarlo.
-- Servidor: `gestionar-linea-pedido` acción `concepto_factura` (una línea o `lineas: [...]`); si el texto es igual al nombre, guarda null.
+## Cómo figura cada línea en la factura — solo en la hoja (2026-11-03)
+A veces la factura describe una línea con otras palabras, **o con otros artículos**. Caso real (PED0LWDM51): un pedido de servicio con una línea «Reparación» de 716 € que Dasan factura como cámaras Neubauer, guantes, acetonitrilo y metanol (suman exactamente 716 €). Las dos cosas son correctas, pero la **hoja de pedido** tiene que cuadrar con la factura, y **ningún otro sitio** debe cambiar: inventario, stock, solicitudes, contabilidad (sigue con el precio de la línea) y email al proveedor siguen con la línea tal cual.
+- Columna `lineas_pedido.conceptos_factura` (jsonb, lista de `{concepto, cantidad, unidad, precio_unitario}`; null = la hoja usa la línea). Cliente: `Conceptos_Factura` (array) en `_lineaPedidoSbToObj`.
+- La hoja imprime esos artículos **en lugar de la línea**, una fila cada uno. Con un solo concepto sin cifras (solo cambia el nombre) hereda cantidad y precio de la línea. La leen `generarHojaPedido` (el subtotal suma las filas impresas) y `enviar-a-trebello` (`aItems`, ids `<id_linea>-f<n>`). Si el pedido ya se envió, hay que **reenviar a Trebello**.
+- Se rellena de tres formas:
+  - **Revisión de factura, artículos sin línea coincidente** (`_bloqueSinMatchEnHoja` → `asignarSinMatchAHoja`): se marcan los artículos, se elige la línea y «Guardar para la hoja». Muestra la suma para comparar con la línea.
+  - **Revisión de factura, líneas emparejadas** (`_celdaConceptoFactura`): casilla «🧾 En la hoja, como en la factura» con el texto editable, **desmarcada** por defecto (en las facturas reales casi todas las líneas llevan referencia/envase). Se guarda con «Aplicar lo seleccionado».
+  - **Botón 🧾 de cada línea** (Admin/Gestor, cualquier estado de la línea) → `modal-concepto-factura`: filas concepto/cantidad/€ por ud, con la suma y si cuadra con la línea. Sin filas = quitarlo.
+- Servidor: `gestionar-linea-pedido` acción `concepto_factura` (`conceptos` de una línea o `lineas: [{id_linea, conceptos}]`).
 
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`

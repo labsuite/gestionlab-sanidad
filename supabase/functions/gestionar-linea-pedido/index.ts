@@ -331,22 +331,38 @@ Deno.serve(async (req) => {
 
   if (accion === "concepto_factura") {
     // Cómo figura la línea en la FACTURA, solo para la hoja de pedido (ver
-    // schema.sql). Como "imputacion", se puede tocar con la línea ya
-    // recibida: no cambia ni el nombre del material, ni cantidades, ni stock.
+    // lineas_pedido.conceptos_factura en schema.sql): uno o varios artículos
+    // {concepto, cantidad, unidad, precio_unitario}. Caso real: una reparación
+    // que la casa comercial factura como cámaras Neubauer, guantes y
+    // disolventes. Como "imputacion", se puede tocar con la línea ya recibida:
+    // no cambia el nombre, ni cantidades, ni stock, ni el precio de la línea.
     // Admite varias líneas a la vez (desde la revisión de la factura leída con IA).
     const lineas = Array.isArray(body.lineas) ? body.lineas as Record<string, unknown>[]
-      : [{ id_linea: body.id_linea, concepto_factura: body.concepto_factura }];
+      : [{ id_linea: body.id_linea, conceptos: body.conceptos }];
+    const num = (v: unknown) => {
+      if (v === "" || v === null || v === undefined) return null;
+      const n = Number(String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
     const actualizadas = [];
     for (const l of lineas) {
       const idLinea = String(l.id_linea || "").trim();
       if (!idLinea) continue;
       const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("material").eq("id_linea", idLinea).maybeSingle();
       if (!linea) continue;
-      let texto = strField(String(l.concepto_factura ?? "").trim());
-      // Igual que el nombre de la línea = no hace falta guardarlo aparte.
-      if (texto && texto === String(linea.material || "").trim()) texto = null;
+      let conceptos = (Array.isArray(l.conceptos) ? l.conceptos as Record<string, unknown>[] : [])
+        .map((c) => ({
+          concepto: String(c?.concepto ?? "").trim(),
+          cantidad: num(c?.cantidad),
+          unidad: strField(String(c?.unidad ?? "").trim()),
+          precio_unitario: num(c?.precio_unitario),
+        }))
+        .filter((c) => c.concepto);
+      // Un solo concepto igual al nombre y sin cifras propias = nada que guardar.
+      if (conceptos.length === 1 && conceptos[0].concepto === String(linea.material || "").trim()
+          && conceptos[0].cantidad == null && conceptos[0].precio_unitario == null) conceptos = [];
       const { data, error } = await supabaseAdmin.from("lineas_pedido")
-        .update({ concepto_factura: texto }).eq("id_linea", idLinea).select().single();
+        .update({ conceptos_factura: conceptos.length ? conceptos : null }).eq("id_linea", idLinea).select().single();
       if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
       actualizadas.push(data);
     }

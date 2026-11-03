@@ -554,7 +554,7 @@ async function copiarLinkProveedor() {
 
 // ── Revisión de lo leído por la IA en un documento del proveedor ──────
 // Escribe dos cosas: el texto de la factura de cada línea para la hoja de
-// pedido (concepto_factura, ver _celdaConceptoFactura) y precio_unitario, en lote, vía
+// pedido (conceptos_factura, ver _celdaConceptoFactura y _bloqueSinMatchEnHoja) y precio_unitario, en lote, vía
 // la misma acción actualizar_precio que ya usa el botón 💶 Precios
 // (js/contabilidad.js) — nunca cantidad_recibida (eso exige comprobar
 // físicamente lo que ha llegado, no lo que diga una factura) ni
@@ -568,7 +568,7 @@ async function copiarLinkProveedor() {
 let _revExtraccionActual = null;
 
 // Cómo llama la factura a esta línea. Si no coincide con el nombre con que se
-// pidió, se ofrece guardarlo para la hoja de pedido (lineas_pedido.concepto_factura)
+// pidió, se ofrece guardarlo para la hoja de pedido (lineas_pedido.conceptos_factura)
 // — en el resto de la app la línea conserva su nombre. Siempre desmarcado: en
 // las facturas reales casi todas las líneas difieren (referencia, envase…) y
 // solo algunas hace falta cambiarlas. El texto es editable porque la IA a
@@ -576,11 +576,40 @@ let _revExtraccionActual = null;
 function _normConcepto(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
+// Artículos de la factura que no son ninguna línea, pero que en realidad SON
+// una línea del pedido facturada de otra forma (caso real: una "Reparación"
+// de 716 € que la casa comercial factura como cámaras Neubauer, guantes y
+// disolventes). Se guardan como conceptos de factura de esa línea: salen en la
+// hoja en su lugar y no entran en el inventario ni cambian la línea.
+function _bloqueSinMatchEnHoja(sinMatch, pedidoId) {
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  if (!lineas.length || !(sinMatch || []).length) return '';
+  const suma = sinMatch.reduce((s, i) => s + (Number(i.precio_unitario) || 0) * (i.cantidad != null ? Number(i.cantidad) : 1), 0);
+  const opciones = lineas.map(l => {
+    const imp = (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0);
+    return `<option value="${l.ID_Linea}">${_escAttr(l.Material)}${imp ? ` — ${imp.toFixed(2)} €` : ''}</option>`;
+  }).join('');
+  return `<div style="margin-top:12px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px">
+    <div style="font-weight:600;margin-bottom:6px">🧾 ¿Son en realidad una línea del pedido facturada de otra forma?</div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+      ${sinMatch.map((i, idx) => `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="revext-sm-check" data-idx="${idx}" style="width:14px;height:14px;margin-top:2px;flex:none"><span>${_escAttr(i.material)}${i.cantidad != null ? ` — ${i.cantidad}` : ''}${i.precio_unitario != null ? ` × ${Number(i.precio_unitario).toFixed(2)} €` : ''}</span></label>`).join('')}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span>Ponerlos en la hoja en lugar de</span>
+      <select id="revext-sm-linea" style="flex:1;min-width:180px">${opciones}</select>
+      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Guardar para la hoja</button>
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Todos juntos suman ${suma.toFixed(2)} € (sin IVA). Solo cambia la hoja de pedido: la línea sigue igual en la app y nada entra en el inventario.</div>
+  </div>`;
+}
+
 function _celdaConceptoFactura(m) {
   const textoFactura = String(m.item_detectado?.material || '').trim();
   if (!textoFactura) return '';
   const linea = DATA.lineasPedido.find(l => l.ID_Linea === m.id_linea);
-  const actual = linea?.Concepto_Factura || '';
+  const conc = linea?.Conceptos_Factura || [];
+  const actual = conc.length === 1 ? conc[0].concepto : '';
+  if (conc.length > 1) return `<div style="margin-top:4px;font-size:11px;color:var(--text-muted)">🧾 En la hoja ya figura como ${conc.length} artículos de la factura (cámbialo con 🧾 en la línea)</div>`;
   if (!actual && _normConcepto(textoFactura) === _normConcepto(m.material_linea)) return '';
   const valor = actual || textoFactura;
   return `<label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--text-muted)">
@@ -654,7 +683,7 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
       </div>`).join('')}
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Por defecto no se toca nada — usa "+ Añadir línea nueva" solo si de verdad llegó algo que no estaba en el pedido (p.ej. un reactivo no contemplado en el presupuesto). Esto funciona aunque el pedido ya no admita añadir líneas a mano.</div>
-  </div>` : '';
+  </div>${_bloqueSinMatchEnHoja(r.sin_match, pedidoId)}` : '';
 
   const cargoExtra = r.cargo_extra ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
     <div>🚚 Cargo extra detectado: <strong>${r.cargo_extra.concepto}</strong> — ${Number(r.cargo_extra.importe).toFixed(2)} €</div>
@@ -709,7 +738,7 @@ function _filaLineaPedido(l, p, puedeEditar) {
   // Material común: lo hereda de la ficha; el 🤝 de la línea lo cambia solo aquí.
   const esComun = p.Tipo !== 'Servicio' && lineaEsComun(l);
   return `<div class="linea-row">
-    <div class="linea-nombre">${l.Material}${l.Concepto_Factura ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así lo llama la factura">🧾 En la factura: ${_escAttr(l.Concepto_Factura)}</div>` : ''}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
+    <div class="linea-nombre">${l.Material}${(l.Conceptos_Factura || []).length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así figura en la factura">🧾 En la hoja, como en la factura: ${l.Conceptos_Factura.map(c => _escAttr(c.concepto) + (c.cantidad != null ? ` ×${c.cantidad}` : '')).join(' · ')}</div>` : ''}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
     <div class="linea-meta">
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
       <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
@@ -718,7 +747,7 @@ function _filaLineaPedido(l, p, puedeEditar) {
     </div>
     <div class="linea-actions">
       ${puedeEditar && p.Tipo !== 'Servicio' ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
-      ${puedeEditar ? `<button class="icon-btn" title="Cómo figura en la factura (solo para la hoja de pedido)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')" style="${l.Concepto_Factura ? '' : 'opacity:.45'}">🧾</button>` : ''}
+      ${puedeEditar ? `<button class="icon-btn" title="Cómo figura en la factura (solo para la hoja de pedido)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')">🧾</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
       ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
       ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}

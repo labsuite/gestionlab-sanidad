@@ -121,7 +121,23 @@ async function generarHojaPedido() {
     }
 
     // ── Construir líneas con precios desde Lineas_Pedido.Precio_Unitario ──
-    const lineasConPrecios = lineas.map(l => {
+    // Si la línea tiene conceptos de factura (cómo la describe la factura, a
+    // veces con otros artículos: una "Reparación" facturada como guantes y
+    // disolventes), la hoja imprime ESOS en lugar de la línea. Sin cifras
+    // propias, un concepto único hereda cantidad y precio de la línea.
+    const fmtEur = n => n > 0 ? n.toFixed(2) + ' €' : '';
+    const lineasConPrecios = lineas.flatMap(l => {
+      const precioLinea = parseFloat(l.Precio_Unitario) || 0;
+      const cantLinea   = parseFloat(l.Cantidad_Pedida) || 0;
+      const conceptos = l.Conceptos_Factura || [];
+      if (conceptos.length) {
+        const uno = conceptos.length === 1;
+        return conceptos.map(c => {
+          const cant   = c.cantidad != null ? Number(c.cantidad) : (uno ? cantLinea : 1);
+          const precio = c.precio_unitario != null ? Number(c.precio_unitario) : (uno ? precioLinea : 0);
+          return { concepto: c.concepto, cantidad: c.cantidad != null || uno ? String(cant) : '', precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant };
+        });
+      }
       const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
       let unidad = mat?.Unidad || '';
       if (!unidad) {
@@ -132,20 +148,8 @@ async function generarHojaPedido() {
           if (uMatch) unidad = uMatch[1].trim();
         }
       }
-      // Si se apuntó cómo lo llama la factura, la hoja usa ese texto tal cual
-      // (ya trae su formato/envase); en el resto de la app sigue l.Material.
-      const concepto = l.Concepto_Factura
-        ? l.Concepto_Factura
-        : (unidad ? l.Material + ', ' + unidad : l.Material);
-      const precio   = parseFloat(l.Precio_Unitario) || 0;
-      const cant     = parseFloat(l.Cantidad_Pedida) || 0;
-      const total    = precio * cant;
-      return {
-        concepto,
-        cantidad: l.Cantidad_Pedida,
-        precio:   precio > 0 ? precio.toFixed(2) + ' \u20AC' : '',
-        total:    total  > 0 ? total.toFixed(2)  + ' \u20AC' : ''
-      };
+      const concepto = unidad ? l.Material + ', ' + unidad : l.Material;
+      return [{ concepto, cantidad: l.Cantidad_Pedida, precio: fmtEur(precioLinea), total: fmtEur(precioLinea * cantLinea), importe: precioLinea * cantLinea }];
     });
 
     // ── Gasto extra (transporte, tasas...) — se añade como línea más, entra en la base del IVA ──
@@ -155,12 +159,15 @@ async function generarHojaPedido() {
         concepto: p.Gasto_Extra_Concepto || 'Gasto extra',
         cantidad: '',
         precio:   '',
-        total:    gastoExtraImporte.toFixed(2) + ' €'
+        total:    gastoExtraImporte.toFixed(2) + ' €',
+        importe:  gastoExtraImporte
       });
     }
 
     // ── Calcular subtotal, IVA y total ──
-    const subtotal    = lineas.reduce((sum, l) => sum + (parseFloat(l.Precio_Unitario)||0) * (parseFloat(l.Cantidad_Pedida)||0), gastoExtraImporte);
+    // Se suma lo que va impreso (el gasto extra ya está como fila), así el total
+    // de la hoja cuadra con sus filas aunque vengan de los conceptos de factura.
+    const subtotal    = lineasConPrecios.reduce((sum, lp) => sum + (lp.importe || 0), 0);
     const ivaAmount   = subtotal * 0.21;
     const totalConIva = subtotal + ivaAmount;
     const hayPrecios  = subtotal > 0;

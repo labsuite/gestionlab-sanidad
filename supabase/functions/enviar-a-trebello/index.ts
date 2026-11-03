@@ -96,21 +96,34 @@ Deno.serve(async (req) => {
   //     la tabla del Word.
   // El id es el de la línea de GestionLab, no un UUID al azar: así reenviar
   // el pedido no le cambia la identidad a cada artículo.
-  const aItem = (l: any) => {
+  //
+  // Si la línea tiene `conceptos_factura` (cómo la describe la factura; ver
+  // schema.sql), en la hoja salen ESOS artículos en lugar de la línea: una
+  // "Reparación" facturada como guantes y disolventes viaja como esos
+  // artículos. Ids `<id_linea>-f<n>`, estables entre reenvíos igual que el resto.
+  const aItems = (l: any) => {
     const pedida   = parseFloat(l.cantidad_pedida)   || 0;
     const recibida = parseFloat(l.cantidad_recibida) || 0;
-    return {
-      id: String(l.id_linea),
-      // En la hoja manda cómo lo llama la factura, si se apuntó (ver
-      // lineas_pedido.concepto_factura en schema.sql).
-      concepto: String(l.concepto_factura || l.material || ""),
-      cantidade: pedida,
-      unidade: String(l.unidad || "").trim() || null,
-      prezo_sin_iva: parseFloat(l.precio_unitario) || 0,
-      received: pedida > 0 && recibida >= pedida,
-      solicitude_id: null,
-      requester_name: null,
-    };
+    const received = pedida > 0 && recibida >= pedida;
+    const precioLinea = parseFloat(l.precio_unitario) || 0;
+    const unidadLinea = String(l.unidad || "").trim() || null;
+    const conceptos = Array.isArray(l.conceptos_factura) ? l.conceptos_factura : [];
+    if (!conceptos.length) {
+      return [{
+        id: String(l.id_linea), concepto: String(l.material || ""), cantidade: pedida,
+        unidade: unidadLinea, prezo_sin_iva: precioLinea, received, solicitude_id: null, requester_name: null,
+      }];
+    }
+    const uno = conceptos.length === 1;
+    return conceptos.map((c: any, i: number) => ({
+      id: `${l.id_linea}-f${i + 1}`,
+      concepto: String(c.concepto || ""),
+      // Sin cifras propias (solo un texto distinto) hereda las de la línea.
+      cantidade: c.cantidad != null ? Number(c.cantidad) : (uno ? pedida : 1),
+      unidade: c.unidad || (uno && c.cantidad == null ? unidadLinea : null),
+      prezo_sin_iva: c.precio_unitario != null ? Number(c.precio_unitario) : (uno ? precioLinea : 0),
+      received, solicitude_id: null, requester_name: null,
+    }));
   };
 
   // ── Material común: va en una hoja aparte (misma factura) ─────────────
@@ -198,7 +211,7 @@ Deno.serve(async (req) => {
       nombre: pedido.nombre_lista || null,
       ciclo: pedido.ciclo || null,
       modulo: pedido.modulo || null,
-      items: lineasPropias.map(aItem),
+      items: lineasPropias.flatMap(aItems),
       cargo_extra: cargoExtra(idPedido),
     });
     if (r.error) return jsonError(r.error, r.status);
@@ -215,7 +228,7 @@ Deno.serve(async (req) => {
       nombre: `${pedido.nombre_lista || idPedido} · Material común`,
       ciclo: "Material común",
       modulo: null,
-      items: lineasComunes.map(aItem),
+      items: lineasComunes.flatMap(aItems),
       cargo_extra: lineasPropias.length ? null : cargoExtra(`${idPedido}-COMUN`),
     });
     if (r.error) {

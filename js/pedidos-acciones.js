@@ -494,30 +494,84 @@ async function toggleLineaComun(lineaId, pedidoId) {
 // Trebello); en el resto de la app la línea sigue con su nombre. Se puede
 // tocar en cualquier estado de la línea, porque la factura suele llegar
 // cuando ya está recibida.
+let _concFacTemp = [];
+
 function openModalConceptoFactura(lineaId, pedidoId) {
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   if (!l) return;
   sv('concfac-id', lineaId);
   sv('concfac-pedido-id', pedidoId);
-  document.getElementById('concfac-material').textContent = l.Material || '';
-  sv('concfac-texto', l.Concepto_Factura || '');
+  const imp = (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0);
+  document.getElementById('concfac-material').textContent = l.Material + (imp ? ` (${imp.toFixed(2)} € sin IVA)` : '');
+  _concFacTemp = (l.Conceptos_Factura || []).map(c => ({ ...c }));
+  if (!_concFacTemp.length) _concFacTemp.push({ concepto: '', cantidad: null, precio_unitario: null });
+  _pintarConceptosFactura();
   openModal('modal-concepto-factura');
+}
+
+function _pintarConceptosFactura() {
+  const cont = document.getElementById('concfac-filas');
+  cont.innerHTML = _concFacTemp.map((c, i) => `<div style="display:grid;grid-template-columns:1fr 64px 84px 28px;gap:6px;align-items:center">
+      <input type="text" placeholder="Texto de la factura" value="${_escAttr(c.concepto || '')}" oninput="_concFacTemp[${i}].concepto=this.value">
+      <input type="number" min="0" step="any" placeholder="Cant." value="${c.cantidad ?? ''}" oninput="_concFacTemp[${i}].cantidad=this.value===''?null:Number(this.value);_sumaConceptosFactura()">
+      <input type="number" min="0" step="0.01" placeholder="€/ud" value="${c.precio_unitario ?? ''}" oninput="_concFacTemp[${i}].precio_unitario=this.value===''?null:Number(this.value);_sumaConceptosFactura()">
+      <button class="icon-btn danger" title="Quitar" onclick="_concFacTemp.splice(${i},1);_pintarConceptosFactura()">✕</button>
+    </div>`).join('');
+  _sumaConceptosFactura();
+}
+
+function _sumaConceptosFactura() {
+  const el = document.getElementById('concfac-suma');
+  const conCifras = _concFacTemp.filter(c => c.precio_unitario != null);
+  if (!conCifras.length) { el.textContent = ''; return; }
+  const suma = conCifras.reduce((s, c) => s + c.precio_unitario * (c.cantidad != null ? c.cantidad : 1), 0);
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === v('concfac-id'));
+  const imp = l ? (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0) : 0;
+  const cuadra = imp && Math.abs(suma - imp) < 0.01;
+  el.innerHTML = `Suma: <strong>${suma.toFixed(2)} €</strong> sin IVA${imp ? (cuadra ? ' · ✓ cuadra con la línea' : ` · ⚠ la línea es de ${imp.toFixed(2)} €`) : ''}`;
+}
+
+function anadirFilaConceptoFactura() {
+  _concFacTemp.push({ concepto: '', cantidad: null, precio_unitario: null });
+  _pintarConceptosFactura();
+}
+
+async function _guardarConceptosLinea(lineaId, pedidoId, conceptos) {
+  const { linea } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'concepto_factura', id_linea: lineaId, conceptos });
+  const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
+  if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const aviso = (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
+  showToast(((linea.conceptos_factura || []).length ? 'Guardado cómo figura en la factura, para la hoja.' : 'La hoja usará la línea tal cual.') + aviso, 'success');
 }
 
 async function guardarConceptoFactura() {
   const lineaId = v('concfac-id');
   const pedidoId = v('concfac-pedido-id');
+  const conceptos = _concFacTemp.map(c => ({ ...c, concepto: String(c.concepto || '').trim() })).filter(c => c.concepto);
   showLoading('Guardando...');
   try {
-    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
-      accion: 'concepto_factura', id_linea: lineaId, concepto_factura: v('concfac-texto').trim(),
-    });
-    const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
-    if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
-    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-    const aviso = (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
-    showToast((linea.concepto_factura ? 'Texto de la factura guardado para la hoja.' : 'La hoja usará el nombre de la línea.') + aviso, 'success');
+    await _guardarConceptosLinea(lineaId, pedidoId, conceptos);
     closeModal('modal-concepto-factura');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// Desde la revisión de la factura: los artículos sin línea coincidente que
+// en realidad son una línea del pedido facturada de otra forma.
+async function asignarSinMatchAHoja() {
+  if (!_revExtraccionActual) return;
+  const { pedidoId, r } = _revExtraccionActual;
+  const items = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-sm-check'))
+    .filter(chk => chk.checked).map(chk => r.sin_match[Number(chk.dataset.idx)]).filter(Boolean);
+  if (!items.length) { showToast('Marca los artículos de la factura que corresponden a esa línea', 'info'); return; }
+  const lineaId = v('revext-sm-linea');
+  const conceptos = items.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
+  showLoading('Guardando...');
+  try {
+    await _guardarConceptosLinea(lineaId, pedidoId, conceptos);
+    closeModal('modal-revision-extraccion');
     verDetallePedido(pedidoId);
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
@@ -714,7 +768,8 @@ async function aplicarPreciosExtraccion() {
     .filter(chk => chk.checked)
     .map(chk => {
       const input = document.querySelector(`#revision-extraccion-contenido .revext-concepto[data-id-linea="${chk.dataset.idLinea}"]`);
-      return { id_linea: chk.dataset.idLinea, concepto_factura: input ? input.value.trim() : '' };
+      const texto = input ? input.value.trim() : '';
+      return { id_linea: chk.dataset.idLinea, conceptos: texto ? [{ concepto: texto }] : [] };
     });
   if (!lineasBody.length && !conceptos.length) { showToast('No has seleccionado nada para aplicar', 'info'); return; }
 
