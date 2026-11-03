@@ -140,8 +140,31 @@ Deno.serve(async (req) => {
              || (materiales || []).find((m: any) => m.nombre === nombre || nombre.startsWith(m.nombre));
     return mat?.material_comun === true;
   };
-  const lineasComunes = (lineas || []).filter(lineaEsComun);
-  const lineasPropias = (lineas || []).filter((l: any) => !lineasComunes.includes(l));
+  let lineasComunes = (lineas || []).filter(lineaEsComun);
+  let lineasPropias = (lineas || []).filter((l: any) => !lineasComunes.includes(l));
+
+  // ── La factura sustituye a todas las líneas (pedidos.hoja_factura) ─────
+  // Una sola hoja con los artículos de la factura: la de material común solo
+  // si TODAS las líneas lo son; si no, la del laboratorio.
+  const hojaFactura = Array.isArray(pedido.hoja_factura) ? pedido.hoja_factura : [];
+  const todoRecibido = (lineas || []).every((l: any) => {
+    const pedida = parseFloat(l.cantidad_pedida) || 0;
+    return pedida > 0 && (parseFloat(l.cantidad_recibida) || 0) >= pedida;
+  });
+  const itemsFactura = hojaFactura.map((c: any, i: number) => ({
+    id: `${idPedido}-fac${i + 1}`,
+    concepto: String(c.concepto || ""),
+    cantidade: c.cantidad != null ? Number(c.cantidad) : 1,
+    unidade: c.unidad || null,
+    prezo_sin_iva: c.precio_unitario != null ? Number(c.precio_unitario) : 0,
+    received: todoRecibido,
+    solicitude_id: null,
+    requester_name: null,
+  }));
+  if (hojaFactura.length) {
+    if (lineasPropias.length) { lineasPropias = lineas || []; lineasComunes = []; }
+  }
+  const itemsDe = (ls: any[]) => hojaFactura.length ? itemsFactura : ls.flatMap(aItems);
 
   // Portes/tasas: con la parte del laboratorio, salvo que todo sea común.
   const gastoExtra = parseFloat(pedido.gasto_extra_importe) || 0;
@@ -211,7 +234,7 @@ Deno.serve(async (req) => {
       nombre: pedido.nombre_lista || null,
       ciclo: pedido.ciclo || null,
       modulo: pedido.modulo || null,
-      items: lineasPropias.flatMap(aItems),
+      items: itemsDe(lineasPropias),
       cargo_extra: cargoExtra(idPedido),
     });
     if (r.error) return jsonError(r.error, r.status);
@@ -228,7 +251,7 @@ Deno.serve(async (req) => {
       nombre: `${pedido.nombre_lista || idPedido} · Material común`,
       ciclo: "Material común",
       modulo: null,
-      items: lineasComunes.flatMap(aItems),
+      items: itemsDe(lineasComunes),
       cargo_extra: lineasPropias.length ? null : cargoExtra(`${idPedido}-COMUN`),
     });
     if (r.error) {

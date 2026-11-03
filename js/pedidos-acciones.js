@@ -496,17 +496,58 @@ async function toggleLineaComun(lineaId, pedidoId) {
 // cuando ya está recibida.
 let _concFacTemp = [];
 
-function openModalConceptoFactura(lineaId, pedidoId) {
-  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
-  if (!l) return;
-  sv('concfac-id', lineaId);
+// El mismo editor sirve para dos cosas (hidden concfac-modo):
+//  · 'linea'  — 🧾 de una línea: cómo se nombra ESA línea en la hoja (otra
+//              forma de expresarlo, referencias…). lineas_pedido.conceptos_factura.
+//  · 'pedido' — 🧾 Hoja como la factura: artículos que sustituyen a TODAS las
+//              líneas en la hoja. pedidos.hoja_factura.
+function _abrirEditorConceptos(modo, pedidoId, lineaId, titulo, subtitulo, conceptos, ayuda) {
+  sv('concfac-modo', modo);
+  sv('concfac-id', lineaId || '');
   sv('concfac-pedido-id', pedidoId);
-  const imp = (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0);
-  document.getElementById('concfac-material').textContent = l.Material + (imp ? ` (${imp.toFixed(2)} € sin IVA)` : '');
-  _concFacTemp = (l.Conceptos_Factura || []).map(c => ({ ...c }));
+  document.getElementById('concfac-titulo').textContent = titulo;
+  document.getElementById('concfac-material').innerHTML = subtitulo;
+  document.getElementById('concfac-ayuda').textContent = ayuda;
+  _concFacTemp = (conceptos || []).map(c => ({ ...c }));
   if (!_concFacTemp.length) _concFacTemp.push({ concepto: '', cantidad: null, precio_unitario: null });
   _pintarConceptosFactura();
   openModal('modal-concepto-factura');
+}
+
+function _importeLineas(lineas) {
+  return lineas.reduce((s, l) => s + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
+}
+
+function openModalConceptoFactura(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  const imp = _importeLineas([l]);
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const avisoPedido = (p?.Hoja_Factura || []).length ? '<div style="margin-top:6px;font-size:12px;color:var(--warning,#b45309)">⚠ Ahora mismo la hoja usa los artículos de la factura del pedido entero, así que esto no se verá hasta que los quites (🧾 Hoja como la factura).</div>' : '';
+  _abrirEditorConceptos('linea', pedidoId, lineaId, '🧾 Cómo figura en la hoja',
+    `Línea del pedido: <strong>${_escAttr(l.Material)}${imp ? ` (${imp.toFixed(2)} € sin IVA)` : ''}</strong>${avisoPedido}`,
+    l.Conceptos_Factura,
+    'Solo cambia cómo sale ESTA línea en la hoja de pedido (otra forma de expresarlo, la referencia…). En el inventario, las solicitudes y el resto de la app la línea sigue igual. Para cambiar solo el nombre basta una fila sin cantidad ni precio (usa los de la línea). Sin filas = la hoja usa la línea.');
+}
+
+function openModalHojaFactura(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  const imp = _importeLineas(DATA.lineasPedido.filter(l => l.Pedido === pedidoId));
+  // Si todavía no hay nada y una factura leída trae artículos sin línea, se precargan.
+  let conceptos = p.Hoja_Factura || [];
+  let precargado = '';
+  if (!conceptos.length) {
+    const doc = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId && (d.Datos_Extraidos?.sin_match || []).length).pop();
+    if (doc) {
+      conceptos = doc.Datos_Extraidos.sin_match.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
+      precargado = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Precargado con lo leído en ${_escAttr(doc.Nombre_Archivo || 'la factura')} — revísalo y pulsa Guardar.</div>`;
+    }
+  }
+  _abrirEditorConceptos('pedido', pedidoId, '', '🧾 Hoja como la factura',
+    `Pedido: <strong>${_escAttr(p.Nombre_Lista)}</strong>${imp ? ` · las líneas suman ${imp.toFixed(2)} € sin IVA` : ''}${precargado}`,
+    conceptos,
+    'Para cuando la casa comercial factura el pedido con otros artículos: en la hoja de pedido (Word y Trebello) salen estos en lugar de todas las líneas. Las líneas, el inventario y la contabilidad no cambian. Sin filas = la hoja vuelve a usar las líneas.');
 }
 
 function _pintarConceptosFactura() {
@@ -525,10 +566,13 @@ function _sumaConceptosFactura() {
   const conCifras = _concFacTemp.filter(c => c.precio_unitario != null);
   if (!conCifras.length) { el.textContent = ''; return; }
   const suma = conCifras.reduce((s, c) => s + c.precio_unitario * (c.cantidad != null ? c.cantidad : 1), 0);
-  const l = DATA.lineasPedido.find(x => x.ID_Linea === v('concfac-id'));
-  const imp = l ? (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0) : 0;
-  const cuadra = imp && Math.abs(suma - imp) < 0.01;
-  el.innerHTML = `Suma: <strong>${suma.toFixed(2)} €</strong> sin IVA${imp ? (cuadra ? ' · ✓ cuadra con la línea' : ` · ⚠ la línea es de ${imp.toFixed(2)} €`) : ''}`;
+  const modo = v('concfac-modo');
+  const lineas = modo === 'pedido'
+    ? DATA.lineasPedido.filter(x => x.Pedido === v('concfac-pedido-id'))
+    : DATA.lineasPedido.filter(x => x.ID_Linea === v('concfac-id'));
+  const imp = _importeLineas(lineas);
+  const ref = modo === 'pedido' ? 'las líneas suman' : 'la línea es de';
+  el.innerHTML = `Suma: <strong>${suma.toFixed(2)} €</strong> sin IVA${imp ? (Math.abs(suma - imp) < 0.01 ? ` · ✓ cuadra con ${modo === 'pedido' ? 'las líneas' : 'la línea'}` : ` · ⚠ ${ref} ${imp.toFixed(2)} €`) : ''}`;
 }
 
 function anadirFilaConceptoFactura() {
@@ -536,22 +580,33 @@ function anadirFilaConceptoFactura() {
   _pintarConceptosFactura();
 }
 
+function _avisoTrebello(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  return (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
+}
+
 async function _guardarConceptosLinea(lineaId, pedidoId, conceptos) {
   const { linea } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'concepto_factura', id_linea: lineaId, conceptos });
   const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
   if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
-  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  const aviso = (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
-  showToast(((linea.conceptos_factura || []).length ? 'Guardado cómo figura en la factura, para la hoja.' : 'La hoja usará la línea tal cual.') + aviso, 'success');
+  showToast(((linea.conceptos_factura || []).length ? 'Guardado cómo sale esta línea en la hoja.' : 'La hoja usará la línea tal cual.') + _avisoTrebello(pedidoId), 'success');
+}
+
+async function _guardarHojaFactura(pedidoId, conceptos) {
+  const { pedido } = await callEdgeFunction('gestionar-pedido', { accion: 'hoja_factura', id_pedido: pedidoId, conceptos });
+  const idx = DATA.pedidos.findIndex(x => x.ID_Pedido === pedidoId);
+  if (idx !== -1) Object.assign(DATA.pedidos[idx], _pedidoSbToObj(pedido));
+  showToast(((pedido.hoja_factura || []).length ? `La hoja llevará los ${pedido.hoja_factura.length} artículos de la factura en lugar de las líneas.` : 'La hoja vuelve a usar las líneas del pedido.') + _avisoTrebello(pedidoId), 'success');
 }
 
 async function guardarConceptoFactura() {
-  const lineaId = v('concfac-id');
+  const modo = v('concfac-modo');
   const pedidoId = v('concfac-pedido-id');
   const conceptos = _concFacTemp.map(c => ({ ...c, concepto: String(c.concepto || '').trim() })).filter(c => c.concepto);
   showLoading('Guardando...');
   try {
-    await _guardarConceptosLinea(lineaId, pedidoId, conceptos);
+    if (modo === 'pedido') await _guardarHojaFactura(pedidoId, conceptos);
+    else await _guardarConceptosLinea(v('concfac-id'), pedidoId, conceptos);
     closeModal('modal-concepto-factura');
     verDetallePedido(pedidoId);
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
@@ -559,18 +614,17 @@ async function guardarConceptoFactura() {
 }
 
 // Desde la revisión de la factura: los artículos sin línea coincidente que
-// en realidad son una línea del pedido facturada de otra forma.
+// en realidad sustituyen a todo el pedido en la hoja (pedidos.hoja_factura).
 async function asignarSinMatchAHoja() {
   if (!_revExtraccionActual) return;
   const { pedidoId, r } = _revExtraccionActual;
   const items = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-sm-check'))
     .filter(chk => chk.checked).map(chk => r.sin_match[Number(chk.dataset.idx)]).filter(Boolean);
-  if (!items.length) { showToast('Marca los artículos de la factura que corresponden a esa línea', 'info'); return; }
-  const lineaId = v('revext-sm-linea');
+  if (!items.length) { showToast('Marca los artículos de la factura que deben salir en la hoja', 'info'); return; }
   const conceptos = items.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
   showLoading('Guardando...');
   try {
-    await _guardarConceptosLinea(lineaId, pedidoId, conceptos);
+    await _guardarHojaFactura(pedidoId, conceptos);
     closeModal('modal-revision-extraccion');
     verDetallePedido(pedidoId);
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }

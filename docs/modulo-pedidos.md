@@ -46,15 +46,20 @@ Una vez la solicitud está en un pedido ya no se edita como solicitud, así que 
 - `gestionar-linea-pedido` `editar` acepta `material`: si el nombre nuevo es de catálogo enlaza a ese `id_material`; si no, conserva el enlace que tuviera.
 - Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
 
-## Cómo figura cada línea en la factura — solo en la hoja (2026-11-03)
-A veces la factura describe una línea con otras palabras, **o con otros artículos**. Caso real (PED0LWDM51): un pedido de servicio con una línea «Reparación» de 716 € que Dasan factura como cámaras Neubauer, guantes, acetonitrilo y metanol (suman exactamente 716 €). Las dos cosas son correctas, pero la **hoja de pedido** tiene que cuadrar con la factura, y **ningún otro sitio** debe cambiar: inventario, stock, solicitudes, contabilidad (sigue con el precio de la línea) y email al proveedor siguen con la línea tal cual.
-- Columna `lineas_pedido.conceptos_factura` (jsonb, lista de `{concepto, cantidad, unidad, precio_unitario}`; null = la hoja usa la línea). Cliente: `Conceptos_Factura` (array) en `_lineaPedidoSbToObj`.
-- La hoja imprime esos artículos **en lugar de la línea**, una fila cada uno. Con un solo concepto sin cifras (solo cambia el nombre) hereda cantidad y precio de la línea. La leen `generarHojaPedido` (el subtotal suma las filas impresas) y `enviar-a-trebello` (`aItems`, ids `<id_linea>-f<n>`). Si el pedido ya se envió, hay que **reenviar a Trebello**.
-- Se rellena de tres formas:
-  - **Revisión de factura, artículos sin línea coincidente** (`_bloqueSinMatchEnHoja` → `asignarSinMatchAHoja`): se marcan los artículos, se elige la línea y «Guardar para la hoja». Muestra la suma para comparar con la línea.
-  - **Revisión de factura, líneas emparejadas** (`_celdaConceptoFactura`): casilla «🧾 En la hoja, como en la factura» con el texto editable, **desmarcada** por defecto (en las facturas reales casi todas las líneas llevan referencia/envase). Se guarda con «Aplicar lo seleccionado».
-  - **Botón 🧾 de cada línea** (Admin/Gestor, cualquier estado de la línea) → `modal-concepto-factura`: filas concepto/cantidad/€ por ud, con la suma y si cuadra con la línea. Sin filas = quitarlo.
-- Servidor: `gestionar-linea-pedido` acción `concepto_factura` (`conceptos` de una línea o `lineas: [{id_linea, conceptos}]`).
+## La hoja de pedido como la factura (2026-11-03)
+Dos casos distintos, los dos **solo en la hoja de pedido** (Word de `generarHojaPedido` y la de Trebello vía `enviar-a-trebello`). Inventario, stock, solicitudes, contabilidad (precio de las líneas) y email al proveedor siguen con las líneas tal cual. Si el pedido ya se envió a Trebello, hay que **reenviarlo**.
+
+### 1. La factura sustituye a TODO el pedido → `pedidos.hoja_factura`
+Caso real (PED0LWDM51): pedido de servicio con una línea «Reparación» de 716 € que Dasan factura como cámaras Neubauer, guantes, acetonitrilo y metanol (suman exactamente 716 €).
+- Columna `pedidos.hoja_factura` (jsonb, lista de `{concepto, cantidad, unidad, precio_unitario}`; null = la hoja usa las líneas). Cliente: `Hoja_Factura` en `_pedidoSbToObj`. Servidor: `gestionar-pedido` acción `hoja_factura`.
+- Si tiene algo, la hoja lleva esos artículos **en lugar de todas las líneas**, y manda también sobre los conceptos por línea del caso 2. En Trebello va **una sola hoja** (ids `<id_pedido>-fac<n>`): la de material común solo si todas las líneas lo son.
+- Se gestiona en **Documentación interna**: botón **🧾 Hoja como la factura** (`openModalHojaFactura`). Si no hay nada guardado y una factura leída trae artículos sin línea, el editor los **precarga**. Cuando está activo aparece una franja «🧾 En la hoja salen los N artículos de la factura…» con la suma, si cuadra con las líneas y «✏️ Revisar».
+- Desde la **revisión de la factura leída con IA**: debajo de los artículos sin línea coincidente, el recuadro «🧾 ¿La factura sustituye a todo el pedido?» (`_bloqueSinMatchEnHoja` → `asignarSinMatchAHoja`), con la suma en vivo.
+
+### 2. Retocar cómo sale UNA línea → `lineas_pedido.conceptos_factura`
+Expresarla de otra manera o añadir la referencia. Mismo formato de lista; un solo concepto sin cifras = solo cambia el texto y hereda cantidad y precio de la línea.
+- **Botón 🧾 de la línea** (discreto si está vacío; Admin/Gestor, cualquier estado de la línea) → mismo modal `modal-concepto-factura` en modo `linea`. Servidor: `gestionar-linea-pedido` acción `concepto_factura`.
+- En la revisión de la factura, las **líneas emparejadas** muestran la casilla «🧾 En la hoja, como en la factura» con el texto editable, **desmarcada** por defecto (en las facturas reales casi todas las líneas llevan referencia/envase). Se guarda con «Aplicar lo seleccionado».
 
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`

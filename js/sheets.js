@@ -317,6 +317,8 @@ function _pedidoSbToObj(p) {
     Trebello_Pedido_Id: p.trebello_pedido_id || '',
     Fecha_Envio_Trebello: p.fecha_envio_trebello || '',
     Trebello_Pedido_Comun_Id: p.trebello_pedido_comun_id || '',
+    // Artículos de la factura que en la hoja sustituyen a TODAS las líneas.
+    Hoja_Factura: Array.isArray(p.hoja_factura) ? p.hoja_factura : [],
   };
 }
 

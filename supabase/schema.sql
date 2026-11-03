@@ -853,3 +853,10 @@ alter table solicitudes add column if not exists compra_nota    text;
 -- hoja (.docx de generarHojaPedido y enviar-a-trebello); en el resto de la app
 -- la línea sigue con `material`, su cantidad y su precio. null = la hoja usa la línea.
 alter table lineas_pedido add column if not exists conceptos_factura jsonb;
+
+-- Cuando la factura sustituye a TODAS las líneas del pedido (caso real: una
+-- "Reparación" de 716 € facturada como cámaras Neubauer, guantes y
+-- disolventes), los artículos van aquí, a nivel de pedido, con el mismo formato
+-- que lineas_pedido.conceptos_factura. Manda sobre las líneas y sobre sus
+-- conceptos_factura, pero solo en la hoja (.docx y enviar-a-trebello). null = la hoja usa las líneas.
+alter table pedidos add column if not exists hoja_factura jsonb;

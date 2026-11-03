@@ -576,31 +576,36 @@ let _revExtraccionActual = null;
 function _normConcepto(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
-// Artículos de la factura que no son ninguna línea, pero que en realidad SON
-// una línea del pedido facturada de otra forma (caso real: una "Reparación"
-// de 716 € que la casa comercial factura como cámaras Neubauer, guantes y
-// disolventes). Se guardan como conceptos de factura de esa línea: salen en la
-// hoja en su lugar y no entran en el inventario ni cambian la línea.
+// Artículos de la factura que no son ninguna línea porque la casa comercial
+// ha facturado el pedido con OTROS artículos (caso real: una "Reparación" de
+// 716 € facturada como cámaras Neubauer, guantes y disolventes). Se guardan en
+// el pedido (pedidos.hoja_factura): en la hoja salen en lugar de todas las
+// líneas; las líneas, el inventario y la contabilidad no cambian.
 function _bloqueSinMatchEnHoja(sinMatch, pedidoId) {
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
   if (!lineas.length || !(sinMatch || []).length) return '';
-  const suma = sinMatch.reduce((s, i) => s + (Number(i.precio_unitario) || 0) * (i.cantidad != null ? Number(i.cantidad) : 1), 0);
-  const opciones = lineas.map(l => {
-    const imp = (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0);
-    return `<option value="${l.ID_Linea}">${_escAttr(l.Material)}${imp ? ` — ${imp.toFixed(2)} €` : ''}</option>`;
-  }).join('');
+  const importeLineas = lineas.reduce((s, l) => s + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
   return `<div style="margin-top:12px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px">
-    <div style="font-weight:600;margin-bottom:6px">🧾 ¿Son en realidad una línea del pedido facturada de otra forma?</div>
+    <div style="font-weight:600;margin-bottom:6px">🧾 ¿La factura sustituye a todo el pedido?</div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
-      ${sinMatch.map((i, idx) => `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="revext-sm-check" data-idx="${idx}" style="width:14px;height:14px;margin-top:2px;flex:none"><span>${_escAttr(i.material)}${i.cantidad != null ? ` — ${i.cantidad}` : ''}${i.precio_unitario != null ? ` × ${Number(i.precio_unitario).toFixed(2)} €` : ''}</span></label>`).join('')}
+      ${sinMatch.map((i, idx) => `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="revext-sm-check" data-idx="${idx}" checked onchange="_sumaSinMatchHoja()" style="width:14px;height:14px;margin-top:2px;flex:none"><span>${_escAttr(i.material)}${i.cantidad != null ? ` — ${i.cantidad}` : ''}${i.precio_unitario != null ? ` × ${Number(i.precio_unitario).toFixed(2)} €` : ''}</span></label>`).join('')}
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <span>Ponerlos en la hoja en lugar de</span>
-      <select id="revext-sm-linea" style="flex:1;min-width:180px">${opciones}</select>
-      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Guardar para la hoja</button>
+    <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
+      <span id="revext-sm-suma" data-lineas="${importeLineas}" style="font-size:12px"></span>
+      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Usar en la hoja en lugar de las líneas</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Todos juntos suman ${suma.toFixed(2)} € (sin IVA). Solo cambia la hoja de pedido: la línea sigue igual en la app y nada entra en el inventario.</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Solo cambia la hoja de pedido. Las líneas siguen igual en la app y nada entra en el inventario. Se puede revisar o quitar después en Documentación interna → 🧾 Hoja como la factura.</div>
   </div>`;
+}
+
+function _sumaSinMatchHoja() {
+  const el = document.getElementById('revext-sm-suma');
+  if (!el || !_revExtraccionActual) return;
+  const items = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-sm-check'))
+    .filter(c => c.checked).map(c => _revExtraccionActual.r.sin_match[Number(c.dataset.idx)]).filter(Boolean);
+  const suma = items.reduce((s, i) => s + (Number(i.precio_unitario) || 0) * (i.cantidad != null ? Number(i.cantidad) : 1), 0);
+  const imp = Number(el.dataset.lineas) || 0;
+  el.innerHTML = `Suma: <strong>${suma.toFixed(2)} €</strong> sin IVA${imp ? (Math.abs(suma - imp) < 0.01 ? ' · ✓ cuadra con el pedido' : ` · ⚠ las líneas suman ${imp.toFixed(2)} €`) : ''}`;
 }
 
 function _celdaConceptoFactura(m) {
@@ -700,6 +705,7 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   </div>` : '';
 
   cont.innerHTML = tabla + sinMatch + cargoExtra + datosFactura;
+  _sumaSinMatchHoja();
   openModal('modal-revision-extraccion');
 }
 
@@ -747,12 +753,20 @@ function _filaLineaPedido(l, p, puedeEditar) {
     </div>
     <div class="linea-actions">
       ${puedeEditar && p.Tipo !== 'Servicio' ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
-      ${puedeEditar ? `<button class="icon-btn" title="Cómo figura en la factura (solo para la hoja de pedido)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')">🧾</button>` : ''}
+      ${puedeEditar ? `<button class="icon-btn" title="Cómo se nombra en la hoja de pedido (otra forma de expresarlo, referencias…)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')" style="${(l.Conceptos_Factura || []).length ? '' : 'opacity:.45'}">🧾</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
       ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
       ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
     </div>
   </div>`;
+}
+
+// "716.00 € · ✓ cuadra con las líneas" — para la fila de Documentación interna.
+function _resumenHojaFactura(p) {
+  const suma = (p.Hoja_Factura || []).reduce((s, c) => s + (Number(c.precio_unitario) || 0) * (c.cantidad != null ? Number(c.cantidad) : 1), 0);
+  const imp = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido)
+    .reduce((s, l) => s + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
+  return `${suma.toFixed(2)} € sin IVA${imp ? (Math.abs(suma - imp) < 0.01 ? ' · ✓ cuadra con las líneas' : ` · ⚠ las líneas suman ${imp.toFixed(2)} €`) : ''}`;
 }
 
 function verDetallePedido(pedidoId) {
@@ -794,11 +808,16 @@ function verDetallePedido(pedidoId) {
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación interna</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
+            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="openModalHojaFactura('${p.ID_Pedido}')" title="Cuando la casa comercial factura el pedido con otros artículos: la hoja lleva los de la factura en lugar de las líneas">🧾 Hoja como la factura</button>` : ''}
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px">
+          ${(p.Hoja_Factura || []).length ? `<div style="font-size:13px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+            <span>🧾 En la hoja salen los <strong>${p.Hoja_Factura.length} artículos de la factura</strong> en lugar de las líneas · ${_resumenHojaFactura(p)}</span>
+            <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="openModalHojaFactura('${p.ID_Pedido}')">✏️ Revisar</button>
+          </div>` : ''}
           <div style="display:flex;align-items:center;gap:10px;font-size:13px">
             <input type="checkbox" id="chk-hoja-generada" ${p.Doc_Hoja_Generada==='TRUE'?'checked':''} disabled style="width:16px;height:16px">
             <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>

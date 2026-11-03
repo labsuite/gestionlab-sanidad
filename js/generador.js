@@ -126,7 +126,14 @@ async function generarHojaPedido() {
     // disolventes), la hoja imprime ESOS en lugar de la línea. Sin cifras
     // propias, un concepto único hereda cantidad y precio de la línea.
     const fmtEur = n => n > 0 ? n.toFixed(2) + ' €' : '';
-    const lineasConPrecios = lineas.flatMap(l => {
+    // Si la factura sustituye a todo el pedido (p.Hoja_Factura), la hoja lleva
+    // esos artículos y no las líneas.
+    const hojaFactura = p.Hoja_Factura || [];
+    const lineasConPrecios = hojaFactura.length ? hojaFactura.map(c => {
+      const cant   = c.cantidad != null ? Number(c.cantidad) : 1;
+      const precio = c.precio_unitario != null ? Number(c.precio_unitario) : 0;
+      return { concepto: c.concepto, cantidad: String(cant), precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant };
+    }) : lineas.flatMap(l => {
       const precioLinea = parseFloat(l.Precio_Unitario) || 0;
       const cantLinea   = parseFloat(l.Cantidad_Pedida) || 0;
       const conceptos = l.Conceptos_Factura || [];

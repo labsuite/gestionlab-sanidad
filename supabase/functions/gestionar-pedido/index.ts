@@ -130,6 +130,31 @@ Deno.serve(async (req) => {
     return jsonOk({ pedido: data });
   }
 
+  if (accion === "hoja_factura") {
+    // Artículos de la factura que, en la HOJA de pedido, sustituyen a TODAS las
+    // líneas (caso real: una "Reparación" facturada como cámaras Neubauer,
+    // guantes y disolventes). Solo la hoja (.docx y enviar-a-trebello): las
+    // líneas, el inventario y la contabilidad no cambian. [] / null = la hoja usa las líneas.
+    const num = (v: unknown) => {
+      if (v === "" || v === null || v === undefined) return null;
+      const n = Number(String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    };
+    const conceptos = (Array.isArray(body.conceptos) ? body.conceptos as Record<string, unknown>[] : [])
+      .map((c) => ({
+        concepto: String(c?.concepto ?? "").trim(),
+        cantidad: num(c?.cantidad),
+        unidad: strField(String(c?.unidad ?? "").trim()),
+        precio_unitario: num(c?.precio_unitario),
+      }))
+      .filter((c) => c.concepto);
+    const { data, error } = await supabaseAdmin.from("pedidos")
+      .update({ hoja_factura: conceptos.length ? conceptos : null }).eq("id_pedido", idPedido).select().single();
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    if (!data) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
+    return jsonOk({ pedido: data });
+  }
+
   if (accion === "generar_link_publico") {
     const { data: p } = await supabaseAdmin.from("pedidos").select("token_publico").eq("id_pedido", idPedido).maybeSingle();
     if (!p) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
