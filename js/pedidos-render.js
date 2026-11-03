@@ -808,7 +808,7 @@ function verDetallePedido(pedidoId) {
           <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación interna</div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
-            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="openModalHojaFactura('${p.ID_Pedido}')" title="Cuando la casa comercial factura el pedido con otros artículos: la hoja lleva los de la factura en lugar de las líneas">🧾 Hoja como la factura</button>` : ''}
+            ${lineas.length && !(p.Hoja_Factura || []).length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="openModalHojaFactura('${p.ID_Pedido}')" title="Cuando la casa comercial factura el pedido con otros artículos: la hoja lleva los de la factura en lugar de las líneas">🧾 Hoja como la factura</button>` : ''}
             <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
             ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
           </div>
