@@ -455,7 +455,7 @@ function abrirHiloIncidencia(incId) {
   if (!inc) return;
   _hiloIncidenciaActiva = incId;
   const label = document.getElementById('hilo-inc-label');
-  if (label) label.textContent = `${inc.ID_Incidencia} · ${inc.Equipo || ''} · ${inc.Estado}`;
+  if (label) label.textContent = `${inc.ID_Incidencia} · ${_equipoConUbicacion(inc.Equipo)} · ${inc.Estado}`;
 
   const cont = document.getElementById('hilo-lista');
   if (!cont) return;
@@ -1822,7 +1822,7 @@ function seleccionarEquipoIncidencia(id, label) {
   const sel  = document.getElementById('inc-equipo-selected');
   const txt  = document.getElementById('inc-equipo-selected-text');
   if (sel) sel.style.display = 'flex';
-  if (txt) txt.textContent = id + (label ? ' – ' + label : '');
+  if (txt) txt.textContent = _equipoConUbicacion(id + (label ? ' – ' + label : ''));
   const list = document.getElementById('inc-equipo-autocomplete');
   if (list) list.classList.remove('open');
   poblarIncidenciasRelacionadas(id);

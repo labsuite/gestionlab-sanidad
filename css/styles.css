@@ -803,6 +803,7 @@
     .inc-card-ident { display: flex; flex-direction: column; gap: 3px; }
     .inc-id { font-size: 11px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.03em; }
     .inc-equipo { font-size: 14px; font-weight: 600; color: var(--accent); }
+    .inc-ubicacion { font-size: 12px; color: var(--text-muted); }
 
     .inc-card-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .inc-fecha { font-size: 12px; color: var(--text-soft); white-space: nowrap; }

@@ -178,6 +178,20 @@ function intervencionEquipoFuera(equipoId) {
 }
 
 // Cartel reutilizable "📦 Fuera del centro". `mini` lo encoge para tablas/tarjetas.
+// Ubicación del equipo al que apunta un texto "ID – Tipo…" (incidencias e
+// intervenciones guardan el equipo así). Hay muchos equipos iguales y nadie se
+// sabe los códigos: con la ubicación al lado se reconoce cuál es.
+function ubicacionDeEquipo(equipoTxt) {
+  const id = (equipoTxt || '').split(' – ')[0].trim();
+  if (!id) return '';
+  const eq = DATA.equipos.find(e => e.ID_Activo === id);
+  return eq && eq.Ubicacion ? getNombreUbicacion(eq.Ubicacion) : '';
+}
+function _equipoConUbicacion(equipoTxt) {
+  const u = ubicacionDeEquipo(equipoTxt);
+  return (equipoTxt || '—') + (u ? ` · 📍 ${u}` : '');
+}
+
 function badgeEquipoFuera(equipoId, mini) {
   const int = intervencionEquipoFuera(equipoId);
   if (!int) return '';
@@ -455,7 +469,7 @@ function renderProximasVisitas() {
     const puedeEjecutar = puedeHacer('crearIntervenciones') &&
       (rol !== 'Profesor' || esResponsableDeEquipo(DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)) || {}));
     return `<tr>
-      <td>${i.Equipo||'—'}${badgeEquipoFuera((i.Equipo || '').split(' – ')[0].trim(), true)}</td>
+      <td>${i.Equipo||'—'}${ubicacionDeEquipo(i.Equipo) ? `<div class="text-muted" style="font-size:11px">📍 ${ubicacionDeEquipo(i.Equipo)}</div>` : ''}${badgeEquipoFuera((i.Equipo || '').split(' – ')[0].trim(), true)}</td>
       <td><span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span>${nTareas ? ` <span class="badge badge-blue" style="font-size:10px">${nTareas} prevista${nTareas>1?'s':''}</span>` : ''}</td>
       <td>${i.Fecha_Planificada ? formatDate(i.Fecha_Planificada) : '<span class="text-muted">Por concretar</span>'}</td>
       <td>${inc ? `<span class="badge badge-orange" style="font-size:10px;cursor:pointer" onclick="abrirHiloIncidencia('${inc.ID_Incidencia}')" title="Ver hilo completo">🔗 ${inc.ID_Incidencia}</span>` : '<span class="text-muted">—</span>'}</td>
@@ -640,6 +654,7 @@ function renderIncidencias(filtroEstado) {
     <div class="inc-card-ident">
       <span class="inc-id">${i.ID_Incidencia}</span>
       <span class="inc-equipo">${i.Equipo || '—'}</span>
+      ${ubicacionDeEquipo(i.Equipo) ? `<span class="inc-ubicacion">📍 ${ubicacionDeEquipo(i.Equipo)}</span>` : ''}
     </div>
     <div class="inc-card-meta">
       ${i.Urgencia === 'Urgente' ? '<span class="badge badge-red">Urgente</span>' : ''}
@@ -753,7 +768,7 @@ function openFichaIntervencion(intIdx) {
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
 
   document.getElementById('ficha-int-id').textContent       = i.ID_Intervencion;
-  document.getElementById('ficha-int-equipo').textContent   = i.Equipo || '—';
+  document.getElementById('ficha-int-equipo').textContent   = _equipoConUbicacion(i.Equipo);
   document.getElementById('ficha-int-tipo').innerHTML       = `<span class="badge ${tipoBadge[i.Tipo]||'badge-gray'}">${i.Tipo||'—'}</span>`;
   document.getElementById('ficha-int-estado').innerHTML     = i.Estado ? `<span class="badge ${estadoBadge[i.Estado]||'badge-gray'}">${i.Estado}</span>` : '—';
 
