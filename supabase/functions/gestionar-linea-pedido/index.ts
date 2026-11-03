@@ -329,6 +329,31 @@ Deno.serve(async (req) => {
     return jsonOk({ linea: data });
   }
 
+  if (accion === "concepto_factura") {
+    // Cómo figura la línea en la FACTURA, solo para la hoja de pedido (ver
+    // schema.sql). Como "imputacion", se puede tocar con la línea ya
+    // recibida: no cambia ni el nombre del material, ni cantidades, ni stock.
+    // Admite varias líneas a la vez (desde la revisión de la factura leída con IA).
+    const lineas = Array.isArray(body.lineas) ? body.lineas as Record<string, unknown>[]
+      : [{ id_linea: body.id_linea, concepto_factura: body.concepto_factura }];
+    const actualizadas = [];
+    for (const l of lineas) {
+      const idLinea = String(l.id_linea || "").trim();
+      if (!idLinea) continue;
+      const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("material").eq("id_linea", idLinea).maybeSingle();
+      if (!linea) continue;
+      let texto = strField(String(l.concepto_factura ?? "").trim());
+      // Igual que el nombre de la línea = no hace falta guardarlo aparte.
+      if (texto && texto === String(linea.material || "").trim()) texto = null;
+      const { data, error } = await supabaseAdmin.from("lineas_pedido")
+        .update({ concepto_factura: texto }).eq("id_linea", idLinea).select().single();
+      if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+      actualizadas.push(data);
+    }
+    if (!actualizadas.length) return jsonError("Línea no encontrada", 404);
+    return jsonOk({ lineas: actualizadas, linea: actualizadas[0] });
+  }
+
   if (accion === "recepcion") {
     const idLinea = String(body.id_linea || "").trim();
     const cantRec = Number(body.cantidad);

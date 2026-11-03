@@ -510,6 +510,30 @@
   </div>
 </div>
 
+<!-- Modal Texto de la factura (solo para la hoja de pedido) -->
+<div class="modal-overlay" id="modal-concepto-factura">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">🧾 Cómo figura en la factura</div>
+      <button class="modal-close" onclick="closeModal('modal-concepto-factura')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="concfac-id">
+      <input type="hidden" id="concfac-pedido-id">
+      <div style="font-size:13px;margin-bottom:12px">Línea del pedido: <strong id="concfac-material"></strong></div>
+      <div class="form-group full">
+        <label>Texto de la factura</label>
+        <input id="concfac-texto" type="text" placeholder="Tal como lo escribe la casa comercial">
+        <div class="text-muted" style="font-size:11px;margin-top:4px">Solo sale en la hoja de pedido, para que cuadre con la factura. En el inventario, las solicitudes y el resto de la app la línea sigue con su nombre. Déjalo vacío para que la hoja use el nombre de la línea.</div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-concepto-factura')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarConceptoFactura()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal Reasignar Ciclo/Módulo (desde Contabilidad) -->
 <div class="modal-overlay" id="modal-reasignar-ciclo">
   <div class="modal" style="max-width:420px">
@@ -604,7 +628,7 @@
     <div class="modal-header">
       <div>
         <div class="modal-title">🤖 Datos leídos del documento</div>
-        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Marca los precios que quieres aplicar — nada se guarda hasta que pulses Aplicar</div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Marca lo que quieres aplicar — nada se guarda hasta que pulses Aplicar</div>
       </div>
       <button class="modal-close" onclick="closeModal('modal-revision-extraccion')">✕</button>
     </div>
@@ -613,7 +637,7 @@
       <div id="revision-extraccion-contenido"></div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-revision-extraccion')">Cerrar</button>
-        <button class="btn btn-primary" onclick="aplicarPreciosExtraccion()">Aplicar precios seleccionados</button>
+        <button class="btn btn-primary" onclick="aplicarPreciosExtraccion()">Aplicar lo seleccionado</button>
       </div>
     </div>
   </div>

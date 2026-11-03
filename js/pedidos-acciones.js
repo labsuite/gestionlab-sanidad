@@ -490,6 +490,39 @@ async function toggleLineaComun(lineaId, pedidoId) {
   hideLoading();
 }
 
+// Cómo figura una línea en la factura. Solo lo usa la hoja de pedido (Word y
+// Trebello); en el resto de la app la línea sigue con su nombre. Se puede
+// tocar en cualquier estado de la línea, porque la factura suele llegar
+// cuando ya está recibida.
+function openModalConceptoFactura(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  sv('concfac-id', lineaId);
+  sv('concfac-pedido-id', pedidoId);
+  document.getElementById('concfac-material').textContent = l.Material || '';
+  sv('concfac-texto', l.Concepto_Factura || '');
+  openModal('modal-concepto-factura');
+}
+
+async function guardarConceptoFactura() {
+  const lineaId = v('concfac-id');
+  const pedidoId = v('concfac-pedido-id');
+  showLoading('Guardando...');
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'concepto_factura', id_linea: lineaId, concepto_factura: v('concfac-texto').trim(),
+    });
+    const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
+    if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+    const aviso = (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
+    showToast((linea.concepto_factura ? 'Texto de la factura guardado para la hoja.' : 'La hoja usará el nombre de la línea.') + aviso, 'success');
+    closeModal('modal-concepto-factura');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
 // ============================================================
 // AVANCE SECUENCIAL DE ESTADO DE PEDIDO
 // ============================================================
@@ -676,13 +709,24 @@ async function aplicarPreciosExtraccion() {
     if (!precio) continue;
     lineasBody.push({ id_linea: idLinea, precio_unitario: precio });
   }
-  if (!lineasBody.length) { showToast('No has seleccionado ningún precio para aplicar', 'info'); return; }
+  // Texto de la factura para la hoja de pedido (solo las casillas marcadas).
+  const conceptos = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-concepto-check'))
+    .filter(chk => chk.checked)
+    .map(chk => {
+      const input = document.querySelector(`#revision-extraccion-contenido .revext-concepto[data-id-linea="${chk.dataset.idLinea}"]`);
+      return { id_linea: chk.dataset.idLinea, concepto_factura: input ? input.value.trim() : '' };
+    });
+  if (!lineasBody.length && !conceptos.length) { showToast('No has seleccionado nada para aplicar', 'info'); return; }
 
-  showLoading('Aplicando precios...');
+  showLoading('Aplicando...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'actualizar_precio', pedido: pedidoId, proveedor: p.Proveedor || '', lineas: lineasBody });
+    if (lineasBody.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'actualizar_precio', pedido: pedidoId, proveedor: p.Proveedor || '', lineas: lineasBody });
+    if (conceptos.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'concepto_factura', lineas: conceptos });
     await loadAllData();
-    showToast(`${lineasBody.length} precio(s) actualizado(s)`, 'success');
+    const partes = [];
+    if (lineasBody.length) partes.push(`${lineasBody.length} precio(s)`);
+    if (conceptos.length) partes.push(`${conceptos.length} texto(s) de factura para la hoja`);
+    showToast(`Guardado: ${partes.join(' y ')}`, 'success');
     closeModal('modal-revision-extraccion');
     verDetallePedido(pedidoId);
     renderContabilidad(); renderMaterial();

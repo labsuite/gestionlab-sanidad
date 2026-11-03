@@ -843,3 +843,12 @@ alter table pedidos       add column if not exists trebello_pedido_comun_id text
 alter table solicitudes add column if not exists compra_fecha   date;
 alter table solicitudes add column if not exists compra_importe numeric;
 alter table solicitudes add column if not exists compra_nota    text;
+
+-- ── Texto de la factura por línea (2026-11-03) ──────────────────────────
+-- A veces la factura describe una línea con otras palabras (referencia,
+-- marca, formato del envase) que el nombre con que se pidió. Las dos cosas
+-- son correctas, pero la hoja de pedido tiene que cuadrar con la factura.
+-- Solo lo usan la hoja (.docx de generarHojaPedido y la que monta Trebello
+-- con enviar-a-trebello); en el resto de la app la línea sigue llamándose
+-- `material`. null = la hoja usa `material`.
+alter table lineas_pedido add column if not exists concepto_factura text;

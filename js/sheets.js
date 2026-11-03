@@ -352,6 +352,8 @@ function _lineaPedidoSbToObj(l) {
     // null = hereda de la ficha del material; true/false = forzado en esta
     // línea. Usar lineaEsComun() (js/config.js), no leerlo a mano.
     Material_Comun: l.material_comun === true ? true : l.material_comun === false ? false : null,
+    // Cómo lo llama la factura; solo lo usa la hoja de pedido. Vacío = Material.
+    Concepto_Factura: l.concepto_factura || '',
   };
 }
 

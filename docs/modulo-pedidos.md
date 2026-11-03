@@ -46,6 +46,15 @@ Una vez la solicitud está en un pedido ya no se edita como solicitud, así que 
 - `gestionar-linea-pedido` `editar` acepta `material`: si el nombre nuevo es de catálogo enlaza a ese `id_material`; si no, conserva el enlace que tuviera.
 - Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
 
+## Texto de la factura por línea — solo en la hoja (2026-11-03)
+A veces la factura describe una línea con otras palabras (marca, referencia, envase) que el nombre con que se pidió. Las dos son correctas, pero la **hoja de pedido** tiene que cuadrar con la factura, y **ningún otro sitio** debe cambiar (inventario, stock, solicitudes, contabilidad, email al proveedor siguen con `material`).
+- Columna `lineas_pedido.concepto_factura` (text, null = la hoja usa `material`). Cliente: `Concepto_Factura` en `_lineaPedidoSbToObj`.
+- Solo la leen la hoja `.docx` (`generarHojaPedido`, se usa tal cual, sin pegarle la unidad) y `enviar-a-trebello` (`concepto` del item → la hoja que firma la jefa). Si el pedido ya se envió, hay que **reenviar a Trebello**.
+- Se rellena de dos formas:
+  - **Revisión de la factura leída con IA** (`_celdaConceptoFactura`): si el texto de la factura no coincide con el nombre de la línea, aparece debajo, editable, con la casilla "🧾 En la hoja, como en la factura" (marcada por defecto si la línea aún no tenía uno). Se guarda con el mismo botón "Aplicar lo seleccionado" (`aplicarPreciosExtraccion`).
+  - **Botón 🧾 en cada línea** del detalle (Admin/Gestor) → `modal-concepto-factura`. Vale en cualquier estado de la línea (la factura suele llegar con la línea ya recibida). Vacío = quitarlo.
+- Servidor: `gestionar-linea-pedido` acción `concepto_factura` (una línea o `lineas: [...]`); si el texto es igual al nombre, guarda null.
+
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
 - "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales

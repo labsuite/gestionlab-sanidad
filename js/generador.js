@@ -132,7 +132,11 @@ async function generarHojaPedido() {
           if (uMatch) unidad = uMatch[1].trim();
         }
       }
-      const concepto = unidad ? l.Material + ', ' + unidad : l.Material;
+      // Si se apuntó cómo lo llama la factura, la hoja usa ese texto tal cual
+      // (ya trae su formato/envase); en el resto de la app sigue l.Material.
+      const concepto = l.Concepto_Factura
+        ? l.Concepto_Factura
+        : (unidad ? l.Material + ', ' + unidad : l.Material);
       const precio   = parseFloat(l.Precio_Unitario) || 0;
       const cant     = parseFloat(l.Cantidad_Pedida) || 0;
       const total    = precio * cant;

@@ -101,7 +101,9 @@ Deno.serve(async (req) => {
     const recibida = parseFloat(l.cantidad_recibida) || 0;
     return {
       id: String(l.id_linea),
-      concepto: String(l.material || ""),
+      // En la hoja manda cómo lo llama la factura, si se apuntó (ver
+      // lineas_pedido.concepto_factura en schema.sql).
+      concepto: String(l.concepto_factura || l.material || ""),
       cantidade: pedida,
       unidade: String(l.unidad || "").trim() || null,
       prezo_sin_iva: parseFloat(l.precio_unitario) || 0,
