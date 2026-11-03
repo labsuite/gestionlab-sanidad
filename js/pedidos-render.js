@@ -569,9 +569,10 @@ let _revExtraccionActual = null;
 
 // Cómo llama la factura a esta línea. Si no coincide con el nombre con que se
 // pidió, se ofrece guardarlo para la hoja de pedido (lineas_pedido.concepto_factura)
-// — en el resto de la app la línea conserva su nombre. Marcado por defecto
-// solo cuando difiere y la línea aún no tiene uno apuntado; el texto es
-// editable porque la IA a veces arrastra referencias o códigos de más.
+// — en el resto de la app la línea conserva su nombre. Siempre desmarcado: en
+// las facturas reales casi todas las líneas difieren (referencia, envase…) y
+// solo algunas hace falta cambiarlas. El texto es editable porque la IA a
+// veces arrastra referencias o códigos de más.
 function _normConcepto(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 }
@@ -583,7 +584,7 @@ function _celdaConceptoFactura(m) {
   if (!actual && _normConcepto(textoFactura) === _normConcepto(m.material_linea)) return '';
   const valor = actual || textoFactura;
   return `<label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--text-muted)">
-      <input type="checkbox" class="revext-concepto-check" data-id-linea="${m.id_linea}" ${actual ? '' : 'checked'} style="width:14px;height:14px;flex:none">
+      <input type="checkbox" class="revext-concepto-check" data-id-linea="${m.id_linea}" style="width:14px;height:14px;flex:none">
       🧾 En la hoja, como en la factura:
     </label>
     <input type="text" class="revext-concepto" data-id-linea="${m.id_linea}" value="${_escAttr(valor)}" style="width:100%;font-size:12px;margin-top:2px">`;

@@ -51,7 +51,7 @@ A veces la factura describe una línea con otras palabras (marca, referencia, en
 - Columna `lineas_pedido.concepto_factura` (text, null = la hoja usa `material`). Cliente: `Concepto_Factura` en `_lineaPedidoSbToObj`.
 - Solo la leen la hoja `.docx` (`generarHojaPedido`, se usa tal cual, sin pegarle la unidad) y `enviar-a-trebello` (`concepto` del item → la hoja que firma la jefa). Si el pedido ya se envió, hay que **reenviar a Trebello**.
 - Se rellena de dos formas:
-  - **Revisión de la factura leída con IA** (`_celdaConceptoFactura`): si el texto de la factura no coincide con el nombre de la línea, aparece debajo, editable, con la casilla "🧾 En la hoja, como en la factura" (marcada por defecto si la línea aún no tenía uno). Se guarda con el mismo botón "Aplicar lo seleccionado" (`aplicarPreciosExtraccion`).
+  - **Revisión de la factura leída con IA** (`_celdaConceptoFactura`): si el texto de la factura no coincide con el nombre de la línea, aparece debajo, editable, con la casilla "🧾 En la hoja, como en la factura" (**desmarcada** por defecto: en las facturas reales casi todas las líneas llevan referencia/envase y solo algunas interesa cambiarlas). Se guarda con el mismo botón "Aplicar lo seleccionado" (`aplicarPreciosExtraccion`).
   - **Botón 🧾 en cada línea** del detalle (Admin/Gestor) → `modal-concepto-factura`. Vale en cualquier estado de la línea (la factura suele llegar con la línea ya recibida). Vacío = quitarlo.
 - Servidor: `gestionar-linea-pedido` acción `concepto_factura` (una línea o `lineas: [...]`); si el texto es igual al nombre, guarda null.
 
