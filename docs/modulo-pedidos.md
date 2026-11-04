@@ -47,13 +47,13 @@ Una vez la solicitud está en un pedido ya no se edita como solicitud, así que 
 - Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
 
 ## La hoja de pedido como la factura (2026-11-03)
-Dos casos distintos, los dos **solo en la hoja de pedido** (Excel de `generarHojaPedido` y la de Trebello vía `enviar-a-trebello`). Inventario, stock, solicitudes, contabilidad (precio de las líneas) y email al proveedor siguen con las líneas tal cual. Si el pedido ya se envió a Trebello, hay que **reenviarlo**.
+Dos casos distintos, los dos **solo en la hoja de pedido** (Excel de `generarHojaPedido` y la de Trebello vía `enviar-a-trebello`). Inventario, stock, solicitudes, contabilidad (precio de las líneas) y email al proveedor siguen con las líneas tal cual. Si el pedido ya se envió a Trebello, hay que pulsar **↻ Actualizar en Trebello**.
 
 ### 1. La factura sustituye a TODO el pedido → `pedidos.hoja_factura`
 Caso real (PED0LWDM51): pedido de servicio con una línea «Reparación» de 716 € que Dasan factura como cámaras Neubauer, guantes, acetonitrilo y metanol (suman exactamente 716 €).
 - Columna `pedidos.hoja_factura` (jsonb, lista de `{concepto, cantidad, unidad, precio_unitario}`; null = la hoja usa las líneas). Cliente: `Hoja_Factura` en `_pedidoSbToObj`. Servidor: `gestionar-pedido` acción `hoja_factura`.
 - Si tiene algo, la hoja lleva esos artículos **en lugar de todas las líneas**, y manda también sobre los conceptos por línea del caso 2. En Trebello va **una sola hoja** (ids `<id_pedido>-fac<n>`): la de material común solo si todas las líneas lo son.
-- Se gestiona en **Documentación interna**: botón **🧾 Hoja como la factura** (`openModalHojaFactura`), que solo sale mientras no hay nada guardado; después se entra por «✏️ Revisar» de la franja. Si no hay nada guardado y una factura leída trae artículos sin línea, el editor los **precarga**. Cuando está activo aparece una franja «🧾 En la hoja salen los N artículos de la factura…» con la suma, si cuadra con las líneas y «✏️ Revisar».
+- Se gestiona en la ficha → **2 · Hoja de pedido**, con el selector «¿Qué artículos salen en la hoja? Las líneas del pedido / Los de la factura» (`elegirArticulosHoja`). Es una **decisión**, no un botón de acción: «Los de la factura» abre el editor (`openModalHojaFactura`); volver a «Las líneas» pide confirmación y guarda la lista vacía. Con la opción activa, se edita por «✏️ Revisar» de la franja. Si no hay nada guardado y una factura leída trae artículos sin línea, el editor los **precarga**. Cuando está activo aparece una franja «🧾 En la hoja salen los N artículos de la factura…» con la suma, si cuadra con las líneas y «✏️ Revisar».
 - Desde la **revisión de la factura leída con IA**: debajo de los artículos sin línea coincidente, el recuadro «🧾 ¿La factura sustituye a todo el pedido?» (`_bloqueSinMatchEnHoja` → `asignarSinMatchAHoja`), con la suma en vivo.
 
 ### 2. Retocar cómo sale UNA línea → `lineas_pedido.conceptos_factura`
@@ -152,8 +152,8 @@ venía Elena Sánchez Blanco) y ya no trae rellenos el departamento ni el profes
 `pedidos.doc_hoja_path` (columna nueva) vía `gestionar-pedido` `actualizar_campos`. En cada
 regeneración se **reemplaza**: `subir-documento` (`tipo === 'documento'`) hace `storage.list`
 + `remove` de la carpeta `documentos-generados/<id_pedido>/` antes de subir la nueva, así que
-esa carpeta solo tiene un archivo. La ficha del pedido ("Documentación interna",
-`js/pedidos-render.js`) muestra un botón "📥 Abrir" junto a "📄 Hoja de pedido generada"
+esa carpeta solo tiene un archivo. La ficha del pedido ("2 · Hoja de pedido", tarjeta «📄 Hoja a mano»,
+`js/pedidos-render.js`) muestra un botón "📥 Abrir hoja" junto a "📄 Volver a generar"
 cuando `p.Doc_Hoja_Path` tiene valor — antes el único enlace era el efímero del modal de
 generación. `obtener-documento` firma la ruta con `requireValidSession` (no es `facturas/`);
 el botón solo se renderiza para Admin/Gestor porque toda la sección es `puedeEditar`.
@@ -319,7 +319,7 @@ El botón "📄 Generar hoja" se queda como borrador de trabajo interno.
 
 ### Flujo
 1. Pedido normal en GestionLab: líneas → factura del proveedor → IA → precios.
-2. Botón **📤 Enviar a Trebello** (bloque "Documentación interna" de `verDetallePedido`).
+2. Botón **📤 Enviar a Trebello** (tarjeta «📤 Por Trebello» del bloque "2 · Hoja de pedido" de `verDetallePedido`).
 3. `enviarPedidoATrebello` (`js/pedidos-acciones.js`) → Edge Function `enviar-a-trebello`.
 4. La función valida, empaqueta y hace POST a `POST /api/gestionlab/pedidos` de Trebello.
 5. Trebello crea el pedido en Compras en estado `INVOICE_RECEIVED` con las facturas dentro y
@@ -411,3 +411,28 @@ departamento. La jefa no quería verlo imputado entero a "Laboratorios".
   pisarlo si la jefa ya lo reasignó a mano. ⚠ El `ciclo` que manda GestionLab tiene que
   coincidir **literalmente** con un nombre de `ciclos` de Trebello, o el pedido cae en
   "Sen ciclo asignado".
+
+---
+
+## Ficha del pedido: documentación (2026-11-04)
+
+El bloque de documentación de `verDetallePedido` (solo Admin/Gestor) sigue el **orden real
+del trámite** — no se puede hacer la hoja sin la factura:
+
+1. **Documentación del proveedor** — 🔗 Link para proveedor, facturas subidas, lectura con IA.
+2. **Hoja de pedido**
+   - Acción: **💶 Precios**.
+   - Decisión (selector `.toggle-source`, no botón): **¿Qué artículos salen en la hoja?**
+     Las líneas del pedido / Los de la factura (`pedidos.hoja_factura`, ver arriba).
+   - **¿Cómo se tramita?** Dos tarjetas alternativas; con una hecha, la otra se atenúa (sigue
+     usable):
+     - **📤 Por Trebello** — `📤 Enviar a Trebello` y listo: la hoja la genera y firma allí la
+       jefa, aquí **no hace falta generarla**. Una vez enviado muestra «✓ Enviado · fecha»,
+       «↗ Ver en Trebello» y un discreto **↻ Actualizar en Trebello** (misma función
+       `enviarPedidoATrebello`, idempotente) para cuando el pedido cambia después.
+     - **📄 Hoja a mano** — `📄 Generar hoja` (→ «Volver a generar» / «📥 Abrir hoja») y la
+       casilla «📬 Ya la he enviado a secretaría» (`doc_enviada_jefatura`; el nombre de la
+       columna se queda). La casilla no sale si el pedido ya está en Trebello.
+3. **📦 Archivar pedido** sale con `Recepción completa` y **una** de las dos vías cerrada:
+   enviado a Trebello, o hoja generada + enviada a mano. (Antes exigía siempre la hoja
+   generada, así que un pedido tramitado solo por Trebello no se podía archivar.)

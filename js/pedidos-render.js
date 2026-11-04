@@ -594,7 +594,7 @@ function _bloqueSinMatchEnHoja(sinMatch, pedidoId) {
       <span id="revext-sm-suma" data-lineas="${importeLineas}" style="font-size:12px"></span>
       <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Usar en la hoja en lugar de las líneas</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Solo cambia la hoja de pedido. Las líneas siguen igual en la app y nada entra en el inventario. Se puede revisar o quitar después en Documentación interna → 🧾 Hoja como la factura.</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Solo cambia la hoja de pedido. Las líneas siguen igual en la app y nada entra en el inventario. Se puede revisar o quitar después en la ficha del pedido → Hoja de pedido → «Los de la factura».</div>
   </div>`;
 }
 
@@ -761,7 +761,7 @@ function _filaLineaPedido(l, p, puedeEditar) {
   </div>`;
 }
 
-// "716.00 € · ✓ cuadra con las líneas" — para la fila de Documentación interna.
+// "716.00 € · ✓ cuadra con las líneas" — para la franja de "Hoja de pedido".
 function _resumenHojaFactura(p) {
   const suma = (p.Hoja_Factura || []).reduce((s, c) => s + (Number(c.precio_unitario) || 0) * (c.cantidad != null ? Number(c.cantidad) : 1), 0);
   const imp = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido)
@@ -803,41 +803,22 @@ function verDetallePedido(pedidoId) {
         <div class="detail-item"><div class="detail-label">Coste total (IVA 21%)</div><div class="detail-value">${(() => { const gastoExtra = parseFloat(p.Gasto_Extra_Importe)||0; const coste = DATA.lineasPedido.filter(l => l.Pedido === pedidoId).reduce((sum,l) => sum + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), gastoExtra); return coste > 0 ? (coste * 1.21).toFixed(2) + ' €' : '—'; })()}</div></div>
         <div class="detail-item"><div class="detail-label">Gasto extra</div><div class="detail-value" style="display:flex;align-items:center;gap:8px">${parseFloat(p.Gasto_Extra_Importe)>0 ? `${p.Gasto_Extra_Concepto||'Gasto extra'} · ${parseFloat(p.Gasto_Extra_Importe).toFixed(2)} €` : '—'}${puedeEditar ? `<button class="icon-btn" title="Añadir/editar gasto extra" onclick="openModalGastoExtra('${p.ID_Pedido}')" style="font-size:12px;padding:2px 6px">✏️</button>` : ''}</div></div>
       </div>
-      ${puedeEditar ? `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
+      ${puedeEditar ? (() => {
+        // Orden = orden real del trámite: primero llega la factura del proveedor,
+        // luego se prepara la hoja. Las dos vías (Trebello / hoja a mano) son
+        // alternativas. Ver "Ficha del pedido: documentación" en docs/modulo-pedidos.md.
+        const enTrebello = !!(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id);
+        const hojaGenerada = p.Doc_Hoja_Generada === 'TRUE';
+        const enviadaAMano = !enTrebello && p.Doc_Enviada_Jefatura === 'TRUE';
+        const conHojaFactura = (p.Hoja_Factura || []).length > 0;
+        const tit = t => `<div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">${t}</div>`;
+        const btn = 'class="btn btn-secondary" style="font-size:12px;padding:4px 12px"';
+        // Con una vía hecha, la otra se atenúa (sigue usable).
+        const tarjeta = (activa, atenuada, cuerpo) => `<div style="border:1.5px solid ${activa ? 'var(--success)' : 'var(--border)'};border-radius:var(--radius-sm);padding:12px 14px;display:flex;flex-direction:column;gap:8px;${atenuada ? 'opacity:.55' : ''}">${cuerpo}</div>`;
+        return `<div style="padding:0 20px 16px 20px;border-top:1px solid var(--border);margin-top:4px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación interna</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap">
-            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
-            ${lineas.length && !(p.Hoja_Factura || []).length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="openModalHojaFactura('${p.ID_Pedido}')" title="Cuando la casa comercial factura el pedido con otros artículos: la hoja lleva los de la factura en lugar de las líneas">🧾 Hoja como la factura</button>` : ''}
-            <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 Generar hoja</button>
-            ${lineas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Deposita el pedido y las facturas en el módulo Compras de Trebello. La hoja la genera y la firma la jefa allí.">📤 ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? 'Reenviar a' : 'Enviar a'} Trebello</button>` : ''}
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${(p.Hoja_Factura || []).length ? `<div style="font-size:13px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-            <span>🧾 En la hoja salen los <strong>${p.Hoja_Factura.length} artículos de la factura</strong> en lugar de las líneas · ${_resumenHojaFactura(p)}</span>
-            <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="openModalHojaFactura('${p.ID_Pedido}')">✏️ Revisar</button>
-          </div>` : ''}
-          <div style="display:flex;align-items:center;gap:10px;font-size:13px">
-            <input type="checkbox" id="chk-hoja-generada" ${p.Doc_Hoja_Generada==='TRUE'?'checked':''} disabled style="width:16px;height:16px">
-            <span style="${p.Doc_Hoja_Generada==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📄 Hoja de pedido generada</span>
-            ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir</button>` : ''}
-          </div>
-          ${(p.Trebello_Pedido_Id || p.Trebello_Pedido_Comun_Id) ? `
-          <div style="display:flex;align-items:center;gap:10px;font-size:13px;flex-wrap:wrap">
-            <input type="checkbox" checked disabled style="width:16px;height:16px">
-            <span style="color:var(--success);font-weight:500">📬 Enviado a Trebello${p.Trebello_Pedido_Id && p.Trebello_Pedido_Comun_Id ? ' (2 hojas)' : ''}${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
-            <a href="${TREBELLO_URL}/gl/compras?tab=pedidos" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:11px;padding:2px 10px;text-decoration:none">↗ Ver en Trebello</a>
-          </div>` : `
-          <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${p.Doc_Hoja_Generada==='TRUE' ? 'pointer' : 'not-allowed'}">
-            <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${p.Doc_Hoja_Generada!=='TRUE'?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
-            <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(p.Doc_Hoja_Generada!=='TRUE'?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Documentación enviada a jefatura</span>
-          </label>`}
-        </div>
-
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;margin-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Documentación del proveedor</div>
-          <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>
+          ${tit('1 · Documentación del proveedor')}
+          <button ${btn} onclick="abrirModalLinkProveedor('${pedidoId}')">🔗 Link para proveedor</button>
         </div>
         <label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:default">
           <input type="checkbox" ${docsProv.length?'checked':''} disabled style="width:16px;height:16px">
@@ -855,10 +836,50 @@ function verDetallePedido(pedidoId) {
                 <button class="icon-btn danger" title="Eliminar documento" onclick="eliminarDocumentoProveedor('${d.ID_Documento}','${pedidoId}')">🗑️</button>
               </div>
             </div>`).join('')}
-          </div>` : `<div style="font-size:12px;color:var(--text-muted);margin-top:6px">Pulsa "🔗 Link para proveedor" arriba y compártelo con la casa comercial.</div>`}
+          </div>` : `<div style="font-size:12px;color:var(--text-muted);margin-top:6px">Pulsa "🔗 Link para proveedor" y compártelo con la casa comercial.</div>`}
 
-        ${p.Estado==='Recepción completa'&&p.Doc_Hoja_Generada==='TRUE'&&p.Doc_Enviada_Jefatura==='TRUE' ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
-      </div>` : ''}
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;padding-top:14px;margin-top:16px;border-top:1px solid var(--border);flex-wrap:wrap;gap:8px">
+          ${tit('2 · Hoja de pedido')}
+          ${lineas.length ? `<button ${btn} onclick="abrirModalPrecios('${p.ID_Pedido}')">💶 Precios</button>` : ''}
+        </div>
+        ${lineas.length ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">¿Qué artículos salen en la hoja?</div>
+        <div class="toggle-source" style="max-width:460px;margin-bottom:${conHojaFactura ? '8px' : '14px'}">
+          <button class="${conHojaFactura ? '' : 'active'}" onclick="elegirArticulosHoja('${p.ID_Pedido}','lineas')">Las líneas del pedido</button>
+          <button class="${conHojaFactura ? 'active' : ''}" onclick="elegirArticulosHoja('${p.ID_Pedido}','factura')" title="Cuando la casa comercial factura el pedido con otros artículos">Los de la factura</button>
+        </div>
+        ${conHojaFactura ? `<div style="font-size:13px;padding:8px 12px;margin-bottom:14px;background:var(--accent-light);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span>🧾 <strong>${p.Hoja_Factura.length} artículos de la factura</strong> en lugar de las líneas · ${_resumenHojaFactura(p)}</span>
+          <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="openModalHojaFactura('${p.ID_Pedido}')">✏️ Revisar</button>
+        </div>` : ''}` : ''}
+
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">¿Cómo se tramita? Una de las dos:</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+          ${tarjeta(enTrebello, enviadaAMano, `
+            <div style="font-weight:600;font-size:13px">📤 Por Trebello</div>
+            <div style="font-size:12px;color:var(--text-muted)">Deposita el pedido y las facturas en Compras de Trebello. La hoja la genera y la firma allí la jefa: no hace falta generarla aquí.</div>
+            ${enTrebello ? `<div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
+                <span style="color:var(--success);font-weight:500">✓ Enviado${p.Trebello_Pedido_Id && p.Trebello_Pedido_Comun_Id ? ' (2 hojas)' : ''}${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
+                <a href="${TREBELLO_URL}/gl/compras?tab=pedidos" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:11px;padding:2px 10px;text-decoration:none">↗ Ver en Trebello</a>
+              </div>
+              <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px;align-self:flex-start" onclick="enviarPedidoATrebello('${p.ID_Pedido}')" title="Solo si has cambiado algo del pedido después de enviarlo">↻ Actualizar en Trebello</button>`
+            : (lineas.length ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px;align-self:flex-start" onclick="enviarPedidoATrebello('${p.ID_Pedido}')">📤 Enviar a Trebello</button>`
+              : `<div style="font-size:12px;color:var(--text-muted)">Añade primero las líneas del pedido.</div>`)}`)}
+          ${tarjeta(enviadaAMano, enTrebello, `
+            <div style="font-weight:600;font-size:13px">📄 Hoja a mano</div>
+            <div style="font-size:12px;color:var(--text-muted)">Generas tú la hoja de pedido y la mandas a secretaría.</div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <button class="btn ${hojaGenerada || enTrebello ? 'btn-secondary' : 'btn-primary'}" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 ${hojaGenerada ? 'Volver a generar' : 'Generar hoja'}</button>
+              ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir hoja</button>` : ''}
+            </div>
+            ${enTrebello ? '' : `<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${hojaGenerada ? 'pointer' : 'not-allowed'}" title="${hojaGenerada ? '' : 'Primero genera la hoja'}">
+              <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${!hojaGenerada?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
+              <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(!hojaGenerada?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Ya la he enviado a secretaría</span>
+            </label>`}`)}
+        </div>
+
+        ${p.Estado==='Recepción completa' && (enTrebello || (hojaGenerada && p.Doc_Enviada_Jefatura==='TRUE')) ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
+      </div>`;
+      })() : ''}
     </div>
     <div class="card">
       <div class="card-header">

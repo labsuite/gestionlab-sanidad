@@ -523,7 +523,7 @@ function openModalConceptoFactura(lineaId, pedidoId) {
   if (!l) return;
   const imp = _importeLineas([l]);
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  const avisoPedido = (p?.Hoja_Factura || []).length ? '<div style="margin-top:6px;font-size:12px;color:var(--warning,#b45309)">⚠ Ahora mismo la hoja usa los artículos de la factura del pedido entero, así que esto no se verá hasta que los quites (🧾 Hoja como la factura).</div>' : '';
+  const avisoPedido = (p?.Hoja_Factura || []).length ? '<div style="margin-top:6px;font-size:12px;color:var(--warning,#b45309)">⚠ Ahora mismo la hoja usa los artículos de la factura del pedido entero, así que esto no se verá hasta que en la ficha elijas «Las líneas del pedido».</div>' : '';
   _abrirEditorConceptos('linea', pedidoId, lineaId, '🧾 Cómo figura en la hoja',
     `Línea del pedido: <strong>${_escAttr(l.Material)}${imp ? ` (${imp.toFixed(2)} € sin IVA)` : ''}</strong>${avisoPedido}`,
     l.Conceptos_Factura,
@@ -548,6 +548,24 @@ function openModalHojaFactura(pedidoId) {
     `Pedido: <strong>${_escAttr(p.Nombre_Lista)}</strong>${imp ? ` · las líneas suman ${imp.toFixed(2)} € sin IVA` : ''}${precargado}`,
     conceptos,
     'Para cuando la casa comercial factura el pedido con otros artículos: en la hoja de pedido (Word y Trebello) salen estos en lugar de todas las líneas. Las líneas, el inventario y la contabilidad no cambian. Sin filas = la hoja vuelve a usar las líneas.');
+}
+
+// El selector "¿Qué artículos salen en la hoja?" de la ficha del pedido. Es
+// una decisión, no una acción: "factura" abre el editor de artículos (hace
+// falta saber cuáles) y "lineas" quita los que hubiera.
+async function elegirArticulosHoja(pedidoId, opcion) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p) return;
+  const conHojaFactura = (p.Hoja_Factura || []).length > 0;
+  if (opcion === 'factura') { openModalHojaFactura(pedidoId); return; }
+  if (!conHojaFactura) return;
+  if (!confirm(`La hoja dejará de llevar los ${p.Hoja_Factura.length} artículos de la factura y volverá a usar las líneas del pedido. Se pierden los artículos tecleados.\n\n¿Seguir?`)) return;
+  showLoading('Guardando...');
+  try {
+    await _guardarHojaFactura(pedidoId, []);
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
 }
 
 function _pintarConceptosFactura() {
@@ -582,7 +600,7 @@ function anadirFilaConceptoFactura() {
 
 function _avisoTrebello(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  return (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Reenvía a Trebello para que la hoja de allí cambie también.' : '';
+  return (p?.Trebello_Pedido_Id || p?.Trebello_Pedido_Comun_Id) ? ' Pulsa «↻ Actualizar en Trebello» para que la hoja de allí cambie también.' : '';
 }
 
 async function _guardarConceptosLinea(lineaId, pedidoId, conceptos) {
@@ -707,7 +725,7 @@ async function enviarPedidoATrebello(pedidoId) {
     'Este pedido ya se envió a Trebello.\n\n' +
     'Volver a enviarlo actualiza el que hay allí con los datos actuales. ' +
     'Si la jefa ya firmó la hoja, tendrá que volver a generarla y firmarla.\n\n' +
-    '¿Reenviar?'
+    '¿Actualizarlo en Trebello?'
   )) return;
 
   showLoading('Enviando a Trebello...');
