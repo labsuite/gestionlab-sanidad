@@ -441,3 +441,9 @@ del trámite** — no se puede hacer la hoja sin la factura:
    ya no se puede registrar el albarán). La casilla ya no exige haber generado la hoja aquí.
    Si se canceló esa confirmación, el botón **📦 Archivar pedido** sigue en la ficha.
    (Antes solo se archivaba con `Recepción completa`.)
+4. **↩︎ Desarchivar — excepcional a propósito.** Solo en la ficha de un pedido archivado,
+   abajo del todo, en un recuadro rojo discontinuo «Solo en casos muy excepcionales». Pide
+   confirmación y además teclear `DESARCHIVAR` (`desarchivarPedido`). No se guarda el estado
+   previo: la acción `desarchivar` de `gestionar-pedido` lo deduce de las líneas (todas
+   recibidas → Recepción completa; alguna → Recepción parcial; ninguna → Presupuesto
+   aprobado, para poder recibir el albarán). No toca Trebello ni secretaría.

@@ -105,6 +105,25 @@ Deno.serve(async (req) => {
     return jsonOk({ pedido: data });
   }
 
+  // Excepcional: sacar del archivo un pedido archivado por error (p.ej. se
+  // tramitó con material aún sin recibir). No se guarda el estado anterior, así
+  // que se deduce de las líneas: todas recibidas → Recepción completa; alguna →
+  // Recepción parcial; ninguna → Presupuesto aprobado (deja recibir el albarán).
+  if (accion === "desarchivar") {
+    const { data: p } = await supabaseAdmin.from("pedidos").select("estado").eq("id_pedido", idPedido).maybeSingle();
+    if (!p) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
+    if (p.estado !== "Archivado") return jsonError("El pedido no está archivado", 400);
+    const { data: lineas } = await supabaseAdmin.from("lineas_pedido").select("estado_linea").eq("pedido", idPedido);
+    const ls = lineas || [];
+    const recibidas = ls.filter((l: any) => l.estado_linea === "Recibido").length;
+    const algoRecibido = ls.some((l: any) => l.estado_linea === "Recibido" || l.estado_linea === "Recibido parcialmente");
+    const estado = ls.length && recibidas === ls.length ? "Recepción completa"
+      : algoRecibido ? "Recepción parcial" : "Presupuesto aprobado";
+    const { data, error } = await supabaseAdmin.from("pedidos").update({ estado }).eq("id_pedido", idPedido).select().single();
+    if (error) return jsonError(`No se pudo desarchivar: ${error.message}`, 400);
+    return jsonOk({ pedido: data });
+  }
+
   if (accion === "actualizar_campos") {
     // Whitelist — cubre proveedor, gasto extra, ciclo/módulo, factura, docs.
     const permitidos = [

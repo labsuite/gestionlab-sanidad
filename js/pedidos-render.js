@@ -879,6 +879,10 @@ function verDetallePedido(pedidoId) {
         </div>
 
         ${p.Estado!=='Archivado' && (enTrebello || p.Doc_Enviada_Jefatura==='TRUE') ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="_darPedidoPorTerminado('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
+        ${p.Estado==='Archivado' ? `<div style="margin-top:18px;padding:10px 14px;border:1.5px dashed var(--danger,#dc2626);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;color:var(--text-muted)">⚠️ <strong style="color:var(--danger,#dc2626)">Solo en casos muy excepcionales:</strong> el pedido está tramitado y terminado. Sácalo del archivo únicamente si se archivó por error.</span>
+          <button class="btn btn-secondary" style="font-size:11px;padding:2px 10px;color:var(--danger,#dc2626);border-color:var(--danger,#dc2626)" onclick="desarchivarPedido('${p.ID_Pedido}')">↩︎ Desarchivar</button>
+        </div>` : ''}
       </div>`;
       })() : ''}
     </div>

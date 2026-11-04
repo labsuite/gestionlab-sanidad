@@ -801,6 +801,33 @@ async function archivarPedido(pedidoId) {
   hideLoading();
 }
 
+// Excepcional a propósito: un pedido tramitado está terminado. Solo para
+// arreglar un archivado por error (p.ej. quedaba material sin recibir). Doble
+// barrera: aviso + teclear DESARCHIVAR. El estado lo deduce el servidor.
+async function desarchivarPedido(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p || p.Estado !== 'Archivado') return;
+  if (!confirm(
+    '⚠️ ACCIÓN EXCEPCIONAL ⚠️\n\n' +
+    'Este pedido ya está tramitado y terminado. Sacarlo del archivo solo tiene sentido ' +
+    'si se archivó por error (por ejemplo, quedaba material sin recibir).\n\n' +
+    'No cambia nada en Trebello ni en secretaría.\n\n¿Seguro que quieres continuar?'
+  )) return;
+  const txt = prompt('Para confirmar, escribe DESARCHIVAR en mayúsculas:');
+  if ((txt || '').trim() !== 'DESARCHIVAR') {
+    if (txt !== null) showToast('No coincide: el pedido sigue archivado', 'warning');
+    return;
+  }
+  showLoading('Sacando del archivo...');
+  try {
+    const { pedido } = await callEdgeFunction('gestionar-pedido', { accion: 'desarchivar', id_pedido: pedidoId });
+    Object.assign(p, _pedidoSbToObj(pedido));
+    showToast(`Pedido fuera del archivo · estado: ${p.Estado}`, 'warning');
+    verDetallePedido(pedidoId);
+  } catch(e) { showToast(e.message || 'Error desarchivando', 'error'); }
+  hideLoading();
+}
+
 // ============================================================
 // LECTURA CON IA DE DOCUMENTOS DEL PROVEEDOR
 // ============================================================
