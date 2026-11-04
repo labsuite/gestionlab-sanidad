@@ -80,6 +80,104 @@ function _xlsxSetCell(xml, ref, value, formula) {
   });
 }
 
+// Pedidos con más filas que la plantilla: inserta `extra` filas en la tabla
+// (copias de la fila 44, con sus bordes) y desplaza todo lo que va debajo —
+// filas, celdas combinadas, la fórmula del total, el cuadro de texto del pie,
+// el área de impresión y la cadena de cálculo. Devuelve el xml de la hoja.
+async function _xlsxAmpliarTabla(zip, xml, extra) {
+  if (extra <= 0) return xml;
+  const DESDE = 45; // primera fila que baja (la última de la tabla, con su borde inferior)
+  const mueve = n => (n >= DESDE ? n + extra : n);
+  const refMovida = ref => ref.replace(/([A-Z]+)(\d+)/g, (_m, c, n) => c + mueve(+n));
+
+  xml = xml.replace(/<row r="(\d+)"([\s\S]*?)<\/row>/g, (m, n) => {
+    if (+n < DESDE) return m;
+    return m.replace(/<row r="\d+"/, `<row r="${mueve(+n)}"`)
+            .replace(/<c r="([A-Z]+)(\d+)"/g, (_x, c, k) => `<c r="${c}${mueve(+k)}"`)
+            .replace(/<f>([\s\S]*?)<\/f>/g, (_x, f) => `<f>${f.replace(/J45\b/, 'J' + (DESDE + extra))}</f>`);
+  });
+  const fila44 = (xml.match(/<row r="44"[\s\S]*?<\/row>/) || [])[0];
+  if (!fila44) throw new Error('La plantilla de la hoja no tiene la fila 44');
+  let nuevas = '';
+  for (let k = 1; k <= extra; k++) {
+    const n = 44 + k;
+    nuevas += fila44.replace(/<row r="44"/, `<row r="${n}"`).replace(/<c r="([A-Z]+)44"/g, `<c r="$1${n}"`);
+  }
+  xml = xml.replace(fila44, fila44 + nuevas);
+
+  xml = xml.replace(/<mergeCell ref="([^"]+)"\/>/g, (_m, r) => `<mergeCell ref="${refMovida(r)}"/>`);
+  let merges = '';
+  for (let k = 1; k <= extra; k++) merges += `<mergeCell ref="B${44 + k}:G${44 + k}"/>`;
+  xml = xml.replace('</mergeCells>', merges + '</mergeCells>')
+           .replace(/<mergeCells count="(\d+)"/, (_m, c) => `<mergeCells count="${+c + extra}"`)
+           .replace(/<dimension ref="([^"]+)"/, (_m, r) => `<dimension ref="${refMovida(r)}"`);
+
+  const drawPath = 'xl/drawings/drawing1.xml';
+  if (zip.file(drawPath)) {
+    let d = await zip.file(drawPath).async('string');
+    // <xdr:row> va en base 0: la fila 45 es la 44.
+    d = d.replace(/<xdr:row>(\d+)<\/xdr:row>/g, (_m, n) => `<xdr:row>${+n >= DESDE - 1 ? +n + extra : n}</xdr:row>`);
+    zip.file(drawPath, d);
+  }
+  let wb = await zip.file('xl/workbook.xml').async('string');
+  wb = wb.replace(/(_xlnm\.Print_Area"[^>]*>[^<]*?\$K\$)(\d+)/, (_m, a, n) => a + (+n + extra));
+  zip.file('xl/workbook.xml', wb);
+  if (zip.file('xl/calcChain.xml')) {
+    let cc = await zip.file('xl/calcChain.xml').async('string');
+    zip.file('xl/calcChain.xml', cc.replace(/<c r="([A-Z]+\d+)"/g, (_m, r) => `<c r="${refMovida(r)}"`));
+  }
+  return xml;
+}
+
+// Cómo se imprime una tabla más larga que la plantilla:
+//  - hasta HOJA_ENCOGER_MAX filas de más → se encoge para caber en UNA página
+//    (con pocas filas de más se sigue leyendo bien);
+//  - con más → escala original y la tabla sigue en otra página, repitiendo la
+//    cabecera CONCEPTO/CANTIDADE/PREZO/TOTAL (Print_Titles, en el workbook).
+//    El bloque del total y las firmas nunca se parte: si no cabe entero detrás
+//    de la tabla, se fuerza un salto antes de los últimos artículos.
+// El pie «Páxina 1 de 1» de la plantilla pasa a llevar el número real.
+const HOJA_ENCOGER_MAX = 10;
+function _hojaModo(extra) { return extra <= 0 ? 'normal' : extra <= HOJA_ENCOGER_MAX ? 'encoger' : 'paginas'; }
+
+function _hojaAjustarPagina(xml, extra) {
+  xml = xml.replace(/(<oddFooter>[\s\S]*?)1 de 1/, '$1&amp;P de &amp;N');
+  const modo = _hojaModo(extra);
+  if (modo === 'encoger') {
+    xml = xml.replace('<dimension', '<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><dimension')
+             .replace(/<pageSetup([^>]*?)\sscale="\d+"/, '<pageSetup$1')
+             .replace(/fitToWidth="0"/, 'fitToWidth="1" fitToHeight="1"');
+  }
+  if (modo !== 'paginas') return xml;
+
+  // Centrada en vertical, la última página (con pocas filas) quedaría flotando.
+  xml = xml.replace(/\sverticalCentered="1"/, '');
+  // Saltos de página puestos a mano en todas las páginas, para que Excel no
+  // ponga los suyos. Cabida medida en Excel con esta plantilla a escala 70 %:
+  // ~1115 pt de filas por página; se usa algo menos por seguridad.
+  const CABIDA = 1090;
+  const alto = r => {
+    const m = xml.match(new RegExp(`<row r="${r}"[^>]*?\\sht="([\\d.]+)"`));
+    return m ? +m[1] : 13.2;
+  };
+  const ultimaTabla = 45 + extra, iniBloque = 46 + extra, finTodo = 60 + extra;
+  const saltos = []; // brk id = última fila de la página
+  let usado = 0, iniPagina = 1;
+  for (let r = 1; r <= ultimaTabla; r++) {
+    if (usado + alto(r) > CABIDA) { saltos.push(r - 1); iniPagina = r; usado = alto(20); }
+    usado += alto(r);
+  }
+  // Total, firmas y pie van juntos y con al menos dos filas de la tabla delante.
+  let bloque = 0;
+  for (let r = iniBloque; r <= finTodo; r++) bloque += alto(r);
+  if (usado + bloque > CABIDA) { if (ultimaTabla - 2 > iniPagina) saltos.push(ultimaTabla - 2); }
+  else if (saltos.length && ultimaTabla - iniPagina + 1 < 2) saltos[saltos.length - 1] = ultimaTabla - 2;
+  if (saltos.length) {
+    xml = xml.replace('<drawing ', `<rowBreaks count="${saltos.length}" manualBreakCount="${saltos.length}">${saltos.map(id => `<brk id="${id}" max="16383" man="1"/>`).join('')}</rowBreaks><drawing `);
+  }
+  return xml;
+}
+
 function _fechaHoja(f) {
   const m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
   return m ? `${m[3]}/${m[2]}/${m[1]}` : (f || '');
@@ -209,15 +307,17 @@ async function generarHojaPedido() {
       throw new Error('No se pudo cargar la plantilla (' + e.message + '). Comprueba que el archivo existe en assets/templates/.');
     }
 
-    // La tabla tiene 25 filas y la del IVA va justo detrás de los artículos.
+    // La tabla trae 25 filas y la del IVA va justo detrás de los artículos; si
+    // no caben, la tabla crece y lo de debajo (total, firmas) baja con ella.
     const filasNecesarias = lineasConPrecios.length + (hayPrecios ? 1 : 0);
-    if (filasNecesarias > HOJA_PEDIDO_FILAS) {
-      throw new Error(`La hoja solo tiene ${HOJA_PEDIDO_FILAS} filas y este pedido necesita ${filasNecesarias}${hayPrecios ? ' (artículos + IVA)' : ''}. Agrupa artículos en «🧾 Hoja como la factura» o divide el pedido.`);
-    }
+    const extra = Math.max(0, filasNecesarias - HOJA_PEDIDO_FILAS);
+    const abajo = n => n + extra; // filas de debajo de la tabla, ya desplazadas
 
     const zip = await JSZip.loadAsync(templateBuffer);
     const sheetPath = 'xl/worksheets/sheet1.xml';
     let xml = await zip.file(sheetPath).async('string');
+    xml = await _xlsxAmpliarTabla(zip, xml, extra);
+    xml = _hojaAjustarPagina(xml, extra);
     const num = x => { const n = parseFloat(String(x ?? '').replace(',', '.')); return isNaN(n) ? '' : n; };
     const r2 = n => Math.round(n * 100) / 100;
 
@@ -239,13 +339,17 @@ async function generarHojaPedido() {
       const filaIva = 21 + lineasConPrecios.length;
       xml = _xlsxSetCell(xml, 'B' + filaIva, 'IVA (21%)');
       xml = _xlsxSetCell(xml, 'J' + filaIva, r2(ivaAmount));
-      xml = _xlsxSetCell(xml, 'J46', r2(totalConIva), 'SUM(J21:J45)');
+      xml = _xlsxSetCell(xml, 'J' + abajo(46), r2(totalConIva), `SUM(J21:J${abajo(45)})`);
     }
-    xml = _xlsxSetCell(xml, 'B51', 'Asdo: ' + HOJA_PEDIDO_SOLICITANTE);
+    xml = _xlsxSetCell(xml, 'B' + abajo(51), 'Asdo: ' + HOJA_PEDIDO_SOLICITANTE);
     zip.file(sheetPath, xml);
     // Que Excel recalcule al abrir (el total lleva fórmula).
     let wbXml = await zip.file('xl/workbook.xml').async('string');
     wbXml = wbXml.replace(/<calcPr([^>]*?)\s*\/>/, (m, a) => a.includes('fullCalcOnLoad') ? m : `<calcPr${a} fullCalcOnLoad="1"/>`);
+    // En varias páginas, la cabecera CONCEPTO/CANTIDADE/PREZO/TOTAL se repite arriba.
+    if (_hojaModo(extra) === 'paginas') {
+      wbXml = wbXml.replace('</definedNames>', `<definedName name="_xlnm.Print_Titles" localSheetId="0">'MD84COM06 folla pedido'!$20:$20</definedName></definedNames>`);
+    }
     zip.file('xl/workbook.xml', wbXml);
 
     const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';

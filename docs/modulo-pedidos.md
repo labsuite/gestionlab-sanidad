@@ -133,8 +133,17 @@ venía Elena Sánchez Blanco) y ya no trae rellenos el departamento ni el profes
   solicitante (B51) = `HOJA_PEDIDO_SOLICITANTE`, B15/F15/J15 ciclo/módulo/data, B17 empresa,
   F19 nº factura, artículos en B/H/I/J de las filas 21–45 y la fila de IVA detrás. J46 conserva
   su `SUM(J21:J45)` (se fuerza `fullCalcOnLoad`). Cantidades y precios van como **número**.
-- Son **25 filas**: si artículos + IVA no caben, ya no se recorta en silencio (antes se perdía
-  la fila del IVA y el total salía mal): da error y propone agrupar con «🧾 Hoja como la factura».
+- La plantilla trae **25 filas** (artículos + portes + IVA). Si no caben, la tabla **crece**
+  (`_xlsxAmpliarTabla`: copia la fila 44 y baja filas, combinadas, la fórmula del total, el
+  cuadro del pie, el área de impresión y la cadena de cálculo). Cómo se imprime
+  (`_hojaAjustarPagina`):
+  - hasta 10 filas de más (≤ 35 filas, p.ej. 33 artículos + portes + IVA) → se encoge a **una página**;
+  - con más → escala del modelo y **varias páginas**: se repite la cabecera CONCEPTO… (Print_Titles),
+    los saltos se ponen a mano (cabida medida en Excel: ~1115 pt de filas por página; se usan
+    1090) y el bloque total + firmas + pie va siempre entero en la última página, con al menos
+    dos filas de la tabla delante. La página 2 ya no va centrada en vertical.
+  - El pie «Páxina 1 de 1» lleva el número real (`&P de &N`).
+  - Comprobado en Excel de 1 a 110 artículos (2026-11-04).
 - ⚠ La hoja oficial que se firma la produce **Trebello** (`lib/utils/pedido-pdf`, `docx`); su
   generador es independiente de este y hay que cambiarlo allí aparte.
 
