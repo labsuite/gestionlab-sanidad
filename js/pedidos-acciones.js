@@ -704,10 +704,34 @@ async function toggleDocPedido(pedidoId, campo, valor) {
   try {
     await callEdgeFunction('gestionar-pedido', { accion: 'actualizar_campos', id_pedido: pedidoId, campos: { [campoApi]: valor } });
     p[campo] = valor ? 'TRUE' : '';
+    hideLoading();
+    // La hoja ya está en secretaría: el trámite es el último paso, el pedido se
+    // da por terminado (ver _darPedidoPorTerminado).
+    if (campo === 'Doc_Enviada_Jefatura' && valor) return _darPedidoPorTerminado(pedidoId);
     showToast('Documentación actualizada', 'success');
     verDetallePedido(pedidoId);
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); }
   hideLoading();
+}
+
+// Enviar a Trebello o mandar la hoja a secretaría es el último paso del pedido,
+// esté en el estado que esté: en reparaciones y servicios el pedido se hace con
+// la factura ya en la mano y nunca se pasa por «Presupuesto aprobado» ni por la
+// recepción. Por eso se archiva directamente. Solo se pregunta si quedan líneas
+// de material sin recibir, porque archivado ya no se puede recibir el albarán y
+// ese material no entraría en el inventario.
+async function _darPedidoPorTerminado(pedidoId) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (!p || p.Estado === 'Archivado') { verDetallePedido(pedidoId); return; }
+  const sinRecibir = p.Tipo === 'Servicio' ? [] :
+    DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
+  if (sinRecibir.length && !confirm(
+    `El pedido queda tramitado y se va a archivar.\n\n` +
+    `Ojo: hay ${sinRecibir.length} línea(s) sin recibir. Archivado ya no se puede registrar ` +
+    `el albarán, así que ese material no entrará en el inventario.\n\n` +
+    `¿Archivarlo igualmente? (Cancelar = se queda abierto para recibirlo)`
+  )) { verDetallePedido(pedidoId); return; }
+  return archivarPedido(pedidoId);
 }
 
 // Deposita el pedido (datos + facturas del proveedor) en el módulo Compras de
@@ -751,6 +775,8 @@ async function enviarPedidoATrebello(pedidoId) {
         ? `Pedido enviado a Trebello${hojas}${n ? ` con ${n} factura(s)` : ' (sin facturas)'}`
         : `Pedido actualizado en Trebello${hojas}`, 'success');
     }
+    hideLoading();
+    if (r.nuevo) return _darPedidoPorTerminado(pedidoId);
     verDetallePedido(pedidoId);
     if (typeof renderPedidos === 'function') renderPedidos();
   } catch(e) {
@@ -768,7 +794,7 @@ async function archivarPedido(pedidoId) {
   try {
     await callEdgeFunction('gestionar-pedido', { accion: 'archivar', id_pedido: pedidoId });
     p.Estado = 'Archivado';
-    showToast('Pedido archivado', 'success');
+    showToast('Pedido terminado y archivado (📦 Ver archivo en Pedidos)', 'success');
     showPage('pedidos');
     renderPedidos();
   } catch(e) { showToast(e.message || 'Error archivando', 'error'); }

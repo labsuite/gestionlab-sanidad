@@ -856,7 +856,7 @@ function verDetallePedido(pedidoId) {
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
           ${tarjeta(enTrebello, enviadaAMano, `
             <div style="font-weight:600;font-size:13px">📤 Por Trebello</div>
-            <div style="font-size:12px;color:var(--text-muted)">Deposita el pedido y las facturas en Compras de Trebello. La hoja la genera y la firma allí la jefa: no hace falta generarla aquí.</div>
+            <div style="font-size:12px;color:var(--text-muted)">Deposita el pedido y las facturas en Compras de Trebello. La hoja la genera y la firma allí la jefa: no hace falta generarla aquí. Al enviarlo, el pedido se da por terminado y se archiva.</div>
             ${enTrebello ? `<div style="display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap">
                 <span style="color:var(--success);font-weight:500">✓ Enviado${p.Trebello_Pedido_Id && p.Trebello_Pedido_Comun_Id ? ' (2 hojas)' : ''}${p.Fecha_Envio_Trebello ? ` · ${formatDate(p.Fecha_Envio_Trebello.slice(0,10))}` : ''}</span>
                 <a href="${TREBELLO_URL}/gl/compras?tab=pedidos" target="_blank" rel="noopener" class="btn btn-secondary" style="font-size:11px;padding:2px 10px;text-decoration:none">↗ Ver en Trebello</a>
@@ -871,13 +871,14 @@ function verDetallePedido(pedidoId) {
               <button class="btn ${hojaGenerada || enTrebello ? 'btn-secondary' : 'btn-primary'}" style="font-size:12px;padding:4px 12px" onclick="abrirGeneradorHoja('${p.ID_Pedido}')">📄 ${hojaGenerada ? 'Volver a generar' : 'Generar hoja'}</button>
               ${p.Doc_Hoja_Path ? `<button class="btn btn-secondary" style="font-size:11px;padding:2px 10px" onclick="abrirDocumento('${p.Doc_Hoja_Path}')">📥 Abrir hoja</button>` : ''}
             </div>
-            ${enTrebello ? '' : `<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:${hojaGenerada ? 'pointer' : 'not-allowed'}" title="${hojaGenerada ? '' : 'Primero genera la hoja'}">
-              <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} ${!hojaGenerada?'disabled':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
-              <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':(!hojaGenerada?'color:var(--text-muted)':'color:var(--text-soft)')}">📬 Ya la he enviado a secretaría</span>
-            </label>`}`)}
+            ${enTrebello ? '' : `<label style="display:flex;align-items:center;gap:10px;font-size:13px;cursor:pointer" title="Al marcarla el pedido se da por terminado y se archiva">
+              <input type="checkbox" id="chk-enviada-jefatura" ${p.Doc_Enviada_Jefatura==='TRUE'?'checked':''} onchange="toggleDocPedido('${p.ID_Pedido}','Doc_Enviada_Jefatura',this.checked)" style="width:16px;height:16px">
+              <span style="${p.Doc_Enviada_Jefatura==='TRUE'?'color:var(--success);font-weight:500':'color:var(--text-soft)'}">📬 Ya la he enviado a secretaría</span>
+            </label>
+            <div style="font-size:11px;color:var(--text-muted)">Al marcarla, el pedido se da por terminado y se archiva.</div>`}`)}
         </div>
 
-        ${p.Estado==='Recepción completa' && (enTrebello || (hojaGenerada && p.Doc_Enviada_Jefatura==='TRUE')) ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="archivarPedido('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
+        ${p.Estado!=='Archivado' && (enTrebello || p.Doc_Enviada_Jefatura==='TRUE') ? `<div style="margin-top:14px"><button class="btn btn-secondary" onclick="_darPedidoPorTerminado('${p.ID_Pedido}')">📦 Archivar pedido</button></div>` : ''}
       </div>`;
       })() : ''}
     </div>

@@ -64,7 +64,7 @@ Expresarla de otra manera o añadir la referencia. Mismo formato de lista; un so
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`
 - "Recepción parcial" y "Recepción completa": solo automáticos, nunca manuales
-- Archivado: solo posible cuando Estado=Recepción completa Y los tres checks de documentación están marcados
+- Archivado: al tramitar el pedido (enviado a Trebello o hoja enviada a secretaría), en cualquier estado — ver "Tramitar = terminar" más abajo
 - "+ Añadir línea" (`puedeAddLinea` en `pedidos-render.js`): permitido en `Abierto` y `Presupuesto solicitado` — en la práctica se pueden seguir añadiendo artículos mientras se espera el presupuesto. A partir de `Presupuesto aprobado` el pedido se considera cerrado en firme.
 
 ## Añadir artículos con el presupuesto ya solicitado (2026-09-21)
@@ -433,6 +433,11 @@ del trámite** — no se puede hacer la hoja sin la factura:
      - **📄 Hoja a mano** — `📄 Generar hoja` (→ «Volver a generar» / «📥 Abrir hoja») y la
        casilla «📬 Ya la he enviado a secretaría» (`doc_enviada_jefatura`; el nombre de la
        columna se queda). La casilla no sale si el pedido ya está en Trebello.
-3. **📦 Archivar pedido** sale con `Recepción completa` y **una** de las dos vías cerrada:
-   enviado a Trebello, o hoja generada + enviada a mano. (Antes exigía siempre la hoja
-   generada, así que un pedido tramitado solo por Trebello no se podía archivar.)
+3. **Tramitar = terminar.** Enviar a Trebello (el primer envío, no «↻ Actualizar») o marcar
+   «📬 Ya la he enviado a secretaría» **archiva el pedido en ese momento, esté en el estado que
+   esté** (`_darPedidoPorTerminado` en `js/pedidos-acciones.js`): en reparaciones y servicios
+   el pedido se hace con la factura ya en la mano y nunca pasa por «Presupuesto aprobado» ni
+   por la recepción. Solo pide confirmación si quedan líneas de material sin recibir (archivado
+   ya no se puede registrar el albarán). La casilla ya no exige haber generado la hoja aquí.
+   Si se canceló esa confirmación, el botón **📦 Archivar pedido** sigue en la ficha.
+   (Antes solo se archivaba con `Recepción completa`.)
