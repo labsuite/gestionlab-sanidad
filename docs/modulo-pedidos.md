@@ -47,7 +47,7 @@ Una vez la solicitud está en un pedido ya no se edita como solicitud, así que 
 - Renombra también la **solicitud de origen** (por `Desde solicitud SOL…` y, si no, por pedido + nombre normalizado) y la devuelve como `solicitud`, para que quien la pidió vea el nombre corregido y la recepción la siga encontrando.
 
 ## La hoja de pedido como la factura (2026-11-03)
-Dos casos distintos, los dos **solo en la hoja de pedido** (Word de `generarHojaPedido` y la de Trebello vía `enviar-a-trebello`). Inventario, stock, solicitudes, contabilidad (precio de las líneas) y email al proveedor siguen con las líneas tal cual. Si el pedido ya se envió a Trebello, hay que **reenviarlo**.
+Dos casos distintos, los dos **solo en la hoja de pedido** (Excel de `generarHojaPedido` y la de Trebello vía `enviar-a-trebello`). Inventario, stock, solicitudes, contabilidad (precio de las líneas) y email al proveedor siguen con las líneas tal cual. Si el pedido ya se envió a Trebello, hay que **reenviarlo**.
 
 ### 1. La factura sustituye a TODO el pedido → `pedidos.hoja_factura`
 Caso real (PED0LWDM51): pedido de servicio con una línea «Reparación» de 716 € que Dasan factura como cámaras Neubauer, guantes, acetonitrilo y metanol (suman exactamente 716 €).
@@ -120,8 +120,26 @@ Búsqueda de solicitud origen: 2 intentos — por ID en Observaciones ("Desde so
 - `Doc_Enviada_Jefatura` (col P) — hoja enviada a jefatura
 - `toggleDocPedido(pedidoId, campo, valor)` — actualiza el campo en Sheets col por col
 
+## Modelo MD84COM07 de la folla de pedido — Excel (2026-11-04)
+Centro cambió el modelo: ahora es una hoja de Excel (`MD84COM07 folla de pedido`, versión 1
+del 18/09/2025; llegó como `.xls` binario). Cambios respecto al Word: logos sin los de fondos
+europeos, «CICLO / PROXECTO / PROGRAMA», «Vº Pr. Responsable do crédito» **sin nombre** (antes
+venía Elena Sánchez Blanco) y ya no trae rellenos el departamento ni el profesor.
+- Plantilla: `assets/templates/MD84COM07_folla_pedido.xlsx` — el `.xls` guardado como `.xlsx`
+  con Excel (el navegador no puede editar el `.xls` binario) y la columna PREZO con formato
+  `0.00`. El Word `Folla de Pedido _ modelo.docx` se retiró.
+- `generarHojaPedido` escribe en celdas fijas (mapa al principio de `js/generador.js`,
+  `_xlsxSetCell` conserva el estilo de cada celda): B13 `SANIDADE`, F13 y «Asdo:» del
+  solicitante (B51) = `HOJA_PEDIDO_SOLICITANTE`, B15/F15/J15 ciclo/módulo/data, B17 empresa,
+  F19 nº factura, artículos en B/H/I/J de las filas 21–45 y la fila de IVA detrás. J46 conserva
+  su `SUM(J21:J45)` (se fuerza `fullCalcOnLoad`). Cantidades y precios van como **número**.
+- Son **25 filas**: si artículos + IVA no caben, ya no se recorta en silencio (antes se perdía
+  la fila del IVA y el total salía mal): da error y propone agrupar con «🧾 Hoja como la factura».
+- ⚠ La hoja oficial que se firma la produce **Trebello** (`lib/utils/pedido-pdf`, `docx`); su
+  generador es independiente de este y hay que cambiarlo allí aparte.
+
 ## Folla de pedido generada — se conserva solo la última (2026-09-03)
-`generarHojaPedido` (`js/generador.js`) sube el `.docx` a Storage y ahora guarda su ruta en
+`generarHojaPedido` (`js/generador.js`) sube la hoja (`.xlsx` desde 2026-11-04; antes `.docx`) a Storage y guarda su ruta en
 `pedidos.doc_hoja_path` (columna nueva) vía `gestionar-pedido` `actualizar_campos`. En cada
 regeneración se **reemplaza**: `subir-documento` (`tipo === 'documento'`) hace `storage.list`
 + `remove` de la carpeta `documentos-generados/<id_pedido>/` antes de subir la nueva, así que
@@ -161,7 +179,7 @@ Campo "Coste total (IVA 21%)" en `verDetallePedido`: suma `Precio_Unitario × Ca
 - Cols `T` (`Gasto_Extra_Concepto`) y `U` (`Gasto_Extra_Importe`) en `Pedidos` — para tasas puntuales (transporte con hielo, impuestos raros...) que **no** deben generar una línea de pedido normal (eso obligaría a "recibirla" y crearía un ítem falso en el inventario).
 - Un solo gasto por pedido (no hace falta hoja aparte para algo tan infrecuente); si hay varios conceptos, se combinan en un único texto+importe.
 - `openModalGastoExtra` / `guardarGastoExtraPedido` en `js/pedidos-acciones.js`; botón ✏️ junto a "Gasto extra" en `verDetallePedido`.
-- Entra en la **base del IVA** en los tres sitios donde se calcula un total: "Coste total" del detalle, `modal-precios` (`js/contabilidad.js`), resumen de contabilidad por ciclo/módulo, y la hoja Word generada (`generarHojaPedido`, como fila extra tras las líneas de material, antes de la fila de IVA).
+- Entra en la **base del IVA** en los tres sitios donde se calcula un total: "Coste total" del detalle, `modal-precios` (`js/contabilidad.js`), resumen de contabilidad por ciclo/módulo, y la hoja generada (`generarHojaPedido`, como fila extra tras las líneas de material, antes de la fila de IVA).
 - No toca `Lineas_Pedido` ni el flujo de recepción/stock.
 
 ## Traslado de stock a otra ubicación (2026-07-13)
@@ -268,11 +286,11 @@ Caso: al recibir un pedido, el material no siempre va al mismo sitio de siempre 
 - `eliminarEquipo()` en `js/equipos-acciones.js`: elimina la fila de `Equipos` con `sheetsDeleteRow`
 - `eliminarIncidencia(incId)` en `js/equipos-acciones.js`: botón "Eliminar" en cada `.inc-card` para Administrador. Si tiene `Intervencion_Generada`, el `confirm()` lo advierte. Usa `sheetsDeleteRow('Incidencias', idx)`.
 
-## Subida del Word de "Generar folla de pedido" — dos listas blancas de MIME (2026-09-03)
-`generarHojaPedido` (`js/generador.js`) crea el `.docx` con JSZip y lo sube vía `subirDocumento('documento', ...)` → Edge Function `subir-documento`. Hay **dos** filtros de tipo que deben coincidir:
+## Subida de la hoja de "Generar folla de pedido" — dos listas blancas de MIME (2026-09-03)
+`generarHojaPedido` (`js/generador.js`) crea la hoja con JSZip (`.docx` hasta 2026-11-03, `.xlsx` desde el 2026-11-04) y lo sube vía `subirDocumento('documento', ...)` → Edge Function `subir-documento`. Hay **dos** filtros de tipo que deben coincidir:
 1. `TIPOS_MIME_PERMITIDOS` en `supabase/functions/subir-documento/index.ts` (ya incluye `application/vnd.openxmlformats-officedocument.wordprocessingml.document`).
 2. `allowed_mime_types` del **bucket `documentos`** en Supabase Storage (config del bucket, no está en el repo). Si falta el tipo aquí, el upload falla con `mime type ... wordprocessingml.document is not supported` **aunque la Edge Function lo permita**.
-Corregido el 2026-09-03 añadiendo el tipo docx al bucket (`update storage.buckets set allowed_mime_types = array_append(...) where id='documentos'`). El bucket ahora acepta: pdf, jpeg, png, docx.
+Corregido el 2026-09-03 añadiendo el tipo docx al bucket (`update storage.buckets set allowed_mime_types = array_append(...) where id='documentos'`). El bucket ahora acepta: pdf, jpeg, png, docx y, desde 2026-11-04, xlsx (añadido a la vez en el bucket y en `TIPOS_MIME_PERMITIDOS`).
 
 ---
 

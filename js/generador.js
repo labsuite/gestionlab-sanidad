@@ -1,5 +1,5 @@
 // ============================================================
-// GENERACIÓN FOLLA DE PEDIDO (Word + IA)
+// GENERACIÓN FOLLA DE PEDIDO (Excel MD84COM07)
 // ============================================================
 
 function abrirGeneradorHoja(pedidoId) {
@@ -53,21 +53,36 @@ function setGenEstado(msg, tipo = 'info') {
   txt.innerHTML = msg;
 }
 
-function injectTextIntoRow(rowXml, texts) {
-  if (!texts || !texts.some(t => t)) return rowXml;
-  const cells = rowXml.match(/<w:tc[ >][\s\S]*?<\/w:tc>/g) || [];
-  if (!cells.length) return rowXml;
-  let result = rowXml;
-  cells.forEach((cell, idx) => {
-    if (idx >= texts.length) return;
-    const text = texts[idx];
-    if (!text) return;
-    const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    const run = `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="16"/><w:szCs w:val="16"/></w:rPr><w:t xml:space="preserve">${safe}</w:t></w:r>`;
-    const newCell = cell.replace(/<\/w:p>/, run + '</w:p>');
-    result = result.replace(cell, newCell);
+// Plantilla oficial MD84COM07 (Excel, desde 2026-11-04). El original llegó como
+// .xls binario; se guardó como .xlsx con Excel (PREZO con formato 0.00) para
+// poder rellenarlo aquí con JSZip. Celdas (hoja única):
+//   B13 departamento · F13 profesor/a · B15 ciclo · F15 módulo · J15 data
+//   B17 empresa · F17 observacións · B19 nº albarán · F19 nº factura
+//   B21:B45 concepto · H cantidade · I prezo · J total  (25 filas)
+//   J46 importe total = SUM(J21:J45) · B51 «Asdo:» del solicitante
+const HOJA_PEDIDO_PLANTILLA   = './assets/templates/MD84COM07_folla_pedido.xlsx';
+const HOJA_PEDIDO_FILAS       = 25;
+const HOJA_PEDIDO_DEPARTAMENTO = 'SANIDADE';
+const HOJA_PEDIDO_SOLICITANTE = 'Paloma Fernández López';
+
+// Escribe un valor en una celda que ya existe en sheet1.xml, conservando su
+// estilo (bordes, formato). Números como número (para que SUM funcione);
+// el resto como texto en línea.
+function _xlsxSetCell(xml, ref, value, formula) {
+  if (value === '' || value == null) return xml;
+  const re = new RegExp(`<c r="${ref}"([^>]*?)(?:/>|>[\\s\\S]*?</c>)`);
+  return xml.replace(re, (_m, attrs) => {
+    const a = attrs.replace(/\s+t="[^"]*"/, '');
+    if (formula) return `<c r="${ref}"${a}><f>${formula}</f><v>${value}</v></c>`;
+    if (typeof value === 'number') return `<c r="${ref}"${a}><v>${value}</v></c>`;
+    const safe = String(value).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<c r="${ref}"${a} t="inlineStr"><is><t xml:space="preserve">${safe}</t></is></c>`;
   });
-  return result;
+}
+
+function _fechaHoja(f) {
+  const m = String(f || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : (f || '');
 }
 
 async function generarHojaPedido() {
@@ -132,7 +147,7 @@ async function generarHojaPedido() {
     const lineasConPrecios = hojaFactura.length ? hojaFactura.map(c => {
       const cant   = c.cantidad != null ? Number(c.cantidad) : 1;
       const precio = c.precio_unitario != null ? Number(c.precio_unitario) : 0;
-      return { concepto: c.concepto, cantidad: String(cant), precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant };
+      return { concepto: c.concepto, cantidad: String(cant), precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant, precioNum: precio };
     }) : lineas.flatMap(l => {
       const precioLinea = parseFloat(l.Precio_Unitario) || 0;
       const cantLinea   = parseFloat(l.Cantidad_Pedida) || 0;
@@ -142,7 +157,7 @@ async function generarHojaPedido() {
         return conceptos.map(c => {
           const cant   = c.cantidad != null ? Number(c.cantidad) : (uno ? cantLinea : 1);
           const precio = c.precio_unitario != null ? Number(c.precio_unitario) : (uno ? precioLinea : 0);
-          return { concepto: c.concepto, cantidad: c.cantidad != null || uno ? String(cant) : '', precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant };
+          return { concepto: c.concepto, cantidad: c.cantidad != null || uno ? String(cant) : '', precio: fmtEur(precio), total: fmtEur(precio * cant), importe: precio * cant, precioNum: precio };
         });
       }
       const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
@@ -156,7 +171,7 @@ async function generarHojaPedido() {
         }
       }
       const concepto = unidad ? l.Material + ', ' + unidad : l.Material;
-      return [{ concepto, cantidad: l.Cantidad_Pedida, precio: fmtEur(precioLinea), total: fmtEur(precioLinea * cantLinea), importe: precioLinea * cantLinea }];
+      return [{ concepto, cantidad: l.Cantidad_Pedida, precio: fmtEur(precioLinea), total: fmtEur(precioLinea * cantLinea), importe: precioLinea * cantLinea, precioNum: precioLinea }];
     });
 
     // ── Gasto extra (transporte, tasas...) — se añade como línea más, entra en la base del IVA ──
@@ -187,45 +202,62 @@ async function generarHojaPedido() {
     setGenEstado('📝 Generando documento...', 'info');
     let templateBuffer;
     try {
-      const tplResp = await fetch('./assets/templates/Folla%20de%20Pedido%20_%20modelo.docx');
+      const tplResp = await fetch(HOJA_PEDIDO_PLANTILLA);
       if (!tplResp.ok) throw new Error('HTTP ' + tplResp.status);
       templateBuffer = await tplResp.arrayBuffer();
     } catch(e) {
       throw new Error('No se pudo cargar la plantilla (' + e.message + '). Comprueba que el archivo existe en assets/templates/.');
     }
 
-    const zip    = await JSZip.loadAsync(templateBuffer);
-    let docXml   = await zip.file('word/document.xml').async('string');
-    const rows   = docXml.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [];
-    const mod    = [...rows];
-
-    if (rows[4])  mod[4]  = injectTextIntoRow(rows[4],  [cicloNuevo, moduloNuevo, fechaDoc]);
-    if (rows[6])  mod[6]  = injectTextIntoRow(rows[6],  [p.Proveedor||'', '']);
-    if (rows[8])  mod[8]  = injectTextIntoRow(rows[8],  ['', numFactura]);
-    for (let i = 0; i < 25 && rows[10+i]; i++) {
-      if (i < lineasConPrecios.length) {
-        const lp = lineasConPrecios[i];
-        mod[10+i] = injectTextIntoRow(rows[10+i], [String(lp.concepto||''), String(lp.cantidad||''), lp.precio, lp.total]);
-      } else if (hayPrecios && i === lineasConPrecios.length) {
-        // Fila de IVA — siempre en posición fija tras el último ítem (ignorar al leer la hoja de pedido)
-        mod[10+i] = injectTextIntoRow(rows[10+i], ['IVA (21%)', '', '', ivaAmount.toFixed(2) + ' \u20AC']);
-      }
+    // La tabla tiene 25 filas y la del IVA va justo detrás de los artículos.
+    const filasNecesarias = lineasConPrecios.length + (hayPrecios ? 1 : 0);
+    if (filasNecesarias > HOJA_PEDIDO_FILAS) {
+      throw new Error(`La hoja solo tiene ${HOJA_PEDIDO_FILAS} filas y este pedido necesita ${filasNecesarias}${hayPrecios ? ' (artículos + IVA)' : ''}. Agrupa artículos en «🧾 Hoja como la factura» o divide el pedido.`);
     }
-    if (rows[35]) mod[35] = injectTextIntoRow(rows[35], ['', hayPrecios ? totalConIva.toFixed(2) + ' \u20AC' : '']);
 
-    let newXml = docXml;
-    rows.forEach((old, i) => { if (mod[i] !== old) newXml = newXml.replace(old, mod[i]); });
-    zip.file('word/document.xml', newXml);
+    const zip = await JSZip.loadAsync(templateBuffer);
+    const sheetPath = 'xl/worksheets/sheet1.xml';
+    let xml = await zip.file(sheetPath).async('string');
+    const num = x => { const n = parseFloat(String(x ?? '').replace(',', '.')); return isNaN(n) ? '' : n; };
+    const r2 = n => Math.round(n * 100) / 100;
 
-    const docxBlob = await zip.generateAsync({ type:'blob', mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    xml = _xlsxSetCell(xml, 'B13', HOJA_PEDIDO_DEPARTAMENTO);
+    xml = _xlsxSetCell(xml, 'F13', HOJA_PEDIDO_SOLICITANTE);
+    xml = _xlsxSetCell(xml, 'B15', cicloNuevo);
+    xml = _xlsxSetCell(xml, 'F15', moduloNuevo);
+    xml = _xlsxSetCell(xml, 'J15', _fechaHoja(fechaDoc));
+    xml = _xlsxSetCell(xml, 'B17', p.Proveedor || '');
+    xml = _xlsxSetCell(xml, 'F19', numFactura);
+    lineasConPrecios.forEach((lp, i) => {
+      const fila = 21 + i;
+      xml = _xlsxSetCell(xml, 'B' + fila, String(lp.concepto || ''));
+      xml = _xlsxSetCell(xml, 'H' + fila, num(lp.cantidad));
+      if (lp.precioNum > 0) xml = _xlsxSetCell(xml, 'I' + fila, r2(lp.precioNum));
+      if (lp.importe > 0)   xml = _xlsxSetCell(xml, 'J' + fila, r2(lp.importe));
+    });
+    if (hayPrecios) {
+      const filaIva = 21 + lineasConPrecios.length;
+      xml = _xlsxSetCell(xml, 'B' + filaIva, 'IVA (21%)');
+      xml = _xlsxSetCell(xml, 'J' + filaIva, r2(ivaAmount));
+      xml = _xlsxSetCell(xml, 'J46', r2(totalConIva), 'SUM(J21:J45)');
+    }
+    xml = _xlsxSetCell(xml, 'B51', 'Asdo: ' + HOJA_PEDIDO_SOLICITANTE);
+    zip.file(sheetPath, xml);
+    // Que Excel recalcule al abrir (el total lleva fórmula).
+    let wbXml = await zip.file('xl/workbook.xml').async('string');
+    wbXml = wbXml.replace(/<calcPr([^>]*?)\s*\/>/, (m, a) => a.includes('fullCalcOnLoad') ? m : `<calcPr${a} fullCalcOnLoad="1"/>`);
+    zip.file('xl/workbook.xml', wbXml);
+
+    const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const docxBlob = await zip.generateAsync({ type:'blob', mimeType: XLSX_MIME });
 
     setGenEstado('☁️ Subiendo documento...', 'info');
-    const fileName = `Folla_Pedido_${p.Nombre_Lista.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.docx`;
+    const fileName = `Folla_Pedido_${p.Nombre_Lista.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
     const reader = new FileReader();
     reader.onload = async e => {
       try {
         const base64data = e.target.result.split(',')[1];
-        const path = await subirDocumento('documento', pedidoId, base64data, fileName, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        const path = await subirDocumento('documento', pedidoId, base64data, fileName, XLSX_MIME);
         setGenEstado(`✅ Listo. <a href="#" onclick="abrirDocumento('${path}'); return false;" style="color:var(--accent);font-weight:600;text-decoration:underline">📥 Abrir documento</a>`, 'ok');
         // Guardar la ruta de la hoja generada. Se conserva solo la última
         // (subir-documento ya borró la anterior de este pedido); se reescribe
@@ -240,11 +272,11 @@ async function generarHojaPedido() {
 
         }
       } catch(err) { setGenEstado('Error subiendo el documento: ' + err.message, 'error'); }
-      btn.disabled = false; btn.textContent = 'Generar Word';
+      btn.disabled = false; btn.textContent = 'Generar hoja';
     };
     reader.readAsDataURL(docxBlob);
   } catch(e) {
     console.error(e); setGenEstado('Error: ' + e.message, 'error');
-    btn.disabled = false; btn.textContent = 'Generar Word';
+    btn.disabled = false; btn.textContent = 'Generar hoja';
   }
 }

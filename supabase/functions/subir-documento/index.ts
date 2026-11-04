@@ -14,13 +14,15 @@ import { requireAdminOrGestor, requireStaff, requireValidSession, jsonError, jso
 const TIPOS_MIME_PERMITIDOS = [
   "application/pdf", "image/jpeg", "image/png",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  // Folla de pedido MD84COM07 (Excel) generada desde la app, desde 2026-11-04.
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ];
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024; // 10 MB — igual que el límite del bucket
 const CARPETAS: Record<string, string> = {
   manual: "manuales",       // ficha técnica de un equipo (id = ID_Activo)
   factura: "facturas",      // sin uso actual desde el cliente, se deja por compatibilidad
   actuacion: "actuaciones", // adjunto/factura de una intervención (id = ID_Intervencion)
-  documento: "documentos-generados", // Word de pedido generado desde la app (id = ID_Pedido)
+  documento: "documentos-generados", // hoja de pedido generada desde la app (id = ID_Pedido)
   etiqueta: "etiquetas-material",    // foto de la etiqueta de un bote al proponer material (fase B)
 };
 const TIPOS_STAFF = ["actuacion"];
@@ -65,7 +67,7 @@ Deno.serve(async (req) => {
   }
   const mimesPermitidos = TIPOS_CUALQUIER_SESION.includes(tipo) ? MIME_SOLO_IMAGEN : TIPOS_MIME_PERMITIDOS;
   if (!mimesPermitidos.includes(tipo_mime)) {
-    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (${TIPOS_CUALQUIER_SESION.includes(tipo) ? "solo imagen" : "solo PDF, JPEG, PNG o Word .docx"})`, 400);
+    return jsonError(`Tipo de archivo no permitido: ${tipo_mime} (${TIPOS_CUALQUIER_SESION.includes(tipo) ? "solo imagen" : "solo PDF, JPEG, PNG, Word .docx o Excel .xlsx"})`, 400);
   }
 
   let bytes: Uint8Array;
