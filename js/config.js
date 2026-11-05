@@ -240,6 +240,22 @@ function esResponsableDeEquipo(equipo) {
   return responsables.some(r => r === miNombre);
 }
 
+/**
+ * ¿Ve este docente las incidencias y actuaciones de este equipo? Las de los
+ * equipos de los que es responsable y, si en su ficha tiene marcada la
+ * «Zona común» (Labs accesibles → "ZC" en Ubicaciones_Asignadas), también las
+ * de los equipos ubicados en la zona común, que no tienen un responsable claro.
+ * Solo amplía lo que se VE; editar el equipo sigue siendo cosa del responsable.
+ */
+function veIncidenciasDeEquipo(equipo) {
+  if (!equipo) return false;
+  if (esResponsableDeEquipo(equipo)) return true;
+  if (!esZonaComun(equipo.Ubicacion)) return false;
+  const emailNorm = getEffectiveUser().email;
+  const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === emailNorm);
+  return String(u?.Ubicaciones_Asignadas || '').split(',').some(v => v.trim() === 'ZC');
+}
+
 // Una unidad es QUÉ se cuenta (caja, bote…), nunca CUÁNTO: el alumnado metía a
 // menudo la cantidad en ese campo ("1", "25"). Devuelve la unidad limpia, o ''
 // si no es una unidad. Espejo de unidadValida() en supabase/functions/_shared/material.ts.

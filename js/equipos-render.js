@@ -57,7 +57,7 @@ function renderDashboard() {
   const incVisibles = esGestorAdmin
     ? incAbiertas
     : esProfesor
-      ? incAbiertas.filter(i => { const eq = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)); return eq ? esResponsableDeEquipo(eq) : false; })
+      ? incAbiertas.filter(i => { const eq = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)); return eq ? veIncidenciasDeEquipo(eq) : false; })
       : [];
   if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('incidencias')"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.slice(0,3).map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}${incVisibles.length > 3 ? ' y ' + (incVisibles.length-3) + ' más...' : ''}</div></div></div>`;
 
@@ -445,7 +445,7 @@ function renderProximasVisitas() {
   if (rol === 'Profesor') {
     items = items.filter(i => {
       const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
-      return equipo ? esResponsableDeEquipo(equipo) : false;
+      return equipo ? veIncidenciasDeEquipo(equipo) : false;
     });
   }
   if (!items.length) { card.style.display = 'none'; return; }
@@ -496,7 +496,7 @@ function renderIntervenciones(filtroTipo = '') {
   if (rol === 'Profesor') {
     items = items.filter(i => {
       const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
-      return equipo ? esResponsableDeEquipo(equipo) : false;
+      return equipo ? veIncidenciasDeEquipo(equipo) : false;
     });
   }
   if (filtroTipo) items = items.filter(i => i.Tipo === filtroTipo);
@@ -580,7 +580,7 @@ function renderIncidencias(filtroEstado) {
     items = items.filter(i => {
       if ((i.Reportado_Por || '').toLowerCase().trim() === miNombre) return true;
       const equipo = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo));
-      return equipo ? esResponsableDeEquipo(equipo) : false;
+      return equipo ? veIncidenciasDeEquipo(equipo) : false;
     });
   }
   if (filtroEstado === 'todas') { /* sin filtro: incluye Resuelta y Descartada */ }
