@@ -277,3 +277,13 @@ Así se conservan incidencias, intervenciones y registros de mantenimiento. `exp
 Primeros casos: CEN-07, PIP-102 e INC-04 (carga del 25/10/2026). Solo se borra la fila de un
 equipo que nunca llegó a existir y que ninguna tabla referencia (la «CEN-», Eppendorf 5425 R,
 que no se llegó a comprar).
+
+## Profesorado y equipos de la zona común (2026-11-05)
+
+Un Profesor ve las incidencias y actuaciones de los equipos de los que es responsable
+y, además, si en su ficha (Usuarios → Labs accesibles) tiene marcada **Zona común**
+(`ZC` en `ubicaciones_asignadas`), las de los equipos ubicados en la zona común
+(`esZonaComun(equipo.Ubicacion)`). Lo decide `veIncidenciasDeEquipo()` (`js/config.js`):
+se usa en el aviso del panel, la lista de incidencias, próximas actuaciones e historial
+de intervenciones. Editar el equipo y los botones de ejecutar de las tablas siguen
+siendo solo del responsable (`esResponsableDeEquipo`).
