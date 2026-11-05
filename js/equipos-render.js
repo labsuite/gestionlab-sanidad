@@ -356,7 +356,7 @@ function buildIntervencionesEquipo(equipoId) {
   const avisoFuera = intFuera ? `
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-left:3px solid var(--purple,#5b3f9e);border-radius:var(--radius-sm);font-size:12px;margin-bottom:10px">
       <span>📦 <strong>El equipo no está en el centro</strong> — retirado por ${intFuera.Proveedor || intFuera.Realizado_Por || 'el servicio técnico'}${intFuera.Fecha_Retirada ? ' el ' + formatDate(intFuera.Fecha_Retirada) : ''} (${intFuera.ID_Intervencion}).</span>
-      ${puedeHacer('crearIntervenciones') ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();registrarDevolucionEquipo('${intFuera.ID_Intervencion}')">📦 Registrar devolución</button>` : ''}
+      ${puedeActuarEnEquipo(equipoId) ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();registrarDevolucionEquipo('${intFuera.ID_Intervencion}')">📦 Registrar devolución</button>` : ''}
     </div>` : '';
 
   const panelDetalles = avisoFuera + `
@@ -524,9 +524,10 @@ function renderIntervenciones(filtroTipo = '') {
   tbody.innerHTML = items.map(i => {
     const pdfLink = i.URL_Adjunto ? `<a href="#" onclick="abrirDocumento('${i.URL_Adjunto}'); return false;" title="${i.Nombre_Adjunto||'Ver documento'}" class="icon-btn">📄</a>` : '';
     const intIdx  = DATA.intervenciones.indexOf(i);
-    const puedeRegistrar    = puedeHacer('crearIntervenciones') && i.Estado === 'En gestión';
+    const puedeActuar       = puedeActuarEnEquipo(i.Equipo || '');
+    const puedeRegistrar    = puedeActuar && i.Estado === 'En gestión';
     const actFinalizada     = i.Actuacion_Finalizada === 'Sí';
-    const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeHacer('crearIntervenciones');
+    const pendienteFactura  = i.Estado === 'Pendiente factura' && puedeActuar;
 
     const chain = getChainIntervencion(i.ID_Intervencion);
     const posicion = chain.findIndex(c => c.ID_Intervencion === i.ID_Intervencion) + 1;
@@ -782,6 +783,7 @@ function openFichaIntervencion(intIdx) {
     : '<span style="color:var(--text-muted);font-size:12px">—</span>';
 
   const tareas = getTareasIntervencion(i.ID_Intervencion);
+  const puedeActuar = puedeActuarEnEquipo(i.Equipo || '');
   const timelineEl = document.getElementById('ficha-int-timeline');
   if (timelineEl) timelineEl.innerHTML = _buildTimelineIncidencia(incVinculada, chain, i.ID_Intervencion);
 
@@ -813,7 +815,7 @@ function openFichaIntervencion(intIdx) {
   if (elTareas) {
     // Esta lista es de solo lectura; sin esta pista no se ve que las tareas se
     // corrigen desde el botón de abajo (que abre el modal de la actuación).
-    const pistaEdicion = (tareas.length && puedeHacer('crearIntervenciones'))
+    const pistaEdicion = (tareas.length && puedeActuar)
       ? `<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">Para corregir el texto o el resultado de una tarea, usa «✏️ Editar intervención» abajo.</div>`
       : '';
     elTareas.innerHTML = pistaEdicion + (tareas.length
@@ -836,16 +838,16 @@ function openFichaIntervencion(intIdx) {
 
   // Botones de acción
   const actFinalizada = i.Actuacion_Finalizada === 'Sí';
-  const puedeRegistrar = puedeHacer('crearIntervenciones') &&
+  const puedeRegistrar = puedeActuar &&
     (i.Estado === 'Planificada' || i.Estado === 'En gestión' || !i.Estado);
   // Una actuación finalizada se puede reabrir/editar aunque ya esté Cerrada — a veces
   // se registra algo mal y hay que corregirlo (el modal lo deja claro y ofrece "Reabrir").
-  const puedeEditarFinalizada = puedeHacer('crearIntervenciones') && actFinalizada;
+  const puedeEditarFinalizada = puedeActuar && actFinalizada;
   const pendienteFactura = i.Estado === 'Pendiente factura';
   // "Pendiente factura" solo significa que esta visita concreta se factura — no que el
   // problema esté resuelto (una tarea puede quedar Resuelto siendo solo un diagnóstico).
   // Por eso también se puede programar otra visita en ese estado, no solo desde "En gestión".
-  const puedeNuevaVisita = puedeHacer('crearIntervenciones') && (i.Estado !== 'Cerrada' || actFinalizada);
+  const puedeNuevaVisita = puedeActuar && (i.Estado !== 'Cerrada' || actFinalizada);
   const equipoIdFicha = (i.Equipo || '').split(' – ')[0].trim();
   // Este modal edita la intervención entera (sus datos, sus tareas y el resultado
   // de cada una), no solo añade tareas: la etiqueta anterior ("Añadir tarea") hacía
@@ -858,11 +860,11 @@ function openFichaIntervencion(intIdx) {
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');editarPlanificacion(${intIdx})">✏️ Editar planificación</button>`;
   if (puedeRegistrar || puedeEditarFinalizada)
     btns += `<button class="btn ${actFinalizada ? 'btn-secondary' : 'btn-primary'}" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
-  if (pendienteFactura && puedeHacer('crearIntervenciones'))
+  if (pendienteFactura && puedeActuar)
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
   if (puedeNuevaVisita)
     btns += `<button class="btn ${actFinalizada ? 'btn-primary' : 'btn-secondary'}" onclick="closeModal('modal-ficha-intervencion');${incVinculada ? `programarOtraVisita(${intIdx})` : `openModalRegistrarActuacionDirecta('${equipoIdFicha}')`}">${incVinculada ? '📅 Programar otra actuación' : '🔧 Registrar otra actuación'}</button>`;
-  if (puedeHacer('crearIntervenciones') && i.Lugar_Intervencion === 'Equipo retirado' && !i.Fecha_Devolucion)
+  if (puedeActuar && i.Lugar_Intervencion === 'Equipo retirado' && !i.Fecha_Devolucion)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');registrarDevolucionEquipo('${i.ID_Intervencion}')">📦 Registrar devolución</button>`;
   if (incVinculada)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;

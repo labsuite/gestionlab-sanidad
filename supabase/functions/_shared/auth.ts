@@ -79,6 +79,27 @@ export async function requireStaff(req: Request) {
 export const ES_STAFF = (rol: string) => ROLES_STAFF.includes(rol);
 
 /**
+ * Actuar sobre un equipo (actuaciones, tareas, cerrar su incidencia) es de Admin,
+ * Gestor y del Profesor RESPONSABLE del equipo (campo `responsable`, que se
+ * rellena por módulo o por laboratorio). Un profe que solo VE las incidencias de
+ * la zona común no actúa sobre ellas. Devuelve la respuesta 403, o null si puede.
+ * Espejo de `puedeActuarEnEquipo()` en js/config.js.
+ */
+export async function requiereResponsableEquipo(
+  supabaseAdmin: any, user: { rol?: string; nombre?: string }, idEquipo: string | null,
+) {
+  if (user.rol !== "Profesor") return null;
+  const miNombre = String(user.nombre || "").toLowerCase().trim();
+  if (miNombre && idEquipo) {
+    const { data } = await supabaseAdmin.from("equipos")
+      .select("responsable").eq("id_activo", idEquipo).maybeSingle();
+    const responsables = String(data?.responsable || "").toLowerCase().split(",").map((r) => r.trim());
+    if (responsables.includes(miNombre)) return null;
+  }
+  return jsonError("Solo el profesorado responsable del equipo puede actuar sobre él", 403);
+}
+
+/**
  * Nombre y rol de quien llama, para acciones abiertas a cualquier rol
  * (requireValidSession) que luego necesitan saber si es alumnado o profesorado.
  * Busca primero en `users` (cuentas con login real) y cae al catálogo `usuarios`.

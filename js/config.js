@@ -241,6 +241,23 @@ function esResponsableDeEquipo(equipo) {
 }
 
 /**
+ * ¿Puede ACTUAR sobre este equipo (registrar/planificar/ejecutar actuaciones,
+ * editar tareas, cerrar la incidencia)? Admin y Gestor siempre; un Profesor solo
+ * si es responsable del equipo (campo Responsable, que se rellena por módulo o
+ * por laboratorio). Ver las incidencias de la zona común no da permiso para
+ * actuar. Acepta el objeto equipo o su ID_Activo. Espejo de
+ * `requiereResponsableEquipo()` en supabase/functions/_shared/auth.ts.
+ */
+function puedeActuarEnEquipo(equipo) {
+  if (!puedeHacer('crearIntervenciones')) return false;
+  if (getUserRole() !== 'Profesor') return true;
+  const eq = typeof equipo === 'string'
+    ? DATA.equipos.find(e => e.ID_Activo === equipo.split(' – ')[0].trim())
+    : equipo;
+  return !!eq && esResponsableDeEquipo(eq);
+}
+
+/**
  * ¿Ve este docente las incidencias y actuaciones de este equipo? Las de los
  * equipos de los que es responsable y, si en su ficha tiene marcada la
  * «Zona común» (Labs accesibles → "ZC" en Ubicaciones_Asignadas), también las

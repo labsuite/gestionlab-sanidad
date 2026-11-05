@@ -285,5 +285,12 @@ y, además, si en su ficha (Usuarios → Labs accesibles) tiene marcada **Zona c
 (`ZC` en `ubicaciones_asignadas`), las de los equipos ubicados en la zona común
 (`esZonaComun(equipo.Ubicacion)`). Lo decide `veIncidenciasDeEquipo()` (`js/config.js`):
 se usa en el aviso del panel, la lista de incidencias, próximas actuaciones e historial
-de intervenciones. Editar el equipo y los botones de ejecutar de las tablas siguen
-siendo solo del responsable (`esResponsableDeEquipo`).
+de intervenciones.
+
+**Ver no es actuar.** Registrar, planificar o ejecutar actuaciones, editar tareas,
+registrar la devolución y cerrar/reabrir la incidencia es solo de Admin, Gestor y del
+Profesor **responsable** del equipo (campo `responsable`, rellenado por módulo o por
+laboratorio). Cliente: `puedeActuarEnEquipo()` (`js/config.js`) en el hilo, la ficha de
+la intervención y el historial. Servidor: `requiereResponsableEquipo()`
+(`_shared/auth.ts`) en todas las acciones de `gestionar-intervencion` y en `cerrar` de
+`gestionar-incidencia` — antes el servidor dejaba actuar a cualquier Profesor.

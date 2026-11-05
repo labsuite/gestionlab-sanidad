@@ -2,7 +2,7 @@
 // tanto Profesor/Gestor/Admin (openModalIncidencia) como el propio Alumno
 // (aviso de problema con un equipo, openModalAvisoAlumno — ver equipos-render.js
 // getUserRole()==='Alumno'). "eliminar" queda restringido a Admin/Gestor.
-import { requireValidSession, requireAdminOrGestor, requireStaff, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireValidSession, requireAdminOrGestor, requireStaff, requiereResponsableEquipo, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarIdIncidencia(): string {
   return "INC-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -55,8 +55,14 @@ Deno.serve(async (req) => {
   // factura. Aquí es donde además se devuelve el equipo a "Operativo", también
   // a propósito — ver docs/modulo-incidencias.md.
   if (accion === "cerrar") {
-    const { error: authError, supabaseAdmin } = await requireStaff(req);
+    const { error: authError, user, supabaseAdmin } = await requireStaff(req);
     if (authError) return authError;
+    {
+      const { data: previa } = await supabaseAdmin.from("incidencias")
+        .select("id_equipo").eq("id_incidencia", String(body.id_incidencia || "").trim()).maybeSingle();
+      const prohibido = await requiereResponsableEquipo(supabaseAdmin, user, previa?.id_equipo || null);
+      if (prohibido) return prohibido;
+    }
 
     const idIncidencia = String(body.id_incidencia || "").trim();
     const estado = String(body.estado || "").trim();

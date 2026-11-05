@@ -469,7 +469,7 @@ function abrirHiloIncidencia(incId) {
     // Dos caminos, nunca uno impuesto: la actuación puede registrarse tal cual se
     // hizo, o planificarse para más adelante.
     const eqId = (inc.Equipo || '').split(' – ')[0].trim();
-    const botones = puedeHacer('crearIntervenciones')
+    const botones = puedeActuarEnEquipo(eqId)
       ? `<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">
           <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="openModalRegistrarActuacionDirecta('${eqId}', {incId:'${inc.ID_Incidencia}'});closeModal('modal-hilo-incidencia')">🔧 Registrar actuación</button>
           <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="abrirPlanificacion('${inc.ID_Incidencia}','${inc.Equipo}');closeModal('modal-hilo-incidencia')">📅 Planificar actuación</button>
@@ -481,6 +481,7 @@ function abrirHiloIncidencia(incId) {
   }
 
   const chain = getChainIntervencion(inc.Intervencion_Generada);
+  const puedeActuar = puedeActuarEnEquipo(inc.Equipo || '');
   const estadoBadge = {'Planificada':'badge-blue','En gestión':'badge-orange','Cerrada':'badge-green','Pendiente factura':'badge-red'};
   cont.innerHTML = chain.map((c, idx) => {
     const cIdx = DATA.intervenciones.indexOf(c);
@@ -505,9 +506,9 @@ function abrirHiloIncidencia(incId) {
     }
 
     let accion = '';
-    if (c.Lugar_Intervencion === 'Equipo retirado' && !c.Fecha_Devolucion && puedeHacer('crearIntervenciones'))
+    if (c.Lugar_Intervencion === 'Equipo retirado' && !c.Fecha_Devolucion && puedeActuar)
       accion += `<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="closeModal('modal-hilo-incidencia');registrarDevolucionEquipo('${c.ID_Intervencion}')">📦 Devuelto</button>`;
-    if (esActiva && puedeHacer('crearIntervenciones')) {
+    if (esActiva && puedeActuar) {
       if (c.Estado === 'Planificada')
         accion += `<button class="btn btn-secondary" style="font-size:12px;padding:4px 10px" onclick="editarPlanificacion(${cIdx});closeModal('modal-hilo-incidencia')">✏️ Editar planificación</button>
           <button class="btn btn-primary" style="font-size:12px;padding:4px 10px" onclick="openModalActuacionDerivada(${cIdx});closeModal('modal-hilo-incidencia')">🔧 Ejecutar</button>`;
@@ -548,7 +549,7 @@ function _renderAccionesHilo(inc, chain) {
   const cont = document.getElementById('hilo-acciones');
   if (!cont) return;
   cont.innerHTML = '';
-  if (!puedeHacer('crearIntervenciones')) return;
+  if (!puedeActuarEnEquipo(inc.Equipo || '')) return;
   const activa = chain.find(c => c.ID_Intervencion === inc.Intervencion_Generada);
   // Aunque la activa esté cerrada (p.ej. cerrada con una tarea "No resuelto")
   // puede hacer falta otra actuación; solo se ocultan con la incidencia cerrada.
@@ -585,7 +586,7 @@ function _renderCierreHilo(inc) {
   const estadoEq = equipo ? (equipo.Estado_Operativo || '—') : '—';
   const cerrada  = ['Resuelta', 'Descartada'].includes(inc.Estado);
 
-  if (!puedeHacer('crearIntervenciones')) {
+  if (!puedeActuarEnEquipo(equipo)) {
     cont.innerHTML = `<div style="font-size:12px;color:var(--text-muted);padding-top:10px;border-top:1px solid var(--border)">Estado del equipo: <strong>${estadoEq}</strong></div>`;
     return;
   }

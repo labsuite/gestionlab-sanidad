@@ -6,7 +6,7 @@
 // al guardar una tarea se recalcula el resultado/estado agregado de la
 // intervención y se propaga al estado del equipo y de la incidencia vinculada,
 // todo en una sola llamada atómica.
-import { requireStaff, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireStaff, requiereResponsableEquipo, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarIdIntervencion(): string {
   return "INT-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
   if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
 
-  const { error: authError, supabaseAdmin } = await requireStaff(req);
+  const { error: authError, user, supabaseAdmin } = await requireStaff(req);
   if (authError) return authError;
 
   let body: Record<string, unknown>;
@@ -62,6 +62,26 @@ Deno.serve(async (req) => {
   }
 
   const accion = String(body.accion || "");
+
+  // Profesor: solo sobre equipos de los que es responsable.
+  async function equipoDeIntervencion(idIntervencion: string | null): Promise<string | null> {
+    if (!idIntervencion) return null;
+    const { data } = await supabaseAdmin.from("intervenciones")
+      .select("id_equipo").eq("id_intervencion", idIntervencion).maybeSingle();
+    return data?.id_equipo || null;
+  }
+  {
+    let idEquipo: string | null = null;
+    if (accion === "crear") idEquipo = strField(body.id_equipo);
+    else if (accion === "actualizar" || accion === "guardar_tarea") idEquipo = await equipoDeIntervencion(strField(body.id_intervencion));
+    else if (accion === "eliminar_tarea") {
+      const { data: t } = await supabaseAdmin.from("tareas_intervencion")
+        .select("id_intervencion").eq("id_tarea", strField(body.id_tarea) || "").maybeSingle();
+      idEquipo = await equipoDeIntervencion(t?.id_intervencion || null);
+    }
+    const prohibido = await requiereResponsableEquipo(supabaseAdmin, user, idEquipo);
+    if (prohibido) return prohibido;
+  }
 
   // Actualiza el estado operativo del equipo (efecto colateral compartido por
   // varias acciones) sin pasar por gestionar-equipo — mismo cliente service_role.
