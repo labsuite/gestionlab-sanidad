@@ -378,7 +378,7 @@ function _badgesModulos(modulosStr) {
 function _badgesLabs(ubicStr) {
   const labs = _getLabsDeUbics(ubicStr || '');
   if (!labs.length) return _SIN_DATO;
-  return labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">Lab ${l}</span>`).join('');
+  return labs.map(l => `<span class="badge badge-gray" style="margin-right:2px">${_etiquetaLab(l)}</span>`).join('');
 }
 
 // "Ciclo|Módulo" helpers — el separador | evita ambigüedad cuando varios ciclos comparten nombre de módulo
@@ -894,7 +894,7 @@ function _getLabsDeUbics(ubicStr) {
   const vals = ubicStr.split(',').map(s => s.trim()).filter(Boolean);
   const labs = new Set();
   vals.forEach(val => {
-    if (/^\d{3}$/.test(val)) {
+    if (/^\d{3}$/.test(val) || val === LAB_ZONA_COMUN) {
       labs.add(val);
       return;
     }
@@ -910,6 +910,12 @@ function _getLabsDeUbics(ubicStr) {
   });
   return [...labs].sort();
 }
+
+// La zona común se guarda en Ubicaciones_Asignadas como "ZC", junto a los
+// números de lab ("201,205,ZC"). Al alumnado se le suma siempre sola
+// (getUbicacionesAlumno); al profesorado hay que marcársela a mano.
+const LAB_ZONA_COMUN = 'ZC';
+const _etiquetaLab = l => l === LAB_ZONA_COMUN ? 'Zona común' : `Lab ${l}`;
 
 function _getUbicacionesDeLabs(labsList) {
   return labsList.join(',');
@@ -935,13 +941,13 @@ function _renderLabsChecks(labsSeleccionados) {
   const cont = document.getElementById('usr-labs-checks');
   if (!cont) return;
   const sel = labsSeleccionados || [];
-  const todos = _labsConocidos(sel);
+  const todos = _labsConocidos(sel.filter(l => l !== LAB_ZONA_COMUN)).concat(LAB_ZONA_COMUN);
   if (!todos.length) {
     cont.innerHTML = '<span style="font-size:12px;color:var(--text-muted);font-style:italic">Sin laboratorios registrados.</span>';
     return;
   }
   cont.innerHTML = todos.map(l => `<label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-    <input type="checkbox" class="usr-lab-check" value="${l}" ${sel.includes(l) ? 'checked' : ''}> Lab ${l}
+    <input type="checkbox" class="usr-lab-check" value="${l}" ${sel.includes(l) ? 'checked' : ''}> ${_etiquetaLab(l)}
   </label>`).join('');
 }
 
