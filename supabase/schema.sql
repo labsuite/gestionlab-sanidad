@@ -860,3 +860,16 @@ alter table lineas_pedido add column if not exists conceptos_factura jsonb;
 -- que lineas_pedido.conceptos_factura. Manda sobre las líneas y sobre sus
 -- conceptos_factura, pero solo en la hoja (.docx y enviar-a-trebello). null = la hoja usa las líneas.
 alter table pedidos add column if not exists hoja_factura jsonb;
+
+-- ── Solicitudes de material no fungible y de servicios (2026-11-16) ─────
+-- 'Material' (fungible, lo de siempre) · 'No fungible' (micropipeta, pieza,
+-- pequeño aparato…) · 'Servicio' (reparación, calibración, revisión…).
+-- Lo no fungible y los servicios no entran en el inventario de fungibles: la
+-- línea de pedido que nace de ellos sale con sin_inventario = true.
+alter table solicitudes add column if not exists tipo text not null default 'Material';
+
+-- ── Recibido pero fuera del inventario (2026-11-16) ─────────────────────
+-- Piezas de otra cosa, repuestos, algo que se gasta al momento…: la línea se
+-- recibe (cantidad, estado, solicitud de origen y estado del pedido como
+-- siempre) pero no suma stock ni obliga a darle ficha en el catálogo.
+alter table lineas_pedido add column if not exists sin_inventario boolean not null default false;

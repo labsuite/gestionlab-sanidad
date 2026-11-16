@@ -357,6 +357,9 @@ function _lineaPedidoSbToObj(l) {
     // Cómo figura en la factura: [{concepto, cantidad, unidad, precio_unitario}].
     // Solo lo usa la hoja de pedido. Vacío = la hoja usa la línea tal cual.
     Conceptos_Factura: Array.isArray(l.conceptos_factura) ? l.conceptos_factura : [],
+    // true = se recibe pero no entra en el inventario (piezas de otra cosa,
+    // material no fungible, servicios…): no suma stock ni pide ficha.
+    Sin_Inventario: l.sin_inventario === true,
   };
 }
 
@@ -377,6 +380,8 @@ function _solicitudSbToObj(s) {
     Compra_Fecha: s.compra_fecha || '',
     Compra_Importe: s.compra_importe != null ? String(s.compra_importe) : '',
     Compra_Nota: s.compra_nota || '',
+    // 'Material' (fungible) · 'No fungible' · 'Servicio'
+    Tipo: s.tipo || 'Material',
   };
 }
 

@@ -11,6 +11,7 @@ function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
 }
 const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
+const _bool = (v: unknown) => v === true ? true : v === false ? false : undefined;
 const hoy = () => new Date().toISOString().split("T")[0];
 const normNombre = (n: string) => (n || "").normalize("NFC").replace(/\s*\[.*?\]/g, "").trim().toLowerCase();
 
@@ -102,7 +103,10 @@ async function actualizarSolicitudOrigen(supabaseAdmin: any, linea: any, pedidoI
 // recepción: la usuaria puede haberle corregido el nombre (se pidió "5 mL" y
 // lo que existe es "2 mL"), así que buscarlo por el nombre de la línea no lo
 // encontraría y el stock no entraría.
-async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null) {
+// `sinInventario` (true/false) lo decide quien recibe: true = se registra la
+// recepción pero no entra stock (piezas de otra cosa, repuestos…). Se guarda
+// en la línea; undefined = se respeta lo que ya tuviera la línea.
+async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null, sinInventario?: boolean) {
   const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
   if (!linea) return { error: jsonError(`No se encontró la línea "${idLinea}"`, 404) };
   const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", linea.pedido).maybeSingle();
@@ -120,7 +124,9 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   const cantRecTotal = (Number(linea.cantidad_recibida) || 0) + cantRec;
   const estadoLinea = cantRecTotal >= cantPed ? "Recibido" : (cantRecTotal > 0 ? "Recibido parcialmente" : "Pendiente");
   const datosLinea: Record<string, unknown> = { cantidad_recibida: cantRecTotal, estado_linea: estadoLinea };
-  if (mat && mat.id_material !== linea.id_material) datosLinea.id_material = mat.id_material;
+  const fueraInventario = sinInventario ?? linea.sin_inventario === true;
+  if (sinInventario !== undefined) datosLinea.sin_inventario = sinInventario;
+  if (!fueraInventario && mat && mat.id_material !== linea.id_material) datosLinea.id_material = mat.id_material;
   // La marca "Desde solicitud …" es lo que enlaza la línea con su solicitud:
   // una observación escrita al recibir se le añade, no la sustituye.
   if (observaciones) {
@@ -131,8 +137,8 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   const { data: lineaActualizada, error } = await supabaseAdmin.from("lineas_pedido").update(datosLinea).eq("id_linea", idLinea).select().single();
   if (error) return { error: jsonError(`No se pudo guardar la recepción: ${error.message}`, 400) };
 
-  // Servicios: no hay stock que tocar.
-  if (pedido.tipo !== "Servicio" && cantRec > 0 && mat) {
+  // Servicios y líneas fuera del inventario: no hay stock que tocar.
+  if (pedido.tipo !== "Servicio" && !fueraInventario && cantRec > 0 && mat) {
     await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
@@ -164,12 +170,16 @@ Deno.serve(async (req) => {
     const idSolicitud = strField(body.id_solicitud);
 
     let material: string, cantidadPedida: number, observaciones: string | null;
+    // Fuera del inventario de fungibles: lo marca quien añade la línea, o lo
+    // trae la solicitud si es de material no fungible o de un servicio.
+    let sinInventario = body.sin_inventario === true;
     if (idSolicitud) {
       const { data: sol } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", idSolicitud).maybeSingle();
       if (!sol) return jsonError(`No se encontró la solicitud "${idSolicitud}"`, 404);
       material = sol.material;
       cantidadPedida = Number(sol.cantidad_solicitada);
       observaciones = `Desde solicitud ${idSolicitud}`;
+      if (sol.tipo && sol.tipo !== "Material") sinInventario = true;
     } else {
       material = String(body.material || "").trim();
       cantidadPedida = Number(body.cantidad_pedida);
@@ -190,13 +200,14 @@ Deno.serve(async (req) => {
 
     const datos = {
       id_linea: genId("LIN"), pedido: pedidoId, material,
-      id_material: await resolverIdMaterial(supabaseAdmin, material),
+      id_material: sinInventario ? null : await resolverIdMaterial(supabaseAdmin, material),
       cantidad_pedida: cantidadPedida,
       cantidad_recibida: 0, estado_linea: "Pendiente", observaciones,
       precio_unitario: body.precio_unitario ? Number(body.precio_unitario) : null,
       id_equipo: strField(body.id_equipo),
       unidad: strField(body.unidad),
       presupuesto_pendiente: presupuestoPendiente,
+      sin_inventario: sinInventario,
     };
     const { data, error } = await supabaseAdmin.from("lineas_pedido").insert(datos).select().single();
     if (error) return jsonError(`No se pudo añadir la línea: ${error.message}`, 400);
@@ -275,6 +286,7 @@ Deno.serve(async (req) => {
     }
     if (body.observaciones !== undefined) datos.observaciones = strField(body.observaciones);
     if (body.unidad !== undefined) datos.unidad = strField(body.unidad);
+    if (body.sin_inventario !== undefined) datos.sin_inventario = body.sin_inventario === true;
 
     // Renombrar: las solicitudes llegan a veces con nombres poco claros
     // ("bandexa branca") y el nombre de la línea es el que va a la casa
@@ -375,7 +387,7 @@ Deno.serve(async (req) => {
     const cantRec = Number(body.cantidad);
     if (!idLinea) return jsonError("id_linea es obligatorio", 400);
     if (!cantRec || cantRec <= 0) return jsonError("Indica una cantidad válida", 400);
-    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion), strField(body.id_material));
+    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion), strField(body.id_material), _bool(body.sin_inventario));
     if (resultado.error) return resultado.error;
     return jsonOk(resultado);
   }
@@ -390,7 +402,7 @@ Deno.serve(async (req) => {
     for (const l of lineas) {
       const cantRec = Number(l.cantidad);
       if (!cantRec || cantRec <= 0) continue;
-      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion));
+      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion), null, _bool(l.sin_inventario));
       if (r.error) { errores++; resultados.push({ id_linea: l.id_linea, ok: false }); }
       else { procesadas++; resultados.push({ id_linea: l.id_linea, ok: true }); }
     }

@@ -938,8 +938,10 @@ function openModalSolicitudMaterial(matId) {
   openModalSolicitud();
   setTimeout(() => {
     // Ocultar completamente ambas pestañas de fuente — el material ya está fijado
-    const toggleSrc = document.querySelector('#modal-solicitud .toggle-source');
+    const toggleSrc = document.getElementById('sol-source-toggle');
     if (toggleSrc) toggleSrc.style.display = 'none';
+    const tipoGrp = document.getElementById('sol-tipo-group');
+    if (tipoGrp) tipoGrp.style.display = 'none';
     const catGrp = document.getElementById('sol-catalogo-group');
     if (catGrp) catGrp.style.display = 'none';
     const nuevoGrp = document.getElementById('sol-nuevo-group');

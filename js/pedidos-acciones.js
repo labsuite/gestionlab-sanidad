@@ -2,7 +2,9 @@
 // GUARDAR SOLICITUDES
 // ============================================================
 async function guardarSolicitud() {
-  const esNuevo = document.getElementById('btn-source-nuevo').classList.contains('active');
+  const tipo = v('sol-tipo') || 'Material';
+  // No fungible y servicios: siempre texto libre, sin catálogo ni unidad.
+  const esNuevo = tipo !== 'Material' || document.getElementById('btn-source-nuevo').classList.contains('active');
   // Declarar variables comunes ANTES del if/else para evitar problemas de scope
   const cant = v('sol-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
@@ -14,11 +16,11 @@ async function guardarSolicitud() {
   let materialNombre = '', unidadObs = '';
   if (esNuevo) {
     materialNombre = v('sol-material-libre');
-    const unidad = v('sol-unidad');
-    if (!unidad) { showToast('La unidad es obligatoria para material no catalogado', 'error'); return; }
+    const unidad = tipo === 'Material' ? v('sol-unidad') : '';
+    if (tipo === 'Material' && !unidad) { showToast('La unidad es obligatoria para material no catalogado', 'error'); return; }
     if (!materialNombre) { showToast('Indica el material', 'error'); return; }
     // Unidad va solo a observaciones, NO al nombre
-    unidadObs = '[Unidad: ' + unidad + '] ';
+    if (unidad) unidadObs = '[Unidad: ' + unidad + '] ';
   } else {
     const materialId = document.getElementById('sol-material-id').value;
     const mat = DATA.material.find(m => m.ID_Material === materialId);
@@ -29,7 +31,7 @@ async function guardarSolicitud() {
   showLoading('Guardando...');
   try {
     const { solicitud } = await callEdgeFunction('gestionar-solicitud', {
-      accion: 'crear', material: materialNombre, cantidad_solicitada: cant, solicitante: usuario,
+      accion: 'crear', tipo, material: materialNombre, cantidad_solicitada: cant, solicitante: usuario,
       motivo: v('sol-motivo') + (fechaNecesidad ? ' · Necesario: ' + fechaNecesidad : ''),
       proveedor_requerido: v('sol-proveedor'), observaciones: unidadObs + obsBase,
     });
@@ -307,6 +309,7 @@ async function guardarLineaPedido() {
     const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
       accion: 'crear', pedido: pedidoId, material: materialNombre, cantidad_pedida: cant,
       observaciones: obs, precio_unitario: precio, id_equipo: equipoId, unidad: unidadLinea,
+      sin_inventario: !esServicio && document.getElementById('linea-sin-inventario').checked,
     });
     DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
     closeModal('modal-nueva-linea');
@@ -371,7 +374,8 @@ async function guardarRecepcionMasiva() {
       id_linea: l.ID_Linea,
       cantidad: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
       observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '',
-      id_ubicacion: document.getElementById('recmas-ubic-' + l.ID_Linea)?.value || ''
+      sin_inventario: !!document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked,
+      id_ubicacion: document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked ? '' : (document.getElementById('recmas-ubic-' + l.ID_Linea)?.value || '')
     }))
     .filter(x => x.cantidad > 0);
   if (!aRecibir.length) { showToast('Introduce al menos una cantidad', 'error'); return; }
@@ -405,9 +409,11 @@ async function guardarRecepcionLinea() {
     return;
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
-  const idUbicacion = document.getElementById('rec-ubicacion-group')?.style.display !== 'none' ? v('rec-ubicacion-sel') : '';
+  const sinInventario = document.getElementById('rec-sin-inventario').checked;
+  const idUbicacion = !sinInventario && document.getElementById('rec-ubicacion-group')?.style.display !== 'none' ? v('rec-ubicacion-sel') : '';
   const mat = _materialDeLinea(l);
-  if (!mat && cantRec > 0) {
+  // Fuera del inventario: no hace falta darle ficha en el catálogo.
+  if (!mat && cantRec > 0 && !sinInventario) {
     closeModal('modal-recepcion-linea');
     _pendingRecepcion = { lineaId, pedidoId, cantRec, obs: v('rec-obs'), idUbicacion };
     openModalMaterial(); sv('mat-nombre', l.Material);
@@ -424,7 +430,7 @@ async function guardarRecepcionLinea() {
     showToast('Este material no está catalogado. Completa su ficha para continuar.', 'error');
     return;
   }
-  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion);
+  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion, undefined, sinInventario);
 }
 
 // ── Orquestador principal de recepción ───────────────────────
@@ -432,10 +438,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');
@@ -987,6 +993,9 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
+  const pEd = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  document.getElementById('edlinea-sin-inv-group').style.display = pEd?.Tipo === 'Servicio' ? 'none' : '';
+  document.getElementById('edlinea-sin-inventario').checked = !!l.Sin_Inventario;
 
   // Unidad pedida: combo (input + datalist) siempre visible, mismo criterio que
   // la unidad de un lote en el modal de material (ver _unidadesSugeridas). Antes
@@ -1019,6 +1028,7 @@ async function guardarEdicionLinea() {
     const { linea, solicitud } = await callEdgeFunction('gestionar-linea-pedido', {
       accion: 'editar', id_linea: lineaId, material,
       cantidad_pedida: cantidad, precio_unitario: precio, observaciones: obs, unidad,
+      sin_inventario: document.getElementById('edlinea-sin-inventario').checked,
     });
     DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
     if (solicitud) {

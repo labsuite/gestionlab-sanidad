@@ -11,6 +11,7 @@ function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
 }
 
+const TIPOS_SOLICITUD = ["Material", "No fungible", "Servicio"];
 const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
 
 /**
@@ -135,9 +136,12 @@ Deno.serve(async (req) => {
     const cantidad = Number(body.cantidad_solicitada);
     if (!material) return jsonError("Indica el material", 400);
     if (!cantidad || cantidad <= 0) return jsonError("Indica la cantidad", 400);
+    // Material (fungible) · No fungible · Servicio. Solo lo fungible se enlaza
+    // con el catálogo de material: lo demás no entra en ese inventario.
+    const tipo = TIPOS_SOLICITUD.includes(String(body.tipo)) ? String(body.tipo) : "Material";
     const datos = {
-      id_solicitud: genId("SOL"), material,
-      id_material: await resolverIdMaterial(supabaseAdmin, material),
+      id_solicitud: genId("SOL"), material, tipo,
+      id_material: tipo === "Material" ? await resolverIdMaterial(supabaseAdmin, material) : null,
       cantidad_solicitada: cantidad,
       solicitante: String(body.solicitante || "Usuario"),
       motivo: strField(body.motivo), proveedor_requerido: strField(body.proveedor_requerido),
@@ -161,6 +165,10 @@ Deno.serve(async (req) => {
       proveedor_requerido: strField(body.proveedor_requerido), observaciones: strField(body.observaciones),
     };
     if (body.material) datos.material = String(body.material).trim();
+    if (TIPOS_SOLICITUD.includes(String(body.tipo))) {
+      datos.tipo = String(body.tipo);
+      if (datos.tipo !== "Material") datos.id_material = null;
+    }
     const { data, error } = await supabaseAdmin.from("solicitudes").update(datos).eq("id_solicitud", idSolicitud).select().single();
     if (error) return jsonError(`No se pudo actualizar: ${error.message}`, 400);
     return jsonOk({ solicitud: data });

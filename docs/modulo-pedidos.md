@@ -447,3 +447,36 @@ del trámite** — no se puede hacer la hoja sin la factura:
    previo: la acción `desarchivar` de `gestionar-pedido` lo deduce de las líneas (todas
    recibidas → Recepción completa; alguna → Recepción parcial; ninguna → Presupuesto
    aprobado, para poder recibir el albarán). No toca Trebello ni secretaría.
+
+---
+
+## Solicitudes de material no fungible y de servicios (2026-11-16)
+
+El modal de solicitud empieza con **¿Qué necesitas?** (`setTipoSolicitud` en `js/pedidos-render.js`):
+🧪 Material fungible (lo de siempre: catálogo o no catalogado, unidad obligatoria) ·
+🧰 Material no fungible (micropipeta, pieza, pequeño aparato…) · 🔧 Servicio (reparación,
+calibración, revisión…). Lo no fungible y los servicios son siempre **texto libre**, sin
+unidad ni enlace al catálogo (`id_material = null`); el servicio propone cantidad 1.
+
+- Columna `solicitudes.tipo` (`'Material'` por defecto, `'No fungible'`, `'Servicio'`) →
+  `Tipo` en `_solicitudSbToObj`. La tarjeta lleva la etiqueta 🔧 Servicio / 🧰 No fungible.
+- Se añaden a cualquier pedido abierto, como las de material. La línea que nace de una
+  solicitud no fungible o de servicio sale con `sin_inventario = true` (acción `crear` de
+  `gestionar-linea-pedido`).
+- Desde la ficha de un material (`openModalSolicitudMaterial`) no se ve el selector: es fungible.
+
+## Recibido pero fuera del inventario (2026-11-16)
+
+Para lo que llega pero no tiene que sumar stock ni tener ficha en el catálogo (piezas de otra
+cosa, repuestos, lo no fungible…). Columna `lineas_pedido.sin_inventario` (boolean, default
+false) → `Sin_Inventario` en `_lineaPedidoSbToObj`.
+
+- Se marca con la casilla **🚫 No incluir en el inventario** en: añadir línea, ✏️ Editar línea,
+  📥 recepción de una línea y la columna «🚫 Sin inventario» de la recepción por albarán. La
+  casilla de la recepción viene marcada si la línea ya lo estaba, y se puede cambiar ahí mismo.
+- Al recibir con la casilla marcada: se guarda cantidad recibida, estado de la línea, estado
+  del pedido y solicitud de origen como siempre, pero `completarRecepcion` **no toca stock** y
+  la recepción **no obliga a catalogar** el material (se salta el desvío a `openModalMaterial`).
+  La ubicación se oculta.
+- En el detalle del pedido la línea lleva la etiqueta gris «🚫 Sin inventario». En pedidos de
+  tipo Servicio no aparece nada de esto (ya no tocan stock).

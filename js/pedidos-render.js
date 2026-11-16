@@ -135,6 +135,7 @@ function _renderFilaSolicitud(s, rol, extraAttrs, snoozeHasta) {
       <div class="sol-card-material">
         ${s.Material}
         <span class="sol-card-qty">${s.Cantidad_Solicitada}</span>
+        ${s.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : s.Tipo === 'No fungible' ? `<span class="badge badge-purple" style="font-size:10px">🧰 No fungible</span>` : ''}
         ${urgencia === 'Urgente' ? `<span class="badge badge-red" style="font-size:10px">⚠️ Urgente</span>` : ''}
       </div>
       <div class="sol-card-meta">
@@ -749,6 +750,7 @@ function _filaLineaPedido(l, p, puedeEditar) {
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
       <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
       <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
+      ${l.Sin_Inventario && p.Tipo !== 'Servicio' ? `<span class="badge badge-gray" style="font-size:10px" title="Se registra como recibido, pero no entra en el inventario">🚫 Sin inventario</span>` : ''}
       ${esComun ? `<span class="badge badge-purple" style="font-size:10px" title="Va a la partida &quot;${CICLO_MATERIAL_COMUN}&quot; y, en Trebello, a su propia hoja">🤝 Común</span>` : ''}
     </div>
     <div class="linea-actions">
@@ -976,6 +978,36 @@ function setPedidoTipo(tipo) {
     : 'Ej: Consumibles mayo, Sigma junio...';
 }
 
+// Material fungible (lo de siempre: catálogo o no catalogado), material no
+// fungible o servicio. Lo no fungible y los servicios son siempre texto libre:
+// no viven en el catálogo de material y al pedirlos la línea sale fuera del
+// inventario (lineas_pedido.sin_inventario).
+const _AYUDA_TIPO_SOLICITUD = {
+  'Material': 'Lo que se gasta y se repone: reactivos, puntas, guantes… Entra en el inventario al recibirlo.',
+  'No fungible': 'Lo que no se gasta: una micropipeta, una pieza, un pequeño aparato… No entra en el inventario de material.',
+  'Servicio': 'Una reparación, una calibración, una revisión, un transporte…',
+};
+function setTipoSolicitud(tipo) {
+  sv('sol-tipo', tipo);
+  const ids = { 'Material': 'material', 'No fungible': 'nofungible', 'Servicio': 'servicio' };
+  Object.entries(ids).forEach(([t, id]) => document.getElementById('btn-soltipo-' + id).classList.toggle('active', t === tipo));
+  document.getElementById('sol-tipo-ayuda').textContent = _AYUDA_TIPO_SOLICITUD[tipo] || '';
+  const esMaterial = tipo === 'Material';
+  document.getElementById('sol-source-toggle').style.display = esMaterial ? '' : 'none';
+  const lbl = document.getElementById('sol-material-libre-label');
+  const inp = document.getElementById('sol-material-libre');
+  if (tipo === 'Servicio') { lbl.textContent = 'Servicio que se necesita *'; inp.placeholder = 'Ej: reparación de la centrífuga, calibración de micropipetas…'; }
+  else if (tipo === 'No fungible') { lbl.textContent = 'Qué se necesita *'; inp.placeholder = 'Ej: micropipeta 10-100 µl, filtro HEPA de la cabina…'; }
+  else { lbl.textContent = 'Nombre del material *'; inp.placeholder = 'Describe el material que necesitas...'; }
+  if (esMaterial) { setSourceSolicitud('catalogo'); }
+  else {
+    document.getElementById('sol-catalogo-group').style.display = 'none';
+    document.getElementById('sol-nuevo-group').style.display = '';
+    document.getElementById('sol-unidad-group').style.display = 'none';
+  }
+  if (tipo === 'Servicio' && !v('sol-cantidad')) sv('sol-cantidad', '1');
+}
+
 function setSourceSolicitud(source) {
   const esCatalogo = source === 'catalogo';
   document.getElementById('btn-source-catalogo').classList.toggle('active', esCatalogo);
@@ -1010,7 +1042,9 @@ function _mostrarSelectorUnidadLinea(mat) {
 }
 
 function openModalSolicitud() {
-  setSourceSolicitud('catalogo');
+  document.getElementById('sol-tipo-group').style.display = '';
+  sv('sol-cantidad', '');
+  setTipoSolicitud('Material');
   document.getElementById('sol-material-id').value = '';
   document.getElementById('sol-material-selected').style.display = 'none';
   document.getElementById('sol-search').value = '';
@@ -1054,6 +1088,8 @@ function openModalNuevaLinea(pedidoId) {
     document.getElementById('linea-catalogo-unidad').innerHTML = '';
   }
   sv('linea-cantidad', esServicio ? '1' : '');
+  document.getElementById('linea-sin-inventario').checked = false;
+  document.getElementById('linea-sin-inv-group').style.display = esServicio ? 'none' : '';
   sv('linea-precio', '');
   sv('linea-obs','');
   openModal('modal-nueva-linea');
@@ -1098,6 +1134,7 @@ function openModalRecepcionMasiva(pedidoId) {
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
         <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">En este albarán *</th>
         <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Ubicación</th>
+        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600" title="Se registra como recibido pero no entra en el inventario">🚫 Sin inventario</th>
         <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Obs.</th>
       </tr>
     </thead>
@@ -1117,6 +1154,7 @@ function openModalRecepcionMasiva(pedidoId) {
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
           <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
           <td style="padding:8px 6px">${ubicCell}</td>
+          <td style="padding:8px 6px;text-align:center"><input type="checkbox" id="recmas-sininv-${l.ID_Linea}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${l.ID_Linea}')"></td>
           <td style="padding:8px 6px"><input type="text" id="recmas-obs-${l.ID_Linea}" placeholder="opcional" style="width:130px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
         </tr>`;
       }).join('')}
@@ -1132,6 +1170,7 @@ function openModalRecepcionMasiva(pedidoId) {
     if (lotes.length === 1) sel.value = lotes[0].ID_Ubicacion;
     else if (mat.Ubicacion) sel.value = mat.Ubicacion;
   });
+  lineas.forEach(l => _toggleRecmasSinInventario(l.ID_Linea));
   openModal('modal-recepcion-masiva');
 }
 
@@ -1165,6 +1204,8 @@ function openModalRecepcion(lineaId, pedidoId) {
   grupoUbic.style.display = 'none';
   selUbic.innerHTML = '';
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  document.getElementById('rec-sin-inv-group').style.display = esServicio ? 'none' : '';
+  document.getElementById('rec-sin-inventario').checked = !!l?.Sin_Inventario;
   if (l) {
     const unidad = esServicio ? '' : _unidadLineaPedido(l);
     document.getElementById('rec-material-nombre').textContent = l.Material + (unidad ? ' · ' + unidad : '');
@@ -1186,5 +1227,19 @@ function openModalRecepcion(lineaId, pedidoId) {
       }
     }
   }
+  _toggleRecSinInventario();
   openModal('modal-recepcion-linea');
+}
+
+// Con "No incluir en el inventario" no hay dónde guardarlo: fuera la ubicación.
+function _toggleRecSinInventario() {
+  const sinInv = document.getElementById('rec-sin-inventario').checked;
+  const grupoUbic = document.getElementById('rec-ubicacion-group');
+  if (document.getElementById('rec-ubicacion-sel').options.length) grupoUbic.style.display = sinInv ? 'none' : '';
+}
+
+function _toggleRecmasSinInventario(lineaId) {
+  const sinInv = document.getElementById('recmas-sininv-' + lineaId)?.checked;
+  const sel = document.getElementById('recmas-ubic-' + lineaId);
+  if (sel) sel.style.display = sinInv ? 'none' : '';
 }
