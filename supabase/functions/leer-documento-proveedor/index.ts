@@ -50,29 +50,70 @@ function arrayBufferABase64(buffer: ArrayBuffer): string {
   return btoa(binario);
 }
 
-async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown) {
-  const respuesta = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ role: "user", parts }],
-        generationConfig: {
-          responseMimeType: "application/json", responseSchema: schema, temperature: 0.1,
-          thinkingConfig: { thinkingLevel: "low" }, // tareas simples y ya separadas — no hace falta razonamiento largo, ahorra tokens/coste
-        },
-      }),
+// Presupuesto de tiempo de TODA la petición (extracción + emparejamiento).
+// Una factura normal tarda ~45 s (medido 2026-11-19 con 19 artículos), pero
+// bajo carga gemini-3.6-flash devuelve 503 "high demand" o se queda colgado.
+// Antes había una sola llamada sin timeout: un 503 fallaba a la primera y un
+// fetch colgado agotaba el límite del worker (150 s), con lo que la app no
+// recibía ningún mensaje útil (visto el 2026-11-19 con la factura F2026-931).
+// Ahora se reintenta, pero siempre dentro de este margen, para contestar
+// antes de que Supabase mate el worker.
+const PRESUPUESTO_MS = 140_000;
+const TIMEOUT_INTENTO_MS = 90_000;
+const ESPERAS_REINTENTO = [0, 3000, 8000];
+
+class GeminiSaturado extends Error {}
+
+async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown, limite: number) {
+  const cuerpo = JSON.stringify({
+    contents: [{ role: "user", parts }],
+    generationConfig: {
+      responseMimeType: "application/json", responseSchema: schema, temperature: 0.1,
+      thinkingConfig: { thinkingLevel: "low" }, // tareas simples y ya separadas — no hace falta razonamiento largo, ahorra tokens/coste
     },
-  );
-  if (!respuesta.ok) {
-    const detalle = await respuesta.text().catch(() => "");
-    throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+  });
+  let ultimoError = "";
+  for (const espera of ESPERAS_REINTENTO) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    const restante = limite - Date.now() - 2000;
+    if (restante < 10_000) break; // no da tiempo a otro intento útil
+    const ctrl = new AbortController();
+    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(TIMEOUT_INTENTO_MS, restante));
+    let respuesta: Response;
+    try {
+      respuesta = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal, body: cuerpo },
+      );
+    } catch (e) {
+      ultimoError = e instanceof DOMException && e.name === "AbortError"
+        ? "Gemini no respondió a tiempo"
+        : (e instanceof Error ? e.message : String(e));
+      continue;
+    } finally {
+      clearTimeout(timeoutId);
+    }
+    if (respuesta.status === 503 || respuesta.status === 429 || respuesta.status === 500) {
+      ultimoError = `Gemini devolvió ${respuesta.status} (sobrecarga temporal)`;
+      await respuesta.body?.cancel().catch(() => {});
+      continue;
+    }
+    if (!respuesta.ok) {
+      const detalle = await respuesta.text().catch(() => "");
+      throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+    }
+    try {
+      const data = await respuesta.json();
+      const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
+      return JSON.parse(texto);
+    } catch (e) {
+      // 200 pero vacío o cortado (pasa bajo carga): reintentar suele salir bien.
+      ultimoError = e instanceof Error ? e.message : String(e);
+      continue;
+    }
   }
-  const data = await respuesta.json();
-  const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
-  return JSON.parse(texto);
+  throw new GeminiSaturado(ultimoError || "Gemini no disponible");
 }
 
 // ── Paso 1: extracción pura del documento, sin matching ────────────────
@@ -252,6 +293,7 @@ Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
   if (req.method !== "POST") return jsonError("Método no permitido", 405);
+  const limite = Date.now() + PRESUPUESTO_MS;
 
   let body: Record<string, unknown>;
   try {
@@ -291,8 +333,12 @@ Deno.serve(async (req) => {
       geminiKey,
       [{ text: PROMPT_EXTRACCION }, { inline_data: { mime_type: mimeType, data: base64 } }],
       ESQUEMA_EXTRACCION,
+      limite,
     );
   } catch (e) {
+    if (e instanceof GeminiSaturado) {
+      return jsonError(`La IA de Google (Gemini) está saturada ahora mismo y no ha terminado de leer la factura — no es problema del documento. Vuelve a pulsar 🤖 dentro de unos minutos. (${e.message})`, 503);
+    }
     return jsonError(`Error extrayendo el documento: ${(e as Error).message}`, 502);
   }
 
@@ -315,6 +361,7 @@ Deno.serve(async (req) => {
         geminiKey,
         [{ text: construirPromptMatching(items, lineas || []) }],
         ESQUEMA_MATCHING,
+        limite,
       );
       ({ matches, sinMatch } = resolverMatches(items, Array.isArray(asignaciones) ? asignaciones : [], lineas || []));
     } catch {
