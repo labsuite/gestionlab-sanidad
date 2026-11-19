@@ -6,6 +6,14 @@
 // solicitud origen) como una sola operación atómica.
 import { requireAdminOrGestor, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 import { resolverIdMaterial } from "../_shared/material.ts";
+import { actualizarEstadoPedidoPostRecepcion, actualizarSolicitudOrigen, sincronizarLineasDeIntervencion, sincronizarCosteIntervencion } from "../_shared/pedidos.ts";
+
+// Tipos de línea (2026-11-19): el tipo es de cada línea, no del pedido.
+//   Material — fungible, entra en el inventario (salvo sin_inventario);
+//   Equipo   — compra de un equipo (ficha en Equipos, no toca stock);
+//   Servicio — parte económica de una INTERVENCIÓN (id_intervencion) sobre un
+//              equipo existente; se da por realizada al cerrar la actuación.
+const TIPOS_LINEA = ["Material", "Equipo", "Servicio"];
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
@@ -67,38 +75,6 @@ async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: nu
   });
 }
 
-async function actualizarEstadoPedidoPostRecepcion(supabaseAdmin: any, pedidoId: string) {
-  const { data: p } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", pedidoId).maybeSingle();
-  if (!p) return;
-  const { data: lineas } = await supabaseAdmin.from("lineas_pedido").select("estado_linea").eq("pedido", pedidoId);
-  const todasRecibidas = (lineas || []).length > 0 && lineas.every((l: any) => l.estado_linea === "Recibido");
-  if (todasRecibidas && p.estado !== "Recepción completa" && p.estado !== "Factura recibida") {
-    await supabaseAdmin.from("pedidos").update({ estado: "Recepción completa", fecha_recepcion_completa: hoy() }).eq("id_pedido", pedidoId);
-  } else if (!todasRecibidas && p.estado === "Presupuesto aprobado") {
-    await supabaseAdmin.from("pedidos").update({ estado: "Recepción parcial" }).eq("id_pedido", pedidoId);
-  }
-}
-
-async function actualizarSolicitudOrigen(supabaseAdmin: any, linea: any, pedidoId: string) {
-  const solIdMatch = (linea.observaciones || "").match(/Desde solicitud (SOL\S+)/);
-  let solOrigen = null;
-  if (solIdMatch) {
-    const { data } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", solIdMatch[1]).neq("estado", "Recibido").maybeSingle();
-    solOrigen = data;
-  }
-  if (!solOrigen) {
-    const { data: candidatas } = await supabaseAdmin.from("solicitudes").select("*").eq("lista_pedido", pedidoId).neq("estado", "Recibido");
-    solOrigen = (candidatas || []).find((s: any) => normNombre(s.material) === normNombre(linea.material)) || null;
-  }
-  if (!solOrigen) return;
-  const obsSinFecha = (solOrigen.observaciones || "").replace(/\[Recibido:\d{4}-\d{2}-\d{2}\]\s*/g, "").trim();
-  const nuevaObs = (obsSinFecha ? obsSinFecha + " " : "") + `[Recibido:${hoy()}]`;
-  await supabaseAdmin.from("solicitudes").update({
-    estado: "Recibido", observaciones: nuevaObs,
-    lista_pedido: solOrigen.lista_pedido || pedidoId,
-  }).eq("id_solicitud", solOrigen.id_solicitud);
-}
-
 // `idMaterial` llega cuando el material se acaba de catalogar desde la propia
 // recepción: la usuaria puede haberle corregido el nombre (se pidió "5 mL" y
 // lo que existe es "2 mL"), así que buscarlo por el nombre de la línea no lo
@@ -117,6 +93,9 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   if (idMat) {
     const { data } = await supabaseAdmin.from("material").select("*").eq("id_material", idMat).maybeSingle();
     mat = data;
+  }
+  if (linea.tipo_linea === "Servicio" && linea.id_intervencion) {
+    return { error: jsonError("Este servicio se da por realizado al cerrar su actuación (en el hilo de la intervención), no desde el pedido.", 400) };
   }
   if (!mat) mat = await buscarMaterialPorNombre(supabaseAdmin, linea.material);
 
@@ -138,7 +117,7 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   if (error) return { error: jsonError(`No se pudo guardar la recepción: ${error.message}`, 400) };
 
   // Servicios y líneas fuera del inventario: no hay stock que tocar.
-  if (linea.tipo_linea !== "Servicio" && !fueraInventario && cantRec > 0 && mat) {
+  if (linea.tipo_linea === "Material" && !fueraInventario && cantRec > 0 && mat) {
     await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
@@ -174,7 +153,9 @@ Deno.serve(async (req) => {
     // trae la solicitud si es de material no fungible o de un servicio.
     let sinInventario = body.sin_inventario === true;
     // El tipo es de cada línea (2026-11-19): 'Material' o 'Servicio' (servicio o equipo).
-    let tipoLinea = body.tipo_linea === "Servicio" ? "Servicio" : "Material";
+    let tipoLinea = TIPOS_LINEA.includes(String(body.tipo_linea)) ? String(body.tipo_linea) : "Material";
+    let idEquipo = strField(body.id_equipo);
+    const idIntervencion = strField(body.id_intervencion);
     if (idSolicitud) {
       const { data: sol } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", idSolicitud).maybeSingle();
       if (!sol) return jsonError(`No se encontró la solicitud "${idSolicitud}"`, 404);
@@ -191,6 +172,14 @@ Deno.serve(async (req) => {
     }
     if (!cantidadPedida || cantidadPedida <= 0) return jsonError("Indica la cantidad", 400);
 
+    // Un servicio unido a una intervención toma el equipo de ella.
+    if (idIntervencion) {
+      if (tipoLinea !== "Servicio") return jsonError("Solo una línea de servicio se une a una intervención", 400);
+      const { data: interv } = await supabaseAdmin.from("intervenciones").select("id_equipo").eq("id_intervencion", idIntervencion).maybeSingle();
+      if (!interv) return jsonError(`No se encontró la intervención "${idIntervencion}"`, 404);
+      idEquipo = interv.id_equipo;
+    }
+
     // Una línea metida cuando el presupuesto YA está solicitado no va en ese
     // presupuesto: hay que pedírsela aparte a la casa comercial. Se marca y la
     // app la enseña en un apartado propio hasta que se solicita (entonces
@@ -203,11 +192,12 @@ Deno.serve(async (req) => {
 
     const datos = {
       id_linea: genId("LIN"), pedido: pedidoId, material,
-      id_material: sinInventario ? null : await resolverIdMaterial(supabaseAdmin, material),
+      id_material: sinInventario || tipoLinea !== "Material" ? null : await resolverIdMaterial(supabaseAdmin, material),
       cantidad_pedida: cantidadPedida,
       cantidad_recibida: 0, estado_linea: "Pendiente", observaciones,
       precio_unitario: body.precio_unitario ? Number(body.precio_unitario) : null,
-      id_equipo: strField(body.id_equipo),
+      id_equipo: idEquipo,
+      id_intervencion: idIntervencion,
       unidad: strField(body.unidad),
       presupuesto_pendiente: presupuestoPendiente,
       sin_inventario: sinInventario,
@@ -219,7 +209,38 @@ Deno.serve(async (req) => {
     if (idSolicitud) {
       await supabaseAdmin.from("solicitudes").update({ estado: "Añadida a pedido", lista_pedido: pedidoId }).eq("id_solicitud", idSolicitud);
     }
-    return jsonOk({ linea: data });
+    if (idIntervencion) {
+      await sincronizarCosteIntervencion(supabaseAdmin, idIntervencion);
+      await sincronizarLineasDeIntervencion(supabaseAdmin, idIntervencion); // si ya estaba cerrada, sale realizada
+    }
+    const { data: lineaFinal } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", data.id_linea).single();
+    return jsonOk({ linea: lineaFinal || data });
+  }
+
+  if (accion === "vincular_intervencion") {
+    // Une (o separa, con id_intervencion vacío) una línea de servicio y su
+    // intervención: p.ej. las de antes de 2026-11-19 o las que llegan desde
+    // una solicitud de servicio.
+    const idLinea = String(body.id_linea || "").trim();
+    const idInterv = strField(body.id_intervencion);
+    const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
+    if (!linea) return jsonError("Línea no encontrada", 404);
+    if (linea.tipo_linea !== "Servicio") return jsonError("Solo una línea de servicio se une a una intervención", 400);
+    const datos: Record<string, unknown> = { id_intervencion: idInterv };
+    if (idInterv) {
+      const { data: interv } = await supabaseAdmin.from("intervenciones").select("id_equipo").eq("id_intervencion", idInterv).maybeSingle();
+      if (!interv) return jsonError(`No se encontró la intervención "${idInterv}"`, 404);
+      datos.id_equipo = interv.id_equipo;
+    }
+    const { error } = await supabaseAdmin.from("lineas_pedido").update(datos).eq("id_linea", idLinea);
+    if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
+    await sincronizarCosteIntervencion(supabaseAdmin, linea.id_intervencion);
+    if (idInterv) {
+      await sincronizarCosteIntervencion(supabaseAdmin, idInterv);
+      await sincronizarLineasDeIntervencion(supabaseAdmin, idInterv);
+    }
+    const { data: lineaFinal } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).single();
+    return jsonOk({ linea: lineaFinal });
   }
 
   if (accion === "marcar_presupuesto_solicitado") {
@@ -262,6 +283,7 @@ Deno.serve(async (req) => {
       const { data } = await supabaseAdmin.from("solicitudes").update({ estado: "Pendiente", lista_pedido: null }).eq("id_solicitud", solOrigen.id_solicitud).select().single();
       solRevertida = data;
     }
+    await sincronizarCosteIntervencion(supabaseAdmin, linea.id_intervencion);
     return jsonOk({ eliminada: idLinea, solicitud_revertida: solRevertida });
   }
 
@@ -329,6 +351,7 @@ Deno.serve(async (req) => {
         solicitud = sol;
       }
     }
+    if (linea.id_intervencion) await sincronizarCosteIntervencion(supabaseAdmin, linea.id_intervencion);
     return jsonOk({ linea: data, solicitud });
   }
 
@@ -433,6 +456,9 @@ Deno.serve(async (req) => {
       };
       await supabaseAdmin.from("historico_precio").insert(hist);
       actualizadas.push(linea);
+    }
+    for (const idInt of new Set(actualizadas.map((l: any) => l.id_intervencion).filter(Boolean))) {
+      await sincronizarCosteIntervencion(supabaseAdmin, idInt as string);
     }
     return jsonOk({ actualizadas });
   }

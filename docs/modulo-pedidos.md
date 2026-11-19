@@ -486,21 +486,36 @@ false) → `Sin_Inventario` en `_lineaPedidoSbToObj`.
 - En el detalle del pedido la línea lleva la etiqueta gris «🚫 Sin inventario». En pedidos de
   tipo Servicio no aparece nada de esto (ya no tocan stock).
 
-## El tipo (material / servicio-equipo) es de cada línea, no del pedido (2026-11-19)
+## El tipo es de cada línea: Material fungible / Equipo / Servicio (2026-11-19)
 
-Un equipo y sus fungibles llegan a menudo en el mismo pedido, así que el selector
-«Material fungible | Servicio / Equipo» pasó de «Nueva lista de pedido» a **«Añadir línea al
-pedido»** (`setTipoLinea` en `js/pedidos-render.js`). Columna nueva
-`lineas_pedido.tipo_linea` (`'Material'` | `'Servicio'`, por defecto `'Material'`; en la app
-`Tipo_Linea`). Las líneas existentes heredaron `pedidos.tipo`, que **queda sin uso** (se sigue
-rellenando con `'Material'` por defecto, nadie lo lee).
+Un equipo y sus fungibles llegan a menudo en el mismo pedido, así que el tipo pasó de «Nueva
+lista de pedido» a **«Añadir línea al pedido»** (`setTipoLinea` en `js/pedidos-render.js`).
+Columna `lineas_pedido.tipo_linea` (`'Material'` | `'Equipo'` | `'Servicio'`, por defecto
+`'Material'`; en la app `Tipo_Linea`). `pedidos.tipo` **queda sin uso**.
 
-Lo que antes miraba el tipo del pedido ahora mira el de la línea:
-- recibir: una línea de servicio/equipo se «confirma realizada» y no toca stock (cliente y
-  `completarRecepcion` en `gestionar-linea-pedido`); en «Recibir albarán» no lleva ubicación ni
-  casilla de inventario;
-- material común (`lineaEsComun` en `js/config.js` y en `enviar-a-trebello`): una línea de
-  servicio/equipo nunca lo es;
-- archivar un pedido tramitado avisa solo de las líneas de **material** sin recibir;
-- una solicitud de tipo «Servicio» crea una línea de servicio.
-El pedido muestra «🔧 Servicio/equipo» si alguna de sus líneas lo es, y cada línea lleva su propia insignia.
+- **Material** — fungible; entra en el inventario al recibirlo (salvo «sin inventario»).
+- **Equipo** — compra de un equipo: se da de alta su ficha en Equipos («En pedido»). Al
+  recibirlo se confirma sin tocar stock.
+- **Servicio** — **la parte económica de una intervención** (la parte técnica), siempre
+  sobre un equipo existente: `lineas_pedido.id_intervencion`. Al añadirlo se elige el equipo y
+  una de sus intervenciones (también cerradas: la factura suele llegar después) o se crea una
+  nueva, que queda planificada en el equipo con el proveedor del pedido.
+  - Se da por **realizado al cerrar la actuación** en el hilo, y vuelve a pendiente si se
+    reabre (`sincronizarLineasDeIntervencion` en `supabase/functions/_shared/pedidos.ts`,
+    llamada desde `gestionar-intervencion`). No tiene 📥 ni sale en «Recibir albarán»; el
+    servidor rechaza recibirlo a mano.
+  - El **coste de la intervención sale del precio de sus líneas** (`sincronizarCosteIntervencion`,
+    tras crear/editar/borrar/actualizar_precio/vincular). En el modal de la actuación el campo
+    Coste queda de solo lectura.
+  - Desde la ficha de la intervención: «💶 Pedir a la casa comercial» (`openModalPedirServicio`)
+    la añade a un pedido abierto o a uno nuevo; si ya está en un pedido, la ficha lo enlaza con
+    su factura.
+  - Las de antes (y las que vienen de una solicitud de servicio) salen «⚠ Sin intervención ·
+    🔗 Unir» (`openModalUnirIntervencion` → acción `vincular_intervencion`). Las tres
+    reparaciones de PED28JXBPM se dejaron sin unir a propósito: cada equipo tiene una cadena de
+    actuaciones y cuál factura cada línea lo decide la usuaria.
+
+Lo que antes miraba el tipo del pedido ahora mira el de la línea: recepción, material común
+(`lineaEsComun` en `js/config.js` y `enviar-a-trebello`: equipo o servicio nunca lo es),
+archivar (solo avisa del material sin recibir) y las solicitudes de servicio (crean línea de
+servicio). El pedido muestra «🔧 Equipo/servicio» si alguna línea lo es.

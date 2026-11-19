@@ -247,12 +247,13 @@ async function guardarNuevoPedido() {
 async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
-  const esServicio = v('linea-pedido-tipo') === 'Servicio';
+  const tipoLinea = v('linea-pedido-tipo') || 'Material';
+  const esServicio = tipoLinea !== 'Material'; // equipo o servicio: sin inventario de fungibles
   let materialNombre = '', equipoId = '', nuevoEquipoDatos = null, unidadLinea = '';
+  let idIntervencion = '', nuevaIntervencion = null;
 
   if (esServicio) {
-    const esNuevo = document.getElementById('btn-seq-nuevo').classList.contains('active');
-    if (esNuevo) {
+    if (tipoLinea === 'Equipo') {
       const newEqId   = v('linea-nuevo-eq-id').trim();
       const newEqTipo = v('linea-nuevo-eq-tipo').trim();
       const newEqMarca  = v('linea-nuevo-eq-marca').trim();
@@ -269,9 +270,20 @@ async function guardarLineaPedido() {
         coste: v('linea-precio') || '',
       };
     } else {
-      materialNombre = v('linea-servicio-desc');
-      if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
+      // Servicio: equipo existente + su intervención (elegida o nueva).
       equipoId = document.getElementById('linea-equipo-id').value;
+      if (!equipoId) { showToast('Elige el equipo del servicio', 'error'); return; }
+      const elegida = document.querySelector('input[name="linea-interv"]:checked')?.value || '';
+      if (!elegida) { showToast('Elige la intervención del servicio o crea una nueva', 'error'); return; }
+      materialNombre = v('linea-servicio-desc').trim();
+      if (!materialNombre) { showToast('Indica la descripción del servicio', 'error'); return; }
+      if (elegida === 'nueva') {
+        nuevaIntervencion = {
+          accion: 'crear', id_equipo: equipoId, tipo: v('linea-interv-tipo') || 'Correctivo',
+          origen: 'Pedido ' + (pedido?.Nombre_Lista || pedidoId),
+          proveedor: pedido?.Proveedor || '', descripcion_actuacion: materialNombre,
+        };
+      } else idIntervencion = elegida;
     }
   } else {
     const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
@@ -305,16 +317,23 @@ async function guardarLineaPedido() {
   const obs = v('linea-obs');
   showLoading('Guardando línea...');
   try {
+    if (nuevaIntervencion) {
+      const { intervencion } = await callEdgeFunction('gestionar-intervencion', nuevaIntervencion);
+      DATA.intervenciones.push(_intervencionSbToObj(intervencion));
+      idIntervencion = intervencion.id_intervencion;
+    }
     const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
       accion: 'crear', pedido: pedidoId, material: materialNombre, cantidad_pedida: cant,
       observaciones: obs, precio_unitario: precio, id_equipo: equipoId, unidad: unidadLinea,
       sin_inventario: !esServicio && document.getElementById('linea-sin-inventario').checked,
-      tipo_linea: esServicio ? 'Servicio' : 'Material',
+      tipo_linea: tipoLinea, id_intervencion: idIntervencion,
     });
     DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
+    if (idIntervencion) await _refrescarIntervencion(idIntervencion); // coste y estado sincronizados
     closeModal('modal-nueva-linea');
     verDetallePedido(pedidoId);
-    showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida' : 'Línea añadida', 'success');
+    showToast(nuevoEquipoDatos ? 'Equipo creado en inventario y línea añadida'
+      : nuevaIntervencion ? `Servicio añadido y nueva intervención ${idIntervencion} planificada en el equipo` : 'Línea añadida', 'success');
   } catch(e) {
     showToast(e.message || 'Error al guardar la línea. Vuelve a intentarlo.', 'error');
     console.error(e);
@@ -401,8 +420,8 @@ async function guardarRecepcionLinea() {
   if (idx === -1) return;
   const l = DATA.lineasPedido[idx];
   const cantPed = parseFloat(l.Cantidad_Pedida) || 0;
-  // Servicios/equipos: confirmar realizado sin actualizar stock
-  if (l.Tipo_Linea === 'Servicio') {
+  // Equipos/servicios: confirmar recibido/realizado sin actualizar stock
+  if ((l.Tipo_Linea || 'Material') !== 'Material') {
     const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
     await _completarRecepcionLinea(lineaId, pedidoId, cantPed - yaRec, v('rec-obs'));
     return;
@@ -734,7 +753,7 @@ async function _darPedidoPorTerminado(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p || p.Estado === 'Archivado') { verDetallePedido(pedidoId); return; }
   // Solo cuenta el material: un servicio/equipo sin "realizado" no pierde stock.
-  const sinRecibir = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Tipo_Linea !== 'Servicio' && l.Estado_Linea !== 'Recibido');
+  const sinRecibir = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && (l.Tipo_Linea || 'Material') === 'Material' && l.Estado_Linea !== 'Recibido');
   if (sinRecibir.length && !confirm(
     `El pedido queda tramitado y se va a archivar.\n\n` +
     `Ojo: hay ${sinRecibir.length} línea(s) sin recibir. Archivado ya no se puede registrar ` +
@@ -997,7 +1016,7 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
-  document.getElementById('edlinea-sin-inv-group').style.display = l.Tipo_Linea === 'Servicio' ? 'none' : '';
+  document.getElementById('edlinea-sin-inv-group').style.display = (l.Tipo_Linea || 'Material') !== 'Material' ? 'none' : '';
   document.getElementById('edlinea-sin-inventario').checked = !!l.Sin_Inventario;
 
   // Unidad pedida: combo (input + datalist) siempre visible, mismo criterio que
@@ -1109,5 +1128,123 @@ async function guardarEdicionSolicitud() {
     closeModal('modal-editar-solicitud');
     renderSolicitudes();
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// ============================================================
+// SERVICIO ↔ INTERVENCIÓN (2026-11-19)
+// ============================================================
+// La línea de servicio es la parte económica de una intervención: el servidor
+// sincroniza el coste de la intervención con el precio de la línea y da la
+// línea por realizada al cerrar la actuación (_shared/pedidos.ts).
+
+// Relee de Supabase una intervención y las líneas unidas a ella (tras cambiar
+// precio o estado, el servidor las ha tocado).
+async function _refrescarIntervencion(idIntervencion) {
+  const [{ data: i }, { data: ls }] = await Promise.all([
+    _sbMigracion.from('intervenciones').select('*').eq('id_intervencion', idIntervencion).maybeSingle(),
+    _sbMigracion.from('lineas_pedido').select('*').eq('id_intervencion', idIntervencion),
+  ]);
+  if (i) {
+    const idx = DATA.intervenciones.findIndex(x => x.ID_Intervencion === idIntervencion);
+    if (idx !== -1) DATA.intervenciones[idx] = _intervencionSbToObj(i); else DATA.intervenciones.push(_intervencionSbToObj(i));
+  }
+  for (const l of ls || []) {
+    const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === l.id_linea);
+    if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(l);
+  }
+  // El estado del pedido puede haber cambiado (p.ej. a «Recepción completa»).
+  const pedidosIds = [...new Set((ls || []).map(l => l.pedido))];
+  if (pedidosIds.length) {
+    const { data: peds } = await _sbMigracion.from('pedidos').select('*').in('id_pedido', pedidosIds);
+    for (const p of peds || []) {
+      const idx = DATA.pedidos.findIndex(x => x.ID_Pedido === p.id_pedido);
+      if (idx !== -1) DATA.pedidos[idx] = _pedidoSbToObj(p);
+    }
+  }
+}
+
+async function guardarUnirIntervencion() {
+  const lineaId = v('unir-int-linea-id'), pedidoId = v('unir-int-pedido-id');
+  const idInterv = document.querySelector('input[name="unir-int"]:checked')?.value || '';
+  if (!idInterv) { showToast('Elige la intervención', 'error'); return; }
+  showLoading('Uniendo...');
+  try {
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'vincular_intervencion', id_linea: lineaId, id_intervencion: idInterv });
+    const idx = DATA.lineasPedido.findIndex(x => x.ID_Linea === lineaId);
+    if (idx !== -1) DATA.lineasPedido[idx] = _lineaPedidoSbToObj(linea);
+    await _refrescarIntervencion(idInterv);
+    const pIdx = DATA.pedidos.findIndex(x => x.ID_Pedido === pedidoId);
+    const { data: ped } = await _sbMigracion.from('pedidos').select('*').eq('id_pedido', pedidoId).maybeSingle();
+    if (ped && pIdx !== -1) DATA.pedidos[pIdx] = _pedidoSbToObj(ped);
+    closeModal('modal-unir-intervencion');
+    verDetallePedido(pedidoId);
+    showToast(linea.estado_linea === 'Recibido' ? `Unida a ${idInterv} (ya cerrada: el servicio queda realizado)` : `Unida a ${idInterv}`, 'success');
+  } catch (e) { showToast(e.message || 'No se pudo unir', 'error'); console.error(e); }
+  hideLoading();
+}
+
+// Desde la ficha de una intervención: pedírsela a la casa comercial.
+const _ESTADOS_PEDIDO_ABIERTOS = ['Abierto', 'Presupuesto solicitado', 'Presupuesto aprobado', 'Recepción parcial'];
+
+function openModalPedirServicio(idIntervencion) {
+  const i = DATA.intervenciones.find(x => x.ID_Intervencion === idIntervencion);
+  if (!i) return;
+  sv('pedir-serv-interv-id', idIntervencion);
+  document.getElementById('pedir-serv-interv').textContent = `${i.ID_Intervencion} · ${i.Tipo || ''} · ${i.Equipo || ''}`;
+  const abiertos = DATA.pedidos.filter(p => _ESTADOS_PEDIDO_ABIERTOS.includes(p.Estado))
+    // primero los del mismo proveedor que la intervención
+    .sort((a, b) => (b.Proveedor === i.Proveedor) - (a.Proveedor === i.Proveedor));
+  document.getElementById('pedir-serv-pedido').innerHTML = abiertos
+    .map(p => `<option value="${p.ID_Pedido}">${_escAttr(p.Nombre_Lista)} · ${_escAttr(p.Proveedor || 'sin proveedor')} · ${p.Estado}</option>`).join('')
+    + '<option value="__nuevo">＋ Pedido nuevo…</option>';
+  if (!abiertos.length) sv('pedir-serv-pedido', '__nuevo');
+  const provs = DATA.proveedores.filter(p => p.Activo !== 'FALSE');
+  document.getElementById('pedir-serv-proveedor').innerHTML = '<option value="">Sin asignar todavía</option>'
+    + provs.map(p => `<option value="${_escAttr(p.Nombre_Proveedor)}">${_escAttr(p.Nombre_Proveedor)}</option>`).join('');
+  const provCoincide = provs.find(p => (p.Nombre_Proveedor || '').toLowerCase() === (i.Proveedor || '').toLowerCase());
+  sv('pedir-serv-proveedor', provCoincide ? provCoincide.Nombre_Proveedor : '');
+  sv('pedir-serv-nuevo-nombre', '');
+  const eq = DATA.equipos.find(e => e.ID_Activo === _idEquipoDeIntervencion(i));
+  sv('pedir-serv-desc', [i.Tipo, eq ? [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ') : ''].filter(Boolean).join(' — '));
+  sv('pedir-serv-precio', i.Coste_Intervencion || '');
+  _togglePedirServNuevo();
+  openModal('modal-pedir-servicio');
+}
+
+function _togglePedirServNuevo() {
+  const nuevo = v('pedir-serv-pedido') === '__nuevo';
+  document.getElementById('pedir-serv-nuevo-group').style.display = nuevo ? '' : 'none';
+  document.getElementById('pedir-serv-prov-group').style.display = nuevo ? '' : 'none';
+}
+
+async function guardarPedirServicio() {
+  const idInterv = v('pedir-serv-interv-id');
+  const i = DATA.intervenciones.find(x => x.ID_Intervencion === idInterv);
+  const desc = v('pedir-serv-desc').trim();
+  if (!desc) { showToast('Indica la descripción del servicio', 'error'); return; }
+  let pedidoId = v('pedir-serv-pedido');
+  if (pedidoId === '__nuevo' && !v('pedir-serv-nuevo-nombre').trim()) { showToast('Ponle nombre al pedido nuevo', 'error'); return; }
+  showLoading('Añadiendo al pedido...');
+  try {
+    if (pedidoId === '__nuevo') {
+      const { pedido } = await callEdgeFunction('gestionar-pedido', {
+        accion: 'crear', nombre_lista: v('pedir-serv-nuevo-nombre').trim(), proveedor: v('pedir-serv-proveedor'), observaciones: '',
+      });
+      DATA.pedidos.push(_pedidoSbToObj(pedido));
+      pedidoId = pedido.id_pedido;
+    }
+    const { linea } = await callEdgeFunction('gestionar-linea-pedido', {
+      accion: 'crear', pedido: pedidoId, material: desc, cantidad_pedida: 1,
+      precio_unitario: v('pedir-serv-precio'), tipo_linea: 'Servicio', id_intervencion: idInterv,
+      id_equipo: i ? _idEquipoDeIntervencion(i) : '',
+    });
+    DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
+    await _refrescarIntervencion(idInterv);
+    closeModal('modal-pedir-servicio');
+    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+    showToast(`Añadido al pedido «${p?.Nombre_Lista || pedidoId}»`, 'success');
+    renderPedidos();
+  } catch (e) { showToast(e.message || 'No se pudo añadir al pedido', 'error'); console.error(e); }
   hideLoading();
 }

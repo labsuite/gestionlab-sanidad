@@ -133,7 +133,7 @@ Deno.serve(async (req) => {
   // con ciclo "Material común", para que la jefa no las impute a Laboratorios.
   const { data: materiales } = await supabaseAdmin.from("material").select("id_material, nombre, material_comun");
   const lineaEsComun = (l: any): boolean => {
-    if (l.tipo_linea === "Servicio") return false; // servicio/equipo: nunca material común
+    if (l.tipo_linea && l.tipo_linea !== "Material") return false; // equipo o servicio: nunca material común
     if (l.material_comun === true || l.material_comun === false) return l.material_comun;
     const nombre = String(l.material || "");
     const mat = (materiales || []).find((m: any) => l.id_material && m.id_material === l.id_material)

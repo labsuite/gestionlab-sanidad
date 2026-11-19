@@ -393,7 +393,7 @@ function renderPedidos(filtroEstado = '') {
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
         <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
-          ${lineas.some(l => l.Tipo_Linea === 'Servicio') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún servicio o equipo">🔧 Servicio/equipo</span>` : ''}
+          ${lineas.some(l => l.Tipo_Linea !== 'Material') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún equipo o servicio">🔧 Equipo/servicio</span>` : ''}
           ${docBadges}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${!['Archivado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Cambiar estado" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄</button>` : ''}
@@ -778,22 +778,30 @@ function _filaLineaPedido(l, p, puedeEditar) {
   const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
   // Material común: lo hereda de la ficha; el 🤝 de la línea lo cambia solo aquí.
   const esServicio = l.Tipo_Linea === 'Servicio';
-  const esComun = lineaEsComun(l); // false en servicio/equipo
+  const esEquipo = l.Tipo_Linea === 'Equipo';
+  const esComun = lineaEsComun(l); // false en equipo o servicio
+  // Servicio unido a su intervención: se da por realizado al cerrar la actuación.
+  const interv = esServicio && l.ID_Intervencion ? DATA.intervenciones.find(i => i.ID_Intervencion === l.ID_Intervencion) : null;
+  const intIdx = interv ? DATA.intervenciones.indexOf(interv) : -1;
+  const infoServicio = !esServicio ? '' : interv
+    ? `<div style="font-size:11px;margin-top:2px"><a href="#" onclick="openFichaIntervencion(${intIdx});return false">🔧 ${interv.ID_Intervencion} · ${_escAttr(interv.Tipo || '')} · ${_escAttr(interv.Estado || '')}</a> <span style="color:var(--text-muted)">— se da por realizado al cerrar la actuación</span></div>`
+    : `<div style="font-size:11px;margin-top:2px;color:var(--warning,#b45309)">⚠ Sin intervención${puedeEditar ? ` · <a href="#" onclick="openModalUnirIntervencion('${l.ID_Linea}','${pedidoId}');return false">🔗 Unir</a>` : ''}</div>`;
   return `<div class="linea-row">
-    <div class="linea-nombre">${l.Material}${(l.Conceptos_Factura || []).length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así figura en la factura">🧾 En la hoja, como en la factura: ${l.Conceptos_Factura.map(c => _escAttr(c.concepto) + (c.cantidad != null ? ` ×${c.cantidad}` : '')).join(' · ')}</div>` : ''}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
+    <div class="linea-nombre">${l.Material}${(l.Conceptos_Factura || []).length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así figura en la factura">🧾 En la hoja, como en la factura: ${l.Conceptos_Factura.map(c => _escAttr(c.concepto) + (c.cantidad != null ? ` ×${c.cantidad}` : '')).join(' · ')}</div>` : ''}${equipoVinc && !interv ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esEquipo ? '🖥️' : '🔧'} ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}${infoServicio}</div>
     <div class="linea-meta">
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
       <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
       <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
-      ${esServicio ? `<span class="badge badge-blue" style="font-size:10px" title="Servicio o equipo: no entra en el inventario de fungibles">🔧 Servicio/equipo</span>` : ''}
-      ${l.Sin_Inventario && !esServicio ? `<span class="badge badge-gray" style="font-size:10px" title="Se registra como recibido, pero no entra en el inventario">🚫 Sin inventario</span>` : ''}
+      ${esServicio ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
+      ${esEquipo ? `<span class="badge badge-blue" style="font-size:10px" title="Compra de un equipo: no entra en el inventario de fungibles">🖥️ Equipo</span>` : ''}
+      ${l.Sin_Inventario && !esServicio && !esEquipo ? `<span class="badge badge-gray" style="font-size:10px" title="Se registra como recibido, pero no entra en el inventario">🚫 Sin inventario</span>` : ''}
       ${esComun ? `<span class="badge badge-purple" style="font-size:10px" title="Va a la partida &quot;${CICLO_MATERIAL_COMUN}&quot; y, en Trebello, a su propia hoja">🤝 Común</span>` : ''}
     </div>
     <div class="linea-actions">
-      ${puedeEditar && !esServicio ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
+      ${puedeEditar && !esServicio && !esEquipo ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
       ${puedeEditar ? `<button class="icon-btn" title="Cómo se nombra en la hoja de pedido (otra forma de expresarlo, referencias…)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')" style="${(l.Conceptos_Factura || []).length ? '' : 'opacity:.45'}">🧾</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
-      ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
+      ${puedeEditar && !interv && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
       ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
     </div>
   </div>`;
@@ -825,7 +833,7 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div><div class="card-title">${p.Nombre_Lista}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${p.ID_Pedido}</div></div>
         <div style="display:flex;gap:8px;align-items:center">
-          ${DATA.lineasPedido.some(l => l.Pedido === p.ID_Pedido && l.Tipo_Linea === 'Servicio') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún servicio o equipo">🔧 Servicio/equipo</span>` : ''}
+          ${DATA.lineasPedido.some(l => l.Pedido === p.ID_Pedido && l.Tipo_Linea !== 'Material') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún equipo o servicio">🔧 Equipo/servicio</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${puedeEditar && !['Recepción parcial','Recepción completa','Archivado'].includes(p.Estado) ? `<button class="btn btn-secondary" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄 Estado</button>` : ''}
           ${puedeHacer('eliminarItems') ? `<button class="icon-btn" title="Eliminar pedido" onclick="eliminarPedido('${p.ID_Pedido}')" style="color:var(--danger,#dc2626)">🗑️</button>` : ''}
@@ -959,11 +967,74 @@ function verDetallePedido(pedidoId) {
 // ============================================================
 // MODALES PEDIDOS / SOLICITUDES
 // ============================================================
-function setLineaServicioTipo(tipo) {
-  document.getElementById('btn-seq-existente').classList.toggle('active', tipo === 'existente');
-  document.getElementById('btn-seq-nuevo').classList.toggle('active', tipo === 'nuevo');
-  document.getElementById('linea-seq-existente-group').style.display = tipo === 'existente' ? '' : 'none';
-  document.getElementById('linea-seq-nuevo-group').style.display = tipo === 'nuevo' ? '' : 'none';
+// ── Servicio ↔ intervención (2026-11-19) ──────────────────────────────
+// Un servicio de un pedido es la parte económica de una intervención sobre un
+// equipo existente. Al elegir el equipo se ofrecen sus intervenciones (también
+// las cerradas: la factura suele llegar después) o crear una nueva.
+const _idEquipoDeIntervencion = i => (i.Equipo || '').split(' – ')[0].trim();
+
+function _intervencionesDeEquipo(idEquipo) {
+  return DATA.intervenciones
+    .filter(i => _idEquipoDeIntervencion(i) === idEquipo)
+    .sort((a, b) => String(b.Fecha_Realizacion || b.Fecha_Planificada || '').localeCompare(String(a.Fecha_Realizacion || a.Fecha_Planificada || '')))
+    .slice(0, 10);
+}
+
+function _htmlOpcionesIntervencion(idEquipo, name, conNueva, onchange) {
+  const lista = _intervencionesDeEquipo(idEquipo);
+  const fila = (valor, html, marcada) => `<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;font-size:13px">
+      <input type="radio" name="${name}" value="${valor}" ${marcada ? 'checked' : ''} onchange="${onchange || ''}" style="margin-top:3px;flex:none"><span>${html}</span></label>`;
+  const opciones = lista.map(i => {
+    const fecha = formatDate(i.Fecha_Realizacion || i.Fecha_Planificada) || 'sin fecha';
+    const yaEnPedido = DATA.lineasPedido.some(l => l.ID_Intervencion === i.ID_Intervencion);
+    return fila(i.ID_Intervencion, `<strong>${i.ID_Intervencion}</strong> · ${_escAttr(i.Tipo || '—')} · ${fecha} · ${_escAttr(i.Estado || '')}${i.Proveedor ? ' · ' + _escAttr(i.Proveedor) : ''}
+      ${i.Descripcion_Actuacion ? `<div style="font-size:11px;color:var(--text-muted)">${_escAttr(i.Descripcion_Actuacion.slice(0, 90))}</div>` : ''}
+      ${yaEnPedido ? '<div style="font-size:11px;color:var(--warning,#b45309)">Ya está en un pedido</div>' : ''}`, false);
+  }).join('');
+  const nueva = conNueva ? fila('nueva', '＋ <strong>Nueva intervención</strong> <span style="font-size:11px;color:var(--text-muted)">(queda planificada en el equipo)</span>', !lista.length) : '';
+  return (opciones || '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Este equipo no tiene intervenciones todavía.</div>') + nueva;
+}
+
+function _pintarIntervencionesLinea(idEquipo) {
+  const grupo = document.getElementById('linea-interv-group');
+  if (!idEquipo) { grupo.style.display = 'none'; document.getElementById('linea-interv-tipo-group').style.display = 'none'; return; }
+  document.getElementById('linea-interv-lista').innerHTML = _htmlOpcionesIntervencion(idEquipo, 'linea-interv', true, '_onElegirIntervencionLinea()');
+  grupo.style.display = '';
+  _onElegirIntervencionLinea();
+}
+
+function _onElegirIntervencionLinea() {
+  const elegida = document.querySelector('input[name="linea-interv"]:checked')?.value || '';
+  document.getElementById('linea-interv-tipo-group').style.display = elegida === 'nueva' ? '' : 'none';
+  // Descripción propuesta a partir de la intervención elegida (editable).
+  const i = DATA.intervenciones.find(x => x.ID_Intervencion === elegida);
+  if (i && !v('linea-servicio-desc')) {
+    const eq = DATA.equipos.find(e => e.ID_Activo === _idEquipoDeIntervencion(i));
+    sv('linea-servicio-desc', [i.Tipo, eq ? [eq.Tipo_Equipo, eq.Marca, eq.Modelo].filter(Boolean).join(' ') : _idEquipoDeIntervencion(i)].filter(Boolean).join(' — '));
+  }
+}
+
+// Unir una línea de servicio ya existente a su intervención.
+function openModalUnirIntervencion(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  sv('unir-int-linea-id', lineaId);
+  sv('unir-int-pedido-id', pedidoId);
+  document.getElementById('unir-int-linea').textContent = l.Material;
+  const sel = document.getElementById('unir-int-equipo');
+  sel.innerHTML = '<option value="">— Elige el equipo —</option>' + [...DATA.equipos]
+    .sort((a, b) => (a.ID_Activo || '').localeCompare(b.ID_Activo || ''))
+    .map(e => `<option value="${_escAttr(e.ID_Activo)}">${_escAttr(e.ID_Activo)} — ${_escAttr([e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' '))}</option>`).join('');
+  sel.value = l.ID_Equipo || '';
+  _pintarIntervencionesUnir();
+  openModal('modal-unir-intervencion');
+}
+
+function _pintarIntervencionesUnir() {
+  const idEquipo = v('unir-int-equipo');
+  document.getElementById('unir-int-lista').innerHTML = idEquipo
+    ? _htmlOpcionesIntervencion(idEquipo, 'unir-int', false)
+    : '<div style="font-size:12px;color:var(--text-muted)">Elige primero el equipo.</div>';
 }
 
 function buscarEquipoLinea(query) {
@@ -996,6 +1067,7 @@ function seleccionarEquipoLinea(id, label) {
   document.getElementById('linea-equipo-autocomplete').classList.remove('open');
   document.getElementById('linea-equipo-selected-text').textContent = label;
   document.getElementById('linea-equipo-selected').style.display = 'flex';
+  _pintarIntervencionesLinea(id);
 }
 
 function clearEquipoLinea() {
@@ -1003,6 +1075,7 @@ function clearEquipoLinea() {
   document.getElementById('linea-equipo-search').value = '';
   document.getElementById('linea-equipo-autocomplete').classList.remove('open');
   document.getElementById('linea-equipo-selected').style.display = 'none';
+  _pintarIntervencionesLinea('');
 }
 
 // Material fungible (lo de siempre: catálogo o no catalogado), material no
@@ -1094,7 +1167,6 @@ function openModalNuevoPedido() {
 function openModalNuevaLinea(pedidoId) {
   sv('linea-pedido-id', pedidoId);
   // Se dejan limpias las dos secciones, por si se cambia de tipo a medias.
-  setLineaServicioTipo('existente');
   sv('linea-servicio-desc', '');
   clearEquipoLinea();
   sv('linea-nuevo-eq-id', ''); sv('linea-nuevo-eq-tipo', '');
@@ -1114,17 +1186,20 @@ function openModalNuevaLinea(pedidoId) {
   openModal('modal-nueva-linea');
 }
 
+// Material fungible / Equipo (compra, ficha nueva en Equipos) / Servicio
+// (sobre un equipo existente, unido a una intervención).
 function setTipoLinea(tipo) {
-  const esServicio = tipo === 'Servicio';
-  sv('linea-pedido-tipo', esServicio ? 'Servicio' : 'Material');
-  document.getElementById('btn-ltipo-material').classList.toggle('active', !esServicio);
-  document.getElementById('btn-ltipo-servicio').classList.toggle('active', esServicio);
+  tipo = ['Equipo', 'Servicio'].includes(tipo) ? tipo : 'Material';
+  sv('linea-pedido-tipo', tipo);
+  for (const t of ['Material', 'Equipo', 'Servicio'])
+    document.getElementById('btn-ltipo-' + t.toLowerCase()).classList.toggle('active', t === tipo);
   const titulo = document.querySelector('#modal-nueva-linea .modal-title');
-  if (titulo) titulo.textContent = esServicio ? 'Añadir servicio / equipo' : 'Añadir línea al pedido';
-  document.getElementById('linea-material-section').style.display = esServicio ? 'none' : '';
-  document.getElementById('linea-servicio-section').style.display = esServicio ? '' : 'none';
-  document.getElementById('linea-sin-inv-group').style.display = esServicio ? 'none' : '';
-  if (esServicio && !v('linea-cantidad')) sv('linea-cantidad', '1');
+  if (titulo) titulo.textContent = { Material: 'Añadir línea al pedido', Equipo: 'Añadir equipo al pedido', Servicio: 'Añadir servicio al pedido' }[tipo];
+  document.getElementById('linea-material-section').style.display = tipo === 'Material' ? '' : 'none';
+  document.getElementById('linea-equipo-section').style.display = tipo === 'Equipo' ? '' : 'none';
+  document.getElementById('linea-servicio-section').style.display = tipo === 'Servicio' ? '' : 'none';
+  document.getElementById('linea-sin-inv-group').style.display = tipo === 'Material' ? '' : 'none';
+  if (tipo !== 'Material' && !v('linea-cantidad')) sv('linea-cantidad', '1');
 }
 
 function openModalEstadoPedido(pedidoId) {
@@ -1147,7 +1222,8 @@ function openModalEstadoPedido(pedidoId) {
 
 function openModalRecepcionMasiva(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
+  // Los servicios unidos a una intervención se dan por realizados al cerrarla.
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido' && !(l.Tipo_Linea === 'Servicio' && l.ID_Intervencion));
   sv('recmas-pedido-id', pedidoId);
   const tituloEl = document.querySelector('#modal-recepcion-masiva .modal-title');
   if (tituloEl) tituloEl.textContent = `Recibir albarán — ${p?.Nombre_Lista || pedidoId}`;
@@ -1176,8 +1252,8 @@ function openModalRecepcionMasiva(pedidoId) {
         const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
         const unidad = _unidadLineaPedido(l);
         const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-        const esServ = l.Tipo_Linea === 'Servicio';
-        const ubicCell = esServ ? `<span style="color:var(--text-muted);font-size:12px">🔧 servicio/equipo</span>` : mat
+        const esServ = l.Tipo_Linea !== 'Material';
+        const ubicCell = esServ ? `<span style="color:var(--text-muted);font-size:12px">${l.Tipo_Linea === 'Equipo' ? '🖥️ equipo' : '🔧 servicio'}</span>` : mat
           ? `<select id="recmas-ubic-${l.ID_Linea}" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:12px">${_opcionesUbicacionRecepcion(mat.ID_Material, unidad)}</select>`
           : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
         return `<tr style="border-bottom:1px solid var(--border)">
@@ -1225,7 +1301,7 @@ function _opcionesUbicacionRecepcion(matId, unidad) {
 
 function openModalRecepcion(lineaId, pedidoId) {
   sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
-  const esServicio = DATA.lineasPedido.find(x => x.ID_Linea === lineaId)?.Tipo_Linea === 'Servicio';
+  const esServicio = (DATA.lineasPedido.find(x => x.ID_Linea === lineaId)?.Tipo_Linea || 'Material') !== 'Material'; // equipo o servicio: sin stock
   document.getElementById('rec-label-material').textContent = esServicio ? 'Servicio' : 'Material';
   document.getElementById('rec-grupo-cantidad-pedida').style.display = esServicio ? 'none' : '';
   document.getElementById('rec-grupo-cantidad').style.display = esServicio ? 'none' : '';

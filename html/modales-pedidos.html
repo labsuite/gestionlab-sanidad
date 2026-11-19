@@ -123,7 +123,8 @@
       <input type="hidden" id="linea-pedido-tipo" value="Material">
       <div class="toggle-source" style="margin-bottom:14px">
         <button id="btn-ltipo-material" class="active" onclick="setTipoLinea('Material')">Material fungible</button>
-        <button id="btn-ltipo-servicio" onclick="setTipoLinea('Servicio')">Servicio / Equipo</button>
+        <button id="btn-ltipo-equipo" onclick="setTipoLinea('Equipo')">Equipo</button>
+        <button id="btn-ltipo-servicio" onclick="setTipoLinea('Servicio')">Servicio</button>
       </div>
       <!-- Sección material fungible -->
       <div id="linea-material-section">
@@ -156,53 +157,60 @@
           </div>
         </div>
       </div>
-      <!-- Sección servicio / equipo -->
-      <div id="linea-servicio-section" style="display:none">
-        <div class="toggle-source" style="margin-bottom:12px">
-          <button id="btn-seq-existente" class="active" onclick="setLineaServicioTipo('existente')">Servicio / equipo existente</button>
-          <button id="btn-seq-nuevo" onclick="setLineaServicioTipo('nuevo')">Compra equipo nuevo</button>
-        </div>
-        <!-- Servicio sobre equipo existente -->
-        <div id="linea-seq-existente-group">
-          <div class="form-grid" style="gap:14px">
-            <div class="form-group">
-              <label>Descripción del servicio *</label>
-              <input id="linea-servicio-desc" placeholder="Ej: Revisión anual microscopio trinocular...">
-            </div>
-            <div class="form-group">
-              <label>Equipo vinculado (opcional)</label>
-              <div class="search-material-wrap">
-                <span class="search-icon">🔧</span>
-                <input type="text" id="linea-equipo-search" placeholder="Buscar por ID, tipo, marca..." oninput="buscarEquipoLinea(this.value)" autocomplete="off">
-                <div class="autocomplete-list" id="linea-equipo-autocomplete"></div>
-              </div>
-              <input type="hidden" id="linea-equipo-id">
-              <div id="linea-equipo-selected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);align-items:center;justify-content:space-between">
-                <span id="linea-equipo-selected-text"></span>
-                <button type="button" onclick="clearEquipoLinea()" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:0 4px">✕</button>
-              </div>
-            </div>
+      <!-- Sección equipo: compra de un equipo nuevo (se da de alta en Equipos, «En pedido») -->
+      <div id="linea-equipo-section" style="display:none">
+        <div class="form-grid" style="gap:14px;grid-template-columns:1fr 1fr">
+          <div class="form-group">
+            <label>ID del activo *</label>
+            <input id="linea-nuevo-eq-id" placeholder="Ej: MIC-05">
+          </div>
+          <div class="form-group">
+            <label>Tipo de equipo *</label>
+            <input id="linea-nuevo-eq-tipo" placeholder="Ej: Microscopio">
+          </div>
+          <div class="form-group">
+            <label>Marca</label>
+            <input id="linea-nuevo-eq-marca" placeholder="">
+          </div>
+          <div class="form-group">
+            <label>Modelo</label>
+            <input id="linea-nuevo-eq-modelo" placeholder="">
           </div>
         </div>
-        <!-- Compra equipo nuevo -->
-        <div id="linea-seq-nuevo-group" style="display:none">
-          <div class="form-grid" style="gap:14px;grid-template-columns:1fr 1fr">
-            <div class="form-group">
-              <label>ID del activo *</label>
-              <input id="linea-nuevo-eq-id" placeholder="Ej: MIC-05">
+      </div>
+      <!-- Sección servicio: siempre sobre un equipo existente y unido a una
+           intervención (la parte técnica); la línea es la parte económica. -->
+      <div id="linea-servicio-section" style="display:none">
+        <div class="form-grid" style="gap:14px">
+          <div class="form-group">
+            <label>Equipo *</label>
+            <div class="search-material-wrap">
+              <span class="search-icon">🔧</span>
+              <input type="text" id="linea-equipo-search" placeholder="Buscar por ID, tipo, marca..." oninput="buscarEquipoLinea(this.value)" autocomplete="off">
+              <div class="autocomplete-list" id="linea-equipo-autocomplete"></div>
             </div>
-            <div class="form-group">
-              <label>Tipo de equipo *</label>
-              <input id="linea-nuevo-eq-tipo" placeholder="Ej: Microscopio">
+            <input type="hidden" id="linea-equipo-id">
+            <div id="linea-equipo-selected" style="display:none;margin-top:6px;padding:6px 10px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:12px;color:var(--accent);align-items:center;justify-content:space-between">
+              <span id="linea-equipo-selected-text"></span>
+              <button type="button" onclick="clearEquipoLinea()" style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--text-muted);padding:0 4px">✕</button>
             </div>
-            <div class="form-group">
-              <label>Marca</label>
-              <input id="linea-nuevo-eq-marca" placeholder="">
-            </div>
-            <div class="form-group">
-              <label>Modelo</label>
-              <input id="linea-nuevo-eq-modelo" placeholder="">
-            </div>
+          </div>
+          <div class="form-group" id="linea-interv-group" style="display:none">
+            <label>Intervención *</label>
+            <div id="linea-interv-lista"></div>
+          </div>
+          <div class="form-group" id="linea-interv-tipo-group" style="display:none">
+            <label>Tipo de la intervención nueva</label>
+            <select id="linea-interv-tipo">
+              <option>Correctivo</option><option>Calibración</option><option>Verificación funcional</option>
+              <option>Validación</option><option>Limpieza</option><option>Descontaminación</option>
+              <option>Sustitución de pieza</option><option>Cambio de consumibles</option>
+              <option>Control de temperatura</option><option>Puesta en marcha</option><option>Actualización de software</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Descripción del servicio (como irá en el pedido) *</label>
+            <input id="linea-servicio-desc" placeholder="Ej: Reparación del agua UP, revisión anual del microscopio…">
           </div>
         </div>
       </div>
@@ -795,6 +803,81 @@
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-editar-solicitud')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarEdicionSolicitud()">Guardar cambios</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Unir línea de servicio ↔ intervención (líneas de antes de 2026-11-19
+     o que vienen de una solicitud de servicio) -->
+<div class="modal-overlay" id="modal-unir-intervencion">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">🔗 Unir a una intervención</div>
+        <div id="unir-int-linea" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-unir-intervencion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="unir-int-linea-id">
+      <input type="hidden" id="unir-int-pedido-id">
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>Equipo *</label>
+          <select id="unir-int-equipo" onchange="_pintarIntervencionesUnir()"></select>
+        </div>
+        <div class="form-group">
+          <label>Intervención *</label>
+          <div id="unir-int-lista"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:8px">El servicio se dará por realizado cuando se cierre la actuación, y su precio pasa a ser el coste de la intervención.</div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-unir-intervencion')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarUnirIntervencion()">Unir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Pedir una intervención a la casa comercial (desde su ficha) -->
+<div class="modal-overlay" id="modal-pedir-servicio">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">💶 Pedir a la casa comercial</div>
+        <div id="pedir-serv-interv" style="font-size:12px;color:var(--text-muted);margin-top:2px"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-pedir-servicio')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pedir-serv-interv-id">
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <label>Pedido *</label>
+          <select id="pedir-serv-pedido" onchange="_togglePedirServNuevo()"></select>
+        </div>
+        <div class="form-group" id="pedir-serv-nuevo-group" style="display:none">
+          <label>Nombre del pedido nuevo *</label>
+          <input id="pedir-serv-nuevo-nombre" placeholder="Ej: Reparaciones noviembre">
+        </div>
+        <div class="form-group" id="pedir-serv-prov-group" style="display:none">
+          <label>Proveedor</label>
+          <select id="pedir-serv-proveedor"></select>
+        </div>
+        <div class="form-group">
+          <label>Descripción del servicio (como irá en el pedido) *</label>
+          <input id="pedir-serv-desc">
+        </div>
+        <div class="form-group">
+          <label>Precio (€ sin IVA)</label>
+          <input id="pedir-serv-precio" type="number" min="0" step="0.01" placeholder="Si ya lo sabes">
+        </div>
+      </div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-pedir-servicio')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarPedirServicio()">Añadir al pedido</button>
       </div>
     </div>
   </div>

@@ -294,3 +294,13 @@ laboratorio). Cliente: `puedeActuarEnEquipo()` (`js/config.js`) en el hilo, la f
 la intervención y el historial. Servidor: `requiereResponsableEquipo()`
 (`_shared/auth.ts`) en todas las acciones de `gestionar-intervencion` y en `cerrar` de
 `gestionar-incidencia` — antes el servidor dejaba actuar a cualquier Profesor.
+
+## Conexión con pedidos: la intervención es la parte técnica de un servicio (2026-11-19)
+
+Una línea de pedido de tipo **Servicio** va unida a una intervención (`lineas_pedido.id_intervencion`)
+y es su parte económica. Cerrar la actuación da el servicio por realizado en el pedido (y
+reabrirla lo devuelve a pendiente); el coste de la intervención sale del precio de la línea (el
+de la factura) y el campo Coste del modal queda de solo lectura. Desde la ficha:
+«💶 Pedir a la casa comercial», o el enlace al pedido y su factura si ya está pedida. Detalle en
+`docs/modulo-pedidos.md`.
+

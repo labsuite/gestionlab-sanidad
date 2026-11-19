@@ -881,3 +881,12 @@ alter table lineas_pedido add column if not exists sin_inventario boolean not nu
 alter table lineas_pedido add column if not exists tipo_linea text not null default 'Material';
 alter table lineas_pedido drop constraint if exists lineas_pedido_tipo_linea_check;
 alter table lineas_pedido add constraint lineas_pedido_tipo_linea_check check (tipo_linea in ('Material','Servicio'));
+
+-- 2026-11-19 (2): tres tipos de línea. 'Equipo' = compra de un equipo;
+-- 'Servicio' = parte económica de una INTERVENCIÓN sobre un equipo existente
+-- (la parte técnica). La línea se da por realizada al cerrar la actuación y el
+-- coste de la intervención sale del precio de sus líneas (_shared/pedidos.ts).
+alter table lineas_pedido drop constraint if exists lineas_pedido_tipo_linea_check;
+alter table lineas_pedido add constraint lineas_pedido_tipo_linea_check check (tipo_linea in ('Material','Equipo','Servicio'));
+alter table lineas_pedido add column if not exists id_intervencion text references intervenciones(id_intervencion) on update cascade on delete set null;
+create index if not exists idx_lineas_pedido_id_intervencion on lineas_pedido (id_intervencion);

@@ -831,6 +831,19 @@ function openFichaIntervencion(intIdx) {
   document.getElementById('ficha-int-coste').textContent = costeTotal
     ? costeTotal.toLocaleString('es-ES', { style:'currency', currency:'EUR' }) + (chain.length > 1 ? ' (total del hilo)' : '')
     : '—';
+  // Parte económica: la(s) línea(s) de pedido unidas a esta intervención
+  // (2026-11-19). Su precio es el coste; la factura es la del pedido.
+  const lineasPed = DATA.lineasPedido.filter(l => l.ID_Intervencion === i.ID_Intervencion);
+  if (lineasPed.length) {
+    const html = lineasPed.map(l => {
+      const ped = DATA.pedidos.find(p => p.ID_Pedido === l.Pedido);
+      const docs = DATA.documentosProveedor.filter(d => d.Pedido === l.Pedido);
+      const precio = l.Precio_Unitario ? (parseFloat(l.Precio_Unitario) * (parseFloat(l.Cantidad_Pedida) || 1)).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' }) : 'sin precio aún';
+      return `<div style="margin-top:4px;font-size:12px">💶 En el pedido <a href="#" onclick="closeModal('modal-ficha-intervencion');verDetallePedido('${l.Pedido}');return false">«${_escAttr(ped?.Nombre_Lista || l.Pedido)}»</a> · ${precio}${ped?.Proveedor ? ' · ' + _escAttr(ped.Proveedor) : ''}
+        ${docs.map(d => `<a href="#" onclick="abrirDocumento('${_escAttr(d.Path)}');return false" style="margin-left:6px">📎 ${_escAttr(d.Nombre_Archivo || 'Factura')}</a>`).join('')}</div>`;
+    }).join('');
+    document.getElementById('ficha-int-coste').innerHTML += html;
+  }
   document.getElementById('ficha-int-observaciones').textContent = i.Observaciones || '—';
   document.getElementById('ficha-int-doc').innerHTML = i.URL_Adjunto
     ? `<a href="#" onclick="abrirDocumento('${i.URL_Adjunto}'); return false;" class="btn btn-secondary" style="font-size:12px">📄 ${i.Nombre_Adjunto || 'Ver documento'}</a>`
@@ -868,6 +881,8 @@ function openFichaIntervencion(intIdx) {
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');registrarDevolucionEquipo('${i.ID_Intervencion}')">📦 Registrar devolución</button>`;
   if (incVinculada)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
+  if (!lineasPed.length && puedeHacer('gestionarPedidos'))
+    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');openModalPedirServicio('${i.ID_Intervencion}')">💶 Pedir a la casa comercial</button>`;
   acciones.innerHTML = btns;
 
   openModal('modal-ficha-intervencion');

@@ -974,6 +974,13 @@ function openModalRegistrarActuacion(intIdx) {
   // siempre editables — por si hace falta corregirlos más adelante.
   sv('act-fecha-real', i.Fecha_Realizacion || new Date().toISOString().split('T')[0]);
   sv('act-coste', i.Coste_Intervencion || '');
+  {
+    const lineaPed = DATA.lineasPedido.find(l => l.ID_Intervencion === i.ID_Intervencion);
+    const inp = document.getElementById('act-coste');
+    inp.readOnly = !!lineaPed;
+    inp.title = lineaPed ? 'Sale del precio de su línea en el pedido (el de la factura). Cámbialo allí.' : '';
+    inp.style.background = lineaPed ? 'var(--bg, #f5f5f4)' : '';
+  }
   const esExterna = !!i.Proveedor;
   const radInterna = document.getElementById('act-ejec-interna');
   const radExterna = document.getElementById('act-ejec-externa');
@@ -1048,6 +1055,8 @@ async function reabrirActuacion() {
       accion: 'actualizar', id_intervencion: i.ID_Intervencion, actuacion_finalizada: false,
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    // Su servicio en el pedido vuelve a pendiente (lo hace el servidor).
+    if (DATA.lineasPedido.some(l => l.ID_Intervencion === i.ID_Intervencion)) await _refrescarIntervencion(i.ID_Intervencion);
     _aplicarModoModalActuacion(DATA.intervenciones[intIdx]);
     showToast('Actuación reabierta', 'success');
     renderEquipos(); renderProximasVisitas(); renderIntervenciones(); renderIncidencias(); renderDashboard(); updateBadges();
@@ -1336,6 +1345,8 @@ async function guardarActuacion(finalizar) {
         });
         DATA.intervenciones[intIdx] = _intervencionSbToObj(finalizada);
       }
+      // Su servicio en el pedido queda realizado / pendiente (lo hace el servidor).
+      if (DATA.lineasPedido.some(l => l.ID_Intervencion === i.ID_Intervencion)) await _refrescarIntervencion(i.ID_Intervencion);
 
       closeModal('modal-registrar-actuacion');
       showToast(desc
@@ -1627,6 +1638,7 @@ function openModalRegistrarActuacionDirecta(equipoId, ctx) {
   sv('act-fecha-real',    new Date().toISOString().split('T')[0]);
   _resetCamposTarea();
   sv('act-coste',         '');
+  { const inp = document.getElementById('act-coste'); inp.readOnly = false; inp.title = ''; inp.style.background = ''; }
   sv('act-pdf-url',       '');
 
   poblarSelects();

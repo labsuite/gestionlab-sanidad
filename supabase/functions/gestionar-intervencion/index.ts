@@ -7,6 +7,7 @@
 // intervención y se propaga al estado del equipo y de la incidencia vinculada,
 // todo en una sola llamada atómica.
 import { requireStaff, requiereResponsableEquipo, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { sincronizarLineasDeIntervencion } from "../_shared/pedidos.ts";
 
 function generarIdIntervencion(): string {
   return "INT-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -187,6 +188,8 @@ Deno.serve(async (req) => {
 
     await actualizarEstadoEquipoSiProcede(intervencion.id_equipo, body.estado_equipo);
     if (strField(body.incidencia_estado)) await actualizarIncidenciaVinculada(idIntervencion, String(body.incidencia_estado));
+    // Cerrar/reabrir la actuación da por realizado (o no) el servicio en su pedido.
+    if ("actuacion_finalizada" in body) await sincronizarLineasDeIntervencion(supabaseAdmin, idIntervencion);
 
     return jsonOk({ intervencion });
   }
@@ -229,6 +232,8 @@ Deno.serve(async (req) => {
     const { data: intervencionActualizada } = await supabaseAdmin.from("intervenciones")
       .update({ resultado: resultadoAgg, estado: estadoAgg, actuacion_finalizada: finalizada })
       .eq("id_intervencion", idIntervencion).select().single();
+    // Si se ha reabierto sola, su servicio en el pedido vuelve a pendiente.
+    if (!!intervencion.actuacion_finalizada !== finalizada) await sincronizarLineasDeIntervencion(supabaseAdmin, idIntervencion);
 
     // El estado del equipo solo se DEGRADA automáticamente desde las tareas
     // ("No operativo" / "Operativo con fallos"). Volver a "Operativo" es una
