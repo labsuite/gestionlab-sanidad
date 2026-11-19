@@ -76,7 +76,10 @@ class GeminiSaturado extends Error {}
 
 // Devuelve el JSON y el modelo que contestó (se guarda en el resultado para
 // saber si una factura la leyó el modelo de respaldo).
-async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown, limite: number): Promise<{ json: any; modelo: string }> {
+// timeoutPrincipalMs: cuánto se espera al modelo principal antes de pasar al
+// de respaldo (en la extracción más, porque leer el PDF lleva su tiempo; en el
+// emparejamiento poco, que es texto corto).
+async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown, limite: number, timeoutPrincipalMs: number): Promise<{ json: any; modelo: string }> {
   const cuerpo = JSON.stringify({
     contents: [{ role: "user", parts }],
     generationConfig: {
@@ -95,7 +98,8 @@ async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown
     const restante = limite - Date.now() - 2000;
     if (restante < 10_000) break; // no da tiempo a otro intento útil
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, restante));
+    const espera = modelo === GEMINI_MODELO ? Math.min(timeoutMs, timeoutPrincipalMs) : timeoutMs;
+    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(espera, restante));
     let respuesta: Response;
     try {
       respuesta = await fetch(
@@ -358,7 +362,11 @@ Deno.serve(async (req) => {
       geminiKey,
       [{ text: PROMPT_EXTRACCION }, { inline_data: { mime_type: mimeType, data: base64 } }],
       ESQUEMA_EXTRACCION,
-      limite,
+      // Se reservan 30 s para el emparejamiento: el 2026-11-19 la extracción
+      // por el modelo de respaldo agotó todo el presupuesto y la factura se
+      // guardó con los 19 artículos "sin línea".
+      limite - 30_000,
+      45_000,
     );
     extraido = r.json;
     modeloExtraccion = r.modelo;
@@ -389,6 +397,7 @@ Deno.serve(async (req) => {
         [{ text: construirPromptMatching(items, lineas || []) }],
         ESQUEMA_MATCHING,
         limite,
+        15_000,
       );
       ({ matches, sinMatch } = resolverMatches(items, Array.isArray(asignaciones) ? asignaciones : [], lineas || []));
     } catch {
