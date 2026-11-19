@@ -30,6 +30,17 @@ async function authIdDeEmail(supabaseAdmin: any, email: string): Promise<string 
 }
 
 /**
+ * Pone `email` en el login de Supabase Auth y en su perfil de public.users.
+ * Devuelve el mensaje de error, o null si todo fue bien.
+ */
+async function alinearEmailLogin(supabaseAdmin: any, authId: string, email: string): Promise<string | null> {
+  const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(authId, { email, email_confirm: true });
+  if (authErr) return authErr.message;
+  const { error: perfilErr } = await supabaseAdmin.from("users").update({ email }).eq("id", authId);
+  return perfilErr?.message ?? null;
+}
+
+/**
  * Copia cifrada de la contraseña de una cuenta de GRUPO, para poder consultarla
  * después (ver _shared/secretos.ts). Solo se llama con cuentas de grupo: la
  * contraseña de una persona no se guarda nunca.
@@ -392,6 +403,23 @@ Deno.serve(async (req) => {
         }
         authId = listadoAuth.find((u) => String(u.email || "").toLowerCase().trim() === emailU)?.id ?? null;
       }
+      // Su login puede estar con un email ANTIGUO: si se le cambió el email en la
+      // ficha antes de que «actualizar» lo propagase, el perfil sigue enlazado por
+      // gestionlab_id pero con el email viejo (Marta Alén, 2026-11-19: crear uno
+      // nuevo chocaba con users_gestionlab_id_key). Se alinea con el de la ficha.
+      if (!authId) {
+        const { data: perfilPorId } = await supabaseAdmin.from("users")
+          .select("id, email").eq("gestionlab_id", f.id_usuario).maybeSingle();
+        if (perfilPorId?.id) {
+          const alinear = await alinearEmailLogin(supabaseAdmin, perfilPorId.id, emailU);
+          if (alinear) {
+            resultados.push({ nombre: nombreU, email: emailU, ok: false,
+              motivo: `Su cuenta de acceso está con otro email (${perfilPorId.email}) y no se pudo cambiar: ${alinear}` });
+            continue;
+          }
+          authId = perfilPorId.id;
+        }
+      }
       // Dar de alta a alguien desde la app («Nuevo usuario») solo crea la ficha del
       // catálogo, no el login: hasta ahora la 🔑 respondía "No tiene cuenta de
       // acceso" y no había forma de darle entrada desde la app (Marta Alén,
@@ -510,7 +538,23 @@ Deno.serve(async (req) => {
     // acceso: el catálogo manda igual, así que no se aborta la actualización.
     if (syncError) console.error(`No se pudo sincronizar public.users para ${existente.email}: ${syncError.message}`);
 
-    return jsonOk({ usuario: data });
+    // Cambio de email en la ficha: el login tiene que pasar al email nuevo, o la
+    // persona sigue entrando con el viejo y la 🔑 ya no la encuentra.
+    let aviso: string | null = null;
+    const emailViejo = String(existente.email || "").toLowerCase().trim();
+    const emailNuevo = email.toLowerCase().trim();
+    if (emailNuevo && emailNuevo !== emailViejo) {
+      let { data: perfil } = await supabaseAdmin.from("users").select("id").eq("email", emailViejo).maybeSingle();
+      if (!perfil) {
+        ({ data: perfil } = await supabaseAdmin.from("users").select("id").eq("gestionlab_id", idUsuario).maybeSingle());
+      }
+      if (perfil?.id) {
+        const err = await alinearEmailLogin(supabaseAdmin, perfil.id, emailNuevo);
+        if (err) aviso = `La ficha se guardó, pero su cuenta de acceso sigue con ${emailViejo}: ${err}`;
+      }
+    }
+
+    return jsonOk({ usuario: data, aviso });
   }
 
   return jsonError(

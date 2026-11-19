@@ -1538,9 +1538,10 @@ async function guardarUsuario() {
   showLoading('Guardando...');
   try {
     if (existingU) {
-      const { usuario } = await callEdgeFunction('gestionar-usuario', { accion: 'actualizar', id_usuario: existingU.ID_Usuario, ...datos });
+      const { usuario, aviso } = await callEdgeFunction('gestionar-usuario', { accion: 'actualizar', id_usuario: existingU.ID_Usuario, ...datos });
       DATA.usuarios[editingRow.rowIndex] = _usuarioSbToObj(usuario);
-      showToast('Usuario actualizado', 'success');
+      if (aviso) showToast(aviso, 'error');
+      else showToast('Usuario actualizado', 'success');
     } else {
       const { usuario } = await callEdgeFunction('gestionar-usuario', { accion: 'crear', ...datos });
       DATA.usuarios.push(_usuarioSbToObj(usuario));
