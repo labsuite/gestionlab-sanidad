@@ -1127,7 +1127,14 @@ async function _chatResEnviar() {
     await _chatResProcesarRespuesta(respuesta);
   } catch (e) {
     document.getElementById('chat-res-mensajes').lastElementChild.remove();
-    _chatResPintarMensaje('model', 'No he podido conectar con el asistente. Si es urgente, avisa directamente a tu profesor/a. También puedes usar el aviso manual a la gestora.');
+    // La pregunta sale del historial y vuelve a la caja de texto: así se puede
+    // reenviar tal cual sin que Gemini reciba dos turnos seguidos de la persona.
+    _chatResHistory.pop();
+    sv('chat-res-texto', texto);
+    const saturada = /saturad|503|429|a tiempo/i.test(e?.message || '');
+    _chatResPintarMensaje('model', saturada
+      ? 'La IA de Google está saturada ahora mismo y no ha contestado. Tu pregunta sigue en la caja de texto: vuelve a enviarla dentro de un momento. Si es urgente, avisa directamente a tu profesor/a.'
+      : 'No he podido conectar con el asistente. Tu pregunta sigue en la caja de texto para volver a enviarla. Si es urgente, avisa directamente a tu profesor/a. También puedes usar el aviso manual a la gestora.');
     console.error(e);
   }
 }

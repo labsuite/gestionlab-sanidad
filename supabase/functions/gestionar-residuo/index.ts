@@ -20,7 +20,18 @@ const GEMINI_MODELO = "gemini-3.6-flash";
 
 // La clave nunca sale de este servidor — el chat del consultorio de residuos
 // (js/residuos.js) manda aquí el historial y solo recibe el texto de vuelta.
-async function llamarGeminiChat(history: unknown): Promise<string> {
+// Tiempos por uso. Chat: la persona está esperando la respuesta con el modal
+// abierto y prefiere esperar a ver un error. Comprobación al añadir: está de pie
+// junto al contenedor y, si la IA no contesta, ya hay alternativa (se registra
+// con la validación determinista o se pregunta al profesorado).
+// Subidos el 2026-11-19: con Gemini lento ese día, 2 intentos de 16 s fallaban
+// siempre ("no respondió a tiempo" y luego 503).
+type TiemposGemini = { presupuestoMs: number; timeoutIntentoMs: number; esperas: number[] };
+const TIEMPOS_CHAT: TiemposGemini = { presupuestoMs: 60_000, timeoutIntentoMs: 35_000, esperas: [0, 2000, 5000] };
+const TIEMPOS_COMPROBACION: TiemposGemini = { presupuestoMs: 35_000, timeoutIntentoMs: 25_000, esperas: [0, 2000] };
+
+async function llamarGeminiChat(history: unknown, tiempos: TiemposGemini = TIEMPOS_CHAT): Promise<string> {
+  const limite = Date.now() + tiempos.presupuestoMs;
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   if (!geminiKey) throw new Error("Falta configurar GEMINI_API_KEY en los secretos del proyecto");
   const cuerpo = JSON.stringify({
@@ -37,15 +48,15 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
   // Timeout explícito por intento: si Gemini no responde, el worker de Supabase
   // acaba matando todo el isolate con WORKER_RESOURCE_LIMIT (un 546 sin cuerpo
   // útil) en vez de dejar que este throw lo capture el llamador.
-  // 2 intentos: alguien de pie junto al contenedor no puede esperar 3×22 s. Un
-  // 503 suele venir rápido y el retry a los 2 s a menudo sale; el caso malo
-  // (fetch colgado) queda acotado a ~2×16 s.
-  const REINTENTOS = [0, 2000];
+  // Número de intentos y esperas según el uso (TIEMPOS_CHAT / TIEMPOS_COMPROBACION),
+  // siempre dentro de su presupuesto total para no dejar a nadie esperando sin fin.
   let ultimoError = "";
-  for (let intento = 0; intento < REINTENTOS.length; intento++) {
-    if (REINTENTOS[intento]) await new Promise((r) => setTimeout(r, REINTENTOS[intento]));
+  for (const espera of tiempos.esperas) {
+    if (espera) await new Promise((r) => setTimeout(r, espera));
+    const restante = limite - Date.now();
+    if (restante < 5000) break; // no da tiempo a otro intento útil
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), 16000);
+    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(tiempos.timeoutIntentoMs, restante));
     let respuesta: Response;
     try {
       respuesta = await fetch(
@@ -54,7 +65,7 @@ async function llamarGeminiChat(history: unknown): Promise<string> {
       );
     } catch (e) {
       ultimoError = e instanceof DOMException && e.name === "AbortError"
-        ? "Gemini no respondió a tiempo (timeout de 16 s)"
+        ? "Gemini no respondió a tiempo"
         : (e instanceof Error ? e.message : String(e));
       continue;
     } finally {
@@ -446,7 +457,7 @@ Deno.serve(async (req) => {
 
       let respuestaIa: string | null = null;
       try {
-        respuestaIa = await llamarGeminiChat(construirHistoryComprobacionIA(ctx));
+        respuestaIa = await llamarGeminiChat(construirHistoryComprobacionIA(ctx), TIEMPOS_COMPROBACION);
       } catch (e) {
         // IA no disponible: si hay tipo del catálogo, ya ha pasado la validación
         // determinista (Nivel 1/2) y se permite; si es solo texto libre, no hay
@@ -522,10 +533,12 @@ Deno.serve(async (req) => {
       return jsonError("history es obligatorio (array de turnos role/parts)", 400);
     }
     try {
-      const texto = await llamarGeminiChat(history);
+      const texto = await llamarGeminiChat(history, TIEMPOS_CHAT);
       return jsonOk({ texto });
     } catch (e) {
-      return jsonError(e instanceof Error ? e.message : "Error al consultar la IA", 502);
+      const detalle = e instanceof Error ? e.message : "Error al consultar la IA";
+      console.error("Chat de residuos: Gemini no disponible:", detalle);
+      return jsonError(`La IA de Google (Gemini) está saturada ahora mismo y no ha contestado. Vuelve a enviar la pregunta dentro de un momento. (${detalle})`, 503);
     }
   }
 
