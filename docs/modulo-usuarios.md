@@ -333,12 +333,6 @@ falta para la responsabilidad sobre equipos.
 
 ## Contraseña del alumnado y "Restablecer contraseña" (2026-09-17)
 
-> ⚠ **Retirado de la app el 2026-11-18**: ya no hay botón 🔑 «Restablecer contraseña»
-> ni para el profesorado ni para cuentas personales antiguas de alumnado (función
-> `resetearPasswordUsuario` eliminada de `js/ubicaciones.js`). La 🔑 «Contraseña del
-> grupo» sigue igual. La acción `resetear_password` de `gestionar-usuario` sigue en el
-> servidor, sin nada que la llame.
-
 > ⚠ Lo de abajo describe el sistema de **cuentas personales**, ya retirado. Se conserva
 > porque el botón 🔑 y `passwordDesdeEmail()` siguen existiendo para el profesorado y para
 > cualquier cuenta que no sea de grupo.

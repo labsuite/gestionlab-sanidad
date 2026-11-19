@@ -299,7 +299,7 @@ function _renderTablaUsuarios(lista, rolActual) {
             <td>${_badgesModulos(u.Modulo)}</td>
             <td>${_badgesLabs(u.Ubicaciones_Asignadas)}</td>
             <td>${u.Activo !== 'FALSE' ? '<span class="badge badge-green">Activo</span>' : '<span class="badge badge-gray">Inactivo</span>'}</td>
-            <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
+            <td><div class="row-actions">${puedeEditar && (!u._sbOnly || u.Rol === 'Profesor') ? `<button class="icon-btn" onclick="editUsuario(${idx})">✏️</button>` : ''}${_botonPasswordPersonal(u, idx, rolActual)}${_botonBorrarUsuario(u, idx, puedeBorrar)}</div></td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -645,15 +645,30 @@ async function setRevisarInventarioGrupo(gi, valor) {
 // es el modal 🔑, que la pide al servidor (se guarda cifrada, ver
 // supabase/functions/_shared/secretos.ts).
 //
-// "Restablecer contraseña" de cuentas PERSONALES se retiró el 2026-11-18: la
-// contraseña de una persona solo la cambia ella misma desde "Mi perfil".
+// La contraseña de una PERSONA no se guarda en ningún sitio, así que no se puede
+// consultar: si quedase alguna cuenta personal antigua de alumnado, su botón 🔑
+// sigue siendo el de restablecer de siempre.
 function _botonPasswordAlumnado(u, idx) {
-  if (!_esCuentaDeGrupo(u.Email)) return '';
+  if (!_esCuentaDeGrupo(u.Email)) {
+    return `<button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>`;
+  }
   // Un Profesor solo lleva sus grupos: el servidor rechaza los demás
   // (`requiereGrupoPropio`), así que aquí no se ofrece el botón siquiera.
   // Admin y Gestor administran las cuentas y llegan a todas.
   if (getUserRole() === 'Profesor' && !_esGrupoPropio(u.ID_Usuario)) return '';
   return `<button class="icon-btn" title="Contraseña del grupo" onclick="abrirPasswordGrupo(${idx})">🔑</button>`;
+}
+
+// Profesorado y gestión: Admin y Gestor les restablecen la contraseña (ya no hay
+// "Olvidé mi contraseña" en el login). La de un Administrador solo la toca otro
+// Administrador — el servidor lo impone igual. A uno mismo no: para eso está
+// "Mi perfil", que pide la actual.
+function _botonPasswordPersonal(u, idx, rolActual) {
+  if (rolActual !== 'Administrador' && rolActual !== 'Gestor') return '';
+  if (u.Rol === 'Administrador' && rolActual !== 'Administrador') return '';
+  if (!u.Email || u._sbOnly) return '';
+  if ((u.Email || '').toLowerCase().trim() === (currentUser?.email || '').toLowerCase().trim()) return '';
+  return `<button class="icon-btn" title="Restablecer contraseña" onclick="resetearPasswordUsuario(${idx})">🔑</button>`;
 }
 
 /** ¿Este grupo está asignado a quien mira? Respeta la vista previa de rol. */
@@ -824,6 +839,35 @@ async function _cambiarPasswordGrupo(password, mensajeOk) {
     showToast('Error: ' + e.message, 'error');
   }
   hideLoading();
+}
+
+// La contraseña de una cuenta PERSONAL no se guarda: solo se puede restablecer a la
+// parte del email anterior a "@" (igual que en TRebello). No se manda ningún correo,
+// se dicta en clase — por eso se enseña en un alert y no en un toast, que desaparece
+// a los 3 segundos.
+async function resetearPasswordUsuario(idx) {
+  const u = DATA.usuarios[idx];
+  if (!u) return;
+  const esPersonal = u.Rol !== 'Alumno';
+  if (!confirm(
+    `¿Restablecer la contraseña de ${u.Nombre}?\n\n` +
+    (esPersonal
+      ? `Se le pondrá una contraseña nueva provisional, que verás a continuación. La que tuviera dejará de valer.`
+      : `Volverá a ser la parte de su email anterior a «@». La que tuviera dejará de valer.`)
+  )) return;
+
+  showLoading('Restableciendo...');
+  let resultados;
+  try {
+    ({ resultados } = await callEdgeFunction('gestionar-usuario', { accion: 'resetear_password', ids: [u.ID_Usuario] }));
+  } catch (e) {
+    hideLoading(); showToast('Error: ' + e.message, 'error'); return;
+  }
+  hideLoading();
+  const r = (resultados || [])[0];
+  if (r?.ok) alert(`Contraseña de ${u.Nombre} restablecida:\n\n${r.password}` +
+    (esPersonal ? `\n\nDásela en persona y pídele que la cambie al entrar, en «Mi perfil».` : ''));
+  else showToast(`No se pudo restablecer: ${r?.motivo || 'error desconocido'}`, 'error');
 }
 
 function filtrarAlumnos(modulo) {
