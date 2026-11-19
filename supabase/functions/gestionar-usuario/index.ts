@@ -374,7 +374,7 @@ Deno.serve(async (req) => {
     let listadoAuth: Array<{ id: string; email?: string }> | null = null;
 
     const resultados: Array<
-      { nombre: string; email: string; ok: boolean; password?: string; motivo?: string }
+      { nombre: string; email: string; ok: boolean; password?: string; motivo?: string; creada?: boolean }
     > = [];
 
     for (const f of filas) {
@@ -392,8 +392,35 @@ Deno.serve(async (req) => {
         }
         authId = listadoAuth.find((u) => String(u.email || "").toLowerCase().trim() === emailU)?.id ?? null;
       }
+      // Dar de alta a alguien desde la app («Nuevo usuario») solo crea la ficha del
+      // catálogo, no el login: hasta ahora la 🔑 respondía "No tiene cuenta de
+      // acceso" y no había forma de darle entrada desde la app (Marta Alén,
+      // 2026-11-19). Ahora se le crea aquí mismo, con la contraseña provisional.
       if (!authId) {
-        resultados.push({ nombre: nombreU, email: emailU, ok: false, motivo: "No tiene cuenta de acceso" });
+        const esGrupoNuevo = esCuentaDeGrupo(emailU);
+        const password = (esGrupoNuevo || f.rol !== "Alumno") ? passwordDeGrupo() : passwordDesdeEmail(emailU);
+        const { data: creado, error: crearErr } = await supabaseAdmin.auth.admin.createUser({
+          email: emailU, password, email_confirm: true,
+        });
+        if (crearErr || !creado?.user) {
+          resultados.push({ nombre: nombreU, email: emailU, ok: false,
+            motivo: `No tenía cuenta de acceso y no se pudo crear: ${crearErr?.message ?? "error desconocido"}` });
+          continue;
+        }
+        const { error: perfilErr } = await supabaseAdmin.from("users").insert({
+          id: creado.user.id, gestionlab_id: f.id_usuario, nombre: nombreU, email: emailU,
+          rol: f.rol, activo: true,
+        });
+        if (perfilErr) {
+          await supabaseAdmin.auth.admin.deleteUser(creado.user.id);
+          resultados.push({ nombre: nombreU, email: emailU, ok: false,
+            motivo: `No se pudo crear su perfil: ${perfilErr.message}` });
+          continue;
+        }
+        if (esGrupoNuevo && hayClaveDeCifrado()) {
+          await guardarCopiaPassword(supabaseAdmin, f.id_usuario, password, nombreCorto(String(user?.nombre || "")));
+        }
+        resultados.push({ nombre: nombreU, email: emailU, ok: true, password, creada: true });
         continue;
       }
       // Las cuentas de grupo y las del personal llevan contraseña aleatoria y

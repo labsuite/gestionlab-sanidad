@@ -865,7 +865,9 @@ async function resetearPasswordUsuario(idx) {
   }
   hideLoading();
   const r = (resultados || [])[0];
-  if (r?.ok) alert(`Contraseña de ${u.Nombre} restablecida:\n\n${r.password}` +
+  if (r?.ok) alert((r.creada
+      ? `${u.Nombre} aún no tenía cuenta para entrar: se le acaba de crear.\n\nContraseña provisional:\n\n${r.password}`
+      : `Contraseña de ${u.Nombre} restablecida:\n\n${r.password}`) +
     (esPersonal ? `\n\nDásela en persona y pídele que la cambie al entrar, en «Mi perfil».` : ''));
   else showToast(`No se pudo restablecer: ${r?.motivo || 'error desconocido'}`, 'error');
 }
