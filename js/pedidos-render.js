@@ -736,7 +736,7 @@ async function _cargarVisorFactura(doc) {
     const esImagen = /\.(png|jpe?g|webp|gif)$/i.test(doc.Nombre_Archivo || doc.Path);
     visor.innerHTML = esImagen
       ? `<img src="${_escAttr(url)}" alt="Factura">`
-      : `<iframe src="${_escAttr(url)}#view=FitH" title="Factura"></iframe>`;
+      : `<iframe src="${_escAttr(url)}#view=FitH&navpanes=0" title="Factura"></iframe>`;
     abrir.innerHTML = `<button class="btn btn-secondary" style="width:100%" onclick="window.open('${_escAttr(url)}','_blank')">📄 Ver la factura</button>`;
   } catch (e) {
     visor.innerHTML = `<div class="empty-state" style="padding:24px">No se pudo cargar la factura: ${_escAttr(e.message || '')}</div>`;
