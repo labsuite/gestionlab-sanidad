@@ -208,7 +208,7 @@ function _renderContabilidadConAnio(anio) {
     sum + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
   for (const p of pedidosAnio) {
     const lineasP = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido);
-    const comunes = p.Tipo === 'Servicio' ? [] : lineasP.filter(lineaEsComun);
+    const comunes = lineasP.filter(lineaEsComun); // las de servicio/equipo nunca son comunes
     const propias = lineasP.filter(l => !comunes.includes(l));
     const gastoExtra = parseFloat(p.Gasto_Extra_Importe) || 0;
     const portesAComun = !propias.length;

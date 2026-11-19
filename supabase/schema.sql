@@ -873,3 +873,11 @@ alter table solicitudes add column if not exists tipo text not null default 'Mat
 -- recibe (cantidad, estado, solicitud de origen y estado del pedido como
 -- siempre) pero no suma stock ni obliga a darle ficha en el catálogo.
 alter table lineas_pedido add column if not exists sin_inventario boolean not null default false;
+
+-- 2026-11-19: el tipo (material / servicio-equipo) es de cada LÍNEA, no del
+-- pedido: un equipo y sus fungibles llegan a menudo en el mismo pedido.
+-- 'Servicio' = servicio o equipo (no toca stock; al recibir se marca realizado).
+-- Las líneas existentes heredaron pedidos.tipo; esa columna queda sin uso.
+alter table lineas_pedido add column if not exists tipo_linea text not null default 'Material';
+alter table lineas_pedido drop constraint if exists lineas_pedido_tipo_linea_check;
+alter table lineas_pedido add constraint lineas_pedido_tipo_linea_check check (tipo_linea in ('Material','Servicio'));

@@ -292,6 +292,7 @@ const CICLO_MATERIAL_COMUN = 'Material común';
  */
 function lineaEsComun(linea) {
   if (!linea) return false;
+  if (linea.Tipo_Linea === 'Servicio') return false;
   if (linea.Material_Comun === true || linea.Material_Comun === false) return linea.Material_Comun;
   // Mismo criterio de búsqueda que _materialDeLinea / buscarMaterialPorNombre.
   const mat = (linea.ID_Material && DATA.material.find(m => m.ID_Material === linea.ID_Material))

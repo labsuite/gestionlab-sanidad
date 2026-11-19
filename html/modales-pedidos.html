@@ -87,11 +87,6 @@
       <button class="modal-close" onclick="closeModal('modal-nuevo-pedido')">✕</button>
     </div>
     <div class="modal-body">
-      <input type="hidden" id="ped-tipo" value="Material">
-      <div class="toggle-source" style="margin-bottom:16px">
-        <button id="btn-ped-tipo-material" class="active" onclick="setPedidoTipo('Material')">Material fungible</button>
-        <button id="btn-ped-tipo-servicio" onclick="setPedidoTipo('Servicio')">Servicio / Equipo</button>
-      </div>
       <div class="form-grid" style="gap:14px">
         <div class="form-group">
           <label>Nombre de la lista *</label>
@@ -123,7 +118,13 @@
     </div>
     <div class="modal-body">
       <input type="hidden" id="linea-pedido-id">
-      <input type="hidden" id="linea-pedido-tipo">
+      <!-- El tipo es de cada línea (2026-11-19): un equipo y sus fungibles
+           pueden venir en el mismo pedido. -->
+      <input type="hidden" id="linea-pedido-tipo" value="Material">
+      <div class="toggle-source" style="margin-bottom:14px">
+        <button id="btn-ltipo-material" class="active" onclick="setTipoLinea('Material')">Material fungible</button>
+        <button id="btn-ltipo-servicio" onclick="setTipoLinea('Servicio')">Servicio / Equipo</button>
+      </div>
       <!-- Sección material fungible -->
       <div id="linea-material-section">
         <div class="toggle-source">

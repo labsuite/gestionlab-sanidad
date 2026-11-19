@@ -393,7 +393,7 @@ function renderPedidos(filtroEstado = '') {
       <div class="pedido-card-header">
         <div><div class="pedido-card-title">${p.Nombre_Lista}</div><div class="pedido-card-meta">${p.Proveedor||'Sin proveedor asignado'} · Creado ${formatDate(p.Fecha_Creacion)}</div></div>
         <div style="display:flex;gap:8px;align-items:center" onclick="event.stopPropagation()">
-          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
+          ${lineas.some(l => l.Tipo_Linea === 'Servicio') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún servicio o equipo">🔧 Servicio/equipo</span>` : ''}
           ${docBadges}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${!['Archivado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Cambiar estado" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄</button>` : ''}
@@ -686,7 +686,7 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   </table>` : `<div class="empty-state" style="padding:16px">No se detectó ningún artículo en el documento.</div>`;
 
   const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  const puedeAnadirDesdeFactura = pedido?.Tipo !== 'Servicio'; // el caso "reactivo sorpresa" es de material, no de servicio/equipo
+  const puedeAnadirDesdeFactura = true; // la línea nueva se añade como material; el tipo es de cada línea
   const sinMatch = (r.sin_match || []).length ? `<div style="margin-top:16px;padding:10px 14px;background:var(--danger-light,#fdf0f0);border-radius:var(--radius-sm);font-size:13px">
     <div style="font-weight:600;margin-bottom:6px">⚠️ Detectado en el documento pero sin línea de pedido coincidente:</div>
     <div style="display:flex;flex-direction:column;gap:6px">
@@ -777,18 +777,20 @@ function _filaLineaPedido(l, p, puedeEditar) {
   const puedeEliminar = puedeEditar && l.Estado_Linea === 'Pendiente';
   const equipoVinc = l.ID_Equipo ? DATA.equipos.find(e => e.ID_Activo === l.ID_Equipo) : null;
   // Material común: lo hereda de la ficha; el 🤝 de la línea lo cambia solo aquí.
-  const esComun = p.Tipo !== 'Servicio' && lineaEsComun(l);
+  const esServicio = l.Tipo_Linea === 'Servicio';
+  const esComun = lineaEsComun(l); // false en servicio/equipo
   return `<div class="linea-row">
     <div class="linea-nombre">${l.Material}${(l.Conceptos_Factura || []).length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así figura en la factura">🧾 En la hoja, como en la factura: ${l.Conceptos_Factura.map(c => _escAttr(c.concepto) + (c.cantidad != null ? ` ×${c.cantidad}` : '')).join(' · ')}</div>` : ''}${equipoVinc ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🔧 ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}</div>
     <div class="linea-meta">
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
       <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
       <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
-      ${l.Sin_Inventario && p.Tipo !== 'Servicio' ? `<span class="badge badge-gray" style="font-size:10px" title="Se registra como recibido, pero no entra en el inventario">🚫 Sin inventario</span>` : ''}
+      ${esServicio ? `<span class="badge badge-blue" style="font-size:10px" title="Servicio o equipo: no entra en el inventario de fungibles">🔧 Servicio/equipo</span>` : ''}
+      ${l.Sin_Inventario && !esServicio ? `<span class="badge badge-gray" style="font-size:10px" title="Se registra como recibido, pero no entra en el inventario">🚫 Sin inventario</span>` : ''}
       ${esComun ? `<span class="badge badge-purple" style="font-size:10px" title="Va a la partida &quot;${CICLO_MATERIAL_COMUN}&quot; y, en Trebello, a su propia hoja">🤝 Común</span>` : ''}
     </div>
     <div class="linea-actions">
-      ${puedeEditar && p.Tipo !== 'Servicio' ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
+      ${puedeEditar && !esServicio ? `<button class="icon-btn" title="${esComun ? 'Quitar de material común (solo esta línea)' : 'Marcar como material común (solo esta línea)'}" onclick="toggleLineaComun('${l.ID_Linea}','${pedidoId}')" style="${esComun ? '' : 'opacity:.45'}">🤝</button>` : ''}
       ${puedeEditar ? `<button class="icon-btn" title="Cómo se nombra en la hoja de pedido (otra forma de expresarlo, referencias…)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')" style="${(l.Conceptos_Factura || []).length ? '' : 'opacity:.45'}">🧾</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
       ${puedeEditar && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
@@ -823,7 +825,7 @@ function verDetallePedido(pedidoId) {
       <div class="card-header">
         <div><div class="card-title">${p.Nombre_Lista}</div><div style="font-size:12px;color:var(--text-muted);margin-top:2px">${p.ID_Pedido}</div></div>
         <div style="display:flex;gap:8px;align-items:center">
-          ${p.Tipo === 'Servicio' ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio/equipo</span>` : ''}
+          ${DATA.lineasPedido.some(l => l.Pedido === p.ID_Pedido && l.Tipo_Linea === 'Servicio') ? `<span class="badge badge-blue" style="font-size:10px" title="Lleva algún servicio o equipo">🔧 Servicio/equipo</span>` : ''}
           <span class="estado-pedido ${estadoPedidoClass(p.Estado)}">${p.Estado}</span>
           ${puedeEditar && !['Recepción parcial','Recepción completa','Archivado'].includes(p.Estado) ? `<button class="btn btn-secondary" onclick="openModalEstadoPedido('${p.ID_Pedido}')">🔄 Estado</button>` : ''}
           ${puedeHacer('eliminarItems') ? `<button class="icon-btn" title="Eliminar pedido" onclick="eliminarPedido('${p.ID_Pedido}')" style="color:var(--danger,#dc2626)">🗑️</button>` : ''}
@@ -924,7 +926,7 @@ function verDetallePedido(pedidoId) {
     </div>
     <div class="card">
       <div class="card-header">
-        <div class="card-title">${p.Tipo === 'Servicio' ? 'Servicios / equipos' : 'Líneas del pedido'} (${lineas.length})</div>
+        <div class="card-title">Líneas del pedido (${lineas.length})</div>
         <div style="display:flex;gap:8px">
           ${puedeEditar && lineasSolicitadas.length ? `<button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="abrirModalEmailPedido('${pedidoId}')">✉️ Email al proveedor</button>` : ''}
           ${puedeEditar && ['Presupuesto aprobado','Recepción parcial'].includes(p.Estado) && lineas.some(l => l.Estado_Linea !== 'Recibido') ? `<button class="btn btn-primary" style="font-size:12px;padding:4px 12px" onclick="openModalRecepcionMasiva('${pedidoId}')">📥 Recibir albarán</button>` : ''}
@@ -1001,15 +1003,6 @@ function clearEquipoLinea() {
   document.getElementById('linea-equipo-search').value = '';
   document.getElementById('linea-equipo-autocomplete').classList.remove('open');
   document.getElementById('linea-equipo-selected').style.display = 'none';
-}
-
-function setPedidoTipo(tipo) {
-  sv('ped-tipo', tipo);
-  document.getElementById('btn-ped-tipo-material').classList.toggle('active', tipo === 'Material');
-  document.getElementById('btn-ped-tipo-servicio').classList.toggle('active', tipo === 'Servicio');
-  document.getElementById('ped-nombre').placeholder = tipo === 'Servicio'
-    ? 'Ej: Revisión SAT mayo, Compra microscopio...'
-    : 'Ej: Consumibles mayo, Sigma junio...';
 }
 
 // Material fungible (lo de siempre: catálogo o no catalogado), material no
@@ -1091,42 +1084,47 @@ function openModalSolicitud() {
 
 function openModalNuevoPedido() {
   sv('ped-nombre',''); sv('ped-obs','');
-  setPedidoTipo('Material');
   const sel = document.getElementById('ped-proveedor');
   sel.innerHTML = '<option value="">Sin asignar todavía</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
   openModal('modal-nuevo-pedido');
 }
 
+// El tipo (material fungible / servicio-equipo) se elige en cada línea, no en
+// el pedido: un equipo y sus fungibles suelen venir juntos (2026-11-19).
 function openModalNuevaLinea(pedidoId) {
-  const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
-  const esServicio = pedido?.Tipo === 'Servicio';
   sv('linea-pedido-id', pedidoId);
-  sv('linea-pedido-tipo', pedido?.Tipo || 'Material');
+  // Se dejan limpias las dos secciones, por si se cambia de tipo a medias.
+  setLineaServicioTipo('existente');
+  sv('linea-servicio-desc', '');
+  clearEquipoLinea();
+  sv('linea-nuevo-eq-id', ''); sv('linea-nuevo-eq-tipo', '');
+  sv('linea-nuevo-eq-marca', ''); sv('linea-nuevo-eq-modelo', '');
+  setSourceLinea('catalogo');
+  document.getElementById('linea-material-id').value = '';
+  document.getElementById('linea-material-selected').style.display = 'none';
+  document.getElementById('linea-search').value = '';
+  sv('linea-material-libre',''); sv('linea-material-unidades','');
+  document.getElementById('linea-catalogo-unidad-group').style.display = 'none';
+  document.getElementById('linea-catalogo-unidad').innerHTML = '';
+  sv('linea-cantidad', '');
+  document.getElementById('linea-sin-inventario').checked = false;
+  sv('linea-precio', '');
+  sv('linea-obs','');
+  setTipoLinea('Material');
+  openModal('modal-nueva-linea');
+}
+
+function setTipoLinea(tipo) {
+  const esServicio = tipo === 'Servicio';
+  sv('linea-pedido-tipo', esServicio ? 'Servicio' : 'Material');
+  document.getElementById('btn-ltipo-material').classList.toggle('active', !esServicio);
+  document.getElementById('btn-ltipo-servicio').classList.toggle('active', esServicio);
   const titulo = document.querySelector('#modal-nueva-linea .modal-title');
   if (titulo) titulo.textContent = esServicio ? 'Añadir servicio / equipo' : 'Añadir línea al pedido';
   document.getElementById('linea-material-section').style.display = esServicio ? 'none' : '';
   document.getElementById('linea-servicio-section').style.display = esServicio ? '' : 'none';
-  if (esServicio) {
-    setLineaServicioTipo('existente');
-    sv('linea-servicio-desc', '');
-    clearEquipoLinea();
-    sv('linea-nuevo-eq-id', ''); sv('linea-nuevo-eq-tipo', '');
-    sv('linea-nuevo-eq-marca', ''); sv('linea-nuevo-eq-modelo', '');
-  } else {
-    setSourceLinea('catalogo');
-    document.getElementById('linea-material-id').value = '';
-    document.getElementById('linea-material-selected').style.display = 'none';
-    document.getElementById('linea-search').value = '';
-    sv('linea-material-libre',''); sv('linea-material-unidades','');
-    document.getElementById('linea-catalogo-unidad-group').style.display = 'none';
-    document.getElementById('linea-catalogo-unidad').innerHTML = '';
-  }
-  sv('linea-cantidad', esServicio ? '1' : '');
-  document.getElementById('linea-sin-inventario').checked = false;
   document.getElementById('linea-sin-inv-group').style.display = esServicio ? 'none' : '';
-  sv('linea-precio', '');
-  sv('linea-obs','');
-  openModal('modal-nueva-linea');
+  if (esServicio && !v('linea-cantidad')) sv('linea-cantidad', '1');
 }
 
 function openModalEstadoPedido(pedidoId) {
@@ -1178,7 +1176,8 @@ function openModalRecepcionMasiva(pedidoId) {
         const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
         const unidad = _unidadLineaPedido(l);
         const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-        const ubicCell = mat
+        const esServ = l.Tipo_Linea === 'Servicio';
+        const ubicCell = esServ ? `<span style="color:var(--text-muted);font-size:12px">🔧 servicio/equipo</span>` : mat
           ? `<select id="recmas-ubic-${l.ID_Linea}" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:12px">${_opcionesUbicacionRecepcion(mat.ID_Material, unidad)}</select>`
           : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
         return `<tr style="border-bottom:1px solid var(--border)">
@@ -1188,7 +1187,7 @@ function openModalRecepcionMasiva(pedidoId) {
           <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
           <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
           <td style="padding:8px 6px">${ubicCell}</td>
-          <td style="padding:8px 6px;text-align:center"><input type="checkbox" id="recmas-sininv-${l.ID_Linea}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${l.ID_Linea}')"></td>
+          <td style="padding:8px 6px;text-align:center">${esServ ? '' : `<input type="checkbox" id="recmas-sininv-${l.ID_Linea}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${l.ID_Linea}')">`}</td>
           <td style="padding:8px 6px"><input type="text" id="recmas-obs-${l.ID_Linea}" placeholder="opcional" style="width:130px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
         </tr>`;
       }).join('')}
@@ -1226,8 +1225,7 @@ function _opcionesUbicacionRecepcion(matId, unidad) {
 
 function openModalRecepcion(lineaId, pedidoId) {
   sv('rec-linea-id', lineaId); sv('rec-pedido-id', pedidoId); sv('rec-obs', ''); sv('rec-cantidad', '');
-  const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  const esServicio = pedido?.Tipo === 'Servicio';
+  const esServicio = DATA.lineasPedido.find(x => x.ID_Linea === lineaId)?.Tipo_Linea === 'Servicio';
   document.getElementById('rec-label-material').textContent = esServicio ? 'Servicio' : 'Material';
   document.getElementById('rec-grupo-cantidad-pedida').style.display = esServicio ? 'none' : '';
   document.getElementById('rec-grupo-cantidad').style.display = esServicio ? 'none' : '';

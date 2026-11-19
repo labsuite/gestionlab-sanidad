@@ -485,3 +485,22 @@ false) → `Sin_Inventario` en `_lineaPedidoSbToObj`.
   La ubicación se oculta.
 - En el detalle del pedido la línea lleva la etiqueta gris «🚫 Sin inventario». En pedidos de
   tipo Servicio no aparece nada de esto (ya no tocan stock).
+
+## El tipo (material / servicio-equipo) es de cada línea, no del pedido (2026-11-19)
+
+Un equipo y sus fungibles llegan a menudo en el mismo pedido, así que el selector
+«Material fungible | Servicio / Equipo» pasó de «Nueva lista de pedido» a **«Añadir línea al
+pedido»** (`setTipoLinea` en `js/pedidos-render.js`). Columna nueva
+`lineas_pedido.tipo_linea` (`'Material'` | `'Servicio'`, por defecto `'Material'`; en la app
+`Tipo_Linea`). Las líneas existentes heredaron `pedidos.tipo`, que **queda sin uso** (se sigue
+rellenando con `'Material'` por defecto, nadie lo lee).
+
+Lo que antes miraba el tipo del pedido ahora mira el de la línea:
+- recibir: una línea de servicio/equipo se «confirma realizada» y no toca stock (cliente y
+  `completarRecepcion` en `gestionar-linea-pedido`); en «Recibir albarán» no lleva ubicación ni
+  casilla de inventario;
+- material común (`lineaEsComun` en `js/config.js` y en `enviar-a-trebello`): una línea de
+  servicio/equipo nunca lo es;
+- archivar un pedido tramitado avisa solo de las líneas de **material** sin recibir;
+- una solicitud de tipo «Servicio» crea una línea de servicio.
+El pedido muestra «🔧 Servicio/equipo» si alguna de sus líneas lo es, y cada línea lleva su propia insignia.

@@ -217,11 +217,10 @@ async function confirmarStockAPedido(pedidoId, matNombre, cantidad) {
 async function guardarNuevoPedido() {
   const nombre = v('ped-nombre');
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
-  const tipo = v('ped-tipo') || 'Material';
   showLoading('Creando lista...');
   try {
     const { pedido: pedidoCreado } = await callEdgeFunction('gestionar-pedido', {
-      accion: 'crear', nombre_lista: nombre, proveedor: v('ped-proveedor'), observaciones: v('ped-obs'), tipo,
+      accion: 'crear', nombre_lista: nombre, proveedor: v('ped-proveedor'), observaciones: v('ped-obs'),
     });
     DATA.pedidos.push(_pedidoSbToObj(pedidoCreado));
     const id = pedidoCreado.id_pedido;
@@ -248,7 +247,7 @@ async function guardarNuevoPedido() {
 async function guardarLineaPedido() {
   const pedidoId = v('linea-pedido-id');
   const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
-  const esServicio = pedido?.Tipo === 'Servicio';
+  const esServicio = v('linea-pedido-tipo') === 'Servicio';
   let materialNombre = '', equipoId = '', nuevoEquipoDatos = null, unidadLinea = '';
 
   if (esServicio) {
@@ -310,6 +309,7 @@ async function guardarLineaPedido() {
       accion: 'crear', pedido: pedidoId, material: materialNombre, cantidad_pedida: cant,
       observaciones: obs, precio_unitario: precio, id_equipo: equipoId, unidad: unidadLinea,
       sin_inventario: !esServicio && document.getElementById('linea-sin-inventario').checked,
+      tipo_linea: esServicio ? 'Servicio' : 'Material',
     });
     DATA.lineasPedido.push(_lineaPedidoSbToObj(linea));
     closeModal('modal-nueva-linea');
@@ -401,9 +401,8 @@ async function guardarRecepcionLinea() {
   if (idx === -1) return;
   const l = DATA.lineasPedido[idx];
   const cantPed = parseFloat(l.Cantidad_Pedida) || 0;
-  // Servicios: confirmar realizado sin actualizar stock
-  const pedido = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
-  if (pedido?.Tipo === 'Servicio') {
+  // Servicios/equipos: confirmar realizado sin actualizar stock
+  if (l.Tipo_Linea === 'Servicio') {
     const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
     await _completarRecepcionLinea(lineaId, pedidoId, cantPed - yaRec, v('rec-obs'));
     return;
@@ -734,8 +733,8 @@ async function toggleDocPedido(pedidoId, campo, valor) {
 async function _darPedidoPorTerminado(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p || p.Estado === 'Archivado') { verDetallePedido(pedidoId); return; }
-  const sinRecibir = p.Tipo === 'Servicio' ? [] :
-    DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
+  // Solo cuenta el material: un servicio/equipo sin "realizado" no pierde stock.
+  const sinRecibir = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Tipo_Linea !== 'Servicio' && l.Estado_Linea !== 'Recibido');
   if (sinRecibir.length && !confirm(
     `El pedido queda tramitado y se va a archivar.\n\n` +
     `Ojo: hay ${sinRecibir.length} línea(s) sin recibir. Archivado ya no se puede registrar ` +
@@ -998,8 +997,7 @@ function openModalEditarLinea(lineaId, pedidoId) {
   sv('edlinea-cantidad', l.Cantidad_Pedida || '');
   sv('edlinea-precio', l.Precio_Unitario || '');
   sv('edlinea-obs', l.Observaciones || '');
-  const pEd = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  document.getElementById('edlinea-sin-inv-group').style.display = pEd?.Tipo === 'Servicio' ? 'none' : '';
+  document.getElementById('edlinea-sin-inv-group').style.display = l.Tipo_Linea === 'Servicio' ? 'none' : '';
   document.getElementById('edlinea-sin-inventario').checked = !!l.Sin_Inventario;
 
   // Unidad pedida: combo (input + datalist) siempre visible, mismo criterio que

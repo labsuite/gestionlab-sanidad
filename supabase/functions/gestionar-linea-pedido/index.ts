@@ -138,7 +138,7 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   if (error) return { error: jsonError(`No se pudo guardar la recepción: ${error.message}`, 400) };
 
   // Servicios y líneas fuera del inventario: no hay stock que tocar.
-  if (pedido.tipo !== "Servicio" && !fueraInventario && cantRec > 0 && mat) {
+  if (linea.tipo_linea !== "Servicio" && !fueraInventario && cantRec > 0 && mat) {
     await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
@@ -173,6 +173,8 @@ Deno.serve(async (req) => {
     // Fuera del inventario de fungibles: lo marca quien añade la línea, o lo
     // trae la solicitud si es de material no fungible o de un servicio.
     let sinInventario = body.sin_inventario === true;
+    // El tipo es de cada línea (2026-11-19): 'Material' o 'Servicio' (servicio o equipo).
+    let tipoLinea = body.tipo_linea === "Servicio" ? "Servicio" : "Material";
     if (idSolicitud) {
       const { data: sol } = await supabaseAdmin.from("solicitudes").select("*").eq("id_solicitud", idSolicitud).maybeSingle();
       if (!sol) return jsonError(`No se encontró la solicitud "${idSolicitud}"`, 404);
@@ -180,6 +182,7 @@ Deno.serve(async (req) => {
       cantidadPedida = Number(sol.cantidad_solicitada);
       observaciones = `Desde solicitud ${idSolicitud}`;
       if (sol.tipo && sol.tipo !== "Material") sinInventario = true;
+      if (sol.tipo === "Servicio") tipoLinea = "Servicio";
     } else {
       material = String(body.material || "").trim();
       cantidadPedida = Number(body.cantidad_pedida);
@@ -208,6 +211,7 @@ Deno.serve(async (req) => {
       unidad: strField(body.unidad),
       presupuesto_pendiente: presupuestoPendiente,
       sin_inventario: sinInventario,
+      tipo_linea: tipoLinea,
     };
     const { data, error } = await supabaseAdmin.from("lineas_pedido").insert(datos).select().single();
     if (error) return jsonError(`No se pudo añadir la línea: ${error.message}`, 400);

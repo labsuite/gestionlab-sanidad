@@ -366,6 +366,8 @@ function _lineaPedidoSbToObj(l) {
     // true = se recibe pero no entra en el inventario (piezas de otra cosa,
     // material no fungible, servicios…): no suma stock ni pide ficha.
     Sin_Inventario: l.sin_inventario === true,
+    // 'Material' | 'Servicio' (servicio o equipo): es de la línea, no del pedido.
+    Tipo_Linea: l.tipo_linea === 'Servicio' ? 'Servicio' : 'Material',
   };
 }
 
