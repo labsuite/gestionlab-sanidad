@@ -254,21 +254,11 @@ async function guardarLineaPedido() {
 
   if (esServicio) {
     if (tipoLinea === 'Equipo') {
-      const newEqId   = v('linea-nuevo-eq-id').trim();
+      // Solo se describe: la ficha (ID, nº de serie, ubicación) se da de alta al
+      // recibirlo. «Tipo · Marca · Modelo» para poder precargar ese alta.
       const newEqTipo = v('linea-nuevo-eq-tipo').trim();
-      const newEqMarca  = v('linea-nuevo-eq-marca').trim();
-      const newEqModelo = v('linea-nuevo-eq-modelo').trim();
-      if (!newEqId || !newEqTipo) { showToast('El ID y el tipo de equipo son obligatorios', 'error'); return; }
-      if (DATA.equipos.find(e => e.ID_Activo === newEqId)) { showToast('Ya existe un equipo con ese ID', 'error'); return; }
-      materialNombre = [newEqTipo, newEqMarca, newEqModelo].filter(Boolean).join(' ');
-      equipoId = newEqId;
-      nuevoEquipoDatos = {
-        id_activo: newEqId, tipo_equipo: newEqTipo, marca: newEqMarca, modelo: newEqModelo,
-        proveedor_compra: pedido?.Proveedor || '',
-        estado_operativo: 'En pedido',
-        observaciones: 'Creado desde pedido ' + pedidoId,
-        coste: v('linea-precio') || '',
-      };
+      if (!newEqTipo) { showToast('Indica el tipo de equipo', 'error'); return; }
+      materialNombre = [newEqTipo, v('linea-nuevo-eq-marca').trim(), v('linea-nuevo-eq-modelo').trim()].filter(Boolean).join(' · ');
     } else {
       // Servicio: equipo existente + su intervención (elegida o nueva).
       equipoId = document.getElementById('linea-equipo-id').value;
@@ -420,6 +410,27 @@ async function guardarRecepcionLinea() {
   if (idx === -1) return;
   const l = DATA.lineasPedido[idx];
   const cantPed = parseFloat(l.Cantidad_Pedida) || 0;
+  // Equipo: alta de su ficha al recibirlo (una unidad cada vez) y recepción de 1.
+  const pedidoEq = DATA.pedidos.find(p => p.ID_Pedido === pedidoId);
+  if (l.Tipo_Linea === 'Equipo' && document.getElementById('rec-equipo-group').style.display !== 'none') {
+    const id = v('rec-eq-id').trim(), tipo = v('rec-eq-tipo').trim(), marca = v('rec-eq-marca').trim();
+    if (!id || !tipo || !marca) { showToast('El ID del activo, el tipo y la marca son obligatorios', 'error'); return; }
+    if (DATA.equipos.some(e => e.ID_Activo === id)) { showToast('Ya existe un equipo con ese ID', 'error'); return; }
+    showLoading('Dando de alta el equipo...');
+    try {
+      await callEdgeFunction('gestionar-equipo', {
+        accion: 'crear', id_activo: id, tipo_equipo: tipo, marca, modelo: v('rec-eq-modelo').trim(),
+        numero_serie: v('rec-eq-serie').trim(), ubicacion: v('rec-eq-ubicacion'),
+        proveedor_compra: pedidoEq?.Proveedor || '', fecha_adquisicion: new Date().toISOString().split('T')[0],
+        coste: l.Precio_Unitario || '', estado_operativo: 'Operativo',
+        observaciones: `Recibido en el pedido «${pedidoEq?.Nombre_Lista || pedidoId}»`,
+      });
+    } catch (e) { hideLoading(); showToast(e.message || 'No se pudo dar de alta el equipo', 'error'); return; }
+    hideLoading();
+    await _completarRecepcionLinea(lineaId, pedidoId, 1, v('rec-obs'), '', '', undefined, id);
+    showToast(`Equipo ${id} dado de alta y recibido`, 'success');
+    return;
+  }
   // Equipos/servicios: confirmar recibido/realizado sin actualizar stock
   if ((l.Tipo_Linea || 'Material') !== 'Material') {
     const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
@@ -456,10 +467,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario, idEquipo) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined, id_equipo: idEquipo || undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');

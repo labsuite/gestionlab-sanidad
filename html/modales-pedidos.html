@@ -157,14 +157,11 @@
           </div>
         </div>
       </div>
-      <!-- Sección equipo: compra de un equipo nuevo (se da de alta en Equipos, «En pedido») -->
+      <!-- Sección equipo: compra de un equipo. Solo se describe; la ficha en
+           Equipos (ID, nº de serie, ubicación) se da de alta AL RECIBIRLO. -->
       <div id="linea-equipo-section" style="display:none">
         <div class="form-grid" style="gap:14px;grid-template-columns:1fr 1fr">
-          <div class="form-group">
-            <label>ID del activo *</label>
-            <input id="linea-nuevo-eq-id" placeholder="Ej: MIC-05">
-          </div>
-          <div class="form-group">
+          <div class="form-group" style="grid-column:1/-1">
             <label>Tipo de equipo *</label>
             <input id="linea-nuevo-eq-tipo" placeholder="Ej: Microscopio">
           </div>
@@ -177,6 +174,7 @@
             <input id="linea-nuevo-eq-modelo" placeholder="">
           </div>
         </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px">La ficha del equipo (ID del activo, nº de serie, ubicación) se da de alta al recibirlo, con 📥 en la línea.</div>
       </div>
       <!-- Sección servicio: siempre sobre un equipo existente y unido a una
            intervención (la parte técnica); la línea es la parte económica. -->
@@ -340,6 +338,18 @@
         <div class="form-group" id="rec-ubicacion-group" style="display:none">
           <label>Ubicación de recepción</label>
           <select id="rec-ubicacion-sel"></select>
+        </div>
+        <!-- Línea de tipo Equipo: alta de su ficha al recibirlo (una unidad cada vez) -->
+        <div id="rec-equipo-group" style="display:none">
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Se da de alta la ficha del equipo en Equipos. Si llegan varios, regístralos de uno en uno.</div>
+          <div class="form-grid" style="gap:12px;grid-template-columns:1fr 1fr">
+            <div class="form-group"><label>ID del activo *</label><input id="rec-eq-id" placeholder="Ej: BAL-08"></div>
+            <div class="form-group"><label>Nº de serie</label><input id="rec-eq-serie"></div>
+            <div class="form-group"><label>Tipo de equipo *</label><input id="rec-eq-tipo"></div>
+            <div class="form-group"><label>Marca *</label><input id="rec-eq-marca"></div>
+            <div class="form-group"><label>Modelo</label><input id="rec-eq-modelo"></div>
+            <div class="form-group"><label>Ubicación</label><select id="rec-eq-ubicacion"></select></div>
+          </div>
         </div>
         <div class="form-group">
           <label>Observaciones</label>

@@ -304,3 +304,8 @@ de la factura) y el campo Coste del modal queda de solo lectura. Desde la ficha:
 «💶 Pedir a la casa comercial», o el enlace al pedido y su factura si ya está pedida. Detalle en
 `docs/modulo-pedidos.md`.
 
+Al planificar o registrar una actuación con **ejecución externa**, quien gestiona pedidos ve la
+casilla «💶 Pedírsela a la casa comercial» (`_prepararCasillaPedido` / `_ofrecerPedidoServicio`
+en `js/equipos-acciones.js`); marcada, al guardar se abre el modal de pedirla (salvo que ya esté
+en un pedido).
+

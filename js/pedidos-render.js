@@ -1169,7 +1169,7 @@ function openModalNuevaLinea(pedidoId) {
   // Se dejan limpias las dos secciones, por si se cambia de tipo a medias.
   sv('linea-servicio-desc', '');
   clearEquipoLinea();
-  sv('linea-nuevo-eq-id', ''); sv('linea-nuevo-eq-tipo', '');
+  sv('linea-nuevo-eq-tipo', '');
   sv('linea-nuevo-eq-marca', ''); sv('linea-nuevo-eq-modelo', '');
   setSourceLinea('catalogo');
   document.getElementById('linea-material-id').value = '';
@@ -1222,8 +1222,11 @@ function openModalEstadoPedido(pedidoId) {
 
 function openModalRecepcionMasiva(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  // Los servicios unidos a una intervención se dan por realizados al cerrarla.
-  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido' && !(l.Tipo_Linea === 'Servicio' && l.ID_Intervencion));
+  // Los servicios unidos a una intervención se dan por realizados al cerrarla, y
+  // un equipo sin ficha se recibe con 📥 en su línea (ahí se da de alta).
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido'
+    && !(l.Tipo_Linea === 'Servicio' && l.ID_Intervencion)
+    && !(l.Tipo_Linea === 'Equipo' && !DATA.equipos.some(e => e.ID_Activo === l.ID_Equipo)));
   sv('recmas-pedido-id', pedidoId);
   const tituloEl = document.querySelector('#modal-recepcion-masiva .modal-title');
   if (tituloEl) tituloEl.textContent = `Recibir albarán — ${p?.Nombre_Lista || pedidoId}`;
@@ -1334,6 +1337,26 @@ function openModalRecepcion(lineaId, pedidoId) {
         grupoUbic.style.display = '';
       }
     }
+  }
+  // Equipo: su ficha se da de alta ahora, al recibirlo (se ve el nº de serie).
+  // Si la línea ya tiene ficha (las de antes de 2026-11-19), solo se confirma.
+  const esEquipo = l?.Tipo_Linea === 'Equipo';
+  const fichaYa = esEquipo && l.ID_Equipo && DATA.equipos.some(e => e.ID_Activo === l.ID_Equipo);
+  document.getElementById('rec-equipo-group').style.display = esEquipo && !fichaYa ? '' : 'none';
+  if (esEquipo) {
+    document.getElementById('rec-label-material').textContent = 'Equipo';
+    document.getElementById('btn-confirmar-recepcion').textContent = fichaYa ? 'Confirmar recibido' : 'Dar de alta y confirmar recibido';
+    const pend = (parseFloat(l.Cantidad_Pedida) || 1) - (parseFloat(l.Cantidad_Recibida) || 0);
+    if (pend > 1) document.getElementById('rec-material-nombre').textContent = `${l.Material} · faltan ${pend}`;
+    if (fichaYa) document.getElementById('rec-material-nombre').textContent += ` · ficha ${l.ID_Equipo}`;
+    // «Tipo · Marca · Modelo» al añadir la línea; si no, todo el texto como tipo.
+    const partes = (l.Material || '').split(' · ');
+    sv('rec-eq-id', ''); sv('rec-eq-serie', '');
+    sv('rec-eq-tipo', partes[0] || ''); sv('rec-eq-marca', partes[1] || ''); sv('rec-eq-modelo', partes.slice(2).join(' · '));
+    document.getElementById('rec-eq-ubicacion').innerHTML = '<option value="">Sin ubicar todavía</option>' + DATA.ubicaciones
+      .filter(u => u.Activa !== 'FALSE')
+      .sort((a, b) => (a.ID_Ubicacion || '').localeCompare(b.ID_Ubicacion || ''))
+      .map(u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_escAttr(getNombreUbicacion(u.ID_Ubicacion))}</option>`).join('');
   }
   _toggleRecSinInventario();
   openModal('modal-recepcion-linea');

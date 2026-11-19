@@ -410,6 +410,7 @@ function _toggleEjecucionPlan(tipo) {
   const extGrp = document.getElementById('plan-externa-group');
   if (intGrp) intGrp.style.display = tipo === 'Interna' ? '' : 'none';
   if (extGrp) extGrp.style.display = tipo === 'Externa' ? '' : 'none';
+  _prepararCasillaPedido('plan');
 }
 
 // ============================================================
@@ -848,6 +849,7 @@ async function guardarPlanificacion(finalizar) {
       descripcion_actuacion: v('plan-descripcion'), estado: 'Planificada',
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    _ofrecerPedidoServicio(i.ID_Intervencion, 'plan');
 
     if (finalizar) {
       closeModal('modal-planificar-intervencion');
@@ -1097,6 +1099,7 @@ function toggleActEjecucion(tipo) {
   if (intGrp)   intGrp.style.display   = tipo === 'Interna' ? '' : 'none';
   if (extGrp)   extGrp.style.display   = tipo === 'Externa' ? '' : 'none';
   if (costeGrp) costeGrp.style.display = tipo === 'Externa' ? '' : 'none';
+  _prepararCasillaPedido('act');
   // "¿Dónde se hace?" solo tiene sentido con un SAT: quien se puede llevar el
   // equipo a su taller es el técnico externo. Una actuación interna es siempre
   // aquí, así que ni se pregunta — se fija "En el centro" y se oculta.
@@ -1252,6 +1255,7 @@ async function guardarActuacion(finalizar) {
     showLoading('Guardando...');
     try {
       await _guardarTareaIntervencion(intervencion.id_intervencion, desc, 'Pendiente', '', v('act-observaciones'));
+      _ofrecerPedidoServicio(intervencion.id_intervencion, 'act');
       // La tarea nace "Pendiente" y una actuación no se cierra con tareas sin
       // resultado: en vez de salir, el modal se reabre sobre la actuación recién
       // creada para marcar el resultado y, entonces sí, «🔒 Cerrar actuación».
@@ -1326,6 +1330,7 @@ async function guardarActuacion(finalizar) {
       ...(urlAdjunto ? { url_adjunto: urlAdjunto, nombre_adjunto: nombreAdjunto } : {}),
     });
     DATA.intervenciones[intIdx] = _intervencionSbToObj(intervencion);
+    _ofrecerPedidoServicio(i.ID_Intervencion, 'act');
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); hideLoading(); return; }
 
   // La tarea nueva es opcional para "Guardar sin cerrar": los datos de la visita
@@ -1885,4 +1890,25 @@ async function guardarAvisoAlumno() {
     updateBadges();
   } catch(e) { showToast('Error enviando el aviso', 'error'); console.error(e); }
   hideLoading();
+}
+
+// ── Intervención externa → pedido a la casa comercial (2026-11-19) ──────
+// En los modales de planificar y de actuación, al elegir ejecución externa sale
+// la casilla «💶 Pedírsela a la casa comercial» (solo a quien gestiona pedidos).
+// Marcada, al guardar se abre «Pedir a la casa comercial» (openModalPedirServicio
+// en pedidos-acciones.js), salvo que la intervención ya esté en un pedido.
+function _prepararCasillaPedido(prefijo) {
+  const wrap = document.getElementById(prefijo + '-pedir-casa-wrap');
+  if (!wrap) return;
+  wrap.style.display = puedeHacer('gestionarPedidos') ? 'flex' : 'none';
+}
+
+function _ofrecerPedidoServicio(idIntervencion, prefijo) {
+  const chk = document.getElementById(prefijo + '-pedir-casa');
+  if (!chk || !chk.checked) return;
+  chk.checked = false;
+  if (!puedeHacer('gestionarPedidos')) return;
+  if (DATA.lineasPedido.some(l => l.ID_Intervencion === idIntervencion)) return; // ya pedida
+  // Después de que el modal de origen se cierre o se reabra.
+  setTimeout(() => openModalPedirServicio(idIntervencion), 500);
 }

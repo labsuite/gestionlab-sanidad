@@ -494,8 +494,13 @@ Columna `lineas_pedido.tipo_linea` (`'Material'` | `'Equipo'` | `'Servicio'`, po
 `'Material'`; en la app `Tipo_Linea`). `pedidos.tipo` **queda sin uso**.
 
 - **Material** — fungible; entra en el inventario al recibirlo (salvo «sin inventario»).
-- **Equipo** — compra de un equipo: se da de alta su ficha en Equipos («En pedido»). Al
-  recibirlo se confirma sin tocar stock.
+- **Equipo** — compra de un equipo. Al añadir la línea solo se describe (texto
+  «Tipo · Marca · Modelo»); **la ficha en Equipos se da de alta al recibirlo** con 📥, cuando se
+  ve el número de serie: el modal de recepción pide ID del activo, nº de serie, tipo, marca
+  (obligatoria en `gestionar-equipo`), modelo y ubicación, y pone proveedor, fecha de adquisición
+  y coste desde el pedido. Una unidad por recepción; la línea guarda en `id_equipo` la última
+  ficha creada (`completarRecepcion(..., idEquipo)`). Sin ficha no sale en «Recibir albarán».
+  Las líneas de antes que ya tenían ficha («En pedido») solo se confirman.
 - **Servicio** — **la parte económica de una intervención** (la parte técnica), siempre
   sobre un equipo existente: `lineas_pedido.id_intervencion`. Al añadirlo se elige el equipo y
   una de sus intervenciones (también cerradas: la factura suele llegar después) o se crea una
