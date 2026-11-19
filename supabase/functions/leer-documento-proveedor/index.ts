@@ -59,12 +59,24 @@ function arrayBufferABase64(buffer: ArrayBuffer): string {
 // Ahora se reintenta, pero siempre dentro de este margen, para contestar
 // antes de que Supabase mate el worker.
 const PRESUPUESTO_MS = 140_000;
-const TIMEOUT_INTENTO_MS = 90_000;
-const ESPERAS_REINTENTO = [0, 3000, 8000];
+
+// Cadena de modelos (2026-11-19): ese día TODOS los "flash" (3.5, 3.6, 3.7,
+// 3.8, flash-latest) se quedaban colgados a la vez, mientras que
+// gemini-flash-lite-latest contestaba en ~7 s y gemini-3.5-flash-lite en ~35 s.
+// Si el principal falla se pasa al siguiente. Los "pro" no valen: devuelven
+// 429 de cuota con el plan de esta clave. Listado de modelos vigentes: GET
+// /v1beta/models?key=... (gemini-2.5-flash ya da 404 a claves nuevas).
+const INTENTOS_GEMINI = [
+  { modelo: GEMINI_MODELO, timeoutMs: 65_000 },
+  { modelo: "gemini-flash-lite-latest", timeoutMs: 45_000, esperaMs: 1000 },
+  { modelo: "gemini-3.5-flash-lite", timeoutMs: 45_000, esperaMs: 1000 },
+];
 
 class GeminiSaturado extends Error {}
 
-async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown, limite: number) {
+// Devuelve el JSON y el modelo que contestó (se guarda en el resultado para
+// saber si una factura la leyó el modelo de respaldo).
+async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown, limite: number): Promise<{ json: any; modelo: string }> {
   const cuerpo = JSON.stringify({
     contents: [{ role: "user", parts }],
     generationConfig: {
@@ -73,16 +85,21 @@ async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown
     },
   });
   let ultimoError = "";
-  for (const espera of ESPERAS_REINTENTO) {
-    if (espera) await new Promise((r) => setTimeout(r, espera));
+  let errorNoSaturacion = "";
+  // Se da la vuelta a la cadena hasta 3 veces (con pausa entre vueltas) mientras
+  // quede presupuesto: un 503 llega en segundos, y con los tres modelos
+  // saturados a la vez (visto 2026-11-19) una sola vuelta se rendía a los 14 s.
+  const ronda = (n: number) => INTENTOS_GEMINI.map((x, i) => ({ ...x, esperaMs: i === 0 && n > 0 ? 5000 * n : x.esperaMs }));
+  for (const { modelo, timeoutMs, esperaMs } of [...ronda(0), ...ronda(1), ...ronda(2)]) {
+    if (esperaMs) await new Promise((r) => setTimeout(r, esperaMs));
     const restante = limite - Date.now() - 2000;
     if (restante < 10_000) break; // no da tiempo a otro intento útil
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(TIMEOUT_INTENTO_MS, restante));
+    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, restante));
     let respuesta: Response;
     try {
       respuesta = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal, body: cuerpo },
       );
     } catch (e) {
@@ -99,20 +116,27 @@ async function llamarGemini(geminiKey: string, parts: unknown[], schema: unknown
       continue;
     }
     if (!respuesta.ok) {
+      // Otro error (p.ej. 404 si Google retira un modelo de la cadena): se
+      // prueba el siguiente; si era el último, se informa tal cual.
       const detalle = await respuesta.text().catch(() => "");
-      throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+      ultimoError = `${modelo} devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`;
+      errorNoSaturacion = ultimoError;
+      continue;
     }
     try {
       const data = await respuesta.json();
       const texto = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!texto) throw new Error("Gemini no devolvió contenido interpretable");
-      return JSON.parse(texto);
+      return { json: JSON.parse(texto), modelo };
     } catch (e) {
       // 200 pero vacío o cortado (pasa bajo carga): reintentar suele salir bien.
       ultimoError = e instanceof Error ? e.message : String(e);
       continue;
     }
   }
+  // Si todos fallaron solo por sobrecarga/timeout, es saturación; si alguno
+  // dio otro error y ninguno contestó, se informa ese error (puede ser config).
+  if (errorNoSaturacion && ultimoError === errorNoSaturacion) throw new Error(ultimoError);
   throw new GeminiSaturado(ultimoError || "Gemini no disponible");
 }
 
@@ -328,13 +352,16 @@ Deno.serve(async (req) => {
     numero_factura?: string;
     fecha_factura?: string;
   };
+  let modeloExtraccion = GEMINI_MODELO;
   try {
-    extraido = await llamarGemini(
+    const r = await llamarGemini(
       geminiKey,
       [{ text: PROMPT_EXTRACCION }, { inline_data: { mime_type: mimeType, data: base64 } }],
       ESQUEMA_EXTRACCION,
       limite,
     );
+    extraido = r.json;
+    modeloExtraccion = r.modelo;
   } catch (e) {
     if (e instanceof GeminiSaturado) {
       return jsonError(`La IA de Google (Gemini) está saturada ahora mismo y no ha terminado de leer la factura — no es problema del documento. Vuelve a pulsar 🤖 dentro de unos minutos. (${e.message})`, 503);
@@ -357,7 +384,7 @@ Deno.serve(async (req) => {
   let sinMatch = items;
   if (items.length && (lineas || []).length) {
     try {
-      const asignaciones = await llamarGemini(
+      const { json: asignaciones } = await llamarGemini(
         geminiKey,
         [{ text: construirPromptMatching(items, lineas || []) }],
         ESQUEMA_MATCHING,
@@ -383,6 +410,9 @@ Deno.serve(async (req) => {
     numero_factura: extraido.numero_factura || null,
     fecha_factura: fechaFacturaValida ? extraido.fecha_factura : null,
     generado_en: new Date().toISOString(),
+    // Qué modelo leyó la factura: si no es el principal, fue el de respaldo
+    // (más ligero) por saturación — conviene revisar con más cuidado.
+    modelo_ia: modeloExtraccion,
   };
 
   const { error: updateErr } = await supabaseAdmin

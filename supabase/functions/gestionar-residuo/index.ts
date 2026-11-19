@@ -20,15 +20,32 @@ const GEMINI_MODELO = "gemini-3.6-flash";
 
 // La clave nunca sale de este servidor — el chat del consultorio de residuos
 // (js/residuos.js) manda aquí el historial y solo recibe el texto de vuelta.
-// Tiempos por uso. Chat: la persona está esperando la respuesta con el modal
-// abierto y prefiere esperar a ver un error. Comprobación al añadir: está de pie
-// junto al contenedor y, si la IA no contesta, ya hay alternativa (se registra
-// con la validación determinista o se pregunta al profesorado).
-// Subidos el 2026-11-19: con Gemini lento ese día, 2 intentos de 16 s fallaban
-// siempre ("no respondió a tiempo" y luego 503).
-type TiemposGemini = { presupuestoMs: number; timeoutIntentoMs: number; esperas: number[] };
-const TIEMPOS_CHAT: TiemposGemini = { presupuestoMs: 60_000, timeoutIntentoMs: 35_000, esperas: [0, 2000, 5000] };
-const TIEMPOS_COMPROBACION: TiemposGemini = { presupuestoMs: 35_000, timeoutIntentoMs: 25_000, esperas: [0, 2000] };
+// Cadena de modelos por uso. Si el principal se cuelga o está saturado, se
+// pasa al siguiente, siempre dentro del presupuesto total.
+// · Chat: la persona espera con el modal abierto. Respaldo con modelos "lite"
+//   (2026-11-19: todos los "flash" se colgaban a la vez y
+//   gemini-flash-lite-latest contestaba en ~7 s; los "pro" dan 429 de cuota).
+// · Comprobación al añadir a un contenedor: SOLO el modelo principal. Decide si
+//   algo se puede tirar ahí y, si la IA no contesta, ya hay alternativa segura
+//   (validación determinista o preguntar al profesorado); no se deja ese
+//   veredicto a un modelo más ligero.
+type IntentoGemini = { modelo: string; timeoutMs: number; esperaMs?: number };
+type TiemposGemini = { presupuestoMs: number; intentos: IntentoGemini[] };
+const TIEMPOS_CHAT: TiemposGemini = {
+  presupuestoMs: 60_000,
+  intentos: [
+    { modelo: GEMINI_MODELO, timeoutMs: 20_000 },
+    { modelo: "gemini-flash-lite-latest", timeoutMs: 20_000, esperaMs: 500 },
+    { modelo: "gemini-3.5-flash-lite", timeoutMs: 20_000, esperaMs: 500 },
+  ],
+};
+const TIEMPOS_COMPROBACION: TiemposGemini = {
+  presupuestoMs: 35_000,
+  intentos: [
+    { modelo: GEMINI_MODELO, timeoutMs: 25_000 },
+    { modelo: GEMINI_MODELO, timeoutMs: 25_000, esperaMs: 2000 },
+  ],
+};
 
 async function llamarGeminiChat(history: unknown, tiempos: TiemposGemini = TIEMPOS_CHAT): Promise<string> {
   const limite = Date.now() + tiempos.presupuestoMs;
@@ -43,24 +60,20 @@ async function llamarGeminiChat(history: unknown, tiempos: TiemposGemini = TIEMP
     generationConfig: { maxOutputTokens: 2048, temperature: 0.2, thinkingConfig: { thinkingLevel: "low" } },
   });
 
-  // El modelo flash sufre picos de 503 "high demand" que Google describe como
-  // temporales: reintentar un par de veces con espera corta rescata la mayoría.
   // Timeout explícito por intento: si Gemini no responde, el worker de Supabase
   // acaba matando todo el isolate con WORKER_RESOURCE_LIMIT (un 546 sin cuerpo
   // útil) en vez de dejar que este throw lo capture el llamador.
-  // Número de intentos y esperas según el uso (TIEMPOS_CHAT / TIEMPOS_COMPROBACION),
-  // siempre dentro de su presupuesto total para no dejar a nadie esperando sin fin.
   let ultimoError = "";
-  for (const espera of tiempos.esperas) {
-    if (espera) await new Promise((r) => setTimeout(r, espera));
+  for (const { modelo, timeoutMs, esperaMs } of tiempos.intentos) {
+    if (esperaMs) await new Promise((r) => setTimeout(r, esperaMs));
     const restante = limite - Date.now();
     if (restante < 5000) break; // no da tiempo a otro intento útil
     const ctrl = new AbortController();
-    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(tiempos.timeoutIntentoMs, restante));
+    const timeoutId = setTimeout(() => ctrl.abort(), Math.min(timeoutMs, restante));
     let respuesta: Response;
     try {
       respuesta = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODELO}:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${geminiKey}`,
         { method: "POST", headers: { "Content-Type": "application/json" }, signal: ctrl.signal, body: cuerpo },
       );
     } catch (e) {
@@ -77,8 +90,10 @@ async function llamarGeminiChat(history: unknown, tiempos: TiemposGemini = TIEMP
       continue;
     }
     if (!respuesta.ok) {
+      // p.ej. 404 si Google retira un modelo de la cadena: probar el siguiente.
       const detalle = await respuesta.text().catch(() => "");
-      throw new Error(`Gemini devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`);
+      ultimoError = `${modelo} devolvió un error (${respuesta.status}): ${detalle.slice(0, 300)}`;
+      continue;
     }
     try {
       return extraerTextoGemini(await respuesta.json());

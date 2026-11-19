@@ -518,8 +518,15 @@ Modelo usado: `gemini-3.6-flash` (constante `GEMINI_MODELO` en el Edge Function,
 con `GET /v1beta/models?key=...` antes de cambiar el nombre a ciegas — Google puede retirar modelos
 con el tiempo. Ojo: `gemini-3.6-flash` devuelve **503 "high demand"** con cierta frecuencia (visto
 el 2026-09-02, con el modelo perfectamente vigente); no confundir esos picos temporales con un
-modelo retirado. `llamarGeminiChat` ya reintenta hasta 3 veces ante 503/429/500 y aborta cada
-intento a los 22 s para no morir con `WORKER_RESOURCE_LIMIT`.
+modelo retirado. **Cadena de modelos de respaldo (2026-11-19):** ese día todos los "flash" (3.5–3.8,
+`gemini-flash-latest`) se colgaban a la vez y solo contestaban los "lite". Por eso el chat de
+residuos (`TIEMPOS_CHAT`) y el lector de facturas (`INTENTOS_GEMINI`, que da hasta 3 vueltas)
+prueban `gemini-3.6-flash` → `gemini-flash-lite-latest` → `gemini-3.5-flash-lite`, siempre dentro
+de un presupuesto de tiempo (60 s chat, 140 s factura) para no morir con `WORKER_RESOURCE_LIMIT`.
+La factura guarda en `datos_extraidos.modelo_ia` qué modelo la leyó y la revisión avisa si fue un
+"lite". La **comprobación al añadir a un contenedor** usa solo el principal, a propósito: no se
+deja ese veredicto a un modelo más ligero. Los "pro" dan 429 (cuota del plan) y `gemini-2.5-flash`
+da 404 a esta clave.
 
 No enviar datos personales de usuarios a Gemini. Sin historial persistente (se borra al cerrar el modal).
 

@@ -705,7 +705,11 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     🧾 Factura detectada y guardada en el pedido: ${r.numero_factura ? `<strong>${r.numero_factura}</strong>` : '(sin número)'}${r.fecha_factura ? ` · ${formatDate(r.fecha_factura)}` : ''}
   </div>` : '';
 
-  cont.innerHTML = tabla + sinMatch + cargoExtra + datosFactura;
+  // Si el modelo principal estaba saturado, la leyó el de respaldo (más ligero).
+  const avisoRespaldo = /lite/i.test(r.modelo_ia || '')
+    ? `<div style="margin-bottom:10px;padding:8px 12px;border-radius:var(--radius-sm);background:#fef3c7;color:#92400e;font-size:12px">⚠ La IA principal estaba saturada y esta factura la ha leído el modelo de respaldo (${_escAttr(r.modelo_ia)}), más ligero. Revisa los precios con un poco más de cuidado, o vuelve a leerla 🔄 más tarde.</div>`
+    : '';
+  cont.innerHTML = avisoRespaldo + tabla + sinMatch + cargoExtra + datosFactura;
   _sumaSinMatchHoja();
   openModal('modal-revision-extraccion');
 }
