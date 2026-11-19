@@ -633,50 +633,56 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   const cont = document.getElementById('revision-extraccion-contenido');
   if (!r) { cont.innerHTML = `<div class="empty-state" style="padding:24px">Todavía no se ha leído este documento.</div>`; openModal('modal-revision-extraccion'); return; }
 
-  const filasMatch = (r.matches || []).map(m => {
-    const it = m.item_detectado || {};
+  // Una fila por artículo de la FACTURA, en su mismo orden, para ir bajando a
+  // la vez por el PDF (izquierda) y por aquí. Cada fila dice a qué línea del
+  // pedido la asignó la IA; las que no tienen línea se tratan más abajo.
+  const usados = new Set();
+  const matchDe = (it) => (r.matches || []).find((m, i) => {
+    if (usados.has(i) || m.item_detectado?.material !== it.material) return false;
+    usados.add(i); return true;
+  });
+  const items = (r.items || []).length ? r.items : (r.matches || []).map(m => m.item_detectado || {});
+  const filasMatch = items.map((itemFactura, n) => {
+    const m = matchDe(itemFactura);
+    const it = m?.item_detectado || itemFactura;
     const unidad = it.unidad ? ' ' + it.unidad : '';
+    const precioFactura = it.precio_envase_original ?? it.precio_unitario;
+    const factura = `<div style="font-weight:500">${_escAttr(itemFactura.material || '')}</div>
+      <div class="revext-fila-factura">${itemFactura.cantidad ?? '—'}${unidad} × ${precioFactura != null ? Number(precioFactura).toFixed(2) + ' €' : '—'}</div>`;
+    if (!m) {
+      return `<tr style="border-bottom:1px solid var(--border);background:var(--danger-light,#fdf0f0)">
+        <td style="padding:6px 8px;color:var(--text-muted)">${n + 1}</td>
+        <td style="padding:6px 8px">${factura}</td>
+        <td style="padding:6px 8px;color:var(--danger,#b91c1c);font-size:12px" colspan="2">Sin línea en el pedido — ver abajo</td>
+      </tr>`;
+    }
     const tienePrecio = it.precio_unitario != null;
     // Sin semáforo rojo/verde: no hay forma de saber desde la factura si esta
-    // línea se cuenta por unidad suelta o por envase (eso es un criterio tuyo,
-    // no algo deducible del documento) — solo se muestra el envase tal cual lo
-    // dice la factura, sin comparar ni juzgar si "coincide" con lo pedido.
-    const envase = it.unidades_por_envase != null ? `<div style="font-size:11px;color:var(--text-muted)">envase de ${it.unidades_por_envase}${unidad}</div>` : '';
-    const cantidadDetectada = it.cantidad != null ? `${it.cantidad}${unidad}${envase}` : '—';
-    // El precio que factura el proveedor es por SU unidad de venta (el
-    // envase) — el servidor (ajustarPrecioPorEnvase, leer-documento-proveedor)
-    // ya comparó Cantidad_Pedida contra la cantidad de envases facturados
-    // para saber si hacía falta dividir entre el tamaño del envase (caso
-    // real: "Pinzas estériles, pack 10 uds" a 10,50 €/pack, Cantidad_Pedida
-    // = 10 unidades sueltas → precio ya ajustado aquí a 1,05 €/ud). Cuando sí
-    // pudo deducirlo se muestra de dónde sale ese número; cuando no pudo
-    // (p.ej. líneas nuevas sin cantidad_pedida todavía) se deja el precio de
-    // envase tal cual, con un aviso neutro para que se revise a mano.
+    // línea se cuenta por unidad suelta o por envase (eso es un criterio tuyo).
+    // Si el servidor dividió el precio del envase entre sus unidades
+    // (ajustarPrecioPorEnvase en leer-documento-proveedor) se explica aquí.
     const precioPorUnidad = it.precio_envase_original != null
-      ? `<div style="font-size:11px;color:var(--success,#16a34a)">✓ ${it.precio_envase_original.toFixed(2)} €/envase de ${it.unidades_por_envase} ÷ ${it.unidades_por_envase} = ${it.precio_unitario.toFixed(2)} €/ud (pedido en unidad suelta)</div>`
+      ? `<div style="font-size:11px;color:var(--success,#16a34a)">${it.precio_envase_original.toFixed(2)} € ÷ ${it.unidades_por_envase} = ${it.precio_unitario.toFixed(2)} €/ud</div>`
       : (tienePrecio && it.unidades_por_envase > 1)
         ? `<div style="font-size:11px;color:var(--text-muted)">= ${(it.precio_unitario / it.unidades_por_envase).toFixed(2)} €/ud si se pidió suelta</div>` : '';
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:6px 8px;text-align:center"><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
-      <td style="padding:6px 8px">${m.material_linea}${_celdaConceptoFactura(m)}</td>
-      <td style="padding:6px 8px;text-align:center">${m.cantidad_pedida ?? '—'}</td>
-      <td style="padding:6px 8px;text-align:center">${m.cantidad_recibida || '0'}</td>
-      <td style="padding:6px 8px;text-align:center">${cantidadDetectada}</td>
-      <td style="padding:6px 8px;text-align:right"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right">${precioPorUnidad}</td>
+      <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
+      <td style="padding:6px 8px;vertical-align:top">${factura}</td>
+      <td style="padding:6px 8px;vertical-align:top">→ ${_escAttr(m.material_linea)}
+        <div class="revext-fila-factura">pedido ${m.cantidad_pedida ?? '—'} · recibido ${m.cantidad_recibida || 0}</div>${_celdaConceptoFactura(m)}</td>
+      <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right">${precioPorUnidad}</td>
     </tr>`;
   }).join('');
 
-  const tabla = (r.matches || []).length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px">
+  const tabla = items.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px">
     <thead><tr style="border-bottom:2px solid var(--border)">
       <th style="padding:6px 8px"></th>
+      <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">En la factura</th>
       <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Línea del pedido</th>
-      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
-      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
-      <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Detectado</th>
-      <th style="text-align:right;padding:6px 8px;color:var(--text-muted);font-weight:600">Precio (€)</th>
+      <th style="text-align:right;padding:6px 8px;color:var(--text-muted);font-weight:600">€/ud sin IVA</th>
     </tr></thead>
     <tbody>${filasMatch}</tbody>
-  </table></div>` : `<div class="empty-state" style="padding:16px">No se detectó ninguna línea que coincida con las líneas de este pedido.</div>`;
+  </table>` : `<div class="empty-state" style="padding:16px">No se detectó ningún artículo en el documento.</div>`;
 
   const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const puedeAnadirDesdeFactura = pedido?.Tipo !== 'Servicio'; // el caso "reactivo sorpresa" es de material, no de servicio/equipo
@@ -712,6 +718,29 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   cont.innerHTML = avisoRespaldo + tabla + sinMatch + cargoExtra + datosFactura;
   _sumaSinMatchHoja();
   openModal('modal-revision-extraccion');
+  _cargarVisorFactura(doc);
+}
+
+// Lado izquierdo de la revisión: la propia factura. PDF en <iframe> (visor del
+// navegador), imagen en <img>. En móvil el visor se oculta por CSS y queda un
+// botón para abrirla aparte.
+async function _cargarVisorFactura(doc) {
+  const visor = document.getElementById('revext-visor');
+  const abrir = document.getElementById('revext-abrir-movil');
+  if (!visor) return;
+  visor.innerHTML = '<div class="empty-state" style="padding:24px">Cargando la factura…</div>';
+  abrir.innerHTML = '';
+  if (!doc?.Path) { visor.innerHTML = '<div class="empty-state" style="padding:24px">No se encuentra el archivo de la factura.</div>'; return; }
+  try {
+    const url = await urlDocumento(doc.Path);
+    const esImagen = /\.(png|jpe?g|webp|gif)$/i.test(doc.Nombre_Archivo || doc.Path);
+    visor.innerHTML = esImagen
+      ? `<img src="${_escAttr(url)}" alt="Factura">`
+      : `<iframe src="${_escAttr(url)}#view=FitH" title="Factura"></iframe>`;
+    abrir.innerHTML = `<button class="btn btn-secondary" style="width:100%" onclick="window.open('${_escAttr(url)}','_blank')">📄 Ver la factura</button>`;
+  } catch (e) {
+    visor.innerHTML = `<div class="empty-state" style="padding:24px">No se pudo cargar la factura: ${_escAttr(e.message || '')}</div>`;
+  }
 }
 
 // Excepción puntual y deliberada a "no se pueden añadir líneas tras

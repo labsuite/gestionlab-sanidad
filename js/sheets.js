@@ -68,17 +68,23 @@ async function subirDocumento(tipo, id, fileData, fileName, fileType) {
   return path;
 }
 
+// URL temporal (firmada) de un documento de Storage, para abrirlo o incrustarlo
+// (p.ej. la factura en la pantalla partida de la revisión con IA).
+async function urlDocumento(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const { data: { session } } = await _sbMigracion.auth.getSession();
+  const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/obtener-documento?path=${encodeURIComponent(path)}`, {
+    headers: { 'Authorization': `Bearer ${session?.access_token || SUPABASE_MIGRACION_ANON}` },
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
+  return data.url;
+}
+
 async function abrirDocumento(path) {
   if (!path) return;
-  if (/^https?:\/\//i.test(path)) { window.open(path, '_blank'); return; }
   try {
-    const { data: { session } } = await _sbMigracion.auth.getSession();
-    const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/obtener-documento?path=${encodeURIComponent(path)}`, {
-      headers: { 'Authorization': `Bearer ${session?.access_token || SUPABASE_MIGRACION_ANON}` },
-    });
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
-    window.open(data.url, '_blank');
+    window.open(await urlDocumento(path), '_blank');
   } catch(e) { showToast(e.message || 'No se pudo abrir el documento', 'error'); }
 }
 
