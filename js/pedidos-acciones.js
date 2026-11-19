@@ -540,14 +540,19 @@ function openModalHojaFactura(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
   const imp = _importeLineas(DATA.lineasPedido.filter(l => l.Pedido === pedidoId));
-  // Si todavía no hay nada y una factura leída trae artículos sin línea, se precargan.
+  // Si todavía no hay nada y hay una factura leída con IA, se precargan TODOS
+  // los artículos que leyó (no solo los sin línea: la hoja tiene que salir
+  // como la factura entera). El cargo extra (portes…) no: la hoja ya lo añade
+  // aparte desde Gasto extra.
   let conceptos = p.Hoja_Factura || [];
   let precargado = '';
   if (!conceptos.length) {
-    const doc = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId && (d.Datos_Extraidos?.sin_match || []).length).pop();
+    const doc = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId && (d.Datos_Extraidos?.items || []).length).pop();
     if (doc) {
-      conceptos = doc.Datos_Extraidos.sin_match.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
-      precargado = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Precargado con lo leído en ${_escAttr(doc.Nombre_Archivo || 'la factura')} — revísalo y pulsa Guardar.</div>`;
+      conceptos = doc.Datos_Extraidos.items.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
+      precargado = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Precargado con los ${conceptos.length} artículos leídos en ${_escAttr(doc.Nombre_Archivo || 'la factura')} — revísalo y pulsa Guardar.</div>`;
+    } else if (DATA.documentosProveedor.some(d => d.Pedido === pedidoId)) {
+      precargado = `<div style="margin-top:6px;font-size:12px;color:var(--warning,#b45309)">La factura subida aún no se ha leído con IA. Cancela, pulsa 🤖 en la factura (Documentación del proveedor) y vuelve aquí: los artículos saldrán ya rellenos.</div>`;
     }
   }
   _abrirEditorConceptos('pedido', pedidoId, '', '🧾 Hoja como la factura',
