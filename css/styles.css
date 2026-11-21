@@ -1083,7 +1083,7 @@
     .ubi-grupo-rows.open { display: block; }
     .ubi-table-header {
       display: grid;
-      grid-template-columns: 140px 1fr 1fr 80px 80px auto;
+      grid-template-columns: 140px 1fr 1fr 80px 80px 120px;
       gap: 8px;
       padding: 6px 20px;
       background: var(--surface2);
@@ -1096,7 +1096,7 @@
     }
     .ubi-row {
       display: grid;
-      grid-template-columns: 140px 1fr 1fr 80px 80px auto;
+      grid-template-columns: 140px 1fr 1fr 80px 80px 120px;
       gap: 8px; align-items: center;
       padding: 10px 20px;
       border-bottom: 1px solid var(--border);
