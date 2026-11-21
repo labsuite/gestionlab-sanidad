@@ -45,6 +45,48 @@ function renderProveedores() {
 const _ubiAbiertos = new Set();
 let _ubiFiltro = '';
 let _ubiResaltar = ''; // ubicación recién guardada: se enseña y se marca un momento
+// Sitios con la lista de lo que contienen desplegada (por ID). Se ve ahí mismo,
+// sin saltar a Inventario: cambiar de pantalla hacía perder el hilo.
+const _ubiItemsAbiertos = new Set();
+
+function toggleUbiItems(idUbicacion) {
+  const abierto = !_ubiItemsAbiertos.has(idUbicacion);
+  abierto ? _ubiItemsAbiertos.add(idUbicacion) : _ubiItemsAbiertos.delete(idUbicacion);
+  const panel = document.getElementById('ubi-items-' + idUbicacion);
+  if (panel) panel.style.display = abierto ? '' : 'none';
+  const badge = document.getElementById('ubi-itbtn-' + idUbicacion);
+  if (badge) badge.classList.toggle('abierto', abierto);
+}
+
+/** Lo que hay en un sitio: botes de material (con su stock) y equipos. */
+function _ubiContenido(idUbicacion) {
+  const lotes = (DATA.materialUbicaciones || []).filter(l => l.ID_Ubicacion === idUbicacion);
+  const mats = lotes.map(l => {
+    const m = DATA.material.find(x => x.ID_Material === l.ID_Material);
+    return { nombre: m?.Nombre || l.ID_Material, stock: parseFloat(l.Stock_Local) || 0,
+             unidad: l.Unidad_Lote || m?.Unidad || '', alicuota: !!l.ID_Lote_Padre, idMat: l.ID_Material };
+  });
+  // Material "legacy": sin botes, con la ubicación en su ficha.
+  DATA.material.filter(m => m.Ubicacion === idUbicacion && !getMatUbics(m.ID_Material).length)
+    .forEach(m => mats.push({ nombre: m.Nombre, stock: parseFloat(m.Stock_Actual) || 0, unidad: m.Unidad || '', alicuota: false, idMat: m.ID_Material }));
+  mats.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const equipos = DATA.equipos.filter(e => e.Ubicacion === idUbicacion)
+    .sort((a, b) => (a.ID_Activo || '').localeCompare(b.ID_Activo || '', 'es', { numeric: true }));
+  return { mats, equipos };
+}
+
+function _ubiPanelItems(idUbicacion, abierto) {
+  const { mats, equipos } = _ubiContenido(idUbicacion);
+  const filasMat = mats.map(x => `<div class="ubi-item">
+      <span class="ubi-item-nombre">🧪 ${_escAttr(x.nombre)}${x.alicuota ? ' <span class="ubi-item-tag">alícuota</span>' : ''}</span>
+      <span class="ubi-item-stock${x.stock <= 0 ? ' agotado' : ''}">${x.stock} ${_escAttr(x.unidad)}</span>
+    </div>`).join('');
+  const filasEq = equipos.map(e => `<div class="ubi-item">
+      <span class="ubi-item-nombre">🖥️ ${_escAttr([e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' '))}</span>
+      <span class="ubi-item-stock">${_escAttr(e.ID_Activo)}</span>
+    </div>`).join('');
+  return `<div class="ubi-items" id="ubi-items-${_escAttr(idUbicacion)}" style="${abierto ? '' : 'display:none'}">${filasMat}${filasEq}</div>`;
+}
 
 function _ubiNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 
@@ -70,8 +112,16 @@ function renderUbicaciones() {
   DATA.material.forEach(m => anotar(m.Ubicacion, m.ID_Material));
 
   const palabras = _ubiNorm(_ubiFiltro).trim().split(/\s+/).filter(Boolean);
-  const coincide = u => !palabras.length || palabras.every(p => _ubiNorm(
+  // También busca por lo que hay dentro ("etanol" → dónde hay etanol).
+  const nombresDentro = {};
+  if (palabras.length) DATA.ubicaciones.forEach(u => {
+    const { mats, equipos } = _ubiContenido(u.ID_Ubicacion);
+    nombresDentro[u.ID_Ubicacion] = _ubiNorm([...mats.map(m => m.nombre), ...equipos.map(e => [e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo].join(' '))].join(' | '));
+  });
+  const coincideSitio = u => palabras.every(p => _ubiNorm(
     [u.ID_Ubicacion, u.Laboratorio_Aula, 'lab ' + (u.Laboratorio_Aula || ''), u.Zona, u.Subzona, u.Descripcion_Completa].join(' ')).includes(p));
+  const coincideDentro = u => palabras.length && palabras.every(p => (nombresDentro[u.ID_Ubicacion] || '').includes(p));
+  const coincide = u => !palabras.length || coincideSitio(u) || coincideDentro(u);
 
   // El recién guardado: su laboratorio se abre (si había filtro y no coincide, se quita).
   if (_ubiResaltar) {
@@ -102,7 +152,13 @@ function renderUbicaciones() {
     const abierto = palabras.length > 0 || _ubiAbiertos.has(lab);
     const rows = items.map(u => {
       const nMat = (matPorUbic[u.ID_Ubicacion] || new Set()).size;
-      const matCell = nMat ? `<span class="badge badge-blue" style="cursor:pointer" onclick="verMaterialUbicacion('${u.ID_Ubicacion}')">${nMat} ítem(s)</span>` : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
+      const nEq = DATA.equipos.filter(e => e.Ubicacion === u.ID_Ubicacion).length;
+      // Si se encontró por lo que tiene dentro, la lista sale ya abierta.
+      const itemsAbiertos = _ubiItemsAbiertos.has(u.ID_Ubicacion) || (!coincideSitio(u) && coincideDentro(u));
+      const idJs = u.ID_Ubicacion.replace(/'/g, "\\'");
+      const matCell = (nMat || nEq)
+        ? `<button type="button" class="ubi-itbtn${itemsAbiertos ? ' abierto' : ''}" id="ubi-itbtn-${_escAttr(u.ID_Ubicacion)}" onclick="toggleUbiItems('${idJs}')" title="Ver qué hay aquí">${[nMat ? `${nMat} ítem${nMat === 1 ? '' : 's'}` : '', nEq ? `${nEq} equipo${nEq === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')} <span class="ubi-itbtn-flecha">▾</span></button>`
+        : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
       const sub = u.Subzona || '';
       const desc = u.Descripcion_Completa && u.Descripcion_Completa !== sub ? u.Descripcion_Completa : '';
       return `<div class="ubi-row${u.ID_Ubicacion === _ubiResaltar ? ' ubi-row-resaltada' : ''}" id="ubi-row-${_escAttr(u.ID_Ubicacion)}">
@@ -117,7 +173,7 @@ function renderUbicaciones() {
           ${puedeEditar && u.Activa === 'FALSE' ? `<button class="icon-btn" onclick="cambiarEstadoUbicacion(${DATA.ubicaciones.indexOf(u)}, true)" title="Reactivar">♻️</button>` : ''}
           ${puedeEditar ? `<button class="icon-btn danger" onclick="borrarUbicacion(${DATA.ubicaciones.indexOf(u)})" title="Eliminar">🗑️</button>` : ''}
         </div>
-      </div>`;
+      </div>${(nMat || nEq) ? _ubiPanelItems(u.ID_Ubicacion, itemsAbiertos) : ''}`;
     }).join('');
     return `<div class="ubi-grupo">
       <div class="ubi-grupo-header" onclick="toggleUbiGrupo('${grupoId}')" data-lab="${_escAttr(lab)}">
