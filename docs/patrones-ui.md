@@ -104,3 +104,8 @@ nombre en `_ubiAbiertos`, así que siguen abiertos tras guardar (antes `renderAl
 cerraba todos); la fila recién guardada se centra en pantalla y se marca un momento
 (`_ubiResaltar`). El recuento de material cuenta los botes (`material_ubicaciones`), no solo
 `material.ubicacion`.
+Lo que hay en cada sitio (botes con su stock y equipos) se despliega **en la misma fila**
+pulsando «N ítems ▾» (`toggleUbiItems` / `_ubiPanelItems`), sin saltar a Inventario —
+cambiar de pantalla hacía perder el hilo. Los desplegados se recuerdan en `_ubiItemsAbiertos`.
+El buscador también encuentra por lo que hay dentro ("etanol" → sitios con etanol, ya
+desplegados).
