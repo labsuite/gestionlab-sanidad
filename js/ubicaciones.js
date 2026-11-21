@@ -89,7 +89,7 @@ function renderUbicaciones() {
 
   const resumen = document.getElementById('ubi-buscar-resumen');
   const total = Object.values(grupos).reduce((t, g) => t + g.length, 0);
-  if (resumen) resumen.textContent = palabras.length ? `${total} ubicación${total === 1 ? '' : 'es'}` : '';
+  if (resumen) resumen.textContent = palabras.length ? `${total} ${total === 1 ? 'ubicación' : 'ubicaciones'}` : '';
   if (!total) {
     cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔎</div><div class="empty-state-title">Ninguna ubicación coincide con «${_escAttr(_ubiFiltro)}»</div></div>`;
     return;
