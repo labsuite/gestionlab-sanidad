@@ -394,11 +394,14 @@ async function guardarRecepcionMasiva() {
       : Math.max(0, (parseFloat(l.Cantidad_Pedida) || 1) - yaRec);
     if (cantidad <= 0) { showToast(`Indica cuánto llega de «${l.Material}» o desmárcalo`, 'error'); return; }
     const sinInv = !!document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked;
-    const ubicInput = document.getElementById('recmas-ubic-' + l.ID_Linea);
-    const idUbic = sinInv ? '' : (ubicInput?.value || '');
-    if (ubicInput && !sinInv && !idUbic) { showToast(`Elige dónde se guarda «${l.Material}»`, 'error'); return; }
+    let repartos = [];
+    if (!sinInv && document.getElementById('rep-recmas-' + l.ID_Linea)) {
+      const r = repartoLeer('recmas-' + l.ID_Linea);
+      if (r.error) { showToast(`«${l.Material}»: ${r.error}`, 'error'); return; }
+      repartos = r.repartos;
+    }
     aRecibir.push({
-      id_linea: l.ID_Linea, cantidad, sin_inventario: sinInv, id_ubicacion: idUbic,
+      id_linea: l.ID_Linea, cantidad, sin_inventario: sinInv, repartos,
       observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '',
     });
   }
@@ -453,9 +456,15 @@ async function guardarRecepcionLinea() {
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
   const sinInventario = document.getElementById('rec-sin-inventario').checked;
-  const conUbicacion = !sinInventario && document.getElementById('rec-ubicacion-group')?.style.display !== 'none';
-  const idUbicacion = conUbicacion ? v('rec-ubicacion-sel') : '';
-  if (conUbicacion && cantRec > 0 && !idUbicacion) { showToast('Elige dónde se guarda', 'error'); return; }
+  const conUbicacion = !sinInventario && !!document.getElementById('rep-rec') && document.getElementById('rec-ubicacion-group')?.style.display !== 'none';
+  let repartos = [];
+  if (conUbicacion && cantRec > 0) {
+    const r = repartoLeer('rec');
+    if (r.error) { showToast(r.error, 'error'); return; }
+    repartos = r.repartos;
+  }
+  // Para el alta de material sin ficha (más abajo) basta con un sitio: aún no tiene picker.
+  const idUbicacion = repartos.length === 1 ? repartos[0].id_ubicacion : '';
   const mat = _materialDeLinea(l);
   // Fuera del inventario: no hace falta darle ficha en el catálogo.
   if (!mat && cantRec > 0 && !sinInventario) {
@@ -475,7 +484,7 @@ async function guardarRecepcionLinea() {
     showToast('Este material no está catalogado. Completa su ficha para continuar.', 'error');
     return;
   }
-  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion, undefined, sinInventario);
+  await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion, undefined, sinInventario, undefined, repartos);
 }
 
 // ── Orquestador principal de recepción ───────────────────────
@@ -483,10 +492,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario, idEquipo) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario, idEquipo, repartos) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined, id_equipo: idEquipo || undefined });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined, id_equipo: idEquipo || undefined, repartos: repartos?.length > 1 ? repartos : undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');

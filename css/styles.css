@@ -1842,3 +1842,14 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
   .recmas-item-detalle { padding-left: 12px; }
   .ubp-hueco { flex-wrap: wrap; }
 }
+
+/* ── Reparto entre varios sitios (js/ubic-picker.js) ─────────────────── */
+.rep-fila.rep-varios { border: 1px dashed var(--border); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 8px; background: var(--surface); }
+.rep-fila-cab { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; font-size: 12px; color: var(--text-soft); flex-wrap: wrap; }
+.rep-fila-num { font-weight: 600; color: var(--text); }
+.rep-fila-cab input[type=number] { width: 70px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; text-align: center; }
+.rep-resto { color: var(--accent); }
+.rep-resto.rep-error { color: var(--danger); font-weight: 600; }
+.rep-quitar { margin-left: auto; border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 14px; }
+.rep-quitar:hover { color: var(--danger); }
+.rep-mas { font-size: 12px !important; padding: 4px 10px !important; margin-top: 6px; }

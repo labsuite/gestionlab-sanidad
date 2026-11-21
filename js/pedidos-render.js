@@ -1255,7 +1255,7 @@ function openModalRecepcionMasiva(pedidoId) {
     if (!esServ && mat) {
       const lotes = getMatUbics(mat.ID_Material);
       const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
-      ubic = `<div id="recmas-ubicwrap-${id}" style="margin-top:4px"><div class="recmas-fila" style="margin-bottom:4px"><label>📍 ¿Dónde se guarda?</label></div>${ubicPickerHTML('recmas-ubic-' + id, { matId: mat.ID_Material, unidad, valor: ini })}</div>`;
+      ubic = `<div id="recmas-ubicwrap-${id}" style="margin-top:4px"><div class="recmas-fila" style="margin-bottom:4px"><label>📍 ¿Dónde se guarda?</label></div>${repartoHTML('recmas-' + id, { totalId: 'recmas-cant-' + id, matId: mat.ID_Material, unidad, valor: ini })}</div>`;
     } else if (!esServ) {
       ubic = `<div style="font-size:11px;color:var(--text-muted)">No está en el catálogo: al confirmar podrás darle ficha desde su línea (📥).</div>`;
     }
@@ -1270,7 +1270,7 @@ function openModalRecepcionMasiva(pedidoId) {
       </div>
       <div class="recmas-item-detalle">
         <div class="recmas-fila">
-          ${esServ ? '' : `<label>Llegan en este albarán <input type="number" id="recmas-cant-${id}" min="0" step="0.01" value="${pendiente}"> ${_escAttr(unidad || '')}</label>`}
+          ${esServ ? '' : `<label>Llegan en este albarán <input type="number" id="recmas-cant-${id}" min="0" step="0.01" value="${pendiente}" oninput="repartoActualizar('recmas-${id}')"> ${_escAttr(unidad || '')}</label>`}
           ${esServ ? '' : `<label title="Se registra como recibido pero no entra en el inventario"><input type="checkbox" id="recmas-sininv-${id}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${id}')"> 🚫 Sin inventario</label>`}
           <label>Obs. <input type="text" id="recmas-obs-${id}" placeholder="opcional"></label>
         </div>
@@ -1339,7 +1339,7 @@ function openModalRecepcion(lineaId, pedidoId) {
       if (mat) {
         const lotes = getMatUbics(mat.ID_Material);
         const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
-        pickUbic.innerHTML = ubicPickerHTML('rec-ubicacion-sel', { matId: mat.ID_Material, unidad, valor: ini });
+        pickUbic.innerHTML = repartoHTML('rec', { totalId: 'rec-cantidad', matId: mat.ID_Material, unidad, valor: ini });
         grupoUbic.style.display = '';
       }
     }
@@ -1371,7 +1371,7 @@ function openModalRecepcion(lineaId, pedidoId) {
 function _toggleRecSinInventario() {
   const sinInv = document.getElementById('rec-sin-inventario').checked;
   const grupoUbic = document.getElementById('rec-ubicacion-group');
-  if (document.getElementById('rec-ubicacion-sel')) grupoUbic.style.display = sinInv ? 'none' : '';
+  if (document.getElementById('rep-rec')) grupoUbic.style.display = sinInv ? 'none' : '';
 }
 
 function _toggleRecmasSinInventario(lineaId) {

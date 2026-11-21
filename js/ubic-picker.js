@@ -200,3 +200,103 @@ function _ubpElegir(id, idUbicacion) {
   _ubpPintar(id);
   if (st.onchange && typeof window[st.onchange] === 'function') window[st.onchange](id, idUbicacion);
 }
+
+// ============================================================
+// REPARTO ENTRE VARIOS SITIOS (2026-11-21)
+// ============================================================
+// Lo que llega a veces se reparte: 4 garrafas al 205 y 2 al 207, a un sitio
+// donde ya había botes y a otro donde no había nada (ahí se crea el bote al
+// guardar). La cantidad total la pone quien recibe en su propio input
+// (totalId); el primer sitio se lleva "el resto" y en los demás se escribe
+// cuánto va. Con un solo sitio no hay nada que repartir y no se ve ninguna
+// cantidad extra.
+//
+// repartoHTML(pref, { totalId, matId, unidad, valor }) → HTML
+// repartoLeer(pref) → { repartos: [{id_ubicacion, cantidad}] } o { error }
+// repartoActualizar(pref) → llamarlo en el oninput del total.
+
+const _reparto = {}; // pref → { totalId, matId, unidad, filas: [n…], next }
+
+function repartoHTML(pref, opts = {}) {
+  _reparto[pref] = { totalId: opts.totalId, matId: opts.matId || '', unidad: opts.unidad || '', filas: [0], next: 1 };
+  return `<div class="rep" id="rep-${pref}">
+    <div id="rep-${pref}-filas">${_repFila(pref, 0, opts.valor || '')}</div>
+    <button type="button" class="btn btn-secondary rep-mas" onclick="repartoAnadir('${pref}')">➕ Repartir en otro sitio</button>
+  </div>`;
+}
+
+function _repFila(pref, n, valor) {
+  const st = _reparto[pref];
+  return `<div class="rep-fila" id="rep-${pref}-${n}">
+    <div class="rep-fila-cab" id="rep-${pref}-${n}-cab" style="display:none">
+      <span class="rep-fila-num">Sitio ${n === 0 ? 1 : st.filas.indexOf(n) + 1}</span>
+      ${n === 0
+        ? `<span class="rep-resto" id="rep-${pref}-${n}-resto"></span>`
+        : `<label>Van aquí <input type="number" id="rep-${pref}-${n}-cant" min="0" step="0.01" value="" oninput="repartoActualizar('${pref}')"> ${_ubpTxt(st.unidad)}</label>
+           <button type="button" class="rep-quitar" title="Quitar este sitio" onclick="repartoQuitar('${pref}', ${n})">✕</button>`}
+    </div>
+    ${ubicPickerHTML(`rep-${pref}-${n}-ubic`, { matId: st.matId, unidad: st.unidad, valor })}
+  </div>`;
+}
+
+function repartoAnadir(pref) {
+  const st = _reparto[pref];
+  const n = st.next++;
+  st.filas.push(n);
+  document.getElementById(`rep-${pref}-filas`).insertAdjacentHTML('beforeend', _repFila(pref, n, ''));
+  repartoActualizar(pref);
+  document.getElementById(`rep-${pref}-${n}-cant`)?.focus();
+}
+
+function repartoQuitar(pref, n) {
+  const st = _reparto[pref];
+  st.filas = st.filas.filter(x => x !== n);
+  document.getElementById(`rep-${pref}-${n}`)?.remove();
+  delete _ubicPicker[`rep-${pref}-${n}-ubic`];
+  repartoActualizar(pref);
+}
+
+function _repTotal(st) { return parseFloat(document.getElementById(st.totalId)?.value) || 0; }
+
+function _repCantidades(pref) {
+  const st = _reparto[pref];
+  const otros = st.filas.slice(1).map(n => parseFloat(document.getElementById(`rep-${pref}-${n}-cant`)?.value) || 0);
+  const resto = Math.round((_repTotal(st) - otros.reduce((a, b) => a + b, 0)) * 1000) / 1000;
+  return [resto, ...otros];
+}
+
+function repartoActualizar(pref) {
+  const st = _reparto[pref];
+  if (!st) return;
+  const varios = st.filas.length > 1;
+  st.filas.forEach((n, i) => {
+    const cab = document.getElementById(`rep-${pref}-${n}-cab`);
+    if (cab) cab.style.display = varios ? '' : 'none';
+    const num = cab?.querySelector('.rep-fila-num');
+    if (num) num.textContent = `Sitio ${i + 1}`;
+    document.getElementById(`rep-${pref}-${n}`)?.classList.toggle('rep-varios', varios);
+  });
+  if (!varios) return;
+  const resto = _repCantidades(pref)[0];
+  const el = document.getElementById(`rep-${pref}-${st.filas[0]}-resto`);
+  if (el) {
+    el.textContent = resto < 0 ? `te pasas en ${-resto} ${st.unidad}` : `van aquí ${resto} ${st.unidad} (el resto)`;
+    el.classList.toggle('rep-error', resto < 0);
+  }
+}
+
+function repartoLeer(pref) {
+  const st = _reparto[pref];
+  if (!st) return { repartos: [] };
+  const cants = _repCantidades(pref);
+  if (cants[0] < 0) return { error: 'Lo repartido suma más de lo que llega' };
+  const repartos = [];
+  for (let i = 0; i < st.filas.length; i++) {
+    const c = cants[i];
+    if (c <= 0) continue;
+    const ubic = _ubpValor(`rep-${pref}-${st.filas[i]}-ubic`);
+    if (!ubic) return { error: st.filas.length > 1 ? `Elige el sitio ${i + 1}` : 'Elige dónde se guarda' };
+    repartos.push({ id_ubicacion: ubic, cantidad: c });
+  }
+  return { repartos };
+}

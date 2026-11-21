@@ -72,7 +72,23 @@ async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: nu
     id_movimiento: genId("MOV"), material: mat.nombre, id_material: mat.id_material,
     tipo: "Entrada", cantidad: cantRec,
     usuario, motivo: `Recepción pedido ${pedidoId}`,
+    observaciones: idUbicacion ? `→ ${idUbicacion}` : null,
   });
+}
+
+// Reparto de lo recibido entre varios sitios (2026-11-21): [{id_ubicacion, cantidad}].
+// Cada sitio suma a su bote o crea uno si ahí no había (actualizarStockMaterial).
+// Los repartos con la misma ubicación se juntan; los de cantidad 0 se ignoran.
+function leerRepartos(v: unknown): { id_ubicacion: string; cantidad: number }[] {
+  if (!Array.isArray(v)) return [];
+  const porUbic = new Map<string, number>();
+  for (const r of v as Record<string, unknown>[]) {
+    const id = String(r?.id_ubicacion || "").trim();
+    const c = Number(r?.cantidad);
+    if (!id || !Number.isFinite(c) || c <= 0) continue;
+    porUbic.set(id, (porUbic.get(id) || 0) + c);
+  }
+  return [...porUbic].map(([id_ubicacion, cantidad]) => ({ id_ubicacion, cantidad }));
 }
 
 // `idMaterial` llega cuando el material se acaba de catalogar desde la propia
@@ -84,7 +100,7 @@ async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: nu
 // en la línea; undefined = se respeta lo que ya tuviera la línea.
 // `idEquipo`: en una línea de tipo Equipo, la ficha que se acaba de dar de alta al
 // recibirlo (el alta se hace al recibir, cuando se ve el número de serie).
-async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null, sinInventario?: boolean, idEquipo: string | null = null, albaran: string | null = null) {
+async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null, sinInventario?: boolean, idEquipo: string | null = null, albaran: string | null = null, repartos: { id_ubicacion: string; cantidad: number }[] = []) {
   const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
   if (!linea) return { error: jsonError(`No se encontró la línea "${idLinea}"`, 404) };
   const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", linea.pedido).maybeSingle();
@@ -126,7 +142,11 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
 
   // Servicios y líneas fuera del inventario: no hay stock que tocar.
   if (linea.tipo_linea === "Material" && !fueraInventario && cantRec > 0 && mat) {
-    await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
+    if (repartos.length) {
+      for (const r of repartos) await actualizarStockMaterial(supabaseAdmin, mat, r.cantidad, linea.pedido, usuario, linea.unidad || null, r.id_ubicacion);
+    } else {
+      await actualizarStockMaterial(supabaseAdmin, mat, cantRec, linea.pedido, usuario, linea.unidad || null, idUbicacion);
+    }
   }
   await actualizarEstadoPedidoPostRecepcion(supabaseAdmin, linea.pedido);
   if (estadoLinea === "Recibido") await actualizarSolicitudOrigen(supabaseAdmin, lineaActualizada, linea.pedido);
@@ -419,10 +439,12 @@ Deno.serve(async (req) => {
 
   if (accion === "recepcion") {
     const idLinea = String(body.id_linea || "").trim();
-    const cantRec = Number(body.cantidad);
+    const repartos = leerRepartos(body.repartos);
+    // Con reparto, lo recibido es la suma de lo que va a cada sitio.
+    const cantRec = repartos.length ? repartos.reduce((t, r) => t + r.cantidad, 0) : Number(body.cantidad);
     if (!idLinea) return jsonError("id_linea es obligatorio", 400);
     if (!cantRec || cantRec <= 0) return jsonError("Indica una cantidad válida", 400);
-    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion), strField(body.id_material), _bool(body.sin_inventario), strField(body.id_equipo));
+    const resultado = await completarRecepcion(supabaseAdmin, idLinea, cantRec, strField(body.observaciones), usuarioNombre, strField(body.id_ubicacion), strField(body.id_material), _bool(body.sin_inventario), strField(body.id_equipo), strField(String(body.albaran ?? "").trim()), repartos);
     if (resultado.error) return resultado.error;
     return jsonOk(resultado);
   }
@@ -436,9 +458,10 @@ Deno.serve(async (req) => {
     const resultados = [];
     let procesadas = 0, errores = 0;
     for (const l of lineas) {
-      const cantRec = Number(l.cantidad);
+      const repartos = leerRepartos(l.repartos);
+      const cantRec = repartos.length ? repartos.reduce((t, r) => t + r.cantidad, 0) : Number(l.cantidad);
       if (!cantRec || cantRec <= 0) continue;
-      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion), null, _bool(l.sin_inventario), null, albaran);
+      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion), null, _bool(l.sin_inventario), null, albaran, repartos);
       if (r.error) { errores++; resultados.push({ id_linea: l.id_linea, ok: false }); }
       else { procesadas++; resultados.push({ id_linea: l.id_linea, ok: true }); }
     }
