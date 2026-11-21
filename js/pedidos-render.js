@@ -790,7 +790,8 @@ function _filaLineaPedido(l, p, puedeEditar) {
     <div class="linea-nombre">${l.Material}${(l.Conceptos_Factura || []).length ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px" title="Solo en la hoja de pedido: así figura en la factura">🧾 En la hoja, como en la factura: ${l.Conceptos_Factura.map(c => _escAttr(c.concepto) + (c.cantidad != null ? ` ×${c.cantidad}` : '')).join(' · ')}</div>` : ''}${equipoVinc && !interv ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">${esEquipo ? '🖥️' : '🔧'} ${equipoVinc.ID_Activo} — ${[equipoVinc.Tipo_Equipo,equipoVinc.Marca,equipoVinc.Modelo].filter(Boolean).join(' ')}</div>` : ''}${infoServicio}</div>
     <div class="linea-meta">
       <span>Ped: ${l.Cantidad_Pedida}${unidadLinea}</span>
-      <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>
+      <span style="color:var(--text)">Rec: ${l.Cantidad_Recibida||'0'}${unidadLinea}</span>${l.Albaranes ? `
+      <span style="color:var(--text-muted);font-size:11px" title="Albarán en que llegó">🧾 ${_escAttr(l.Albaranes)}</span>` : ''}
       <span class="badge ${estadoLinea}" style="font-size:10px">${l.Estado_Linea||'Pendiente'}</span>
       ${esServicio ? `<span class="badge badge-blue" style="font-size:10px">🔧 Servicio</span>` : ''}
       ${esEquipo ? `<span class="badge badge-blue" style="font-size:10px" title="Compra de un equipo: no entra en el inventario de fungibles">🖥️ Equipo</span>` : ''}
@@ -1220,6 +1221,10 @@ function openModalEstadoPedido(pedidoId) {
   openModal('modal-estado-pedido');
 }
 
+// Recibir albarán: salen todos los artículos pendientes SIN marcar y se van
+// tocando de uno en uno los que figuran en el papel. Es una confirmación activa:
+// nada se da por recibido porque sí (antes venían todos con la cantidad
+// pendiente puesta y había que acordarse de poner 0 en lo que no venía).
 function openModalRecepcionMasiva(pedidoId) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   // Los servicios unidos a una intervención se dan por realizados al cerrarla, y
@@ -1228,78 +1233,80 @@ function openModalRecepcionMasiva(pedidoId) {
     && !(l.Tipo_Linea === 'Servicio' && l.ID_Intervencion)
     && !(l.Tipo_Linea === 'Equipo' && !DATA.equipos.some(e => e.ID_Activo === l.ID_Equipo)));
   sv('recmas-pedido-id', pedidoId);
+  sv('recmas-albaran', '');
   const tituloEl = document.querySelector('#modal-recepcion-masiva .modal-title');
   if (tituloEl) tituloEl.textContent = `Recibir albarán — ${p?.Nombre_Lista || pedidoId}`;
   const cont = document.getElementById('recmas-tabla-contenedor');
   if (!lineas.length) {
     cont.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">No hay líneas pendientes de recepción</div>`;
+    _recmasActualizarResumen();
     openModal('modal-recepcion-masiva');
     return;
   }
-  cont.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px">
-    <thead>
-      <tr style="border-bottom:2px solid var(--border)">
-        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Material</th>
-        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Unidad</th>
-        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Pedido</th>
-        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">Ya recibido</th>
-        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600">En este albarán *</th>
-        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Ubicación</th>
-        <th style="text-align:center;padding:6px 8px;color:var(--text-muted);font-weight:600" title="Se registra como recibido pero no entra en el inventario">🚫 Sin inventario</th>
-        <th style="text-align:left;padding:6px 8px;color:var(--text-muted);font-weight:600">Obs.</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${lineas.map(l => {
-        const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
-        const pendiente = Math.max(0, (parseFloat(l.Cantidad_Pedida) || 0) - yaRec);
-        const unidad = _unidadLineaPedido(l);
-        const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-        const esServ = l.Tipo_Linea !== 'Material';
-        const ubicCell = esServ ? `<span style="color:var(--text-muted);font-size:12px">${l.Tipo_Linea === 'Equipo' ? '🖥️ equipo' : '🔧 servicio'}</span>` : mat
-          ? `<select id="recmas-ubic-${l.ID_Linea}" style="width:150px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:12px">${_opcionesUbicacionRecepcion(mat.ID_Material, unidad)}</select>`
-          : `<span style="color:var(--text-muted);font-size:12px">—</span>`;
-        return `<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:8px 6px;font-weight:500">${l.Material}</td>
-          <td style="padding:8px 6px;color:var(--text-soft)">${unidad || '—'}</td>
-          <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${l.Cantidad_Pedida}</td>
-          <td style="padding:8px 6px;text-align:center;color:var(--text-soft)">${yaRec > 0 ? yaRec : '—'}</td>
-          <td style="padding:8px 6px;text-align:center"><input type="number" id="recmas-cant-${l.ID_Linea}" min="0" step="0.01" value="${pendiente}" style="width:80px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
-          <td style="padding:8px 6px">${ubicCell}</td>
-          <td style="padding:8px 6px;text-align:center">${esServ ? '' : `<input type="checkbox" id="recmas-sininv-${l.ID_Linea}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${l.ID_Linea}')">`}</td>
-          <td style="padding:8px 6px"><input type="text" id="recmas-obs-${l.ID_Linea}" placeholder="opcional" style="width:130px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm,4px);font-size:13px"></td>
-        </tr>`;
-      }).join('')}
-    </tbody>
-  </table>
-  <div style="font-size:11px;color:var(--text-muted);margin-top:8px">* Pon 0 si el artículo no viene en este albarán</div>`;
-  lineas.forEach(l => {
-    const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
-    if (!mat) return;
-    const sel = document.getElementById('recmas-ubic-' + l.ID_Linea);
-    if (!sel) return;
-    const lotes = getMatUbics(mat.ID_Material);
-    if (lotes.length === 1) sel.value = lotes[0].ID_Ubicacion;
-    else if (mat.Ubicacion) sel.value = mat.Ubicacion;
-  });
+  cont.innerHTML = `<div class="recmas-resumen" id="recmas-resumen"></div>` + lineas.map(l => {
+    const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+    const pedida = parseFloat(l.Cantidad_Pedida) || 0;
+    const pendiente = Math.max(0, pedida - yaRec);
+    const unidad = _unidadLineaPedido(l);
+    const mat = _materialDeLinea(l);
+    const esServ = l.Tipo_Linea !== 'Material';
+    const id = l.ID_Linea;
+    let ubic = '';
+    if (!esServ && mat) {
+      const lotes = getMatUbics(mat.ID_Material);
+      const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
+      ubic = `<div id="recmas-ubicwrap-${id}" style="margin-top:4px"><div class="recmas-fila" style="margin-bottom:4px"><label>📍 ¿Dónde se guarda?</label></div>${ubicPickerHTML('recmas-ubic-' + id, { matId: mat.ID_Material, unidad, valor: ini })}</div>`;
+    } else if (!esServ) {
+      ubic = `<div style="font-size:11px;color:var(--text-muted)">No está en el catálogo: al confirmar podrás darle ficha desde su línea (📥).</div>`;
+    }
+    const cantTxt = esServ ? (l.Tipo_Linea === 'Equipo' ? '🖥️ equipo' : '🔧 servicio')
+      : `Pedido ${pedida} ${unidad}${yaRec > 0 ? ` · ya llegaron ${yaRec} · faltan ${pendiente}` : ''}`;
+    return `<div class="recmas-item" id="recmas-item-${id}" data-linea="${id}">
+      <div class="recmas-item-cab" onclick="_recmasToggle('${id}')" role="checkbox" aria-checked="false" tabindex="0"
+        onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();_recmasToggle('${id}')}">
+        <span class="recmas-check">✓</span>
+        <span class="recmas-item-nombre">${_escAttr(l.Material)}</span>
+        <span class="recmas-item-cant">${_escAttr(cantTxt)}</span>
+      </div>
+      <div class="recmas-item-detalle">
+        <div class="recmas-fila">
+          ${esServ ? '' : `<label>Llegan en este albarán <input type="number" id="recmas-cant-${id}" min="0" step="0.01" value="${pendiente}"> ${_escAttr(unidad || '')}</label>`}
+          ${esServ ? '' : `<label title="Se registra como recibido pero no entra en el inventario"><input type="checkbox" id="recmas-sininv-${id}"${l.Sin_Inventario ? ' checked' : ''} onchange="_toggleRecmasSinInventario('${id}')"> 🚫 Sin inventario</label>`}
+          <label>Obs. <input type="text" id="recmas-obs-${id}" placeholder="opcional"></label>
+        </div>
+        ${ubic}
+      </div>
+    </div>`;
+  }).join('');
   lineas.forEach(l => _toggleRecmasSinInventario(l.ID_Linea));
+  _recmasActualizarResumen();
   openModal('modal-recepcion-masiva');
 }
 
-// Opciones de ubicación al recibir una línea de pedido: TODAS las ubicaciones
-// activas del catálogo (no solo las que ya tienen bote de este material),
-// porque a veces un pedido reabastece un sitio nuevo. Las que ya tienen bote
-// muestran su stock actual; elegir una sin bote crea uno nuevo al confirmar
-// (mismo criterio que el destino de un Traslado, ver guardarTraslado).
-function _opcionesUbicacionRecepcion(matId, unidad) {
-  const lotes = getMatUbics(matId);
-  const porUbicacion = {};
-  lotes.forEach(l => { porUbicacion[l.ID_Ubicacion] = l; });
-  return DATA.ubicaciones.filter(u => u.Activa !== 'FALSE').map(u => {
-    const lote = porUbicacion[u.ID_Ubicacion];
-    const stock = lote ? ` (stock: ${parseFloat(lote.Stock_Local) || 0} ${lote.Unidad_Lote || unidad || ''})` : '';
-    return `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}${stock}</option>`;
-  }).join('');
+function _recmasToggle(lineaId) {
+  const item = document.getElementById('recmas-item-' + lineaId);
+  if (!item) return;
+  const marcado = item.classList.toggle('marcado');
+  item.querySelector('.recmas-item-cab')?.setAttribute('aria-checked', marcado ? 'true' : 'false');
+  _recmasActualizarResumen();
+}
+
+function _recmasMarcadas() {
+  return [...document.querySelectorAll('#recmas-tabla-contenedor .recmas-item.marcado')].map(el => el.dataset.linea);
+}
+
+function _recmasActualizarResumen() {
+  const total = document.querySelectorAll('#recmas-tabla-contenedor .recmas-item').length;
+  const n = _recmasMarcadas().length;
+  const res = document.getElementById('recmas-resumen');
+  if (res) res.innerHTML = n
+    ? `<b>${n}</b> de ${total} marcado${n === 1 ? '' : 's'} como llegado${n === 1 ? '' : 's'} en este albarán.`
+    : `Toca cada artículo que figure en el albarán (${total} pendiente${total === 1 ? '' : 's'}).`;
+  const btn = document.getElementById('btn-recmas-confirmar');
+  if (btn) {
+    btn.disabled = !n;
+    btn.textContent = n ? `Confirmar ${n} artículo${n === 1 ? '' : 's'}` : 'Confirmar recepción';
+  }
 }
 
 function openModalRecepcion(lineaId, pedidoId) {
@@ -1311,9 +1318,9 @@ function openModalRecepcion(lineaId, pedidoId) {
   document.getElementById('rec-ya-recibida-group').style.display = 'none';
   document.getElementById('btn-confirmar-recepcion').textContent = esServicio ? 'Confirmar realizado' : 'Confirmar recepción';
   const grupoUbic = document.getElementById('rec-ubicacion-group');
-  const selUbic = document.getElementById('rec-ubicacion-sel');
+  const pickUbic = document.getElementById('rec-ubicacion-picker');
   grupoUbic.style.display = 'none';
-  selUbic.innerHTML = '';
+  pickUbic.innerHTML = '';
   const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
   document.getElementById('rec-sin-inv-group').style.display = esServicio ? 'none' : '';
   document.getElementById('rec-sin-inventario').checked = !!l?.Sin_Inventario;
@@ -1330,10 +1337,9 @@ function openModalRecepcion(lineaId, pedidoId) {
       }
       const mat = DATA.material.find(m => m.Nombre === l.Material || l.Material.startsWith(m.Nombre));
       if (mat) {
-        selUbic.innerHTML = _opcionesUbicacionRecepcion(mat.ID_Material, unidad);
         const lotes = getMatUbics(mat.ID_Material);
-        if (lotes.length === 1) selUbic.value = lotes[0].ID_Ubicacion;
-        else if (mat.Ubicacion) selUbic.value = mat.Ubicacion;
+        const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
+        pickUbic.innerHTML = ubicPickerHTML('rec-ubicacion-sel', { matId: mat.ID_Material, unidad, valor: ini });
         grupoUbic.style.display = '';
       }
     }
@@ -1353,10 +1359,9 @@ function openModalRecepcion(lineaId, pedidoId) {
     const partes = (l.Material || '').split(' · ');
     sv('rec-eq-id', ''); sv('rec-eq-serie', '');
     sv('rec-eq-tipo', partes[0] || ''); sv('rec-eq-marca', partes[1] || ''); sv('rec-eq-modelo', partes.slice(2).join(' · '));
-    document.getElementById('rec-eq-ubicacion').innerHTML = '<option value="">Sin ubicar todavía</option>' + DATA.ubicaciones
-      .filter(u => u.Activa !== 'FALSE')
-      .sort((a, b) => (a.ID_Ubicacion || '').localeCompare(b.ID_Ubicacion || ''))
-      .map(u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_escAttr(getNombreUbicacion(u.ID_Ubicacion))}</option>`).join('');
+    document.getElementById('rec-eq-ubicacion-picker').innerHTML = ubicPickerHTML('rec-eq-ubicacion', { permitirVacio: true });
+    _ubicPicker['rec-eq-ubicacion'].abierto = false; // "Sin ubicar todavía" hasta que se elija
+    _ubpPintar('rec-eq-ubicacion');
   }
   _toggleRecSinInventario();
   openModal('modal-recepcion-linea');
@@ -1366,11 +1371,11 @@ function openModalRecepcion(lineaId, pedidoId) {
 function _toggleRecSinInventario() {
   const sinInv = document.getElementById('rec-sin-inventario').checked;
   const grupoUbic = document.getElementById('rec-ubicacion-group');
-  if (document.getElementById('rec-ubicacion-sel').options.length) grupoUbic.style.display = sinInv ? 'none' : '';
+  if (document.getElementById('rec-ubicacion-sel')) grupoUbic.style.display = sinInv ? 'none' : '';
 }
 
 function _toggleRecmasSinInventario(lineaId) {
   const sinInv = document.getElementById('recmas-sininv-' + lineaId)?.checked;
-  const sel = document.getElementById('recmas-ubic-' + lineaId);
-  if (sel) sel.style.display = sinInv ? 'none' : '';
+  const wrap = document.getElementById('recmas-ubicwrap-' + lineaId);
+  if (wrap) wrap.style.display = sinInv ? 'none' : '';
 }

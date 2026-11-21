@@ -84,7 +84,7 @@ async function actualizarStockMaterial(supabaseAdmin: any, mat: any, cantRec: nu
 // en la línea; undefined = se respeta lo que ya tuviera la línea.
 // `idEquipo`: en una línea de tipo Equipo, la ficha que se acaba de dar de alta al
 // recibirlo (el alta se hace al recibir, cuando se ve el número de serie).
-async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null, sinInventario?: boolean, idEquipo: string | null = null) {
+async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: number, observaciones: string | null, usuario: string, idUbicacion: string | null, idMaterial: string | null = null, sinInventario?: boolean, idEquipo: string | null = null, albaran: string | null = null) {
   const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
   if (!linea) return { error: jsonError(`No se encontró la línea "${idLinea}"`, 404) };
   const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", linea.pedido).maybeSingle();
@@ -108,6 +108,11 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   const fueraInventario = sinInventario ?? linea.sin_inventario === true;
   if (sinInventario !== undefined) datosLinea.sin_inventario = sinInventario;
   if (idEquipo && linea.tipo_linea === "Equipo") datosLinea.id_equipo = idEquipo;
+  // Nº del albarán en que llegó (una línea puede llegar en varios): se acumulan.
+  if (albaran) {
+    const previos = String(linea.albaranes || "").split(",").map((x: string) => x.trim()).filter(Boolean);
+    if (!previos.includes(albaran)) datosLinea.albaranes = [...previos, albaran].join(", ");
+  }
   if (!fueraInventario && mat && mat.id_material !== linea.id_material) datosLinea.id_material = mat.id_material;
   // La marca "Desde solicitud …" es lo que enlaza la línea con su solicitud:
   // una observación escrita al recibir se le añade, no la sustituye.
@@ -427,12 +432,13 @@ Deno.serve(async (req) => {
     const lineas = Array.isArray(body.lineas) ? body.lineas as Record<string, unknown>[] : [];
     if (!pedidoId) return jsonError("pedido es obligatorio", 400);
     if (!lineas.length) return jsonError("Introduce al menos una cantidad", 400);
+    const albaran = strField(String(body.albaran ?? "").trim());
     const resultados = [];
     let procesadas = 0, errores = 0;
     for (const l of lineas) {
       const cantRec = Number(l.cantidad);
       if (!cantRec || cantRec <= 0) continue;
-      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion), null, _bool(l.sin_inventario));
+      const r = await completarRecepcion(supabaseAdmin, String(l.id_linea), cantRec, strField(l.observaciones), usuarioNombre, strField(l.id_ubicacion), null, _bool(l.sin_inventario), null, albaran);
       if (r.error) { errores++; resultados.push({ id_linea: l.id_linea, ok: false }); }
       else { procesadas++; resultados.push({ id_linea: l.id_linea, ok: true }); }
     }

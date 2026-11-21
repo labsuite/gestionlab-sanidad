@@ -370,6 +370,8 @@ function _lineaPedidoSbToObj(l) {
     Tipo_Linea: ['Equipo', 'Servicio'].includes(l.tipo_linea) ? l.tipo_linea : 'Material',
     // Servicio = parte económica de esta intervención (la parte técnica).
     ID_Intervencion: l.id_intervencion || '',
+    // Nº de los albaranes en que llegó, separados por coma.
+    Albaranes: l.albaranes || '',
   };
 }
 

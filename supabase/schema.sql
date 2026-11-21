@@ -890,3 +890,9 @@ alter table lineas_pedido drop constraint if exists lineas_pedido_tipo_linea_che
 alter table lineas_pedido add constraint lineas_pedido_tipo_linea_check check (tipo_linea in ('Material','Equipo','Servicio'));
 alter table lineas_pedido add column if not exists id_intervencion text references intervenciones(id_intervencion) on update cascade on delete set null;
 create index if not exists idx_lineas_pedido_id_intervencion on lineas_pedido (id_intervencion);
+
+-- ── Nº de albarán de cada recepción (2026-11-21) ────────────────────────
+-- Al «Recibir albarán» se puede apuntar su código; se acumula en cada línea
+-- que llegó en él ("A-123, A-130" si llegó en dos entregas). Opcional: por si
+-- algún día hay que ponerlo en la hoja de pedido.
+alter table lineas_pedido add column if not exists albaranes text;

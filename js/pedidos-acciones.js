@@ -90,11 +90,12 @@ function openModalCompraAparte(solId) {
   document.getElementById('ca-stock-campos').style.display = 'none';
   if (mat) {
     sv('ca-stock-cantidad', sol.Cantidad_Solicitada || '');
-    const sel = document.getElementById('ca-stock-ubicacion');
-    sel.innerHTML = _opcionesUbicacionRecepcion(mat.ID_Material, mat.Unidad);
     const lotes = getMatUbics(mat.ID_Material);
-    if (lotes.length === 1) sel.value = lotes[0].ID_Ubicacion;
-    else if (mat.Ubicacion) sel.value = mat.Ubicacion;
+    const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
+    document.getElementById('ca-stock-ubicacion-picker').innerHTML =
+      ubicPickerHTML('ca-stock-ubicacion', { matId: mat.ID_Material, unidad: mat.Unidad, valor: ini });
+  } else {
+    document.getElementById('ca-stock-ubicacion-picker').innerHTML = '';
   }
   openModal('modal-compra-aparte');
 }
@@ -111,6 +112,7 @@ async function guardarCompraAparte() {
     if (!cant || cant <= 0) { showToast('Indica la cantidad que entra en el inventario', 'error'); return; }
     body.cantidad_stock = cant;
     body.id_ubicacion = v('ca-stock-ubicacion');
+    if (!body.id_ubicacion) { showToast('Elige dónde se guarda', 'error'); return; }
   }
   showLoading('Guardando...');
   try {
@@ -377,21 +379,33 @@ async function guardarEstadoPedido() {
 
 async function guardarRecepcionMasiva() {
   const pedidoId = v('recmas-pedido-id');
-  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && l.Estado_Linea !== 'Recibido');
-  const aRecibir = lineas
-    .map(l => ({
-      id_linea: l.ID_Linea,
-      cantidad: parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0,
+  const albaran = v('recmas-albaran').trim();
+  // Solo lo que se ha tocado (confirmación activa): lo no marcado no viene en este albarán.
+  const marcadas = new Set(_recmasMarcadas());
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && marcadas.has(l.ID_Linea));
+  if (!lineas.length) { showToast('Toca los artículos que vienen en el albarán', 'error'); return; }
+  const aRecibir = [];
+  for (const l of lineas) {
+    const esMaterial = (l.Tipo_Linea || 'Material') === 'Material';
+    const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
+    // Equipos/servicios: llega lo que faltaba (no hay cantidad que contar).
+    const cantidad = esMaterial
+      ? parseFloat(document.getElementById('recmas-cant-' + l.ID_Linea)?.value) || 0
+      : Math.max(0, (parseFloat(l.Cantidad_Pedida) || 1) - yaRec);
+    if (cantidad <= 0) { showToast(`Indica cuánto llega de «${l.Material}» o desmárcalo`, 'error'); return; }
+    const sinInv = !!document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked;
+    const ubicInput = document.getElementById('recmas-ubic-' + l.ID_Linea);
+    const idUbic = sinInv ? '' : (ubicInput?.value || '');
+    if (ubicInput && !sinInv && !idUbic) { showToast(`Elige dónde se guarda «${l.Material}»`, 'error'); return; }
+    aRecibir.push({
+      id_linea: l.ID_Linea, cantidad, sin_inventario: sinInv, id_ubicacion: idUbic,
       observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '',
-      sin_inventario: !!document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked,
-      id_ubicacion: document.getElementById('recmas-sininv-' + l.ID_Linea)?.checked ? '' : (document.getElementById('recmas-ubic-' + l.ID_Linea)?.value || '')
-    }))
-    .filter(x => x.cantidad > 0);
-  if (!aRecibir.length) { showToast('Introduce al menos una cantidad', 'error'); return; }
+    });
+  }
   closeModal('modal-recepcion-masiva');
   showLoading('Registrando albarán...');
   try {
-    const { procesadas, errores } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion_masiva', pedido: pedidoId, lineas: aRecibir });
+    const { procesadas, errores } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion_masiva', pedido: pedidoId, lineas: aRecibir, albaran });
     await loadAllData();
     if (errores > 0) {
       showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
@@ -439,7 +453,9 @@ async function guardarRecepcionLinea() {
   }
   const cantRec = parseFloat(v('rec-cantidad')) || 0;
   const sinInventario = document.getElementById('rec-sin-inventario').checked;
-  const idUbicacion = !sinInventario && document.getElementById('rec-ubicacion-group')?.style.display !== 'none' ? v('rec-ubicacion-sel') : '';
+  const conUbicacion = !sinInventario && document.getElementById('rec-ubicacion-group')?.style.display !== 'none';
+  const idUbicacion = conUbicacion ? v('rec-ubicacion-sel') : '';
+  if (conUbicacion && cantRec > 0 && !idUbicacion) { showToast('Elige dónde se guarda', 'error'); return; }
   const mat = _materialDeLinea(l);
   // Fuera del inventario: no hace falta darle ficha en el catálogo.
   if (!mat && cantRec > 0 && !sinInventario) {

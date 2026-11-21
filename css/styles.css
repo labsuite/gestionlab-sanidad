@@ -1798,3 +1798,47 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
   .revext-visor { display: none; }
   .revext-abrir-movil { display: block; margin-bottom: 10px; }
 }
+
+/* ── Selector de ubicación (js/ubic-picker.js) ───────────────────────── */
+.ubp { font-size: 13px; }
+.ubp-elegido { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding: 8px 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.ubp-elegido-txt { min-width: 0; }
+.ubp-cambiar { font-size: 12px !important; padding: 4px 10px !important; flex-shrink: 0; }
+.ubp-titulo { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 10px 0 5px; }
+.ubp-buscar { width: 100%; margin-top: 8px; padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; box-sizing: border-box; }
+.ubp-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ubp-chip { border: 1px solid var(--border); background: var(--surface); color: var(--text); border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.ubp-chip:hover { border-color: var(--accent); }
+.ubp-chip.activo { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ubp-n { opacity: .6; font-size: 11px; }
+.ubp-lista { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
+.ubp-hueco { display: flex; align-items: baseline; gap: 10px; text-align: left; border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); padding: 7px 10px; cursor: pointer; font-family: inherit; font-size: 13px; color: var(--text); }
+.ubp-hueco:hover { border-color: var(--accent); background: var(--accent-light); }
+.ubp-hueco.activo { border-color: var(--accent); background: var(--accent-light); box-shadow: inset 3px 0 0 var(--accent); }
+.ubp-hueco.destacado { background: var(--surface2); }
+.ubp-cod { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.ubp-desc { color: var(--text-soft); flex: 1; min-width: 0; }
+.ubp-stock { font-size: 11px; color: var(--accent); background: var(--accent-light); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.ubp-vacio { color: var(--text-muted); font-size: 12px; padding: 8px 2px; }
+
+/* ── Recibir albarán: confirmar artículo a artículo ──────────────────── */
+.recmas-item { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; background: var(--surface); transition: border-color .15s, background .15s; }
+.recmas-item-cab { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; user-select: none; }
+.recmas-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff; }
+.recmas-item.marcado { border-color: var(--accent); background: var(--accent-light); }
+.recmas-item.marcado .recmas-check { background: var(--accent); border-color: var(--accent); }
+.recmas-item-nombre { font-weight: 500; flex: 1; min-width: 0; }
+.recmas-item-cant { font-size: 12px; color: var(--text-soft); white-space: nowrap; }
+.recmas-item-detalle { display: none; padding: 4px 12px 12px 46px; }
+.recmas-item.marcado .recmas-item-detalle { display: block; }
+.recmas-fila { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 10px; }
+.recmas-fila label { font-size: 12px; color: var(--text-soft); display: flex; align-items: center; gap: 6px; }
+.recmas-fila input[type=number] { width: 80px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; text-align: center; }
+.recmas-fila input[type=text] { width: 200px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; }
+.recmas-resumen { font-size: 12px; color: var(--text-soft); margin: 4px 0 10px; }
+@media (max-width: 600px) {
+  .recmas-item-cab { flex-wrap: wrap; }
+  .recmas-item-cant { width: 100%; padding-left: 34px; white-space: normal; }
+  .recmas-item-detalle { padding-left: 12px; }
+  .ubp-hueco { flex-wrap: wrap; }
+}
