@@ -577,6 +577,10 @@
               <button class="btn btn-primary" id="btn-nueva-ubicacion" onclick="openModalUbicacion()">+ Nueva ubicación</button>
             </div>
           </div>
+          <div class="ubi-buscador">
+            <input type="search" id="ubi-buscar" placeholder="🔎 Buscar por código, laboratorio, zona o descripción: nevera, reactivos, cajón, 205…" oninput="filtrarUbicaciones(this.value)" autocomplete="off">
+            <span id="ubi-buscar-resumen" class="ubi-buscar-resumen"></span>
+          </div>
           <div id="ubicaciones-agrupadas" style="padding:8px 0"></div>
         </div>
       </div>

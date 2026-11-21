@@ -1853,3 +1853,10 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .rep-quitar { margin-left: auto; border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 14px; }
 .rep-quitar:hover { color: var(--danger); }
 .rep-mas { font-size: 12px !important; padding: 4px 10px !important; margin-top: 6px; }
+
+/* ── Ubicaciones: buscador y fila recién guardada ────────────────────── */
+.ubi-buscador { display: flex; align-items: center; gap: 12px; padding: 12px 20px 4px; }
+.ubi-buscador input { flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.ubi-buscar-resumen { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+@keyframes ubiResaltar { from { background: var(--accent-light); box-shadow: inset 3px 0 0 var(--accent); } to { background: transparent; box-shadow: inset 3px 0 0 transparent; } }
+.ubi-row-resaltada { animation: ubiResaltar 2.5s ease-out; }

@@ -39,6 +39,20 @@ function renderProveedores() {
 // ============================================================
 // UBICACIONES — RENDER
 // ============================================================
+// Qué laboratorios están desplegados: se recuerda por NOMBRE de laboratorio
+// (no por posición) y sobrevive a renderAll(), que se lanza tras cada guardado.
+// Antes cada edición cerraba todos los grupos y había que volver a buscar el sitio.
+const _ubiAbiertos = new Set();
+let _ubiFiltro = '';
+let _ubiResaltar = ''; // ubicación recién guardada: se enseña y se marca un momento
+
+function _ubiNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+function filtrarUbicaciones(txt) {
+  _ubiFiltro = txt;
+  renderUbicaciones();
+}
+
 function renderUbicaciones() {
   const cont = document.getElementById('ubicaciones-agrupadas');
   const rol = getUserRole();
@@ -48,20 +62,53 @@ function renderUbicaciones() {
   if (!cont) return;
   if (!DATA.ubicaciones.length) { cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📍</div><div class="empty-state-title">Sin ubicaciones registradas</div></div>`; return; }
 
+  // Material de cada sitio: el de sus botes (material_ubicaciones) y el que
+  // solo tiene la ubicación en su ficha (material "legacy" sin botes).
+  const matPorUbic = {};
+  const anotar = (idU, idM) => { if (!idU || !idM) return; (matPorUbic[idU] = matPorUbic[idU] || new Set()).add(idM); };
+  (DATA.materialUbicaciones || []).forEach(l => anotar(l.ID_Ubicacion, l.ID_Material));
+  DATA.material.forEach(m => anotar(m.Ubicacion, m.ID_Material));
+
+  const palabras = _ubiNorm(_ubiFiltro).trim().split(/\s+/).filter(Boolean);
+  const coincide = u => !palabras.length || palabras.every(p => _ubiNorm(
+    [u.ID_Ubicacion, u.Laboratorio_Aula, 'lab ' + (u.Laboratorio_Aula || ''), u.Zona, u.Subzona, u.Descripcion_Completa].join(' ')).includes(p));
+
+  // El recién guardado: su laboratorio se abre (si había filtro y no coincide, se quita).
+  if (_ubiResaltar) {
+    const ur = DATA.ubicaciones.find(u => u.ID_Ubicacion === _ubiResaltar);
+    if (ur) {
+      _ubiAbiertos.add(ur.Laboratorio_Aula || 'Sin asignar');
+      if (!coincide(ur)) { _ubiFiltro = ''; palabras.length = 0; const inp = document.getElementById('ubi-buscar'); if (inp) inp.value = ''; }
+    }
+  }
+
   const grupos = {};
   [...DATA.ubicaciones].sort((a,b) => (a.ID_Ubicacion||'').localeCompare(b.ID_Ubicacion||'', 'es', {numeric:true}))
+    .filter(coincide)
     .forEach(u => { const lab = u.Laboratorio_Aula||'Sin asignar'; if (!grupos[lab]) grupos[lab] = []; grupos[lab].push(u); });
 
-  cont.innerHTML = Object.entries(grupos).map(([lab, items], gi) => {
-    const totalMat = items.reduce((s,u) => s + DATA.material.filter(m => m.Ubicacion === u.ID_Ubicacion).length, 0);
+  const resumen = document.getElementById('ubi-buscar-resumen');
+  const total = Object.values(grupos).reduce((t, g) => t + g.length, 0);
+  if (resumen) resumen.textContent = palabras.length ? `${total} ubicación${total === 1 ? '' : 'es'}` : '';
+  if (!total) {
+    cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔎</div><div class="empty-state-title">Ninguna ubicación coincide con «${_escAttr(_ubiFiltro)}»</div></div>`;
+    return;
+  }
+
+  cont.innerHTML = Object.entries(grupos).sort(([a], [b]) => a.localeCompare(b, 'es', { numeric: true })).map(([lab, items], gi) => {
+    const totalMat = new Set(items.flatMap(u => [...(matPorUbic[u.ID_Ubicacion] || [])])).size;
     const grupoId = 'ubg' + gi;
+    // Con búsqueda se ve todo lo que coincide; sin ella, lo que se dejó abierto.
+    const abierto = palabras.length > 0 || _ubiAbiertos.has(lab);
     const rows = items.map(u => {
-      const matsAqui = DATA.material.filter(m => m.Ubicacion === u.ID_Ubicacion);
-      const matCell = matsAqui.length ? `<span class="badge badge-blue" style="cursor:pointer" onclick="verMaterialUbicacion('${u.ID_Ubicacion}')">${matsAqui.length} ítem(s)</span>` : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
-      return `<div class="ubi-row">
-        <strong style="font-size:12px">${u.ID_Ubicacion}</strong>
-        <span style="color:var(--text-soft);font-size:13px">${u.Zona||'—'}</span>
-        <span style="font-size:12px;color:var(--text-muted)">${u.Subzona||u.Descripcion_Completa||'—'}</span>
+      const nMat = (matPorUbic[u.ID_Ubicacion] || new Set()).size;
+      const matCell = nMat ? `<span class="badge badge-blue" style="cursor:pointer" onclick="verMaterialUbicacion('${u.ID_Ubicacion}')">${nMat} ítem(s)</span>` : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
+      const sub = u.Subzona || '';
+      const desc = u.Descripcion_Completa && u.Descripcion_Completa !== sub ? u.Descripcion_Completa : '';
+      return `<div class="ubi-row${u.ID_Ubicacion === _ubiResaltar ? ' ubi-row-resaltada' : ''}" id="ubi-row-${_escAttr(u.ID_Ubicacion)}">
+        <strong style="font-size:12px">${_escAttr(u.ID_Ubicacion)}</strong>
+        <span style="color:var(--text-soft);font-size:13px">${_escAttr(u.Zona) || '—'}</span>
+        <span style="font-size:12px;color:var(--text-soft)">${_escAttr(sub) || (desc ? '' : '—')}${desc ? `<span style="display:block;color:var(--text-muted);font-size:11px">${_escAttr(desc)}</span>` : ''}</span>
         <div>${matCell}</div>
         <div>${u.Activa !== 'FALSE' ? '<span class="badge badge-green">Activa</span>' : '<span class="badge badge-gray">Inactiva</span>'}</div>
         <div class="row-actions">
@@ -73,12 +120,12 @@ function renderUbicaciones() {
       </div>`;
     }).join('');
     return `<div class="ubi-grupo">
-      <div class="ubi-grupo-header" onclick="toggleUbiGrupo('${grupoId}')">
-        <span class="ubi-grupo-toggle" id="tog-${grupoId}">▶</span>
-        <span>🏛️ ${lab}</span>
-        <span class="ubi-grupo-count"><span class="badge badge-gray">${items.length} zona(s)</span>${totalMat > 0 ? `<span class="badge badge-blue" style="margin-left:4px">${totalMat} ítem(s)</span>` : ''}</span>
+      <div class="ubi-grupo-header" onclick="toggleUbiGrupo('${grupoId}')" data-lab="${_escAttr(lab)}">
+        <span class="ubi-grupo-toggle" id="tog-${grupoId}">${abierto ? '▼' : '▶'}</span>
+        <span>🏛️ ${_escAttr(lab)}</span>
+        <span class="ubi-grupo-count"><span class="badge badge-gray">${items.length} sitio(s)</span>${totalMat > 0 ? `<span class="badge badge-blue" style="margin-left:4px">${totalMat} ítem(s)</span>` : ''}</span>
       </div>
-      <div class="ubi-grupo-rows" id="${grupoId}">
+      <div class="ubi-grupo-rows${abierto ? ' open' : ''}" id="${grupoId}">
         <div class="ubi-table-header">
           <span>ID</span><span>Zona</span><span>Subzona / Descripción</span><span>Material</span><span>Estado</span><span></span>
         </div>
@@ -86,6 +133,14 @@ function renderUbicaciones() {
       </div>
     </div>`;
   }).join('');
+
+  if (_ubiResaltar) {
+    const fila = document.getElementById('ubi-row-' + _ubiResaltar);
+    _ubiResaltar = '';
+    if (fila && document.getElementById('page-ubicaciones')?.classList.contains('active')) {
+      requestAnimationFrame(() => fila.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+    }
+  }
 }
 
 // ============================================================
@@ -124,6 +179,8 @@ function toggleUbiGrupo(id) {
   if (!rows) return;
   const isOpen = rows.classList.toggle('open');
   if (tog) tog.textContent = isOpen ? '▼' : '▶';
+  const lab = rows.previousElementSibling?.dataset.lab;
+  if (lab) isOpen ? _ubiAbiertos.add(lab) : _ubiAbiertos.delete(lab);
 }
 
 function verMaterialUbicacion(ubicacionId) {
@@ -1402,6 +1459,7 @@ Se actualizarán solas ${nEquipos} equipo(s) y ${nLotes} lote(s) de material.`
       const idOriginal = DATA.ubicaciones[editingRow.rowIndex].ID_Ubicacion;
       const { ubicacion, renombrada } = await callEdgeFunction('gestionar-ubicacion', { accion: 'actualizar', id_original: idOriginal, ...datos });
       DATA.ubicaciones[editingRow.rowIndex] = _ubicacionSbToObj(ubicacion);
+      _ubiResaltar = ubicacion.id_ubicacion;
       if (id !== idOriginal) _propagarRenombradoUbicacion(idOriginal, id);
       const arrastrados = (renombrada?.equipos || 0) + (renombrada?.material || 0);
       showToast(arrastrados > 0
@@ -1410,6 +1468,7 @@ Se actualizarán solas ${nEquipos} equipo(s) y ${nLotes} lote(s) de material.`
     } else {
       const { ubicacion } = await callEdgeFunction('gestionar-ubicacion', { accion: 'crear', ...datos });
       DATA.ubicaciones.push(_ubicacionSbToObj(ubicacion));
+      _ubiResaltar = ubicacion.id_ubicacion;
       showToast('Ubicación guardada', 'success');
     }
     closeModal('modal-ubicacion'); renderAll();
@@ -1493,6 +1552,7 @@ async function cambiarEstadoUbicacion(idx, activa) {
     const { ubicacion } = await callEdgeFunction('gestionar-ubicacion',
       { accion: 'cambiar_estado', id_ubicacion: u.ID_Ubicacion, activa });
     DATA.ubicaciones[idx] = _ubicacionSbToObj(ubicacion);
+    _ubiResaltar = ubicacion.id_ubicacion;
     showToast(activa ? 'Ubicación reactivada' : 'Ubicación desactivada', 'success');
     renderAll();
   } catch (e) {
