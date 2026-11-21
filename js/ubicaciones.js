@@ -48,9 +48,9 @@ let _ubiResaltar = ''; // ubicación recién guardada: se enseña y se marca un 
 // Sitios con la lista de lo que contienen desplegada (por ID). Se ve ahí mismo,
 // sin saltar a Inventario: cambiar de pantalla hacía perder el hilo.
 const _ubiItemsAbiertos = new Set();
-// Sitio en el que se está inventariando: tras guardar, su buscador de "añadir"
-// se vuelve a abrir para seguir apuntando lo siguiente sin más clics.
-let _ubiAnadirSeguir = '';
+// Sitios con el buscador de "añadir" abierto: sigue abierto tras guardar (y tras
+// cada repintado) para seguir apuntando lo siguiente sin más clics.
+const _ubiAnadirAbiertos = new Set();
 
 function toggleUbiItems(idUbicacion) {
   const abierto = !_ubiItemsAbiertos.has(idUbicacion);
@@ -121,6 +121,7 @@ function abrirAnadirUbi(idUbicacion) {
   const btn = document.getElementById('ubiadd-btn-' + k);
   if (!cont) return;
   const abrir = cont.style.display === 'none';
+  abrir ? _ubiAnadirAbiertos.add(idUbicacion) : _ubiAnadirAbiertos.delete(idUbicacion);
   cont.style.display = abrir ? '' : 'none';
   if (btn) btn.style.display = abrir ? 'none' : '';
   if (!abrir) { cont.innerHTML = ''; return; }
@@ -201,7 +202,7 @@ async function guardarAnadirMaterialUbi(idUbicacion, idMat) {
     const { sustituido, antes } = await callEdgeFunction('gestionar-material', { accion: 'anadir_en_ubicacion', id_material: idMat, id_ubicacion: idUbicacion, cantidad, unidad });
     await loadAllData();
     _ubiItemsAbiertos.add(idUbicacion);
-    _ubiAnadirSeguir = idUbicacion;
+    _ubiAnadirAbiertos.add(idUbicacion);
     showToast(sustituido ? `${m?.Nombre}: ${antes} → ${cantidad} ${unidad}` : `${m?.Nombre} apuntado aquí (${cantidad} ${unidad})`, 'success');
     renderAll();
   } catch (e) { showToast(e.message || 'No se pudo guardar', 'error'); console.error(e); }
@@ -219,7 +220,7 @@ async function _ubiAnadirEquipo(idUbicacion, idActivo) {
     const i = DATA.equipos.findIndex(x => x.ID_Activo === idActivo);
     if (i >= 0) DATA.equipos[i] = _equipoSbToObj(equipo);
     _ubiItemsAbiertos.add(idUbicacion);
-    _ubiAnadirSeguir = idUbicacion;
+    _ubiAnadirAbiertos.add(idUbicacion);
     showToast(`${idActivo} apuntado aquí`, 'success');
     renderAll();
   } catch (err) { showToast(err.message || 'No se pudo guardar', 'error'); console.error(err); }
@@ -230,7 +231,7 @@ async function _ubiAnadirEquipo(idUbicacion, idActivo) {
 // con este sitio desplegado y el buscador de añadir otra vez abierto.
 function _ubiNuevoMaterial(idUbicacion, nombre) {
   _ubiItemsAbiertos.add(idUbicacion);
-  _ubiAnadirSeguir = idUbicacion;
+  _ubiAnadirAbiertos.add(idUbicacion);
   openModalMaterial();
   if (nombre) sv('mat-nombre', nombre);
   seleccionarUbicacionMatLote(idUbicacion, '');
@@ -238,7 +239,7 @@ function _ubiNuevoMaterial(idUbicacion, nombre) {
 
 function _ubiNuevoEquipo(idUbicacion) {
   _ubiItemsAbiertos.add(idUbicacion);
-  _ubiAnadirSeguir = idUbicacion;
+  _ubiAnadirAbiertos.add(idUbicacion);
   openModalEquipo();
   seleccionarUbicacionEquipo(idUbicacion, descripcionUbicacion(DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion)));
 }
@@ -427,11 +428,10 @@ function renderUbicaciones() {
     </div>`;
   }).join('');
 
-  if (_ubiAnadirSeguir) {
-    const idU = _ubiAnadirSeguir;
-    _ubiAnadirSeguir = '';
-    if (document.getElementById('ubiadd-' + _ubiClaveId(idU))) abrirAnadirUbi(idU);
-  }
+  _ubiAnadirAbiertos.forEach(idU => {
+    const c = document.getElementById('ubiadd-' + _ubiClaveId(idU));
+    if (c && c.style.display === 'none') { _ubiAnadirAbiertos.delete(idU); abrirAnadirUbi(idU); }
+  });
 
   if (_ubiResaltar) {
     const fila = document.getElementById('ubi-row-' + _ubiResaltar);
