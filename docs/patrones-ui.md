@@ -88,3 +88,12 @@ equipo (lo llama `buildMantenimientoEquipo` en `js/mantenimiento.js`):
   negrita/cursiva/código, enlaces y URLs sueltas); escapa todo el texto antes de dar formato. Si un
   protocolo nuevo usa algo más (imágenes, bloques de código ```), hay que añadirlo en `_mdRender`.
 - `position: sticky` no funciona dentro del `<details>` en Chrome: por eso la barra de búsqueda no se queda fija al hacer scroll.
+
+## Ubicaciones: siempre con zona y subzona (2026-11-21)
+Nadie se sabe los códigos (`205-ZC-2.3`) de memoria: en cualquier sitio donde se muestre
+una ubicación tiene que salir también su zona y subzona. Usar `getNombreUbicacion(id)`
+(`js/config.js`) → `205-ZC-2.3 – Zona común · Reactivos · Inferior`, o
+`descripcionUbicacion(u)` si el código ya se pinta aparte. Sin subzona se usa
+`Descripcion_Completa`. El código va siempre delante: zona y subzona solas no
+identifican el sitio (siete «Izquierda · Encimera» en el 201). Para **elegir** una
+ubicación, el selector de `js/ubic-picker.js` (no un `<select>` con todas).

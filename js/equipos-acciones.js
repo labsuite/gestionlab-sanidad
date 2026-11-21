@@ -1775,11 +1775,13 @@ function buscarUbicacionEquipo(query) {
     u.Activa !== 'FALSE' &&
     (u.ID_Ubicacion.toLowerCase().includes(q) ||
      (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
-     (u.Zona || '').toLowerCase().includes(q))
+     (u.Zona || '').toLowerCase().includes(q) ||
+     (u.Subzona || '').toLowerCase().includes(q) ||
+     (u.Descripcion_Completa || '').toLowerCase().includes(q))
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {
-    const label = (u.Laboratorio_Aula || '') + (u.Zona ? ' · ' + u.Zona : '');
+    const label = ['Lab ' + (u.Laboratorio_Aula || ''), descripcionUbicacion(u)].filter(x => x && x !== 'Lab ').join(' · ');
     return `<div class="autocomplete-item" onclick="seleccionarUbicacionEquipo('${u.ID_Ubicacion}','${label.replace(/'/g,"\\'")}')">
       <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${label}</div></div>
     </div>`;

@@ -306,7 +306,7 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
       <td><strong>${e.ID_Activo}</strong></td>
       <td>${e.Tipo_Equipo||'—'}</td>
       <td>${[e.Marca,e.Modelo].filter(Boolean).join(' · ')||'—'}</td>
-      <td>${e.Ubicacion||'—'}</td>
+      <td>${e.Ubicacion ? _esc(getNombreUbicacion(e.Ubicacion)) : '—'}</td>
       <td>${e.Responsable||'—'}</td>
       <td><span class="badge ${estadoBadge}"><span class="dot"></span>${e.Estado_Operativo||'—'}</span>${impactoBadge}${badgeEquipoFuera(e.ID_Activo, true)}</td>
       <td>${planStatus}</td>

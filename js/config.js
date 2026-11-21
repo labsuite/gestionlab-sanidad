@@ -203,10 +203,29 @@ function getMinOptLabel(mat) {
 }
 
 /** Nombre de la ubicación a partir de su ID */
+// Desde 2026-11-21 una ubicación se muestra SIEMPRE con su zona y subzona,
+// no solo con el código: nadie se sabe "205-ZC-2.3" de memoria, y lo que
+// orienta es "Reactivos · Inferior". El código va primero (zona y subzona
+// solas no identifican el sitio: hay siete "Izquierda · Encimera" en el 201).
+// Si el laboratorio tiene apellido ("205 - Zona común", "207 - Residuos")
+// también sale. Sin subzona se usa la descripción.
 function getNombreUbicacion(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion;
-  return u.Laboratorio_Aula ? `${u.ID_Ubicacion} – ${u.Laboratorio_Aula}` : u.ID_Ubicacion;
+  const desc = descripcionUbicacion(u);
+  return desc ? `${u.ID_Ubicacion} – ${desc}` : (u.Laboratorio_Aula ? `${u.ID_Ubicacion} – Lab ${u.Laboratorio_Aula}` : u.ID_Ubicacion);
+}
+
+/** "Zona común · Reactivos · Inferior" — zona/subzona (y apellido del laboratorio) sin el código. */
+function descripcionUbicacion(u) {
+  if (!u) return '';
+  const apellidoLab = ((u.Laboratorio_Aula || '').match(/^\d{3}\s*-\s*(.+)$/) || [])[1] || '';
+  const partes = [];
+  [apellidoLab, u.Zona, u.Subzona || u.Descripcion_Completa].forEach(p => {
+    p = (p || '').trim();
+    if (p && !partes.some(x => x.toLowerCase() === p.toLowerCase())) partes.push(p);
+  });
+  return partes.join(' · ');
 }
 
 // ============================================================

@@ -200,7 +200,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   const dlUbi = document.getElementById('ubicaciones-datalist');
   if (dlUbi) {
     dlUbi.innerHTML = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE').map(u => {
-      const label = [u.ID_Ubicacion, u.Zona, u.Subzona].filter(Boolean).join(' · ');
+      const label = [u.ID_Ubicacion, descripcionUbicacion(u)].filter(Boolean).join(' · ');
       return `<option value="${u.ID_Ubicacion}">${label}</option>`;
     }).join('');
   }
@@ -588,7 +588,7 @@ function buscarMaterialGenerico(query, listId, hiddenId, selectedId) {
     const min   = getStockMinTotal(m);
     const stockClass = stock === 0 || (min > 0 && stock <= min) ? 'low' : 'ok';
     return `<div class="autocomplete-item" onclick="seleccionarMaterial('${m.ID_Material}','${m.Nombre.replace(/'/g,"\\'")}','${listId}','${hiddenId}','${selectedId}')">
-      <div><div class="autocomplete-item-name">${m.Nombre}</div><div class="autocomplete-item-meta">${m.Categoria || ''} · ${m.Ubicacion || ''}</div></div>
+      <div><div class="autocomplete-item-name">${m.Nombre}</div><div class="autocomplete-item-meta">${m.Categoria || ''} · ${m.Ubicacion ? _esc(getNombreUbicacion(m.Ubicacion)) : ''}</div></div>
       <div class="autocomplete-item-stock ${stockClass}">${stock} ${m.Unidad || ''}</div>
     </div>`;
   }).join('');
@@ -629,13 +629,18 @@ function buscarUbicacionMat(query) {
     u.Activa !== 'FALSE' &&
     (u.ID_Ubicacion.toLowerCase().includes(q) ||
      (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
-     (u.Zona || '').toLowerCase().includes(q))
+     (u.Zona || '').toLowerCase().includes(q) ||
+     (u.Subzona || '').toLowerCase().includes(q) ||
+     (u.Descripcion_Completa || '').toLowerCase().includes(q))
   ).sort((a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }))
    .slice(0, 15);
   if (!resultados.length) { list.classList.remove('open'); return; }
-  list.innerHTML = resultados.map(u => `<div class="autocomplete-item" onclick="seleccionarUbicacionMatLote('${u.ID_Ubicacion}','${(u.Laboratorio_Aula + (u.Zona ? ' · ' + u.Zona : '')).replace(/'/g,"\\'")}')">
-    <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${u.Laboratorio_Aula || ''}${u.Zona ? ' · ' + u.Zona : ''}</div></div>
-  </div>`).join('');
+  list.innerHTML = resultados.map(u => {
+    const label = [u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '', descripcionUbicacion(u)].filter(Boolean).join(' · ');
+    return `<div class="autocomplete-item" onclick="seleccionarUbicacionMatLote('${u.ID_Ubicacion}','${label.replace(/'/g,"\\'")}')">
+    <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${_esc(label)}</div></div>
+  </div>`;
+  }).join('');
   list.classList.add('open');
 }
 
@@ -1397,7 +1402,8 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
     labs.map(l => `<option value="${_escAttr(l)}" ${l === lab ? 'selected' : ''}>${_esc(l)}</option>`).join('');
 
   const yaHay  = _ubicsConMaterial(_destinoMatIds[idSelect], idOrigen);
-  const opt    = u => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(_nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
+  // En "★ Ya hay de este material" no hay optgroup de zona: la zona va en el texto.
+  const opt    = (u, conZona) => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(conZona && u.Zona && u.Zona !== _nombreSitio(u) ? u.Zona + ' · ' + _nombreSitio(u) : _nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
   const porId  = (a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true });
   const ubics  = activas.filter(u => labDe(u) === lab);
   const conMat = ubics.filter(u => yaHay.has(u.ID_Ubicacion)).sort(porId);
@@ -1405,9 +1411,9 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
   const zonas  = [...new Set(resto.map(u => u.Zona || 'Sin zona'))].sort();
   selDest.disabled = !lab;
   selDest.innerHTML = `<option value="">${lab ? 'Sitio…' : '← Elige laboratorio'}</option>` +
-    (conMat.length ? `<optgroup label="★ Ya hay de este material">${conMat.map(opt).join('')}</optgroup>` : '') +
+    (conMat.length ? `<optgroup label="★ Ya hay de este material">${conMat.map(u => opt(u, true)).join('')}</optgroup>` : '') +
     zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
-      resto.filter(u => (u.Zona || 'Sin zona') === z).sort(porId).map(opt).join('') + '</optgroup>').join('');
+      resto.filter(u => (u.Zona || 'Sin zona') === z).sort(porId).map(u => opt(u)).join('') + '</optgroup>').join('');
 
   _pintarSugerencias(idSelect, idOrigen);
 }
@@ -1741,7 +1747,7 @@ function buscarDestinoSubdiv(i, query) {
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {
-    const label = [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(' · ');
+    const label = [u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '', descripcionUbicacion(u)].filter(Boolean).join(' · ');
     return `<div class="autocomplete-item" onclick="seleccionarDestinoSubdiv(${i},'${u.ID_Ubicacion}')">
       <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${label}</div></div>
     </div>`;

@@ -1795,7 +1795,7 @@ function _pasoDosImportarProfesores() {
       <tr data-buscar="${_escAttr(buscar)}">
         <td><input type="checkbox" class="importar-equipo-check" data-email="${_escAttr(p.email)}" data-modmatch="${coincideModulo ? '1' : '0'}" value="${_escAttr(e.ID_Activo)}" ${coincideModulo ? 'checked' : ''} onchange="_actualizarContadorEquiposImportar('${_escAttr(p.email)}')"></td>
         <td>${e.Tipo_Equipo || '—'} ${e.Marca || ''} ${e.Modelo || ''} <span style="color:var(--text-muted)">(${e.ID_Activo})</span></td>
-        <td>${e.Ubicacion || '—'}</td>
+        <td>${e.Ubicacion ? _esc(getNombreUbicacion(e.Ubicacion)) : '—'}</td>
         <td style="color:var(--text-muted);font-size:12px">${modulosEquipo.join(', ') || '—'}</td>
         <td style="color:var(--text-muted);font-size:12px">${e.Responsable || '—'}</td>
       </tr>`;
