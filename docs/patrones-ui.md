@@ -122,5 +122,5 @@ equipos; material → «hay N» con `gestionar-material` → `anadir_en_ubicacio
 constaba un bote de esa unidad ahí, lo contado **sustituye** a su stock, como en
 Inventariar; si no, crea el bote; el material legacy se materializa antes); equipo →
 `cambiar_ubicacion`. Si no existe, «Material nuevo» / «Equipo nuevo» abren el alta con el
-sitio puesto. Tras guardar, el buscador del mismo sitio se reabre (`_ubiAnadirSeguir`)
+sitio puesto. Tras guardar, el buscador del mismo sitio sigue abierto (`_ubiAnadirAbiertos`)
 para seguir con lo siguiente.
