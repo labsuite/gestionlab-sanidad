@@ -242,7 +242,6 @@ function _ubiNuevoEquipo(idUbicacion) {
   openModalEquipo();
   seleccionarUbicacionEquipo(idUbicacion, descripcionUbicacion(DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion)));
 }
-}
 
 // ── Mover un ítem mal ubicado, ahí mismo ───────────────────────────────
 // clave: 'lote:<ID bote>' | 'mat:<ID material sin botes>' | 'eq:<ID activo>'
