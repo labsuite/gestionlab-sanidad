@@ -97,3 +97,10 @@ una ubicación tiene que salir también su zona y subzona. Usar `getNombreUbicac
 `Descripcion_Completa`. El código va siempre delante: zona y subzona solas no
 identifican el sitio (siete «Izquierda · Encimera» en el 201). Para **elegir** una
 ubicación, el selector de `js/ubic-picker.js` (no un `<select>` con todas).
+
+**Sección Ubicaciones** (`renderUbicaciones`, `js/ubicaciones.js`): buscador por código /
+laboratorio / zona / subzona / descripción; los laboratorios desplegados se recuerdan por
+nombre en `_ubiAbiertos`, así que siguen abiertos tras guardar (antes `renderAll()` los
+cerraba todos); la fila recién guardada se centra en pantalla y se marca un momento
+(`_ubiResaltar`). El recuento de material cuenta los botes (`material_ubicaciones`), no solo
+`material.ubicacion`.
