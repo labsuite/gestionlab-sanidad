@@ -1889,3 +1889,18 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .ubi-mover-cant span { color: var(--text-muted); font-size: 11px; }
 .ubi-mover-botones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 .ubi-mover-botones .btn { font-size: 12px; padding: 5px 12px; }
+
+/* ── Ubicaciones: añadir lo que hay en un sitio ──────────────────────── */
+.ubi-itbtn-vacio { background: transparent; border: 1px dashed var(--border); color: var(--text-muted); }
+.ubi-itbtn-vacio:hover { border-color: var(--accent); color: var(--accent); }
+.ubi-itbtn-vacio.abierto { background: var(--accent); border: 1px solid var(--accent); color: #fff; }
+.ubi-vacio { font-size: 12px; color: var(--text-muted); padding: 4px 0 2px; }
+.ubi-anadir { margin-top: 6px; }
+.ubi-anadir-btn { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 10px; border: 1px dashed var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text-soft); font-family: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: border-color .15s, color .15s, background .15s; }
+.ubi-anadir-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.ubi-anadir-mas { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: var(--accent-light); color: var(--accent); font-size: 14px; line-height: 1; font-weight: 600; }
+.ubi-anadir-btn:hover .ubi-anadir-mas { background: var(--accent); color: #fff; }
+.ubi-anadir-nuevo { margin-top: 8px; font-size: 12px; color: var(--text-soft); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.ubi-anadir-form { margin-top: 8px; padding: 8px 10px; background: var(--surface2); border-radius: var(--radius-sm); font-size: 13px; }
+.ubi-anadir-form select { padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+.ubi-anadir-aviso { font-size: 11px; color: var(--warning); margin-top: 4px; }

@@ -103,7 +103,7 @@ function _ubiPanelItems(idUbicacion, abierto) {
   const k = _ubiClaveId(idUbicacion);
   const idJs = idUbicacion.replace(/'/g, "\\'");
   const anadir = puedeMover ? `<div class="ubi-anadir">
-      <button type="button" class="ubi-anadir-btn" id="ubiadd-btn-${k}" onclick="abrirAnadirUbi('${idJs}')">➕ Añadir algo que hay aquí</button>
+      <button type="button" class="ubi-anadir-btn" id="ubiadd-btn-${k}" onclick="abrirAnadirUbi('${idJs}')"><span class="ubi-anadir-mas">+</span> Añadir aquí</button>
       <div id="ubiadd-${k}" style="display:none"></div>
     </div>` : '';
   const vacio = !mats.length && !equipos.length ? `<div class="ubi-vacio">Aquí no consta nada todavía.</div>` : '';
