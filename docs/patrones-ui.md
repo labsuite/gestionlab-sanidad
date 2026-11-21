@@ -116,3 +116,11 @@ un bote, cuánto se mueve (por defecto, todo). Va a `gestionar-material` →
 con el del destino si es de la misma unidad) sin dejar un bote vacío atrás, y no aplica la
 regla de «desde zona común solo a un laboratorio». Equipos: `gestionar-equipo` →
 `cambiar_ubicacion`.
+**Inventariar desde la ubicación** (Admin/Gestor): al final de cada desplegable,
+«➕ Añadir algo que hay aquí» (y «＋ Añadir» en los sitios vacíos). Busca en material y
+equipos; material → «hay N» con `gestionar-material` → `anadir_en_ubicacion` (si ya
+constaba un bote de esa unidad ahí, lo contado **sustituye** a su stock, como en
+Inventariar; si no, crea el bote; el material legacy se materializa antes); equipo →
+`cambiar_ubicacion`. Si no existe, «Material nuevo» / «Equipo nuevo» abren el alta con el
+sitio puesto. Tras guardar, el buscador del mismo sitio se reabre (`_ubiAnadirSeguir`)
+para seguir con lo siguiente.

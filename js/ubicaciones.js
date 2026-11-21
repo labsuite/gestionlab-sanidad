@@ -48,6 +48,9 @@ let _ubiResaltar = ''; // ubicación recién guardada: se enseña y se marca un 
 // Sitios con la lista de lo que contienen desplegada (por ID). Se ve ahí mismo,
 // sin saltar a Inventario: cambiar de pantalla hacía perder el hilo.
 const _ubiItemsAbiertos = new Set();
+// Sitio en el que se está inventariando: tras guardar, su buscador de "añadir"
+// se vuelve a abrir para seguir apuntando lo siguiente sin más clics.
+let _ubiAnadirSeguir = '';
 
 function toggleUbiItems(idUbicacion) {
   const abierto = !_ubiItemsAbiertos.has(idUbicacion);
@@ -97,7 +100,148 @@ function _ubiPanelItems(idUbicacion, abierto) {
       ${btnMover(clave)}
     </div><div class="ubi-mover" id="ubimov-${_ubiClaveId(clave)}" style="display:none"></div></div>`;
   }).join('');
-  return `<div class="ubi-items" id="ubi-items-${_escAttr(idUbicacion)}" style="${abierto ? '' : 'display:none'}">${filasMat}${filasEq}</div>`;
+  const k = _ubiClaveId(idUbicacion);
+  const idJs = idUbicacion.replace(/'/g, "\\'");
+  const anadir = puedeMover ? `<div class="ubi-anadir">
+      <button type="button" class="ubi-anadir-btn" id="ubiadd-btn-${k}" onclick="abrirAnadirUbi('${idJs}')">➕ Añadir algo que hay aquí</button>
+      <div id="ubiadd-${k}" style="display:none"></div>
+    </div>` : '';
+  const vacio = !mats.length && !equipos.length ? `<div class="ubi-vacio">Aquí no consta nada todavía.</div>` : '';
+  return `<div class="ubi-items" id="ubi-items-${_escAttr(idUbicacion)}" style="${abierto ? '' : 'display:none'}">${vacio}${filasMat}${filasEq}${anadir}</div>`;
+}
+
+// ── Inventariar desde la ubicación: "aquí hay esto" ────────────────────
+// Se busca en el catálogo de material y en los equipos. Material: se dice cuánto
+// hay (si ya constaba aquí, lo contado sustituye a lo que había). Equipo: pasa a
+// estar aquí. Si no existe, se abre el alta (material o equipo) con este sitio
+// ya puesto; el modal se abre encima, sin salir de Ubicaciones.
+function abrirAnadirUbi(idUbicacion) {
+  const k = _ubiClaveId(idUbicacion);
+  const cont = document.getElementById('ubiadd-' + k);
+  const btn = document.getElementById('ubiadd-btn-' + k);
+  if (!cont) return;
+  const abrir = cont.style.display === 'none';
+  cont.style.display = abrir ? '' : 'none';
+  if (btn) btn.style.display = abrir ? 'none' : '';
+  if (!abrir) { cont.innerHTML = ''; return; }
+  const idJs = idUbicacion.replace(/'/g, "\\'");
+  cont.innerHTML = `<div class="ubi-mover">
+    <div class="ubi-mover-titulo">¿Qué hay en <b>${_escAttr(getNombreUbicacion(idUbicacion))}</b>?</div>
+    <input type="search" class="ubp-buscar" id="ubiadd-q-${k}" placeholder="🔎 Escribe el nombre: etanol, puntas, centrífuga…" autocomplete="off"
+      oninput="_ubiAnadirBuscar('${idJs}', this.value)">
+    <div id="ubiadd-res-${k}"></div>
+    <div class="ubi-mover-botones"><button type="button" class="btn btn-secondary" onclick="abrirAnadirUbi('${idJs}')">Cerrar</button></div>
+  </div>`;
+  document.getElementById('ubiadd-q-' + k)?.focus();
+}
+
+function _ubiAnadirBuscar(idUbicacion, txt) {
+  const k = _ubiClaveId(idUbicacion);
+  const res = document.getElementById('ubiadd-res-' + k);
+  if (!res) return;
+  const palabras = _ubiNorm(txt).trim().split(/\s+/).filter(Boolean);
+  if (!palabras.length) { res.innerHTML = ''; return; }
+  const ok = t => palabras.every(p => _ubiNorm(t).includes(p));
+  const idJs = idUbicacion.replace(/'/g, "\\'");
+  const mats = DATA.material.filter(m => ok([m.Nombre, m.Categoria, m.Referencia_Proveedor].join(' ')))
+    .sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es')).slice(0, 12);
+  const eqs = DATA.equipos.filter(e => ok([e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo, e.Numero_Serie].join(' '))).slice(0, 8);
+  const txtJs = String(txt).replace(/\\/g, '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+  const filas = [
+    ...mats.map(m => {
+      const aqui = getMatUbics(m.ID_Material).find(l => l.ID_Ubicacion === idUbicacion && !l.ID_Lote_Padre);
+      const donde = getMatUbics(m.ID_Material).map(l => l.ID_Ubicacion).filter((x, i, a) => a.indexOf(x) === i);
+      const meta = aqui ? `ya consta aquí: ${parseFloat(aqui.Stock_Local) || 0} ${aqui.Unidad_Lote || m.Unidad || ''}`
+        : donde.length ? `está en ${donde.slice(0, 3).join(', ')}${donde.length > 3 ? '…' : ''}` : (m.Ubicacion ? `está en ${m.Ubicacion}` : 'sin ubicar');
+      return `<button type="button" class="ubp-hueco" onclick="_ubiAnadirMaterial('${idJs}', '${m.ID_Material}')">
+        <span class="ubp-desc" style="color:var(--text)">🧪 ${_escAttr(m.Nombre)}</span><span class="ubp-stock">${_escAttr(meta)}</span></button>`;
+    }),
+    ...eqs.map(e => `<button type="button" class="ubp-hueco" onclick="_ubiAnadirEquipo('${idJs}', '${String(e.ID_Activo).replace(/'/g, "\\'")}')">
+        <span class="ubp-desc" style="color:var(--text)">🖥️ ${_escAttr([e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' '))} <span style="color:var(--text-muted)">${_escAttr(e.ID_Activo)}</span></span>
+        <span class="ubp-stock">${e.Ubicacion === idUbicacion ? 'ya está aquí' : e.Ubicacion ? 'está en ' + _escAttr(e.Ubicacion) : 'sin ubicar'}</span></button>`),
+  ].join('');
+  res.innerHTML = `${filas ? `<div class="ubp-lista" style="margin-top:6px">${filas}</div>` : `<div class="ubp-vacio">No está en el catálogo.</div>`}
+    <div class="ubi-anadir-nuevo">¿No sale? Dalo de alta aquí:
+      <button type="button" class="ubi-item-mover" onclick="_ubiNuevoMaterial('${idJs}', '${txtJs}')">🧪 Material nuevo</button>
+      <button type="button" class="ubi-item-mover" onclick="_ubiNuevoEquipo('${idJs}')">🖥️ Equipo nuevo</button>
+    </div>`;
+}
+
+function _ubiAnadirMaterial(idUbicacion, idMat) {
+  const k = _ubiClaveId(idUbicacion);
+  const res = document.getElementById('ubiadd-res-' + k);
+  const m = DATA.material.find(x => x.ID_Material === idMat);
+  if (!res || !m) return;
+  const unidades = [m.Unidad, ...String(m.Unidades_Extra || '').split(',')].map(u => (u || '').trim()).filter((u, i, a) => u && a.indexOf(u) === i);
+  const aqui = getMatUbics(idMat).find(l => l.ID_Ubicacion === idUbicacion && !l.ID_Lote_Padre);
+  const idJs = idUbicacion.replace(/'/g, "\\'");
+  res.innerHTML = `<div class="ubi-anadir-form">
+    <div style="font-weight:500;margin-bottom:6px">🧪 ${_escAttr(m.Nombre)}</div>
+    <label class="ubi-mover-cant">Hay <input type="number" id="ubiadd-cant-${k}" min="0" step="0.01" value="${aqui ? parseFloat(aqui.Stock_Local) || 0 : ''}">
+      ${unidades.length > 1 ? `<select id="ubiadd-uni-${k}">${unidades.map(u => `<option${(aqui?.Unidad_Lote || m.Unidad) === u ? ' selected' : ''}>${_escAttr(u)}</option>`).join('')}</select>`
+        : `${_escAttr(m.Unidad || '')}<input type="hidden" id="ubiadd-uni-${k}" value="${_escAttr(m.Unidad || '')}">`}
+    </label>
+    ${aqui ? `<div class="ubi-anadir-aviso">Ya constaba aquí con ${parseFloat(aqui.Stock_Local) || 0}: lo que pongas <b>sustituye</b> a esa cantidad (es un recuento, no se suma).</div>` : ''}
+    <div class="ubi-mover-botones">
+      <button type="button" class="btn btn-secondary" onclick="_ubiAnadirBuscar('${idJs}', document.getElementById('ubiadd-q-${k}').value)">← Volver</button>
+      <button type="button" class="btn btn-primary" onclick="guardarAnadirMaterialUbi('${idJs}', '${idMat}')">Guardar</button>
+    </div></div>`;
+  document.getElementById('ubiadd-cant-' + k)?.focus();
+}
+
+async function guardarAnadirMaterialUbi(idUbicacion, idMat) {
+  const k = _ubiClaveId(idUbicacion);
+  const raw = document.getElementById('ubiadd-cant-' + k)?.value;
+  const cantidad = parseFloat(raw);
+  if (raw === '' || !(cantidad >= 0)) { showToast('Indica cuánto hay', 'error'); return; }
+  const unidad = document.getElementById('ubiadd-uni-' + k)?.value || '';
+  const m = DATA.material.find(x => x.ID_Material === idMat);
+  showLoading('Guardando...');
+  try {
+    const { sustituido, antes } = await callEdgeFunction('gestionar-material', { accion: 'anadir_en_ubicacion', id_material: idMat, id_ubicacion: idUbicacion, cantidad, unidad });
+    await loadAllData();
+    _ubiItemsAbiertos.add(idUbicacion);
+    _ubiAnadirSeguir = idUbicacion;
+    showToast(sustituido ? `${m?.Nombre}: ${antes} → ${cantidad} ${unidad}` : `${m?.Nombre} apuntado aquí (${cantidad} ${unidad})`, 'success');
+    renderAll();
+  } catch (e) { showToast(e.message || 'No se pudo guardar', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function _ubiAnadirEquipo(idUbicacion, idActivo) {
+  const e = DATA.equipos.find(x => x.ID_Activo === idActivo);
+  if (!e) return;
+  if (e.Ubicacion === idUbicacion) { showToast('Ese equipo ya consta aquí', 'success'); return; }
+  if (e.Ubicacion && !confirm(`${idActivo} consta en ${getNombreUbicacion(e.Ubicacion)}. ¿Pasa a estar en ${getNombreUbicacion(idUbicacion)}?`)) return;
+  showLoading('Guardando...');
+  try {
+    const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'cambiar_ubicacion', id_activo: idActivo, ubicacion: idUbicacion });
+    const i = DATA.equipos.findIndex(x => x.ID_Activo === idActivo);
+    if (i >= 0) DATA.equipos[i] = _equipoSbToObj(equipo);
+    _ubiItemsAbiertos.add(idUbicacion);
+    _ubiAnadirSeguir = idUbicacion;
+    showToast(`${idActivo} apuntado aquí`, 'success');
+    renderAll();
+  } catch (err) { showToast(err.message || 'No se pudo guardar', 'error'); console.error(err); }
+  hideLoading();
+}
+
+// Alta nueva con el sitio ya puesto. Al guardar, renderAll() repinta Ubicaciones
+// con este sitio desplegado y el buscador de añadir otra vez abierto.
+function _ubiNuevoMaterial(idUbicacion, nombre) {
+  _ubiItemsAbiertos.add(idUbicacion);
+  _ubiAnadirSeguir = idUbicacion;
+  openModalMaterial();
+  if (nombre) sv('mat-nombre', nombre);
+  seleccionarUbicacionMatLote(idUbicacion, '');
+}
+
+function _ubiNuevoEquipo(idUbicacion) {
+  _ubiItemsAbiertos.add(idUbicacion);
+  _ubiAnadirSeguir = idUbicacion;
+  openModalEquipo();
+  seleccionarUbicacionEquipo(idUbicacion, descripcionUbicacion(DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion)));
+}
 }
 
 // ── Mover un ítem mal ubicado, ahí mismo ───────────────────────────────
@@ -250,7 +394,9 @@ function renderUbicaciones() {
       const idJs = u.ID_Ubicacion.replace(/'/g, "\\'");
       const matCell = (nMat || nEq)
         ? `<button type="button" class="ubi-itbtn${itemsAbiertos ? ' abierto' : ''}" id="ubi-itbtn-${_escAttr(u.ID_Ubicacion)}" onclick="toggleUbiItems('${idJs}')" title="Ver qué hay aquí">${[nMat ? `${nMat} ítem${nMat === 1 ? '' : 's'}` : '', nEq ? `${nEq} equipo${nEq === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ')} <span class="ubi-itbtn-flecha">▾</span></button>`
-        : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
+        : puedeEditar
+          ? `<button type="button" class="ubi-itbtn ubi-itbtn-vacio${itemsAbiertos ? ' abierto' : ''}" id="ubi-itbtn-${_escAttr(u.ID_Ubicacion)}" onclick="toggleUbiItems('${idJs}')" title="Apuntar lo que hay aquí">＋ Añadir</button>`
+          : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
       const sub = u.Subzona || '';
       const desc = u.Descripcion_Completa && u.Descripcion_Completa !== sub ? u.Descripcion_Completa : '';
       return `<div class="ubi-row${u.ID_Ubicacion === _ubiResaltar ? ' ubi-row-resaltada' : ''}" id="ubi-row-${_escAttr(u.ID_Ubicacion)}">
@@ -265,7 +411,7 @@ function renderUbicaciones() {
           ${puedeEditar && u.Activa === 'FALSE' ? `<button class="icon-btn" onclick="cambiarEstadoUbicacion(${DATA.ubicaciones.indexOf(u)}, true)" title="Reactivar">♻️</button>` : ''}
           ${puedeEditar ? `<button class="icon-btn danger" onclick="borrarUbicacion(${DATA.ubicaciones.indexOf(u)})" title="Eliminar">🗑️</button>` : ''}
         </div>
-      </div>${(nMat || nEq) ? _ubiPanelItems(u.ID_Ubicacion, itemsAbiertos) : ''}`;
+      </div>${(nMat || nEq || puedeEditar) ? _ubiPanelItems(u.ID_Ubicacion, itemsAbiertos) : ''}`;
     }).join('');
     return `<div class="ubi-grupo">
       <div class="ubi-grupo-header" onclick="toggleUbiGrupo('${grupoId}')" data-lab="${_escAttr(lab)}">
@@ -281,6 +427,12 @@ function renderUbicaciones() {
       </div>
     </div>`;
   }).join('');
+
+  if (_ubiAnadirSeguir) {
+    const idU = _ubiAnadirSeguir;
+    _ubiAnadirSeguir = '';
+    if (document.getElementById('ubiadd-' + _ubiClaveId(idU))) abrirAnadirUbi(idU);
+  }
 
   if (_ubiResaltar) {
     const fila = document.getElementById('ubi-row-' + _ubiResaltar);

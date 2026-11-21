@@ -289,6 +289,55 @@ Deno.serve(async (req) => {
   //    reparto de suministros, no de arreglar un error de inventario).
   // Con cantidad menor que la del bote se separa esa parte al destino.
   // Material "legacy" (sin botes): se cambia material.ubicacion.
+  // Inventariar desde la sección Ubicaciones (2026-11-21): "en este sitio hay N
+  // de este material". Es un recuento, no una compra: si ya había un bote de ese
+  // material (misma unidad) en el sitio, lo contado SUSTITUYE a su stock (mismo
+  // criterio que Inventariar → "ya existía", ver CLAUDE.md); si no, se crea el
+  // bote. Un material "legacy" (sin botes, con stock en la ficha) se materializa
+  // antes como bote en su sitio, o sincronizarStockMaterial borraría ese stock.
+  if (accion === "anadir_en_ubicacion") {
+    const { error: authError, supabaseAdmin, user } = await requireAdminOrGestor(req);
+    if (authError) return authError;
+    const { autor: usuario } = await autorRegistro(supabaseAdmin, user?.email || "", body.usuario);
+    const idMaterial = String(body.id_material || "").trim();
+    const idUbic = String(body.id_ubicacion || "").trim();
+    const cantidad = Number(body.cantidad);
+    if (!idMaterial || !idUbic) return jsonError("id_material e id_ubicacion son obligatorios", 400);
+    if (!(cantidad >= 0)) return jsonError("Indica cuánto hay", 400);
+    const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+    if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
+    const { data: ub } = await supabaseAdmin.from("ubicaciones").select("id_ubicacion").eq("id_ubicacion", idUbic).maybeSingle();
+    if (!ub) return jsonError(`No existe la ubicación "${idUbic}"`, 404);
+    const unidadPedida = String(body.unidad || "").trim();
+    const unidadLote = unidadPedida && unidadPedida !== (mat.unidad || "") ? unidadPedida : null;
+
+    let lotes = await getLotes(supabaseAdmin, idMaterial);
+    if (!lotes.length && mat.ubicacion && (Number(mat.stock_actual) || 0) > 0) {
+      await supabaseAdmin.from("material_ubicaciones").insert({
+        id: genId("LU"), id_material: idMaterial, id_ubicacion: mat.ubicacion,
+        stock_local: mat.stock_actual || 0, stock_minimo_local: mat.stock_minimo || 0,
+        stock_optimo_local: mat.stock_optimo || 0, unidad_lote: null,
+      });
+      lotes = await getLotes(supabaseAdmin, idMaterial);
+    }
+    const unidadDe = (l: any) => l.unidad_lote || mat.unidad || "";
+    const existente = lotes.find((l: any) => l.id_ubicacion === idUbic && !l.id_lote_padre && unidadDe(l) === (unidadLote || mat.unidad || ""));
+    if (existente) {
+      const antes = Number(existente.stock_local) || 0;
+      await supabaseAdmin.from("material_ubicaciones").update({ stock_local: cantidad }).eq("id", existente.id);
+      if (cantidad !== antes) await registrarMovimiento(supabaseAdmin, mat, "Ajuste", cantidad - antes, usuario, `Inventario en ${idUbic}: había ${antes}, se cuentan ${cantidad}`);
+    } else {
+      await supabaseAdmin.from("material_ubicaciones").insert({
+        id: genId("LU"), id_material: idMaterial, id_ubicacion: idUbic, stock_local: cantidad,
+        stock_minimo_local: 0, stock_optimo_local: 0, unidad_lote: unidadLote,
+      });
+      if (cantidad > 0) await registrarMovimiento(supabaseAdmin, mat, "Ajuste", cantidad, usuario, `Inventario en ${idUbic}`);
+    }
+    if (!mat.ubicacion) await supabaseAdmin.from("material").update({ ubicacion: idUbic }).eq("id_material", idMaterial);
+    await sincronizarStockMaterial(supabaseAdmin, idMaterial);
+    return jsonOk({ sustituido: !!existente, antes: existente ? Number(existente.stock_local) || 0 : null });
+  }
+
   if (accion === "corregir_ubicacion") {
     const { error: authError, supabaseAdmin, user } = await requireAdminOrGestor(req);
     if (authError) return authError;
