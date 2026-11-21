@@ -64,11 +64,11 @@ function _ubiContenido(idUbicacion) {
   const mats = lotes.map(l => {
     const m = DATA.material.find(x => x.ID_Material === l.ID_Material);
     return { nombre: m?.Nombre || l.ID_Material, stock: parseFloat(l.Stock_Local) || 0,
-             unidad: l.Unidad_Lote || m?.Unidad || '', alicuota: !!l.ID_Lote_Padre, idMat: l.ID_Material };
+             unidad: l.Unidad_Lote || m?.Unidad || '', alicuota: !!l.ID_Lote_Padre, idMat: l.ID_Material, loteId: l.ID };
   });
   // Material "legacy": sin botes, con la ubicación en su ficha.
   DATA.material.filter(m => m.Ubicacion === idUbicacion && !getMatUbics(m.ID_Material).length)
-    .forEach(m => mats.push({ nombre: m.Nombre, stock: parseFloat(m.Stock_Actual) || 0, unidad: m.Unidad || '', alicuota: false, idMat: m.ID_Material }));
+    .forEach(m => mats.push({ nombre: m.Nombre, stock: parseFloat(m.Stock_Actual) || 0, unidad: m.Unidad || '', alicuota: false, idMat: m.ID_Material, loteId: '' }));
   mats.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const equipos = DATA.equipos.filter(e => e.Ubicacion === idUbicacion)
     .sort((a, b) => (a.ID_Activo || '').localeCompare(b.ID_Activo || '', 'es', { numeric: true }));
@@ -77,15 +77,107 @@ function _ubiContenido(idUbicacion) {
 
 function _ubiPanelItems(idUbicacion, abierto) {
   const { mats, equipos } = _ubiContenido(idUbicacion);
-  const filasMat = mats.map(x => `<div class="ubi-item">
+  const rol = getUserRole();
+  const puedeMover = rol === 'Administrador' || rol === 'Gestor';
+  const btnMover = clave => puedeMover
+    ? `<button type="button" class="ubi-item-mover" onclick="abrirMoverUbi('${clave}')" title="Está mal ubicado: cambiarlo de sitio">📍 Mover</button>` : '';
+  const filasMat = mats.map(x => {
+    const clave = x.loteId ? 'lote:' + x.loteId : 'mat:' + x.idMat;
+    return `<div class="ubi-item-bloque"><div class="ubi-item">
       <span class="ubi-item-nombre">🧪 ${_escAttr(x.nombre)}${x.alicuota ? ' <span class="ubi-item-tag">alícuota</span>' : ''}</span>
       <span class="ubi-item-stock${x.stock <= 0 ? ' agotado' : ''}">${x.stock} ${_escAttr(x.unidad)}</span>
-    </div>`).join('');
-  const filasEq = equipos.map(e => `<div class="ubi-item">
+      ${btnMover(clave)}
+    </div><div class="ubi-mover" id="ubimov-${_ubiClaveId(clave)}" style="display:none"></div></div>`;
+  }).join('');
+  const filasEq = equipos.map(e => {
+    const clave = 'eq:' + e.ID_Activo;
+    return `<div class="ubi-item-bloque"><div class="ubi-item">
       <span class="ubi-item-nombre">🖥️ ${_escAttr([e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' '))}</span>
       <span class="ubi-item-stock">${_escAttr(e.ID_Activo)}</span>
-    </div>`).join('');
+      ${btnMover(clave)}
+    </div><div class="ubi-mover" id="ubimov-${_ubiClaveId(clave)}" style="display:none"></div></div>`;
+  }).join('');
   return `<div class="ubi-items" id="ubi-items-${_escAttr(idUbicacion)}" style="${abierto ? '' : 'display:none'}">${filasMat}${filasEq}</div>`;
+}
+
+// ── Mover un ítem mal ubicado, ahí mismo ───────────────────────────────
+// clave: 'lote:<ID bote>' | 'mat:<ID material sin botes>' | 'eq:<ID activo>'
+function _ubiClaveId(clave) { return clave.replace(/[^A-Za-z0-9_-]/g, '_'); }
+
+function _ubiDatosClave(clave) {
+  const [tipo, ...resto] = clave.split(':');
+  const id = resto.join(':');
+  if (tipo === 'lote') {
+    const l = DATA.materialUbicaciones.find(x => x.ID === id);
+    const m = l && DATA.material.find(x => x.ID_Material === l.ID_Material);
+    return l && m ? { tipo, nombre: m.Nombre, origen: l.ID_Ubicacion, stock: parseFloat(l.Stock_Local) || 0, unidad: l.Unidad_Lote || m.Unidad || '', matId: m.ID_Material, loteId: id } : null;
+  }
+  if (tipo === 'mat') {
+    const m = DATA.material.find(x => x.ID_Material === id);
+    return m ? { tipo, nombre: m.Nombre, origen: m.Ubicacion, stock: parseFloat(m.Stock_Actual) || 0, unidad: m.Unidad || '', matId: id } : null;
+  }
+  const e = DATA.equipos.find(x => x.ID_Activo === id);
+  return e ? { tipo, nombre: [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' '), origen: e.Ubicacion, idActivo: id } : null;
+}
+
+function abrirMoverUbi(clave) {
+  const cont = document.getElementById('ubimov-' + _ubiClaveId(clave));
+  if (!cont) return;
+  if (cont.style.display !== 'none') { cont.style.display = 'none'; cont.innerHTML = ''; return; }
+  const d = _ubiDatosClave(clave);
+  if (!d) return;
+  const k = _ubiClaveId(clave);
+  // Solo con un bote se puede mover una parte; sin botes o un equipo, va entero.
+  const parcial = d.tipo === 'lote' && d.stock > 0;
+  cont.innerHTML = `
+    <div class="ubi-mover-titulo">¿Dónde está de verdad <b>${_escAttr(d.nombre)}</b>?</div>
+    ${parcial ? `<label class="ubi-mover-cant">Se mueven <input type="number" id="ubimov-cant-${k}" min="0" step="0.01" max="${d.stock}" value="${d.stock}"> de ${d.stock} ${_escAttr(d.unidad)} <span>(todo, si está entero en otro sitio)</span></label>` : ''}
+    ${ubicPickerHTML('ubimov-dest-' + k, { matId: d.matId || '', unidad: d.unidad || '' })}
+    <div class="ubi-mover-botones">
+      <button type="button" class="btn btn-secondary" onclick="abrirMoverUbi('${clave}')">Cancelar</button>
+      <button type="button" class="btn btn-primary" onclick="guardarMoverUbi('${clave}')">Mover aquí</button>
+    </div>`;
+  cont.style.display = '';
+}
+
+async function guardarMoverUbi(clave) {
+  const d = _ubiDatosClave(clave);
+  if (!d) return;
+  const k = _ubiClaveId(clave);
+  const destino = v('ubimov-dest-' + k);
+  if (!destino) { showToast('Elige el sitio correcto', 'error'); return; }
+  if (destino === d.origen) { showToast('Ya está en ese sitio', 'error'); return; }
+  let cantidad;
+  const inpCant = document.getElementById('ubimov-cant-' + k);
+  if (inpCant) {
+    cantidad = parseFloat(inpCant.value);
+    if (!(cantidad > 0) || cantidad > d.stock) { showToast(`Indica cuánto se mueve (como mucho ${d.stock})`, 'error'); return; }
+  }
+  showLoading('Moviendo...');
+  try {
+    if (d.tipo === 'eq') {
+      const { equipo } = await callEdgeFunction('gestionar-equipo', { accion: 'cambiar_ubicacion', id_activo: d.idActivo, ubicacion: destino });
+      const i = DATA.equipos.findIndex(e => e.ID_Activo === d.idActivo);
+      if (i >= 0) DATA.equipos[i] = _equipoSbToObj(equipo);
+    } else {
+      await callEdgeFunction('gestionar-material', {
+        accion: 'corregir_ubicacion', id_material: d.matId, lote_id: d.loteId || undefined,
+        id_destino_ubicacion: destino, cantidad,
+      });
+      await loadAllData();
+    }
+    // El sitio de destino también se despliega, para ver que ha llegado.
+    _ubiItemsAbiertos.add(d.origen);
+    _ubiItemsAbiertos.add(destino);
+    const uDest = DATA.ubicaciones.find(u => u.ID_Ubicacion === destino);
+    if (uDest) _ubiAbiertos.add(uDest.Laboratorio_Aula || 'Sin asignar');
+    showToast(`${d.nombre} → ${getNombreUbicacion(destino)}`, 'success');
+    renderAll();
+  } catch (e) {
+    showToast(e.message || 'No se pudo mover', 'error');
+    console.error(e);
+  }
+  hideLoading();
 }
 
 function _ubiNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }

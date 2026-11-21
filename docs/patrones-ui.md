@@ -109,3 +109,10 @@ pulsando «N ítems ▾» (`toggleUbiItems` / `_ubiPanelItems`), sin saltar a In
 cambiar de pantalla hacía perder el hilo. Los desplegados se recuerdan en `_ubiItemsAbiertos`.
 El buscador también encuentra por lo que hay dentro ("etanol" → sitios con etanol, ya
 desplegados).
+Cada ítem del desplegable tiene **📍 Mover** (Admin/Gestor) para corregir lo que está mal
+inventariado ahí mismo: se elige el sitio con el selector de `js/ubic-picker.js` y, si es
+un bote, cuánto se mueve (por defecto, todo). Va a `gestionar-material` →
+`corregir_ubicacion`, que **no es un traslado**: el bote entero cambia de sitio (o se funde
+con el del destino si es de la misma unidad) sin dejar un bote vacío atrás, y no aplica la
+regla de «desde zona común solo a un laboratorio». Equipos: `gestionar-equipo` →
+`cambiar_ubicacion`.

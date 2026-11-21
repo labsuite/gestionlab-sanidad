@@ -45,6 +45,17 @@ Deno.serve(async (req) => {
     return jsonOk({ equipo: data });
   }
 
+  // Solo la ubicación (desde la sección Ubicaciones, para corregir dónde está
+  // sin tener que reenviar la ficha entera).
+  if (accion === "cambiar_ubicacion") {
+    const ubicacion = String(body.ubicacion || "").trim() || null;
+    const { data, error } = await supabaseAdmin.from("equipos")
+      .update({ ubicacion }).eq("id_activo", idActivo).select().single();
+    if (error) return jsonError(`No se pudo cambiar la ubicación: ${error.message}`, 400);
+    if (!data) return jsonError(`No se encontró el equipo "${idActivo}"`, 404);
+    return jsonOk({ equipo: data });
+  }
+
   if (accion === "crear" || accion === "actualizar") {
     const tipoEquipo = String(body.tipo_equipo || "").trim();
     const marca = String(body.marca || "").trim();
@@ -114,5 +125,5 @@ Deno.serve(async (req) => {
     return jsonOk({ eliminado: idActivo });
   }
 
-  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado', 'cambiar_id' o 'eliminar'", 400);
+  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado', 'cambiar_ubicacion', 'cambiar_id' o 'eliminar'", 400);
 });

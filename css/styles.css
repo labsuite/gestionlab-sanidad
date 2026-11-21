@@ -1875,3 +1875,17 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .ubi-item-stock.agotado { color: var(--danger); }
 .ubi-item-tag { font-size: 10px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; }
 @media (max-width: 700px) { .ubi-items { padding-left: 20px; } }
+.ubi-item { align-items: center; }
+.ubi-item-bloque { border-bottom: 1px dashed var(--border); }
+.ubi-item-bloque:last-child { border-bottom: none; }
+.ubi-item-bloque .ubi-item { border-bottom: none; }
+.ubi-item-nombre { flex: 1; }
+.ubi-item-mover { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); font-size: 11px; padding: 2px 8px; cursor: pointer; font-family: inherit; color: var(--text-soft); white-space: nowrap; }
+.ubi-item-mover:hover { border-color: var(--accent); color: var(--accent); }
+.ubi-mover { background: var(--surface); border: 1px solid var(--accent); border-radius: var(--radius-sm); padding: 10px 12px; margin: 4px 0 8px; }
+.ubi-mover-titulo { font-size: 12px; margin-bottom: 6px; }
+.ubi-mover-cant { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text-soft); margin-bottom: 6px; }
+.ubi-mover-cant input { width: 70px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); text-align: center; font-size: 13px; }
+.ubi-mover-cant span { color: var(--text-muted); font-size: 11px; }
+.ubi-mover-botones { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+.ubi-mover-botones .btn { font-size: 12px; padding: 5px 12px; }

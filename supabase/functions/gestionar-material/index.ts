@@ -279,6 +279,86 @@ Deno.serve(async (req) => {
   }
 
   // ── acciones de Admin/Gestor ──
+  // Corregir dónde está un bote (2026-11-21), desde la sección Ubicaciones: algo
+  // se inventarió en el sitio equivocado. No es un movimiento de stock (el total
+  // no cambia), así que a diferencia de "traslado":
+  //  - si se mueve el bote ENTERO no deja un bote vacío en el sitio de origen:
+  //    el propio bote cambia de sitio, o se funde con el que ya hubiera en el
+  //    destino (misma unidad, ninguno es alícuota) y el de origen desaparece;
+  //  - no aplica la regla "de zona común solo a un laboratorio" (eso es del
+  //    reparto de suministros, no de arreglar un error de inventario).
+  // Con cantidad menor que la del bote se separa esa parte al destino.
+  // Material "legacy" (sin botes): se cambia material.ubicacion.
+  if (accion === "corregir_ubicacion") {
+    const { error: authError, supabaseAdmin, user } = await requireAdminOrGestor(req);
+    if (authError) return authError;
+    const { autor: usuario } = await autorRegistro(supabaseAdmin, user?.email || "", body.usuario);
+    const idMaterial = String(body.id_material || "").trim();
+    const destino = String(body.id_destino_ubicacion || "").trim();
+    if (!idMaterial || !destino) return jsonError("id_material e id_destino_ubicacion son obligatorios", 400);
+    const { data: ubDest } = await supabaseAdmin.from("ubicaciones").select("id_ubicacion").eq("id_ubicacion", destino).maybeSingle();
+    if (!ubDest) return jsonError(`No existe la ubicación "${destino}"`, 404);
+    const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+    if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
+    const lotes = await getLotes(supabaseAdmin, idMaterial);
+    const loteId = strField(body.lote_id);
+
+    if (!loteId) {
+      if (lotes.length) return jsonError("Indica qué bote se mueve", 400);
+      if (mat.ubicacion === destino) return jsonError("Ya está en ese sitio", 400);
+      await supabaseAdmin.from("material").update({ ubicacion: destino }).eq("id_material", idMaterial);
+      await registrarMovimiento(supabaseAdmin, mat, "Traslado", Number(mat.stock_actual) || 0, usuario, `Corrección de ubicación: ${mat.ubicacion || "—"} → ${destino}`);
+      return jsonOk({ ok: true });
+    }
+
+    const lote = lotes.find((l: any) => l.id === loteId);
+    if (!lote) return jsonError("Ese bote ya no existe. Recarga la página.", 404);
+    const origen = lote.id_ubicacion;
+    if (origen === destino) return jsonError("Ya está en ese sitio", 400);
+    const stock = Number(lote.stock_local) || 0;
+    const cant = body.cantidad === undefined || body.cantidad === "" ? stock : Number(body.cantidad);
+    if (!(cant >= 0) || cant > stock) return jsonError(`Cantidad no válida (en ese bote hay ${stock})`, 400);
+    const entero = cant >= stock;
+    const unidad = (l: any) => l.unidad_lote || mat.unidad || "";
+    // Bote del destino con el que se puede fundir: normal, misma unidad.
+    const fundible = !lote.id_lote_padre
+      ? lotes.find((l: any) => l.id !== lote.id && l.id_ubicacion === destino && !l.id_lote_padre && unidad(l) === unidad(lote))
+      : null;
+
+    if (entero) {
+      if (fundible) {
+        await supabaseAdmin.from("material_ubicaciones").update({
+          stock_local: (Number(fundible.stock_local) || 0) + stock,
+          stock_minimo_local: (Number(fundible.stock_minimo_local) || 0) + (Number(lote.stock_minimo_local) || 0),
+          stock_optimo_local: (Number(fundible.stock_optimo_local) || 0) + (Number(lote.stock_optimo_local) || 0),
+        }).eq("id", fundible.id);
+        // Sus alícuotas pasan a colgar del bote con el que se ha fundido.
+        await supabaseAdmin.from("material_ubicaciones").update({ id_lote_padre: fundible.id }).eq("id_lote_padre", lote.id);
+        await supabaseAdmin.from("material_ubicaciones").delete().eq("id", lote.id);
+      } else {
+        await supabaseAdmin.from("material_ubicaciones").update({ id_ubicacion: destino }).eq("id", lote.id);
+      }
+      // La ubicación "principal" de la ficha sigue al material si se ha quedado sin nada allí.
+      if (mat.ubicacion === origen && !lotes.some((l: any) => l.id !== lote.id && l.id_ubicacion === origen)) {
+        await supabaseAdmin.from("material").update({ ubicacion: destino }).eq("id_material", idMaterial);
+      }
+    } else {
+      if (cant <= 0) return jsonError("Indica cuánto se mueve", 400);
+      await supabaseAdmin.from("material_ubicaciones").update({ stock_local: stock - cant }).eq("id", lote.id);
+      if (fundible) {
+        await supabaseAdmin.from("material_ubicaciones").update({ stock_local: (Number(fundible.stock_local) || 0) + cant }).eq("id", fundible.id);
+      } else {
+        await supabaseAdmin.from("material_ubicaciones").insert({
+          id: genId("LU"), id_material: idMaterial, id_ubicacion: destino, stock_local: cant,
+          stock_minimo_local: 0, stock_optimo_local: 0, unidad_lote: lote.unidad_lote, id_lote_padre: lote.id_lote_padre || null,
+        });
+      }
+    }
+    await sincronizarStockMaterial(supabaseAdmin, idMaterial);
+    await registrarMovimiento(supabaseAdmin, mat, "Traslado", cant, usuario, `Corrección de ubicación: ${origen} → ${destino}`);
+    return jsonOk({ lotes: await getLotes(supabaseAdmin, idMaterial) });
+  }
+
   if (accion === "crear" || accion === "actualizar" || accion === "entrada" || accion === "subdivision" || accion === "eliminar_lote") {
     const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
     if (authError) return authError;
