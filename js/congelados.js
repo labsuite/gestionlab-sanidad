@@ -473,7 +473,7 @@ function _congRenderFicha(m, gestiona) {
   add('Formato', _congEsc(_CONG_FORMATOS[m.Formato] || m.Formato));
   if (t.pase && m.Pase != null) {
     const ep = _congEstadoPase(m);
-    add('Pase', _congEsc(m.Pase) + (ep ? ` <span style="color:var(--text-muted)">de ${ep.max} como máximo</span>` : '')
+    add('Pase', _congEsc(m.Pase) + (ep && !ep.clase ? ` <span style="color:var(--text-muted)">(máximo ${ep.max})</span>` : '')
       + (ep?.texto ? ` <span class="badge ${ep.clase}" style="margin-left:4px">${ep.texto}</span>` : ''));
   }
   if (m.Tipo === 'Cepa') {
@@ -485,6 +485,7 @@ function _congRenderFicha(m, gestiona) {
   }
   t.campos.forEach(c => {
     if (c.k === 'pase_max') return;   // va junto al pase
+    if ((c.k === 'ref_lote' || c.k === 'ref_apertura') && _congTextoReferencia(m)) return;   // van en «Cepa de referencia»
     let val = m.Datos?.[c.k];
     if (val && c.tipo === 'date') val = _congFecha(val);
     if (c.k === 'grupo_riesgo' && val) val = 'Grupo ' + val;
