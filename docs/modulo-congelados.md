@@ -30,10 +30,29 @@ sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
 ## Estado
 
 1. ✅ **Cajas y cuadrícula** (tabla `cajas_congelado`). Las cajas no se borran: se
-   *retiran* (`activa = false`) y se pueden reactivar; retirar exige que esté vacía.
-2. ⏳ Alta de muestras por tipo y formato, enlace con Material fungible.
-3. ⏳ Usos, bolitas/volumen/descongelaciones, historial y árbol de pases.
+   *retiran* (`activa = false`) y se pueden reactivar; retirar exige que esté vacía
+   (lo comprueba también el servidor).
+2. ✅ **Muestras** (tabla `muestras_congeladas`), ver abajo.
+3. ⏳ Usos (restar bolitas / volumen, sumar descongelaciones, sacar tubos de un uso), historial
+   y árbol de pases (`id_lote_origen`). Es lo único que podrá hacer el alumnado.
 
-`_congMuestrasDeCaja()` ya lee `DATA.muestrasCongeladas` (campos `ID_Caja`, `Posicion`,
-`Nombre`, `Abreviatura`, `Estado`) para pintar la cuadrícula: la parte 2 solo tiene que
-cargar esa tabla con esos nombres.
+## Muestras (parte 2)
+
+- **Una fila por tubo**, cada una en una casilla. Los tubos del mismo stock comparten
+  `id_lote`: al editar, nombre, tipo, formato, fechas, material y `datos` se aplican a todo el
+  lote; caja/casilla y cantidad que queda, solo a ese tubo (`editar_muestra`).
+- Índice único parcial `uq_muestras_congeladas_casilla (id_caja, posicion) where estado =
+  'Disponible'`: un tubo por casilla; los descartados/agotados liberan la casilla.
+- Alta (`crear_muestras`): N tubos de golpe desde una casilla, ocupando las siguientes libres
+  por filas (A1, A2… B1…), calculado en el cliente con `_congCasillasLibres()` y validado
+  otra vez en el servidor (casilla dentro de la caja y libre).
+- Los tipos y sus campos propios se definen en `_CONG_TIPOS` (`js/congelados.js`); los campos
+  van al jsonb `datos`. Para añadir un tipo hay que tocarlo ahí **y** en el `check` de `tipo`
+  de la tabla y en `TIPOS` de la Edge Function.
+- Cantidades: `Bolitas` → `cantidad_*` en bolitas (25 por defecto); `Tubo` → siempre 1;
+  `Volumen` → en `unidad` (µL/mL). «Queda poco» = ≤ 2 bolitas o < 20 % del volumen inicial.
+- Descartar (`descartar_muestra`): motivo obligatorio, el tubo o todo el lote; pasa a
+  `Descartada` con `fecha_baja`/`motivo_baja` y no se borra.
+- Pulsar una casilla vacía abre el alta en esa casilla; pulsar un tubo, su ficha (los demás
+  tubos del mismo lote se marcan con borde discontinuo). El buscador de arriba busca en
+  nombre, tipo, caja, material enlazado y datos propios.

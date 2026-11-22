@@ -917,3 +917,47 @@ create table if not exists cajas_congelado (
 create index if not exists idx_cajas_congelado_equipo on cajas_congelado (id_equipo);
 alter table cajas_congelado enable row level security;
 create policy "cajas_congelado_select_anon" on cajas_congelado for select to anon, authenticated using (true);
+
+-- ── Muestras congeladas · parte 2: muestras (2026-11-22) ────────────────
+-- Una fila por TUBO/VIAL físico: cada uno ocupa una casilla de una caja.
+-- Los tubos que salen del mismo stock comparten `id_lote` (nombre, tipo, pase
+-- y datos propios se editan para todo el lote; posición y cantidad, por tubo).
+-- formato: 'Bolitas' (cantidad = bolitas que quedan) · 'Tubo' (de un solo uso,
+-- cantidad = 1) · 'Volumen' (cantidad = volumen que queda, en `unidad`).
+-- `datos` guarda los campos propios de cada tipo (especie, colección, grupo de
+-- riesgo, concentración…), definidos en _CONG_TIPOS de js/congelados.js.
+-- Kits y master mix: `id_material` enlaza con el material del inventario de
+-- fungibles, que sigue llevando su stock, pedidos y caducidad.
+create table if not exists muestras_congeladas (
+  id_muestra         text primary key,
+  id_lote            text not null,
+  tipo               text not null check (tipo in ('Cepa','Línea celular','Ácido nucleico','Suero, plasma o alícuota','Kit o master mix')),
+  nombre             text not null,
+  abreviatura        text,
+  id_caja            text not null references cajas_congelado(id_caja) on update cascade,
+  posicion           text not null,
+  formato            text not null check (formato in ('Bolitas','Tubo','Volumen')),
+  cantidad_inicial   numeric,
+  cantidad_actual    numeric,
+  unidad             text,
+  descongelaciones   integer not null default 0,
+  pase               integer,
+  id_lote_origen     text,          -- stock del que se hizo este (parte 3)
+  fecha_congelacion  date,
+  caducidad          date,
+  id_material        text references material(id_material) on update cascade on delete set null,
+  datos              jsonb not null default '{}'::jsonb,
+  observaciones      text,
+  estado             text not null default 'Disponible' check (estado in ('Disponible','Agotada','Descartada')),
+  fecha_baja         date,
+  motivo_baja        text,
+  creado_por         text,
+  fecha_alta         timestamptz not null default now()
+);
+create index if not exists idx_muestras_congeladas_caja on muestras_congeladas (id_caja);
+create index if not exists idx_muestras_congeladas_lote on muestras_congeladas (id_lote);
+-- Una casilla, un tubo (solo cuentan los que siguen en la caja)
+create unique index if not exists uq_muestras_congeladas_casilla
+  on muestras_congeladas (id_caja, posicion) where estado = 'Disponible';
+alter table muestras_congeladas enable row level security;
+create policy "muestras_congeladas_select_anon" on muestras_congeladas for select to anon, authenticated using (true);

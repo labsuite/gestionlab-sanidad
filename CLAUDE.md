@@ -20,7 +20,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-residuos.md` — GHS, ciclo de vida de contenedores, consultas, NFC/QR
 - `docs/modulo-reservas.md` — políticas BLOCK/COMPATIBLE, estados, 23 equipos configurados
 - `docs/modulo-registros-uso.md` — registros de calidad por sesión (cabina/autoclave/vitrina de gases), check-in/check-out NFC flexible; cada pestaña se describe entera en `_regConfig`
-- `docs/modulo-congelados.md` — **Muestras congeladas** (bloque «Uso del laboratorio»): congelador (equipo del inventario) → caja → casilla; formatos bolitas / tubo de un uso / volumen; kits de PCR enlazados a Material fungible. Parte 1 (cajas) hecha
+- `docs/modulo-congelados.md` — **Muestras congeladas** (bloque «Uso del laboratorio»): congelador (equipo del inventario) → caja → casilla; formatos bolitas / tubo de un uso / volumen; kits de PCR enlazados a Material fungible. Partes 1 (cajas) y 2 (muestras, un registro por tubo agrupados por lote) hechas
 - `docs/modulo-usuarios.md` — columnas Usuarios, lógica alumnos, ciclos/módulos, usuarios _sbOnly
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes

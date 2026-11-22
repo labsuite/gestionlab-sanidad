@@ -666,6 +666,36 @@ function _cajaCongeladoSbToObj(c) {
   };
 }
 
+function _muestraCongeladaSbToObj(m) {
+  const num = x => (x === null || x === undefined) ? null : Number(x);
+  return {
+    ID_Muestra: m.id_muestra || '',
+    ID_Lote: m.id_lote || '',
+    Tipo: m.tipo || '',
+    Nombre: m.nombre || '',
+    Abreviatura: m.abreviatura || '',
+    ID_Caja: m.id_caja || '',
+    Posicion: m.posicion || '',
+    Formato: m.formato || 'Tubo',
+    Cantidad_Inicial: num(m.cantidad_inicial),
+    Cantidad_Actual: num(m.cantidad_actual),
+    Unidad: m.unidad || '',
+    Descongelaciones: Number(m.descongelaciones) || 0,
+    Pase: num(m.pase),
+    ID_Lote_Origen: m.id_lote_origen || '',
+    Fecha_Congelacion: m.fecha_congelacion || '',
+    Caducidad: m.caducidad || '',
+    ID_Material: m.id_material || '',
+    Datos: m.datos || {},
+    Observaciones: m.observaciones || '',
+    Estado: m.estado || 'Disponible',
+    Fecha_Baja: m.fecha_baja || '',
+    Motivo_Baja: m.motivo_baja || '',
+    Creado_Por: m.creado_por || '',
+    Fecha_Alta: m.fecha_alta || '',
+  };
+}
+
 function _usuarioSbToObj(u) {
   return {
     ID_Usuario: u.id_usuario || '',
@@ -721,7 +751,7 @@ async function loadAllData() {
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
-           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes] = await Promise.all([
+           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -766,7 +796,8 @@ async function loadAllData() {
       _leerTablaCompleta('atributos_material', 'id_ficha').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('cajas_congelado', 'id_caja').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('cajas_congelado', 'id_caja').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('muestras_congeladas', 'id_muestra').then(r => r, () => ({ data: [] }))
     ]);
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
@@ -805,6 +836,7 @@ async function loadAllData() {
     DATA.registrosAutoclave      = (sbRegistrosAutoclaveRes?.data || []).map(_registroAutoclaveSbToObj);
     DATA.registrosVitrina        = (sbRegistrosVitrinaRes?.data || []).map(_registroVitrinaSbToObj);
     DATA.cajasCongelado          = (sbCajasCongeladoRes?.data || []).map(_cajaCongeladoSbToObj);
+    DATA.muestrasCongeladas      = (sbMuestrasCongeladasRes?.data || []).map(_muestraCongeladaSbToObj);
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];

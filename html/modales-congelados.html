@@ -53,3 +53,127 @@
     </div>
   </div>
 </div>
+
+<!-- NUEVA / EDITAR MUESTRA -->
+<div class="modal-overlay" id="modal-muestra">
+  <div class="modal" style="max-width:620px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-muestra-title">🧊 Nueva muestra</div>
+      <button class="modal-close" onclick="closeModal('modal-muestra')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="muestra-nota-lote" style="display:none;font-size:12px;background:var(--accent-light);color:var(--accent);padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:12px"></div>
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Tipo de muestra *</label>
+          <select id="muestra-tipo" onchange="_congCambiarTipo()"></select>
+        </div>
+        <div id="muestra-aviso-tipo" class="form-group full" style="display:none;font-size:12px;background:var(--warning-light);color:var(--warning);padding:8px 12px;border-radius:var(--radius-sm)"></div>
+        <div class="form-group full" id="muestra-material-grupo" style="display:none">
+          <label>Material del inventario (Material fungible)</label>
+          <input type="text" id="muestra-material" list="muestra-material-lista" placeholder="Escribe para buscar el kit o la master mix…">
+          <datalist id="muestra-material-lista"></datalist>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Su stock, pedidos y caducidad del envase siguen en Material fungible; aquí solo se apunta dónde está cada alícuota.</div>
+        </div>
+        <div class="form-group">
+          <label>Nombre *</label>
+          <input type="text" id="muestra-nombre">
+        </div>
+        <div class="form-group">
+          <label>Abreviatura (para la casilla)</label>
+          <input type="text" id="muestra-abreviatura" maxlength="6" placeholder="ej. Ec">
+        </div>
+      </div>
+
+      <div class="form-grid-2" id="muestra-campos-tipo"></div>
+
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Formato *</label>
+          <select id="muestra-formato" onchange="_congActualizarFormato()"></select>
+        </div>
+        <div class="form-group" id="muestra-cantidad-grupo">
+          <label id="muestra-cantidad-label">Bolitas por tubo *</label>
+          <div style="display:flex;gap:6px">
+            <input type="text" inputmode="decimal" id="muestra-cantidad" style="flex:1;min-width:0">
+            <select id="muestra-unidad" style="width:80px"><option>µL</option><option>mL</option></select>
+          </div>
+        </div>
+        <div class="form-group" id="muestra-cantidad-actual-grupo" style="display:none">
+          <label id="muestra-cantidad-actual-label">Lo que queda en este tubo</label>
+          <input type="text" inputmode="decimal" id="muestra-cantidad-actual">
+        </div>
+        <div class="form-group" id="muestra-pase-grupo">
+          <label>Pase</label>
+          <input type="number" id="muestra-pase" min="0" placeholder="ej. 3">
+        </div>
+        <div class="form-group">
+          <label>Fecha de congelación</label>
+          <input type="date" id="muestra-fecha">
+        </div>
+        <div class="form-group" id="muestra-caducidad-grupo">
+          <label>Caducidad</label>
+          <input type="date" id="muestra-caducidad">
+        </div>
+      </div>
+
+      <div class="form-grid-2" style="margin-top:4px">
+        <div class="form-group full">
+          <label>Caja *</label>
+          <select id="muestra-caja" onchange="_congPrimeraLibre();_congPrevisualizarCasillas()"></select>
+        </div>
+        <div class="form-group">
+          <label>Casilla *</label>
+          <input type="text" id="muestra-posicion" maxlength="3" placeholder="ej. A1" style="text-transform:uppercase" oninput="_congPrevisualizarCasillas()">
+        </div>
+        <div class="form-group" id="muestra-num-tubos-grupo">
+          <label>Nº de tubos</label>
+          <input type="number" id="muestra-num-tubos" min="1" max="200" value="1" oninput="_congPrevisualizarCasillas()">
+        </div>
+        <div class="form-group full" id="muestra-casillas-preview" style="font-size:12px;color:var(--text-soft);margin-top:-6px"></div>
+        <div class="form-group full">
+          <label>Observaciones</label>
+          <textarea id="muestra-observaciones" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-muestra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarMuestra()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- DESCARTAR MUESTRA -->
+<div class="modal-overlay" id="modal-descartar-muestra">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">🗑️ Descartar tubo</div>
+      <button class="modal-close" onclick="closeModal('modal-descartar-muestra')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-weight:600;margin-bottom:12px" id="descartar-muestra-titulo"></div>
+      <div class="form-group">
+        <label>Motivo *</label>
+        <select id="descartar-muestra-motivo" onchange="document.getElementById('descartar-muestra-otro').style.display = this.value === 'Otro' ? '' : 'none'">
+          <option value="">Seleccionar…</option>
+          <option>Agotado</option>
+          <option>Contaminado</option>
+          <option>Caducado</option>
+          <option>Demasiadas descongelaciones</option>
+          <option>Sustituido por un stock nuevo</option>
+          <option>Otro</option>
+        </select>
+        <input type="text" id="descartar-muestra-otro" placeholder="Explica el motivo" style="display:none;margin-top:6px">
+      </div>
+      <label class="form-group" id="descartar-muestra-lote-grupo" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="descartar-muestra-lote"> <span id="descartar-muestra-lote-texto"></span>
+      </label>
+      <div style="font-size:12px;color:var(--text-muted)">El tubo sale de la caja y deja la casilla libre, pero queda registrado.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-descartar-muestra')">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarDescartarMuestra()">Descartar</button>
+    </div>
+  </div>
+</div>
