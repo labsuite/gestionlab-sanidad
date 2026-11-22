@@ -391,6 +391,9 @@ function _congRenderBusqueda() {
   const filas = Object.values(lotes)
     .sort((a, b) => a[0].Nombre.localeCompare(b[0].Nombre, 'es'))
     .map(grupo => {
+      grupo.sort((a, b) => a.ID_Caja.localeCompare(b.ID_Caja)
+        || _congIndiceCasilla(a.Posicion, _congCaja(a.ID_Caja) || { Filas: 26, Columnas: 26 })
+         - _congIndiceCasilla(b.Posicion, _congCaja(b.ID_Caja) || { Filas: 26, Columnas: 26 }));
       const m = grupo[0];
       const t = _CONG_TIPOS[m.Tipo] || {};
       const sitios = grupo.map(x => {
