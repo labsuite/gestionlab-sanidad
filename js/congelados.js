@@ -25,7 +25,8 @@ let _congMuestraSel = '';
 let _congBusqueda = '';
 let _congEditandoMuestra = '';
 let _congDescartando = '';
-let _congOrigenStock = '';       // tubo del que se hace un stock nuevo (modal de muestra)
+let _congOrigenStock = '';
+let _congRefNombreBase = '';    // copia del nombre de la cepa de referencia al editar / hacer stock nuevo       // tubo del que se hace un stock nuevo (modal de muestra)
 let _congUsando = '';            // tubo del modal «Usar»
 let _congHistorialCompleto = false;
 const _congMisUsos = {};         // id_uso → ms: usos apuntados desde esta pestaña (para «Deshacer»)
@@ -39,7 +40,10 @@ const _CONG_RE_EQUIPO = /congel|frigor|nevera|nitr[oó]geno|dewar|crioconserv/i;
  */
 const _CONG_TIPOS = {
   'Cepa': {
-    icono: '🦠', clase: 'cepa', formato: 'Bolitas', pase: true, caducidad: false,
+    icono: '🦠', clase: 'cepa', formato: 'Bolitas', pase: true, caducidad: false, material: true,
+    materialLabel: 'Cepa de referencia de la que procede (Material fungible)',
+    materialPh: 'Escribe para buscar la cepa liofilizada, KWIK-STIK…',
+    materialAyuda: 'La cepa de referencia se lleva en Material fungible. Aquí se guarda además una copia de su nombre, lote y fecha de apertura, para no perder la trazabilidad aunque su stock quede a 0.',
     phNombre: 'ej. E. coli ATCC 25922',
     campos: [
       { k: 'especie', label: 'Especie / microorganismo', ph: 'ej. Escherichia coli' },
@@ -47,6 +51,10 @@ const _CONG_TIPOS = {
       { k: 'grupo_riesgo', label: 'Grupo de riesgo biológico', tipo: 'select', opciones: ['1', '2', '3'] },
       { k: 'medio', label: 'Medio de criopreservación', tipo: 'select', otro: true,
         opciones: ['Crioviales con bolitas (Microbank o similar)', 'Glicerol 15 %', 'Glicerol 20 %', 'Leche descremada'] },
+      { k: 'ref_lote', label: 'Lote de la cepa de referencia', ph: 'ej. 485-112-3' },
+      { k: 'ref_apertura', label: 'Apertura / reconstitución de la cepa de referencia', tipo: 'date' },
+      { k: 'pase_max', label: 'Pase máximo permitido', ph: '5', def: '5',
+        ayuda: 'ISO 11133: como máximo 5 pases desde la cepa de referencia.' },
     ],
   },
   'Línea celular': {
@@ -84,6 +92,9 @@ const _CONG_TIPOS = {
   },
   'Reactivo': {
     icono: '🧪', clase: 'kit', formato: 'Volumen', pase: false, caducidad: true, material: true,
+    materialLabel: 'Material del inventario (Material fungible)',
+    materialPh: 'Escribe para buscar el reactivo…',
+    materialAyuda: 'Su stock, pedidos y caducidad del envase siguen en Material fungible; aquí solo se apunta dónde está cada alícuota.',
     phNombre: 'ej. Master mix PCR 2×, ampicilina 100 mg/mL, FBS',
     campos: [
       { k: 'contenido', label: 'Qué es', tipo: 'select', otro: true,
@@ -274,6 +285,24 @@ function _congUpsertMuestras(filas) {
   });
 }
 
+/** Pase máximo de una cepa (Datos.pase_max) y cómo va respecto a él. */
+function _congEstadoPase(m) {
+  const max = Number(m.Datos?.pase_max);
+  if (m.Pase == null || !max) return null;
+  if (m.Pase > max) return { max, clase: 'badge-red', texto: `supera el máximo (${max})` };
+  if (m.Pase === max) return { max, clase: 'badge-orange', texto: 'último pase permitido' };
+  return { max, clase: '', texto: '' };
+}
+/** «🏅 E. coli ATCC 25922 KWIK-STIK (lote 485-112-3, abierta 03/10/2026)» */
+function _congTextoReferencia(m) {
+  const mat = m.ID_Material ? DATA.material.find(x => x.ID_Material === m.ID_Material) : null;
+  const nombre = mat?.Nombre || m.Datos?.ref_nombre;
+  if (!nombre) return '';
+  const extra = [m.Datos?.ref_lote ? 'lote ' + m.Datos.ref_lote : '', m.Datos?.ref_apertura ? 'abierta ' + _congFecha(m.Datos.ref_apertura) : '']
+    .filter(Boolean).join(', ');
+  return `🏅 ${_congEsc(nombre)}${extra ? ` (${_congEsc(extra)})` : ''}`;
+}
+
 function _congEtiqueta(m) {
   return (m.Abreviatura || m.Nombre || '').replace(/\s+/g, '').slice(0, 4);
 }
@@ -442,12 +471,20 @@ function _congRenderFicha(m, gestiona) {
   add('Queda', cantidad);
   if (m.Formato === 'Volumen') add('Descongelaciones', _congEsc(m.Descongelaciones || 0));
   add('Formato', _congEsc(_CONG_FORMATOS[m.Formato] || m.Formato));
-  if (t.pase && m.Pase != null) add('Pase', _congEsc(m.Pase));
-  if (t.material && m.ID_Material) {
+  if (t.pase && m.Pase != null) {
+    const ep = _congEstadoPase(m);
+    add('Pase', _congEsc(m.Pase) + (ep ? ` <span style="color:var(--text-muted)">de ${ep.max} como máximo</span>` : '')
+      + (ep?.texto ? ` <span class="badge ${ep.clase}" style="margin-left:4px">${ep.texto}</span>` : ''));
+  }
+  if (m.Tipo === 'Cepa') {
+    const ref = _congTextoReferencia(m);
+    if (ref) add('Cepa de referencia', ref);
+  } else if (t.material && m.ID_Material) {
     const mat = DATA.material.find(x => x.ID_Material === m.ID_Material);
     add('Material del inventario', `🧴 ${_congEsc(mat ? mat.Nombre : m.ID_Material)} <span style="color:var(--text-muted)">(${_congEsc(m.ID_Material)})</span>`);
   }
   t.campos.forEach(c => {
+    if (c.k === 'pase_max') return;   // va junto al pase
     let val = m.Datos?.[c.k];
     if (val && c.tipo === 'date') val = _congFecha(val);
     if (c.k === 'grupo_riesgo' && val) val = 'Grupo ' + val;
@@ -682,6 +719,7 @@ function openModalMuestra(idMuestra = '', idCaja = '', posicion = '', idOrigen =
   const origen = !m && idOrigen ? _congMuestra(idOrigen) : null;
   _congOrigenStock = origen ? origen.ID_Muestra : '';
   const base = m || origen;
+  _congRefNombreBase = base?.Datos?.ref_nombre || '';
   const cajas = _congCajasActivas();
   if (!m && !cajas.length) { showToast('Primero crea una caja donde guardar la muestra', 'error'); return; }
 
@@ -762,13 +800,16 @@ function _congPintarCamposTipo(datos) {
   document.getElementById('muestra-pase-grupo').style.display = t.pase ? '' : 'none';
   document.getElementById('muestra-caducidad-grupo').style.display = t.caducidad ? '' : 'none';
   document.getElementById('muestra-material-grupo').style.display = t.material ? '' : 'none';
+  setText('muestra-material-label', t.materialLabel || '');
+  setText('muestra-material-ayuda', t.materialAyuda || '');
+  document.getElementById('muestra-material').placeholder = t.materialPh || '';
   const aviso = document.getElementById('muestra-aviso-tipo');
   aviso.style.display = t.aviso ? '' : 'none';
   aviso.textContent = t.aviso || '';
 
   document.getElementById('muestra-campos-tipo').innerHTML = t.campos.map(c => {
     const id = 'muestra-dato-' + c.k;
-    const val = datos[c.k] || '';
+    const val = (c.k in datos) ? (datos[c.k] || '') : (c.def || '');
     let input;
     if (c.tipo === 'select') {
       const opts = [...c.opciones];
@@ -782,7 +823,7 @@ function _congPintarCamposTipo(datos) {
     } else {
       input = `<input type="${c.tipo === 'date' ? 'date' : 'text'}" id="${id}" value="${_congEsc(val)}" placeholder="${_congEsc(c.ph || '')}">`;
     }
-    return `<div class="form-group"><label>${_congEsc(c.label)}</label>${input}</div>`;
+    return `<div class="form-group"><label>${_congEsc(c.label)}</label>${input}${c.ayuda ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">${_congEsc(c.ayuda)}</div>` : ''}</div>`;
   }).join('');
 }
 
@@ -874,11 +915,13 @@ async function guardarMuestra() {
   if (!nombre) { showToast('Ponle un nombre a la muestra', 'error'); return; }
 
   let idMaterial = '';
+  let refNombre = _congRefNombreBase;
   if (t.material && v('muestra-material')) {
     const texto = v('muestra-material');
     const mat = DATA.material.find(x => texto.endsWith('· ' + x.ID_Material) || x.ID_Material === texto || x.Nombre === texto);
     if (!mat) { showToast('Elige el material de la lista (o deja el campo vacío)', 'error'); return; }
     idMaterial = mat.ID_Material;
+    refNombre = mat.Nombre;
   }
 
   const casillas = _congPrevisualizarCasillas();
@@ -900,6 +943,13 @@ async function guardarMuestra() {
     datos: _congLeerDatosTipo(),
     observaciones: v('muestra-observaciones'),
   };
+  // Copia del nombre de la cepa de referencia: sobrevive aunque el material quede a 0 o se borre
+  if (tipo === 'Cepa' && refNombre) lote.datos.ref_nombre = refNombre;
+
+  const paseMax = Number(lote.datos.pase_max);
+  if (tipo === 'Cepa' && paseMax && Number(lote.pase) > paseMax && (!_congEditandoMuestra || _congMuestra(_congEditandoMuestra)?.Pase !== Number(lote.pase))) {
+    if (!confirm(`El pase ${lote.pase} supera el máximo permitido (${paseMax}). Lo recomendable es volver a partir de la cepa de referencia.\n\n¿Guardarlo igualmente?`)) return;
+  }
 
   let body;
   if (_congEditandoMuestra) {
@@ -1138,7 +1188,8 @@ function _congRenderArbol(m) {
     cadena.push(actual);
     actual = _congInfoLote(actual)?.origen;
   }
-  if (cadena.length) partes.push('Procede de ' + cadena.map(_congEnlaceLote).join(' ← '));
+  const ref = m.Tipo === 'Cepa' ? _congTextoReferencia(m) : '';
+  if (cadena.length || ref) partes.push('Procede de ' + [...cadena.map(_congEnlaceLote), ref].filter(Boolean).join(' ← '));
   const hijos = [...new Set((DATA.muestrasCongeladas || []).filter(x => x.ID_Lote_Origen === m.ID_Lote).map(x => x.ID_Lote))];
   if (hijos.length) partes.push('Stocks hechos a partir de este: ' + hijos.map(_congEnlaceLote).join(' '));
   return partes.join('<br>');

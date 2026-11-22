@@ -77,10 +77,10 @@
         </div>
         <div id="muestra-aviso-tipo" class="form-group full" style="display:none;font-size:12px;background:var(--warning-light);color:var(--warning);padding:8px 12px;border-radius:var(--radius-sm)"></div>
         <div class="form-group full" id="muestra-material-grupo" style="display:none">
-          <label>Material del inventario (Material fungible)</label>
-          <input type="text" id="muestra-material" list="muestra-material-lista" placeholder="Escribe para buscar el kit o la master mix…">
+          <label id="muestra-material-label">Material del inventario (Material fungible)</label>
+          <input type="text" id="muestra-material" list="muestra-material-lista">
           <datalist id="muestra-material-lista"></datalist>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Su stock, pedidos y caducidad del envase siguen en Material fungible; aquí solo se apunta dónde está cada alícuota.</div>
+          <div id="muestra-material-ayuda" style="font-size:11px;color:var(--text-muted);margin-top:4px"></div>
         </div>
         <div class="form-group">
           <label>Nombre *</label>

@@ -77,6 +77,20 @@ sueros o plasmas y reactivos (master mix, alícuotas de antibiótico, FBS, enzim
   `id_lote_origen` en los tubos nuevos y apunta el evento `Nuevo stock` en el origen. La ficha
   enseña «Procede de pase 2 ← pase 1» y «Stocks hechos a partir de este».
 
+## Cepas de referencia y límite de pases
+
+- Las cepas de referencia llegan sin congelar (liofilizadas, KWIK-STIK…) y **viven en Material
+  fungible** (decisión de la usuaria, 2026-11-22): allí su compra, stock y caducidad.
+- Al dar de alta el stock del cepario (tipo `Cepa`) se elige ese material como origen
+  (`id_material`) y se apuntan `datos.ref_lote` y `datos.ref_apertura`. El cliente guarda además
+  `datos.ref_nombre` (copia del nombre del material): al abrir el vial el stock del material
+  pasa a 0 y el material puede llegar a borrarse (FK `on delete set null`), y la copia mantiene
+  la trazabilidad. Los stocks hechos «a partir de este» copian `datos` e `id_material`, así que
+  toda la cadena acaba en «🏅 cepa de referencia».
+- `datos.pase_max` (5 por defecto, criterio ISO 11133 para cultivos de trabajo): la ficha
+  avisa en naranja en el último pase permitido y en rojo si se supera; al guardar un pase por
+  encima pide confirmación (aviso, no bloqueo — decisión de la usuaria).
+
 ## Instrucciones de uso
 
 `_CONG_INSTRUCCIONES` (`js/congelados.js`): pasos por **formato** (bolitas: una sola, sin

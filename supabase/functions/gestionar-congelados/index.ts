@@ -67,7 +67,8 @@ function camposLote(body: Record<string, unknown>): Record<string, unknown> | st
     pase,
     fecha_congelacion: fecha(body.fecha_congelacion),
     caducidad: fecha(body.caducidad),
-    id_material: tipo === "Reactivo" ? strField(body.id_material) : null,
+    // Reactivos: su material; cepas: la cepa de referencia (Material fungible) de la que proceden
+    id_material: (tipo === "Reactivo" || tipo === "Cepa") ? strField(body.id_material) : null,
     datos: datosLimpios,
     observaciones: strField(body.observaciones),
   };
