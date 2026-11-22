@@ -169,7 +169,6 @@ function _congPasosUso(tipo, formato, datos = {}) {
   const pasos = [];
   const riesgo = _CONG_INSTRUCCIONES.riesgo[datos.grupo_riesgo];
   if (tipo === 'Cepa' && riesgo) pasos.push('⚠️ ' + riesgo);
-  // En las líneas celulares de un solo uso, los pasos del tipo ya cubren el uso del vial
   pasos.push(...(_CONG_INSTRUCCIONES.formato[formato]?.pasos || []));
   pasos.push(...(_CONG_INSTRUCCIONES.tipo[tipo] || []));
   return pasos;
