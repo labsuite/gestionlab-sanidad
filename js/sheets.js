@@ -652,6 +652,20 @@ function _registroVitrinaSbToObj(r) {
   };
 }
 
+function _cajaCongeladoSbToObj(c) {
+  return {
+    ID_Caja: c.id_caja || '',
+    Nombre: c.nombre || '',
+    ID_Equipo: c.id_equipo || '',
+    Compartimento: c.compartimento || '',
+    Filas: Number(c.filas) || 9,
+    Columnas: Number(c.columnas) || 9,
+    Descripcion: c.descripcion || '',
+    Activa: c.activa !== false,
+    Creado_Por: c.creado_por || '',
+  };
+}
+
 function _usuarioSbToObj(u) {
   return {
     ID_Usuario: u.id_usuario || '',
@@ -707,7 +721,7 @@ async function loadAllData() {
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
-           sbTareasPersonalesRes, sbEvaluacionesCursoRes] = await Promise.all([
+           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -751,7 +765,8 @@ async function loadAllData() {
       _leerTablaCompleta('propuestas_material', 'id_propuesta').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('atributos_material', 'id_ficha').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] })),
-      _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] }))
+      _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('cajas_congelado', 'id_caja').then(r => r, () => ({ data: [] }))
     ]);
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
@@ -789,6 +804,7 @@ async function loadAllData() {
     DATA.registrosCabina         = (sbRegistrosCabinaRes?.data || []).map(_registroCabinaSbToObj);
     DATA.registrosAutoclave      = (sbRegistrosAutoclaveRes?.data || []).map(_registroAutoclaveSbToObj);
     DATA.registrosVitrina        = (sbRegistrosVitrinaRes?.data || []).map(_registroVitrinaSbToObj);
+    DATA.cajasCongelado          = (sbCajasCongeladoRes?.data || []).map(_cajaCongeladoSbToObj);
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];

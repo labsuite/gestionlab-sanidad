@@ -1904,3 +1904,24 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .ubi-anadir-form { margin-top: 8px; padding: 8px 10px; background: var(--surface2); border-radius: var(--radius-sm); font-size: 13px; }
 .ubi-anadir-form select { padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
 .ubi-anadir-aviso { font-size: 11px; color: var(--warning); margin-top: 4px; }
+
+    /* MUESTRAS CONGELADAS — cajas y cuadrícula (js/congelados.js) */
+    .cong-cajas { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+    .cong-chip {
+      text-align: left; font: inherit; font-size: 13px; color: var(--text);
+      background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 10px 12px; cursor: pointer;
+    }
+    .cong-chip:hover { border-color: var(--accent); }
+    .cong-chip.activa { border-color: var(--accent); background: var(--accent-light); }
+    .cong-chip.retirada { opacity: .6; }
+    .cong-chip-sub { font-size: 11px; color: var(--text-soft); margin-top: 2px; }
+    .cong-caja-detalle { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .cong-grid-wrap { overflow-x: auto; }
+    .cong-grid { display: grid; gap: 3px; width: 100%; min-width: max-content; }
+    .cong-cab { font-size: 10px; font-weight: 700; color: var(--text-muted); display: flex; align-items: center; justify-content: center; }
+    .cong-celda {
+      aspect-ratio: 1; border: 1px solid var(--border); border-radius: 50%; background: var(--surface);
+      font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    }
+    .cong-celda.ocupada { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }

@@ -63,6 +63,7 @@ let DATA = {
   propuestasUbicacion: [], propuestasMaterial: [], fichasAtributos: [],
   configReservas: [], reservas: [],
   registrosCabina: [], registrosAutoclave: [], registrosVitrina: [],
+  cajasCongelado: [],
   // Supabase
   sbUsuarios: [],   // usuarios de Supabase (id uuid, email, role, ciclo_principal…)
   userModulos: []   // asignaciones usuario→módulo enriquecidas con labs

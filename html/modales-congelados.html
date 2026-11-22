@@ -1,0 +1,55 @@
+<!-- ============================================================
+     MUESTRAS CONGELADAS — modales (js/congelados.js)
+     ============================================================ -->
+
+<!-- NUEVA / EDITAR CAJA -->
+<div class="modal-overlay" id="modal-caja">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-caja-title">📦 Nueva caja</div>
+      <button class="modal-close" onclick="closeModal('modal-caja')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group full">
+          <label>Nombre de la caja *</label>
+          <input type="text" id="caja-nombre" placeholder="ej. Cepario 1">
+        </div>
+        <div class="form-group full">
+          <label>Congelador *</label>
+          <select id="caja-equipo"></select>
+        </div>
+        <div class="form-group full">
+          <label>Estante / rack / cajón</label>
+          <input type="text" id="caja-compartimento" placeholder="ej. Estante 2, rack B">
+        </div>
+        <div class="form-group full">
+          <label>Formato</label>
+          <select id="caja-formato" onchange="_congAplicarFormato(this.value)">
+            <option value="9x9">9 × 9 (81 casillas) — caja de crioviales estándar</option>
+            <option value="10x10">10 × 10 (100 casillas) — tubos de 1,5 mL</option>
+            <option value="5x5">5 × 5 (25 casillas) — crioviales grandes</option>
+            <option value="8x12">8 × 12 (96) — formato placa</option>
+            <option value="">Otro (filas y columnas a mano)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Filas (A, B, C…)</label>
+          <input type="number" id="caja-filas" min="1" max="26" oninput="_congSincronizarFormato()">
+        </div>
+        <div class="form-group">
+          <label>Columnas (1, 2, 3…)</label>
+          <input type="number" id="caja-columnas" min="1" max="26" oninput="_congSincronizarFormato()">
+        </div>
+        <div class="form-group full">
+          <label>Descripción</label>
+          <textarea id="caja-descripcion" rows="2" placeholder="ej. Cepas de referencia para Microbiología clínica"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-caja')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarCaja()">Guardar</button>
+    </div>
+  </div>
+</div>

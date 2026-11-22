@@ -120,6 +120,9 @@
         <span class="nav-icon">📝</span> Registros de uso
         <span class="nav-badge" id="badge-registros-uso" style="display:none">0</span>
       </div>
+      <div class="nav-item" onclick="showPage('congelados')">
+        <span class="nav-icon">🧊</span> Muestras congeladas
+      </div>
       <!-- RENOMBRADO: "Catálogo" en vez de "Configuración" -->
       <div class="nav-section-label" style="margin-top:12px">Material fungible</div>
       <div class="nav-item" onclick="showPage('material')">
@@ -605,6 +608,7 @@
       <!-- RESERVAS -->
       <div class="page" id="page-reservas"></div>
       <div class="page" id="page-registros-uso"></div>
+      <div class="page" id="page-congelados"></div>
 
     </div>
   </div>
@@ -635,6 +639,7 @@
 <script src="js/residuos.js"></script>
 <script src="js/reservas.js"></script>
 <script src="js/registros-uso.js"></script>
+<script src="js/congelados.js"></script>
 <script src="js/ubicar-equipos.js"></script>
 <script src="js/inventariar-material.js"></script>
 <script>

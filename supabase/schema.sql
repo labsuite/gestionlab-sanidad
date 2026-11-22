@@ -896,3 +896,24 @@ create index if not exists idx_lineas_pedido_id_intervencion on lineas_pedido (i
 -- que llegó en él ("A-123, A-130" si llegó en dos entregas). Opcional: por si
 -- algún día hay que ponerlo en la hoja de pedido.
 alter table lineas_pedido add column if not exists albaranes text;
+
+-- ── Muestras congeladas · parte 1: cajas (2026-11-22) ───────────────────
+-- Cada caja vive en un equipo del inventario (congelador, frigorífico con
+-- congelador, tanque de N₂…) y tiene una cuadrícula de filas × columnas
+-- (A1, B3…). Las muestras (parte 2) ocupan una casilla de una caja.
+-- Ver docs/modulo-congelados.md.
+create table if not exists cajas_congelado (
+  id_caja          text primary key,
+  nombre           text not null,
+  id_equipo        text not null references equipos(id_activo) on update cascade,
+  compartimento    text,            -- estante / rack / cajón, texto libre
+  filas            integer not null default 9 check (filas between 1 and 26),
+  columnas         integer not null default 9 check (columnas between 1 and 26),
+  descripcion      text,
+  activa           boolean not null default true,
+  creado_por       text,
+  fecha_creacion   timestamptz not null default now()
+);
+create index if not exists idx_cajas_congelado_equipo on cajas_congelado (id_equipo);
+alter table cajas_congelado enable row level security;
+create policy "cajas_congelado_select_anon" on cajas_congelado for select to anon, authenticated using (true);
