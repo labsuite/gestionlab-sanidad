@@ -99,6 +99,91 @@ const _CONG_FORMATOS = {
   Volumen: 'Volumen — se descongela y se va gastando',
 };
 
+/**
+ * Cómo se usa cada cosa. Se enseña en «Usar» (antes de confirmar), en la ficha
+ * del tubo y, el resumen, en el alta bajo el formato. Se combinan las del
+ * FORMATO con las del TIPO (y con el grupo de riesgo de las cepas).
+ * Redactadas a partir de la práctica habitual: la usuaria puede corregirlas.
+ */
+const _CONG_INSTRUCCIONES = {
+  formato: {
+    Bolitas: {
+      resumen: 'Se saca una sola bolita cada vez y el tubo no debe llegar a descongelarse.',
+      pasos: [
+        'Lleva el criovial al puesto en <b>frío</b> (bloque refrigerante, gradilla congelada o hielo) y trabaja rápido.',
+        'Saca <b>una sola bolita</b> con asa o pinza estéril, sin tocar las demás.',
+        'El tubo <b>no debe descongelarse</b>: no lo calientes con la mano ni lo dejes en la mesa.',
+        'Ciérralo y devuélvelo a su casilla <b>enseguida</b> (1–2 minutos fuera como máximo).',
+        'Siembra la bolita directamente en la placa o échala en caldo.',
+      ],
+    },
+    Tubo: {
+      resumen: 'Se usa entero una sola vez: lo que sobre no se vuelve a congelar.',
+      pasos: [
+        'El tubo se usa <b>una sola vez</b>: lo que sobre <b>no se vuelve a congelar</b>.',
+        'Sácalo solo cuando vayas a usarlo, y comprueba en la etiqueta que es el que buscas antes de abrirlo.',
+      ],
+    },
+    Volumen: {
+      resumen: 'Se descongela en hielo, se toma lo justo y vuelve al congelador cuanto antes.',
+      pasos: [
+        'Descongélalo <b>en hielo</b>, nunca a temperatura ambiente ni con la mano.',
+        'Trabaja <b>todo el rato en hielo</b>.',
+        'Mézclalo suavemente (pipeteando o con golpecitos) y dale un pulso de centrífuga para bajar las gotas.',
+        'Toma <b>solo lo que necesites</b> con punta estéril nueva; nunca devuelvas lo que sobre al tubo.',
+        'Vuelve a congelarlo <b>cuanto antes</b>: cada descongelación lo estropea un poco. Si se usa mucho, avisa al profesorado para hacer alícuotas más pequeñas.',
+      ],
+    },
+  },
+  tipo: {
+    'Cepa': [
+      'Trabaja junto al mechero o en la cabina, con técnica aséptica.',
+    ],
+    'Línea celular': [
+      'Ten preparado el medio completo precalentado <b>antes</b> de sacar el vial.',
+      'Descongélalo <b>rápido a 37 °C</b> (baño, 1–2 minutos) hasta que quede un cristalito de hielo.',
+      'Desinfecta el exterior con etanol 70 % y ábrelo en la cabina de bioseguridad.',
+      'Pásalo al medio y centrifuga para quitar el DMSO del medio de congelación.',
+      'Un vial de células descongelado <b>no se puede volver a congelar</b>.',
+    ],
+    'Ácido nucleico': [
+      'El ARN se degrada muy deprisa: guantes, material libre de RNasas y siempre en hielo.',
+    ],
+    'Suero o plasma': [
+      'Trátalo como <b>potencialmente infeccioso</b>: guantes y gafas.',
+      'Mézclalo por inversión suave, sin hacer espuma.',
+    ],
+    'Reactivo': [
+      'Las enzimas y la master mix van en glicerol y no se congelan del todo: no hace falta esperar a que se descongelen, sácalas solo lo justo y devuélvelas.',
+      'Sigue también las instrucciones del fabricante.',
+    ],
+  },
+  riesgo: {
+    '2': 'Grupo de riesgo 2: trabaja en la <b>cabina de bioseguridad</b>.',
+    '3': 'Grupo de riesgo 3: solo con autorización del profesorado y en la cabina de bioseguridad.',
+  },
+};
+
+/** Lista de pasos (HTML) para un tubo, o para tipo+formato si aún no existe. */
+function _congPasosUso(tipo, formato, datos = {}) {
+  const pasos = [];
+  const riesgo = _CONG_INSTRUCCIONES.riesgo[datos.grupo_riesgo];
+  if (tipo === 'Cepa' && riesgo) pasos.push('⚠️ ' + riesgo);
+  // En las líneas celulares de un solo uso, los pasos del tipo ya cubren el uso del vial
+  pasos.push(...(_CONG_INSTRUCCIONES.formato[formato]?.pasos || []));
+  pasos.push(...(_CONG_INSTRUCCIONES.tipo[tipo] || []));
+  return pasos;
+}
+
+function _congRenderPasos(tipo, formato, datos, abierto) {
+  const pasos = _congPasosUso(tipo, formato, datos);
+  if (!pasos.length) return '';
+  const lista = `<ul class="cong-pasos">${pasos.map(p => `<li>${p}</li>`).join('')}</ul>`;
+  return abierto
+    ? `<div class="cong-instrucciones"><div class="cong-instrucciones-tit">📋 Cómo se usa</div>${lista}</div>`
+    : `<details class="cong-instrucciones"><summary class="cong-instrucciones-tit">📋 Cómo se usa</summary>${lista}</details>`;
+}
+
 function _congPuedeGestionar() { return ['Administrador', 'Gestor', 'Profesor'].includes(getUserRole()); }
 
 /** Equipos donde puede haber cajas congeladas: congeladores, frigoríficos (su
@@ -401,6 +486,7 @@ function _congRenderFicha(m, gestiona) {
         <button class="btn btn-primary" onclick="openModalUsarMuestra('${m.ID_Muestra}')">${_congTextoUsar(m)}</button>
       </div>
       ${_congRenderDeshacer(m)}
+      ${_congRenderPasos(m.Tipo, m.Formato, m.Datos || {}, false)}
       <div class="cong-ficha-grid">${filas.join('')}</div>
       ${gestiona ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
         ${t.pase || m.Tipo === 'Cepa' || m.Tipo === 'Línea celular' ? `<button class="btn btn-secondary btn-sm" onclick="openModalMuestra('', '', '', '${m.ID_Muestra}')">🌱 Nuevo stock a partir de este</button>` : ''}
@@ -709,6 +795,7 @@ function _congOtro(k) {
 
 function _congActualizarFormato() {
   const formato = v('muestra-formato');
+  setText('muestra-formato-ayuda', _CONG_INSTRUCCIONES.formato[formato]?.resumen || '');
   const grupoCant = document.getElementById('muestra-cantidad-grupo');
   const lbl = document.getElementById('muestra-cantidad-label');
   const unidad = document.getElementById('muestra-unidad');
@@ -922,6 +1009,7 @@ function openModalUsarMuestra(idMuestra) {
     explica = `Quedan ${_congCantidadTexto(m)} · ${m.Descongelaciones || 0} descongelaciones. Se sumará una descongelación.`;
   }
   setText('usar-muestra-explica', explica);
+  document.getElementById('usar-muestra-pasos').innerHTML = _congRenderPasos(m.Tipo, m.Formato, m.Datos || {}, true);
   document.getElementById('usar-muestra-cantidad-grupo').style.display = m.Formato === 'Volumen' ? '' : 'none';
   setText('usar-muestra-unidad', m.Unidad || '');
   sv('usar-muestra-cantidad', '');

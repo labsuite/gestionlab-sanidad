@@ -77,6 +77,16 @@ sueros o plasmas y reactivos (master mix, alícuotas de antibiótico, FBS, enzim
   `id_lote_origen` en los tubos nuevos y apunta el evento `Nuevo stock` en el origen. La ficha
   enseña «Procede de pase 2 ← pase 1» y «Stocks hechos a partir de este».
 
+## Instrucciones de uso
+
+`_CONG_INSTRUCCIONES` (`js/congelados.js`): pasos por **formato** (bolitas: una sola, sin
+descongelar el tubo; tubo: un solo uso, no se recongela; volumen: descongelar y trabajar en
+hielo, devolver cuanto antes) más los de cada **tipo** (líneas celulares: descongelación rápida
+a 37 °C, quitar el DMSO, no recongelar; ARN; sueros potencialmente infecciosos; reactivos en
+glicerol) y un aviso por **grupo de riesgo** 2/3 de la cepa. Se ven abiertos en el modal
+«Usar», desplegables en la ficha y en resumen bajo el formato en el alta. Redactados a partir
+de la práctica habitual (2026-11-22); la usuaria puede corregirlos.
+
 ## Etiquetas NFC / QR
 
 - 🔗 **Etiqueta** en cada caja (`?action=congelados&caja=ID`) y en cada congelador

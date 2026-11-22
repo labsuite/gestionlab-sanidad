@@ -1947,6 +1947,11 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
     .cong-resultado:last-child { border-bottom: none; }
     .cong-link { font: inherit; font-size: 12px; background: var(--accent-light); color: var(--accent); border: none; border-radius: 4px; padding: 2px 7px; margin: 2px 2px 0 0; cursor: pointer; }
     .cong-aviso-deshacer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; background: var(--success-light); color: var(--success); padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 12px; }
+    .cong-instrucciones { font-size: 12px; background: #eef4fb; border: 1px solid #cddcee; color: #24486e; border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 12px; }
+    .cong-instrucciones-tit { font-weight: 700; cursor: default; }
+    details.cong-instrucciones summary { cursor: pointer; }
+    .cong-pasos { margin: 6px 0 0 18px; padding: 0; line-height: 1.5; }
+    .cong-pasos li { margin-bottom: 3px; }
     .cong-historial { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
     .cong-historial-tit { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
     .cong-uso { display: flex; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }

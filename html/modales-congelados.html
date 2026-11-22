@@ -98,6 +98,7 @@
         <div class="form-group full">
           <label>Formato *</label>
           <select id="muestra-formato" onchange="_congActualizarFormato()"></select>
+          <div id="muestra-formato-ayuda" style="font-size:11px;color:var(--text-soft);margin-top:4px"></div>
         </div>
         <div class="form-group" id="muestra-cantidad-grupo">
           <label id="muestra-cantidad-label">Bolitas por tubo *</label>
@@ -194,7 +195,8 @@
     </div>
     <div class="modal-body">
       <div style="font-weight:600;margin-bottom:6px" id="usar-muestra-titulo"></div>
-      <div style="font-size:12px;color:var(--text-soft);margin-bottom:14px" id="usar-muestra-explica"></div>
+      <div style="font-size:12px;color:var(--text-soft);margin-bottom:10px" id="usar-muestra-explica"></div>
+      <div id="usar-muestra-pasos" style="margin-bottom:14px"></div>
       <div class="form-group" id="usar-muestra-cantidad-grupo">
         <label>¿Cuánto has gastado? *</label>
         <div style="display:flex;align-items:center;gap:6px">
