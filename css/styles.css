@@ -1946,4 +1946,10 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
     .cong-resultado { padding: 10px 0; border-bottom: 1px solid var(--border); }
     .cong-resultado:last-child { border-bottom: none; }
     .cong-link { font: inherit; font-size: 12px; background: var(--accent-light); color: var(--accent); border: none; border-radius: 4px; padding: 2px 7px; margin: 2px 2px 0 0; cursor: pointer; }
+    .cong-aviso-deshacer { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; background: var(--success-light); color: var(--success); padding: 8px 12px; border-radius: var(--radius-sm); margin-bottom: 12px; }
+    .cong-historial { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+    .cong-historial-tit { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .cong-uso { display: flex; gap: 10px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+    .cong-uso:last-of-type { border-bottom: none; }
+    .cong-uso-fecha { font-size: 11px; color: var(--text-muted); white-space: nowrap; padding-top: 2px; min-width: 92px; }
     @media (max-width: 520px) { .cong-ficha-grid { grid-template-columns: 1fr; gap: 0; } .cong-ficha-k { margin-top: 6px; font-size: 11px; } }

@@ -3,7 +3,7 @@
 Sección **🧊 Muestras congeladas** del bloque «Uso del laboratorio» (`page-congelados`,
 `js/congelados.js`, `html/modales-congelados.html`, Edge Function `gestionar-congelados`).
 Registro genérico de lo que se guarda congelado: cepario, líneas celulares, ácidos nucleicos,
-sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
+sueros o plasmas y reactivos (master mix, alícuotas de antibiótico, FBS, enzimas, cebadores…).
 
 ## Diseño acordado con la usuaria (2026-11-22)
 
@@ -11,8 +11,9 @@ sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
   del inventario (`_congEquipos()`: tipo que contenga congel/frigor/nevera/nitrógeno/dewar/
   crioconserv, sin los dados de baja; los frigoríficos cuentan por su compartimento congelador).
   Cada caja tiene filas × columnas (máx. 26 × 26) y las casillas se nombran A1, A2… B1…
-- **Tipos de muestra** con campos propios: cepas microbianas, líneas celulares, ácidos
-  nucleicos, sueros/plasmas/alícuotas (sin datos de pacientes), kits y master mix de PCR.
+- **Tipos de muestra** con campos propios: `Cepa`, `Línea celular`, `Ácido nucleico`,
+  `Suero o plasma` (sin datos de pacientes) y `Reactivo` (master mix, antibiótico, FBS,
+  enzimas, cebadores…; renombrado de «Kit o master mix» a petición de la usuaria, 2026-11-22).
 - **Formato** elegido en cada muestra (el tipo solo sugiere uno):
   - *Bolitas* (cepario en crioviales con bolitas): se cuentan las bolitas; cada uso resta una
     y el tubo vuelve a su casilla.
@@ -20,7 +21,7 @@ sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
     libera la casilla.
   - *Volumen* (lo que se congela y descongela: master mix, cebadores, sueros, ADN): volumen
     inicial y restante; cada uso descuenta lo gastado y suma una **descongelación**.
-- **Kits y master mix enlazados a Material fungible**: stock, pedidos y caducidad siguen allí;
+- **Reactivos enlazados a Material fungible** (opcional): stock, pedidos y caducidad siguen allí;
   aquí solo la caja/casilla de cada alícuota, enlazada a su material. No hay dos inventarios.
 - **Historial** de cada muestra: fecha, quién (grupo o docente, con `autorRegistro()`) y para
   qué. Un stock nuevo hecho a partir de otro queda enlazado a su origen con el pase siguiente.
@@ -33,8 +34,7 @@ sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
    *retiran* (`activa = false`) y se pueden reactivar; retirar exige que esté vacía
    (lo comprueba también el servidor).
 2. ✅ **Muestras** (tabla `muestras_congeladas`), ver abajo.
-3. ⏳ Usos (restar bolitas / volumen, sumar descongelaciones, sacar tubos de un uso), historial
-   y árbol de pases (`id_lote_origen`). Es lo único que podrá hacer el alumnado.
+3. ✅ **Usos, historial, árbol de pases y etiquetas NFC/QR** (tabla `usos_muestra`), ver abajo.
 
 ## Muestras (parte 2)
 
@@ -56,3 +56,35 @@ sueros/plasmas/alícuotas y alícuotas de kits y master mix de PCR.
 - Pulsar una casilla vacía abre el alta en esa casilla; pulsar un tubo, su ficha (los demás
   tubos del mismo lote se marcan con borde discontinuo). El buscador de arriba busca en
   nombre, tipo, caja, material enlazado y datos propios.
+
+## Usos, historial y pases (parte 3)
+
+- **Usar** (`usar_muestra`, cualquier sesión, alumnado incluido): bolitas → −1; tubo de un
+  uso → se gasta entero; volumen → lo gastado y +1 descongelación. Si no queda nada, el tubo
+  pasa a `Agotada` y libera la casilla. Motivo obligatorio. El `update` lleva
+  `.eq('cantidad_actual', valor leído)` para que dos usos simultáneos no se pisen (409).
+- `usos_muestra.autor` lo pone el servidor con `autorRegistro()`: nombre corto del docente o
+  **nombre del grupo**; no se guarda email.
+- **Deshacer** (`deshacer_uso`): solo el último uso del tubo, solo quien lo apuntó (mismo
+  `autor`) y en los 15 minutos siguientes. En el cliente sale en el toast y en la ficha, solo
+  para usos apuntados desde esa pestaña (`_congMisUsos`).
+- Eventos del historial: `Uso`, `Nuevo stock`, `Descarte`, `Ajuste` (cuando un docente corrige
+  a mano lo que queda desde «Editar»). Tras acciones que escriben usos en el servidor, el
+  cliente los relee con `_congRecargarUsos()`.
+- **Nuevo stock a partir de un tubo** (docente, solo cepas y líneas celulares): el modal de
+  muestra se rellena con los datos del origen y el pase siguiente; `crear_muestras` con
+  `id_muestra_origen` gasta del origen (1 bolita, el tubo, o el volumen indicado), pone
+  `id_lote_origen` en los tubos nuevos y apunta el evento `Nuevo stock` en el origen. La ficha
+  enseña «Procede de pase 2 ← pase 1» y «Stocks hechos a partir de este».
+
+## Etiquetas NFC / QR
+
+- 🔗 **Etiqueta** en cada caja (`?action=congelados&caja=ID`) y en cada congelador
+  (`?action=congelados&congelador=ID_ACTIVO`). URL con `urlEtiqueta()`, nunca
+  `window.location`. Entrada en `_checkPendingNfcAction()` (`js/ui.js`) →
+  `_abrirCongeladosPorNfc()`.
+- El modal da la URL para el NFC, el QR (api.qrserver.com, como el resto de etiquetas) y
+  **🖨️ Imprimir QR** (hoja con QR de 30 mm + nombre).
+- Consejos que da la propia app: puerta metálica → NFC «anti-metal»; caja a −20 °C → NFC en
+  la tapa suele aguantar; −80 °C o N₂ → QR en etiqueta criogénica.
+- Solo el profesorado ve el botón 🔗; escanear y usar lo puede hacer cualquiera con sesión.

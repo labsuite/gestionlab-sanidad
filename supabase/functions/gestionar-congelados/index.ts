@@ -1,8 +1,9 @@
 // Módulo Muestras congeladas — ver docs/modulo-congelados.md.
 // Parte 1: cajas (congelador → caja → casilla). Parte 2: muestras (un registro
 // por tubo, agrupados por `id_lote`). Todo lo de aquí es del profesorado
-// (Admin/Gestor/Profesor); el alumnado solo consulta (y en la parte 3, apunta usos).
-import { requireStaff, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+// (Admin/Gestor/Profesor), salvo apuntar un uso (`usar_muestra`) y deshacerlo, que
+// puede hacer cualquier sesión (el alumnado firma con el nombre del grupo).
+import { requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function genId(prefix: string): string {
   const abc = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -21,7 +22,7 @@ const numField = (v: unknown) => {
   return Number.isFinite(n) ? n : NaN;
 };
 
-const TIPOS = ["Cepa", "Línea celular", "Ácido nucleico", "Suero, plasma o alícuota", "Kit o master mix"];
+const TIPOS = ["Cepa", "Línea celular", "Ácido nucleico", "Suero o plasma", "Reactivo"];
 const FORMATOS = ["Bolitas", "Tubo", "Volumen"];
 
 function dimension(v: unknown, nombre: string): number | string {
@@ -66,7 +67,7 @@ function camposLote(body: Record<string, unknown>): Record<string, unknown> | st
     pase,
     fecha_congelacion: fecha(body.fecha_congelacion),
     caducidad: fecha(body.caducidad),
-    id_material: tipo === "Kit o master mix" ? strField(body.id_material) : null,
+    id_material: tipo === "Reactivo" ? strField(body.id_material) : null,
     datos: datosLimpios,
     observaciones: strField(body.observaciones),
   };
@@ -85,6 +86,46 @@ async function ocupadas(supabaseAdmin: any, idCaja: string, excluir: string[] = 
   return new Set((data || []).filter((m: any) => !excluir.includes(m.id_muestra)).map((m: any) => m.posicion));
 }
 
+const MINUTOS_DESHACER = 15;
+
+/**
+ * Gasta de un tubo: una bolita, el tubo entero (un solo uso) o `volumen`.
+ * Devuelve los campos a actualizar en el tubo y lo gastado/restante, o un string de error.
+ * Si no queda nada, el tubo pasa a 'Agotada' y libera la casilla.
+ */
+function consumir(m: any, volumen: unknown) {
+  const actual = Number(m.cantidad_actual ?? 0);
+  let gastado: number;
+  const cambios: Record<string, unknown> = {};
+  if (m.formato === "Bolitas") {
+    if (actual < 1) return "Este tubo ya no tiene bolitas";
+    gastado = 1;
+  } else if (m.formato === "Tubo") {
+    gastado = 1;
+  } else {
+    const v = numField(volumen);
+    if (v === null || Number.isNaN(v) || v <= 0) return "Indica cuánto volumen has gastado";
+    if (v > actual + 1e-9) return `En el tubo solo quedan ${actual} ${m.unidad || ""}`.trim();
+    gastado = v;
+    cambios.descongelaciones = Number(m.descongelaciones || 0) + 1;
+  }
+  const restante = Math.max(0, Math.round((actual - gastado) * 1000) / 1000);
+  cambios.cantidad_actual = restante;
+  if (restante <= 0) {
+    cambios.estado = "Agotada";
+    cambios.fecha_baja = new Date().toISOString().slice(0, 10);
+    cambios.motivo_baja = "Agotado";
+  }
+  return { cambios, gastado, restante };
+}
+
+async function registrarUso(supabaseAdmin: any, fila: Record<string, unknown>) {
+  const { data, error } = await supabaseAdmin.from("usos_muestra")
+    .insert({ id_uso: genId("US"), ...fila }).select().single();
+  if (error) console.error("usos_muestra:", error.message);
+  return data;
+}
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -97,6 +138,63 @@ Deno.serve(async (req) => {
     return jsonError("Cuerpo inválido (se esperaba JSON)", 400);
   }
   const accion = String(body.accion || "");
+
+  // ── USOS: cualquier sesión ─────────────────────────────────────────────
+  if (accion === "usar_muestra" || accion === "deshacer_uso") {
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req) as any;
+    if (authError) return authError;
+    const { autor } = await autorRegistro(supabaseAdmin, email);
+
+    if (accion === "usar_muestra") {
+      const idMuestra = strField(body.id_muestra);
+      const motivo = strField(body.motivo);
+      if (!idMuestra) return jsonError("id_muestra es obligatorio", 400);
+      if (!motivo) return jsonError("Indica para qué lo usas", 400);
+      const { data: m } = await supabaseAdmin.from("muestras_congeladas").select("*").eq("id_muestra", idMuestra).maybeSingle();
+      if (!m) return jsonError("Muestra no encontrada", 404);
+      if (m.estado !== "Disponible") return jsonError("Este tubo ya no está en la caja", 400);
+      const r = consumir(m, body.cantidad);
+      if (typeof r === "string") return jsonError(r, 400);
+      // Solo se actualiza si nadie lo ha cambiado mientras tanto
+      const { data: nuevo, error } = await supabaseAdmin.from("muestras_congeladas")
+        .update(r.cambios).eq("id_muestra", idMuestra).eq("cantidad_actual", m.cantidad_actual).select().maybeSingle();
+      if (error) return jsonError(`No se pudo apuntar el uso: ${error.message}`, 400);
+      if (!nuevo) return jsonError("Alguien acaba de usar este tubo; recarga y vuelve a intentarlo", 409);
+      const uso = await registrarUso(supabaseAdmin, {
+        id_muestra: idMuestra, id_lote: m.id_lote, evento: "Uso", autor, motivo: motivo.slice(0, 300),
+        cantidad: r.gastado, restante: r.restante, unidad: m.unidad,
+      });
+      return jsonOk({ muestra: nuevo, uso });
+    }
+
+    // deshacer_uso: solo el último uso del tubo, de quien lo apuntó y en los primeros minutos
+    const idUso = strField(body.id_uso);
+    if (!idUso) return jsonError("id_uso es obligatorio", 400);
+    const { data: uso } = await supabaseAdmin.from("usos_muestra").select("*").eq("id_uso", idUso).maybeSingle();
+    if (!uso || uso.evento !== "Uso") return jsonError("Uso no encontrado", 404);
+    if (uso.autor !== autor) return jsonError("Solo quien apuntó el uso puede deshacerlo", 403);
+    if (Date.now() - new Date(uso.fecha).getTime() > MINUTOS_DESHACER * 60000) {
+      return jsonError(`Solo se puede deshacer en los ${MINUTOS_DESHACER} minutos siguientes; pide a un docente que corrija la cantidad`, 400);
+    }
+    const { data: ultimo } = await supabaseAdmin.from("usos_muestra").select("id_uso")
+      .eq("id_muestra", uso.id_muestra).order("fecha", { ascending: false }).limit(1).maybeSingle();
+    if (ultimo?.id_uso !== idUso) return jsonError("Después de este uso ya se apuntó otro: pide a un docente que corrija la cantidad", 400);
+    const { data: m } = await supabaseAdmin.from("muestras_congeladas").select("*").eq("id_muestra", uso.id_muestra).maybeSingle();
+    if (!m) return jsonError("Muestra no encontrada", 404);
+    const cambios: Record<string, unknown> = {
+      cantidad_actual: Number(uso.restante || 0) + Number(uso.cantidad || 0),
+      estado: "Disponible", fecha_baja: null, motivo_baja: null,
+    };
+    if (m.formato === "Volumen") cambios.descongelaciones = Math.max(0, Number(m.descongelaciones || 0) - 1);
+    const { data: nuevo, error } = await supabaseAdmin.from("muestras_congeladas")
+      .update(cambios).eq("id_muestra", m.id_muestra).select().maybeSingle();
+    if (error) {
+      if (error.code === "23505") return jsonError(`La casilla ${m.posicion} ya la ocupa otro tubo`, 409);
+      return jsonError(`No se pudo deshacer: ${error.message}`, 400);
+    }
+    await supabaseAdmin.from("usos_muestra").delete().eq("id_uso", idUso);
+    return jsonOk({ muestra: nuevo, eliminado: idUso });
+  }
 
   const ACCIONES_STAFF = ["crear_caja", "editar_caja", "retirar_caja", "reactivar_caja",
     "crear_muestras", "editar_muestra", "descartar_muestra"];
@@ -191,8 +289,23 @@ Deno.serve(async (req) => {
       if (!mat) return jsonError("El material enlazado no existe en el inventario", 400);
     }
 
+    // Stock nuevo hecho a partir de un tubo: se enlaza al lote de origen y se gasta de él
+    let origen: any = null;
+    let consumoOrigen: any = null;
+    const idOrigen = strField(body.id_muestra_origen);
+    if (idOrigen) {
+      const { data } = await supabaseAdmin.from("muestras_congeladas").select("*").eq("id_muestra", idOrigen).maybeSingle();
+      if (!data) return jsonError("El tubo de origen no existe", 404);
+      if (data.estado !== "Disponible") return jsonError("El tubo de origen ya no está en la caja", 400);
+      origen = data;
+      const r = consumir(origen, body.cantidad_origen);
+      if (typeof r === "string") return jsonError(`Tubo de origen: ${r}`, 400);
+      consumoOrigen = r;
+      (lote as Record<string, unknown>).id_lote_origen = origen.id_lote;
+    }
+
     const { autor } = await autorRegistro(supabaseAdmin, user.email, user.nombre);
-    const idLote = strField(body.id_lote) || genId("LT");
+    const idLote = genId("LT");
     const filas = posiciones.map((posicion) => ({
       id_muestra: genId("MC"), id_lote: idLote, id_caja: caja.id_caja, posicion,
       cantidad_inicial: cantidad, cantidad_actual: cantidad,
@@ -203,7 +316,18 @@ Deno.serve(async (req) => {
       if (error.code === "23505") return jsonError("Alguna de esas casillas se acaba de ocupar; recarga la caja", 409);
       return jsonError(`No se pudieron guardar las muestras: ${error.message}`, 400);
     }
-    return jsonOk({ muestras: data });
+    let muestraOrigen = null;
+    if (origen) {
+      const { data: o } = await supabaseAdmin.from("muestras_congeladas")
+        .update(consumoOrigen.cambios).eq("id_muestra", origen.id_muestra).select().maybeSingle();
+      muestraOrigen = o;
+      await registrarUso(supabaseAdmin, {
+        id_muestra: origen.id_muestra, id_lote: origen.id_lote, evento: "Nuevo stock", autor,
+        motivo: `Nuevo stock: ${filas.length} tubo${filas.length > 1 ? "s" : ""}${lote.pase != null ? ` (pase ${lote.pase})` : ""}`,
+        cantidad: consumoOrigen.gastado, restante: consumoOrigen.restante, unidad: origen.unidad, id_lote_nuevo: idLote,
+      });
+    }
+    return jsonOk({ muestras: muestraOrigen ? [...data, muestraOrigen] : data });
   }
 
   if (accion === "editar_muestra") {
@@ -243,6 +367,14 @@ Deno.serve(async (req) => {
     // Lo común se aplica a todos los tubos del lote
     const { error: e1 } = await supabaseAdmin.from("muestras_congeladas").update(lote).eq("id_lote", actual.id_lote);
     if (e1) return jsonError(`No se pudo guardar: ${e1.message}`, 400);
+    if (tubo.cantidad_actual !== undefined && Number(tubo.cantidad_actual) !== Number(actual.cantidad_actual)) {
+      const { autor } = await autorRegistro(supabaseAdmin, user.email, user.nombre);
+      await registrarUso(supabaseAdmin, {
+        id_muestra: idMuestra, id_lote: actual.id_lote, evento: "Ajuste", autor,
+        motivo: `Corregido: de ${actual.cantidad_actual} a ${tubo.cantidad_actual}`,
+        restante: tubo.cantidad_actual, unidad: lote.unidad,
+      });
+    }
     if (Object.keys(tubo).length) {
       const { error: e2 } = await supabaseAdmin.from("muestras_congeladas").update(tubo).eq("id_muestra", idMuestra);
       if (e2) {
@@ -267,5 +399,12 @@ Deno.serve(async (req) => {
   q = body.todo_el_lote === true ? q.eq("id_lote", actual.id_lote) : q.eq("id_muestra", idMuestra);
   const { data, error } = await q.select();
   if (error) return jsonError(`No se pudo descartar: ${error.message}`, 400);
+  const { autor } = await autorRegistro(supabaseAdmin, user.email, user.nombre);
+  for (const t of data || []) {
+    await registrarUso(supabaseAdmin, {
+      id_muestra: t.id_muestra, id_lote: t.id_lote, evento: "Descarte", autor, motivo,
+      restante: t.cantidad_actual, unidad: t.unidad,
+    });
+  }
   return jsonOk({ muestras: data });
 });

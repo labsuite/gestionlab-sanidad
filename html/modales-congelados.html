@@ -62,6 +62,13 @@
       <button class="modal-close" onclick="closeModal('modal-muestra')">✕</button>
     </div>
     <div class="modal-body">
+      <div id="muestra-origen" style="display:none;font-size:12px;background:var(--accent-light);color:var(--accent);padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:12px">
+        🌱 <span id="muestra-origen-texto"></span>
+        <div id="muestra-origen-cantidad-grupo" style="display:flex;align-items:center;gap:6px;margin-top:6px">
+          <input type="text" inputmode="decimal" id="muestra-origen-cantidad" style="width:110px">
+          <span id="muestra-origen-unidad"></span>
+        </div>
+      </div>
       <div id="muestra-nota-lote" style="display:none;font-size:12px;background:var(--accent-light);color:var(--accent);padding:8px 12px;border-radius:var(--radius-sm);margin-bottom:12px"></div>
       <div class="form-grid-2">
         <div class="form-group full">
@@ -174,6 +181,75 @@
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-descartar-muestra')">Cancelar</button>
       <button class="btn btn-danger" onclick="confirmarDescartarMuestra()">Descartar</button>
+    </div>
+  </div>
+</div>
+
+<!-- USAR UN TUBO (cualquier rol) -->
+<div class="modal-overlay" id="modal-usar-muestra">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">🧊 Apuntar uso</div>
+      <button class="modal-close" onclick="closeModal('modal-usar-muestra')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-weight:600;margin-bottom:6px" id="usar-muestra-titulo"></div>
+      <div style="font-size:12px;color:var(--text-soft);margin-bottom:14px" id="usar-muestra-explica"></div>
+      <div class="form-group" id="usar-muestra-cantidad-grupo">
+        <label>¿Cuánto has gastado? *</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="text" inputmode="decimal" id="usar-muestra-cantidad" style="width:120px">
+          <span id="usar-muestra-unidad"></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>¿Para qué? *</label>
+        <select id="usar-muestra-motivo" onchange="document.getElementById('usar-muestra-otro').style.display = this.value === 'Otro' ? '' : 'none'">
+          <option value="">Seleccionar…</option>
+          <option>Práctica</option>
+          <option>Resiembra / mantenimiento</option>
+          <option>Control de calidad</option>
+          <option>PCR / ensayo</option>
+          <option>Otro</option>
+        </select>
+        <input type="text" id="usar-muestra-otro" placeholder="Explícalo brevemente" style="display:none;margin-top:6px">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-usar-muestra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarUsarMuestra()">Apuntar uso</button>
+    </div>
+  </div>
+</div>
+
+<!-- ETIQUETA NFC / QR DE CAJA O CONGELADOR -->
+<div class="modal-overlay" id="modal-etiqueta-congelado">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">🔗 Etiqueta NFC / QR</div>
+      <button class="modal-close" onclick="closeModal('modal-etiqueta-congelado')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px" id="etiqueta-cong-titulo"></div>
+      <div style="font-size:12px;color:var(--text-soft);margin-bottom:12px" id="etiqueta-cong-explica"></div>
+      <div style="background:var(--surface2);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px">URL a grabar en la etiqueta NFC</div>
+        <code id="etiqueta-cong-url" style="font-size:11px;color:var(--accent);word-break:break-all;line-height:1.5;display:block"></code>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn btn-secondary" style="flex:1" onclick="copiarUrlEtiquetaCongelado()">📋 Copiar URL</button>
+        <button class="btn btn-secondary" style="flex:1" onclick="imprimirEtiquetaCongelado()">🖨️ Imprimir QR</button>
+      </div>
+      <div style="text-align:center;margin-bottom:12px">
+        <img id="etiqueta-cong-qr" src="" alt="QR de la etiqueta"
+             style="width:180px;height:180px;border-radius:var(--radius-sm);border:1px solid var(--border)"
+             onerror="this.style.display='none'">
+      </div>
+      <p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:0" id="etiqueta-cong-consejo"></p>
+      <p style="font-size:11px;color:var(--text-muted);line-height:1.6;margin:6px 0 0">Graba la URL con <strong>NFC Tools</strong> u otra app de escritura NFC. El QR lleva la misma URL y se lee con la cámara.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('modal-etiqueta-congelado')">Listo</button>
     </div>
   </div>
 </div>

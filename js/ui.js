@@ -542,6 +542,15 @@ function _checkPendingNfcAction() {
     }, 400);
   }
 
+  if (action === 'congelados') {
+    const caja = params.get('caja');
+    const congelador = params.get('congelador');
+    if (!caja && !congelador) return;
+    setTimeout(() => {
+      if (typeof _abrirCongeladosPorNfc === 'function') _abrirCongeladosPorNfc(caja, congelador);
+    }, 400);
+  }
+
   if (action === 'registro-uso') {
     const tipo   = params.get('tipo');
     const equipo = params.get('equipo');

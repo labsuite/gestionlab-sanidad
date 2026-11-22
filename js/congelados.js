@@ -10,8 +10,12 @@
 // del mismo stock comparten ID_Lote. Nombre, tipo y datos propios son del lote;
 // casilla y cantidad que queda, de cada tubo.
 //
-// Cajas y muestras (alta, edición, descarte): profesorado (Admin/Gestor/Profesor).
-// El alumnado consulta.
+// Cajas y muestras (alta, edición, stock nuevo, descarte): profesorado
+// (Admin/Gestor/Profesor). Apuntar un uso (botón «Usar») y deshacerlo en los 15
+// minutos siguientes: cualquiera, también el alumnado (firma el grupo).
+//
+// Etiquetas NFC/QR: una por caja (abre la caja) y una por congelador (abre sus
+// cajas). URL con urlEtiqueta() — nunca window.location (ver CLAUDE.md).
 
 let _congFiltroEquipo = '';
 let _congCajaAbierta = '';
@@ -21,6 +25,11 @@ let _congMuestraSel = '';
 let _congBusqueda = '';
 let _congEditandoMuestra = '';
 let _congDescartando = '';
+let _congOrigenStock = '';       // tubo del que se hace un stock nuevo (modal de muestra)
+let _congUsando = '';            // tubo del modal «Usar»
+let _congHistorialCompleto = false;
+const _congMisUsos = {};         // id_uso → ms: usos apuntados desde esta pestaña (para «Deshacer»)
+const _CONG_MIN_DESHACER = 15;
 
 const _CONG_RE_EQUIPO = /congel|frigor|nevera|nitr[oó]geno|dewar|crioconserv/i;
 
@@ -63,19 +72,23 @@ const _CONG_TIPOS = {
       { k: 'a260_280', label: 'Pureza A260/280', ph: 'ej. 1,85' },
     ],
   },
-  'Suero, plasma o alícuota': {
+  'Suero o plasma': {
     icono: '🩸', clase: 'suero', formato: 'Volumen', pase: false, caducidad: true,
-    phNombre: 'ej. Suero control normal, Taq polimerasa',
+    phNombre: 'ej. Suero control normal',
     aviso: 'Sin datos de pacientes: ni nombres ni números de historia. Si procede de una persona, solo «suero de donante anónimo».',
     campos: [
-      { k: 'contenido', label: 'Qué es', ph: 'ej. Suero control, enzima, cebador, anticuerpo' },
+      { k: 'contenido', label: 'Qué es', tipo: 'select', otro: true,
+        opciones: ['Suero control', 'Plasma control', 'Suero de donante anónimo', 'Suero animal'] },
       { k: 'procedencia', label: 'Procedencia', tipo: 'select', otro: true, opciones: ['Comercial', 'Preparado en el laboratorio'] },
     ],
   },
-  'Kit o master mix': {
+  'Reactivo': {
     icono: '🧪', clase: 'kit', formato: 'Volumen', pase: false, caducidad: true, material: true,
-    phNombre: 'ej. Master mix PCR 2×',
+    phNombre: 'ej. Master mix PCR 2×, ampicilina 100 mg/mL, FBS',
     campos: [
+      { k: 'contenido', label: 'Qué es', tipo: 'select', otro: true,
+        opciones: ['Master mix', 'Enzima', 'Cebadores', 'Antibiótico', 'Suero fetal bovino (FBS)', 'Suplemento de medio', 'Componente de kit'] },
+      { k: 'concentracion', label: 'Concentración', ph: 'ej. 2×, 100 mg/mL, 10 µM' },
       { k: 'lote_comercial', label: 'Lote del fabricante', ph: 'ej. 2405-118' },
     ],
   },
@@ -150,6 +163,34 @@ function _congQuedaPoco(m) {
   if (m.Formato === 'Bolitas' && m.Cantidad_Actual <= 2) return true;
   return m.Cantidad_Inicial > 0 && m.Cantidad_Actual / m.Cantidad_Inicial < 0.2;
 }
+function _congUsosDelLote(idLote) {
+  return (DATA.usosMuestra || []).filter(u => u.ID_Lote === idLote)
+    .sort((a, b) => (b.Fecha || '').localeCompare(a.Fecha || ''));
+}
+function _congFechaHora(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' ' +
+    d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+}
+/** Recarga desde Supabase los usos de unos lotes (tras acciones que los escriben en el servidor). */
+async function _congRecargarUsos(idLotes) {
+  const lotes = [...new Set(idLotes.filter(Boolean))];
+  if (!lotes.length) return;
+  try {
+    const { data, error } = await _sbMigracion.from('usos_muestra').select('*').in('id_lote', lotes);
+    if (error) throw error;
+    DATA.usosMuestra = (DATA.usosMuestra || []).filter(u => !lotes.includes(u.ID_Lote)).concat((data || []).map(_usoMuestraSbToObj));
+  } catch (e) { console.warn('No se pudo recargar el historial de usos', e); }
+}
+function _congUpsertMuestras(filas) {
+  (filas || []).map(_muestraCongeladaSbToObj).forEach(obj => {
+    const idx = DATA.muestrasCongeladas.findIndex(x => x.ID_Muestra === obj.ID_Muestra);
+    if (idx >= 0) DATA.muestrasCongeladas[idx] = obj; else DATA.muestrasCongeladas.push(obj);
+  });
+}
+
 function _congEtiqueta(m) {
   return (m.Abreviatura || m.Nombre || '').replace(/\s+/g, '').slice(0, 4);
 }
@@ -216,7 +257,10 @@ function _congRenderEquipo(equipo, cajas, gestiona) {
   const abierta = cajas.find(c => c.ID_Caja === _congCajaAbierta);
   return `
     <div class="card" style="padding:16px;margin-bottom:16px">
-      <div style="font-weight:700;font-size:15px;margin-bottom:12px">🧊 ${_congEsc(_congNombreEquipo(equipo.ID_Activo))}</div>
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:12px">
+        <div style="font-weight:700;font-size:15px;flex:1">🧊 ${_congEsc(_congNombreEquipo(equipo.ID_Activo))}</div>
+        ${gestiona ? `<button class="btn btn-secondary btn-sm" title="Etiqueta NFC/QR para la puerta del congelador" onclick="openModalEtiquetaCongelado('congelador','${_congEsc(equipo.ID_Activo)}')">🔗 Etiqueta</button>` : ''}
+      </div>
       <div class="cong-cajas">
         ${cajas.map(c => _congRenderChipCaja(c)).join('')}
       </div>
@@ -283,6 +327,7 @@ function _congRenderCaja(c, gestiona) {
           ${c.Descripcion ? `<div style="font-size:12px;color:var(--text-soft);margin-top:4px">${_congEsc(c.Descripcion)}</div>` : ''}
         </div>
         ${gestiona ? `<div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="openModalEtiquetaCongelado('caja','${_congEsc(c.ID_Caja)}')">🔗 Etiqueta</button>
           <button class="btn btn-secondary btn-sm" onclick="openModalCaja('${_congEsc(c.ID_Caja)}')">✏️ Editar caja</button>
           ${c.Activa
             ? `<button class="btn btn-secondary btn-sm" onclick="_congRetirarCaja('${_congEsc(c.ID_Caja)}', false)">Retirar</button>`
@@ -333,6 +378,9 @@ function _congRenderFicha(m, gestiona) {
   add('Observaciones', _congEsc(m.Observaciones));
   add('Dado de alta por', _congEsc([m.Creado_Por, _congFecha((m.Fecha_Alta || '').slice(0, 10))].filter(Boolean).join(' · ')));
 
+  const arbol = _congRenderArbol(m);
+  if (arbol) add('Procedencia', arbol);
+
   const hermanos = _congTubosDelLote(m.ID_Lote);
   const otros = hermanos.filter(x => x.ID_Muestra !== m.ID_Muestra);
   const posTexto = x => {
@@ -349,11 +397,17 @@ function _congRenderFicha(m, gestiona) {
         </div>
         <button class="btn btn-secondary btn-sm" onclick="_congSelMuestra('')">✕</button>
       </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-primary" onclick="openModalUsarMuestra('${m.ID_Muestra}')">${_congTextoUsar(m)}</button>
+      </div>
+      ${_congRenderDeshacer(m)}
       <div class="cong-ficha-grid">${filas.join('')}</div>
       ${gestiona ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+        ${t.pase || m.Tipo === 'Cepa' || m.Tipo === 'Línea celular' ? `<button class="btn btn-secondary btn-sm" onclick="openModalMuestra('', '', '', '${m.ID_Muestra}')">🌱 Nuevo stock a partir de este</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="openModalMuestra('${m.ID_Muestra}')">✏️ Editar</button>
         <button class="btn btn-secondary btn-sm" onclick="openModalDescartarMuestra('${m.ID_Muestra}')">🗑️ Descartar</button>
       </div>` : ''}
+      ${_congRenderHistorial(m)}
     </div>`;
 }
 
@@ -536,14 +590,19 @@ function _congCajasActivas() {
  * Alta: `idCaja`/`posicion` vienen de la casilla pulsada (opcionales).
  * Edición: `idMuestra` del tubo; los datos comunes se guardan para todo su lote.
  */
-function openModalMuestra(idMuestra = '', idCaja = '', posicion = '') {
+function openModalMuestra(idMuestra = '', idCaja = '', posicion = '', idOrigen = '') {
   if (!_congPuedeGestionar()) return;
   const m = idMuestra ? _congMuestra(idMuestra) : null;
   _congEditandoMuestra = m ? m.ID_Muestra : '';
+  // Stock nuevo: se rellena con los datos del tubo de origen y el pase siguiente
+  const origen = !m && idOrigen ? _congMuestra(idOrigen) : null;
+  _congOrigenStock = origen ? origen.ID_Muestra : '';
+  const base = m || origen;
   const cajas = _congCajasActivas();
   if (!m && !cajas.length) { showToast('Primero crea una caja donde guardar la muestra', 'error'); return; }
 
-  setText('modal-muestra-title', m ? `✏️ Editar ${m.Nombre} (${m.Posicion})` : '🧊 Nueva muestra');
+  setText('modal-muestra-title', m ? `✏️ Editar ${m.Nombre} (${m.Posicion})`
+    : origen ? `🌱 Nuevo stock de ${origen.Nombre}` : '🧊 Nueva muestra');
   const selTipo = document.getElementById('muestra-tipo');
   selTipo.innerHTML = Object.entries(_CONG_TIPOS).map(([k, t]) => `<option value="${_congEsc(k)}">${t.icono} ${_congEsc(k)}</option>`).join('');
   const selFormato = document.getElementById('muestra-formato');
@@ -559,22 +618,35 @@ function openModalMuestra(idMuestra = '', idCaja = '', posicion = '') {
     .slice().sort((a, b) => a.Nombre.localeCompare(b.Nombre, 'es'))
     .map(x => `<option value="${_congEsc(x.Nombre + ' · ' + x.ID_Material)}">`).join('');
 
-  const tipo = m?.Tipo || 'Cepa';
+  const tipo = base?.Tipo || 'Cepa';
   sv('muestra-tipo', tipo);
-  sv('muestra-nombre', m?.Nombre || '');
-  sv('muestra-abreviatura', m?.Abreviatura || '');
-  sv('muestra-formato', m?.Formato || _CONG_TIPOS[tipo].formato);
-  sv('muestra-unidad', m?.Formato === 'Volumen' ? (m.Unidad || 'µL') : 'µL');
-  sv('muestra-cantidad', m ? (m.Cantidad_Inicial ?? '') : '');
+  sv('muestra-nombre', base?.Nombre || '');
+  sv('muestra-abreviatura', base?.Abreviatura || '');
+  sv('muestra-formato', base?.Formato || _CONG_TIPOS[tipo].formato);
+  sv('muestra-unidad', base?.Formato === 'Volumen' ? (base.Unidad || 'µL') : 'µL');
+  sv('muestra-cantidad', base ? (base.Cantidad_Inicial ?? '') : '');
   sv('muestra-cantidad-actual', m ? (m.Cantidad_Actual ?? '') : '');
-  sv('muestra-pase', m?.Pase ?? '');
+  sv('muestra-pase', origen ? (origen.Pase != null ? origen.Pase + 1 : '') : (m?.Pase ?? ''));
   sv('muestra-fecha', m ? (m.Fecha_Congelacion || '') : new Date().toISOString().slice(0, 10));
   sv('muestra-caducidad', m?.Caducidad || '');
   sv('muestra-observaciones', m?.Observaciones || '');
-  const mat = m?.ID_Material ? DATA.material.find(x => x.ID_Material === m.ID_Material) : null;
-  sv('muestra-material', mat ? `${mat.Nombre} · ${mat.ID_Material}` : (m?.ID_Material || ''));
+  const mat = base?.ID_Material ? DATA.material.find(x => x.ID_Material === base.ID_Material) : null;
+  sv('muestra-material', mat ? `${mat.Nombre} · ${mat.ID_Material}` : (base?.ID_Material || ''));
 
-  const cajaIni = m?.ID_Caja || idCaja || _congCajaAbierta || cajas[0]?.ID_Caja || '';
+  // Bloque «a partir de»: lo que se gasta del tubo de origen
+  const bloqueOrigen = document.getElementById('muestra-origen');
+  bloqueOrigen.style.display = origen ? '' : 'none';
+  if (origen) {
+    setText('muestra-origen-texto', `A partir de ${origen.Nombre} (${origen.Posicion}${origen.Pase != null ? ', pase ' + origen.Pase : ''}). `
+      + (origen.Formato === 'Bolitas' ? 'Se gastará 1 bolita del tubo de origen.'
+        : origen.Formato === 'Tubo' ? 'El tubo de origen se gasta entero y sale de la caja.'
+        : 'Indica cuánto has gastado del tubo de origen:'));
+    document.getElementById('muestra-origen-cantidad-grupo').style.display = origen.Formato === 'Volumen' ? '' : 'none';
+    sv('muestra-origen-cantidad', '');
+    setText('muestra-origen-unidad', origen.Unidad || '');
+  }
+
+  const cajaIni = m?.ID_Caja || idCaja || origen?.ID_Caja || _congCajaAbierta || cajas[0]?.ID_Caja || '';
   sv('muestra-caja', opcCajas.some(c => c.ID_Caja === cajaIni) ? cajaIni : (opcCajas[0]?.ID_Caja || ''));
   sv('muestra-posicion', m?.Posicion || posicion || '');
   sv('muestra-num-tubos', 1);
@@ -587,7 +659,7 @@ function openModalMuestra(idMuestra = '', idCaja = '', posicion = '') {
   nota.style.display = nLote > 1 ? '' : 'none';
   nota.textContent = nLote > 1 ? `Este tubo es de un stock de ${nLote} tubos: nombre, tipo, formato, fechas y datos se cambian en los ${nLote}. La casilla y lo que queda, solo en este.` : '';
 
-  _congPintarCamposTipo(m?.Datos || {});
+  _congPintarCamposTipo(base?.Datos || {});
   _congActualizarFormato();
   _congPrevisualizarCasillas();
   openModal('modal-muestra');
@@ -756,16 +828,24 @@ async function guardarMuestra() {
     }
   } else {
     body = { accion: 'crear_muestras', ...lote, cantidad_inicial: cantidad, id_caja: v('muestra-caja'), posiciones: casillas };
+    if (_congOrigenStock) {
+      const origen = _congMuestra(_congOrigenStock);
+      body.id_muestra_origen = _congOrigenStock;
+      if (origen?.Formato === 'Volumen') {
+        body.cantidad_origen = v('muestra-origen-cantidad').replace(',', '.');
+        if (!(Number(body.cantidad_origen) > 0)) { showToast('Indica cuánto has gastado del tubo de origen', 'error'); return; }
+        if (Number(body.cantidad_origen) > Number(origen.Cantidad_Actual)) { showToast(`En el tubo de origen solo quedan ${_congCantidadTexto(origen)}`, 'error'); return; }
+      }
+    }
   }
 
   showLoading('Guardando…');
   try {
     const { muestras } = await callEdgeFunction('gestionar-congelados', body);
-    (muestras || []).map(_muestraCongeladaSbToObj).forEach(obj => {
-      const idx = DATA.muestrasCongeladas.findIndex(x => x.ID_Muestra === obj.ID_Muestra);
-      if (idx >= 0) DATA.muestrasCongeladas[idx] = obj; else DATA.muestrasCongeladas.push(obj);
-    });
-    const primera = _congEditandoMuestra || muestras?.[0]?.id_muestra;
+    _congUpsertMuestras(muestras);
+    await _congRecargarUsos((muestras || []).map(x => x.id_lote));
+    const nuevos = (muestras || []).filter(x => x.id_muestra !== _congOrigenStock);
+    const primera = _congEditandoMuestra || nuevos[0]?.id_muestra;
     const caja = _congCaja(v('muestra-caja'));
     if (caja) { _congCajaAbierta = caja.ID_Caja; if (_congFiltroEquipo && _congFiltroEquipo !== caja.ID_Equipo) _congFiltroEquipo = ''; }
     _congMuestraSel = primera || '';
@@ -773,7 +853,7 @@ async function guardarMuestra() {
     closeModal('modal-muestra');
     renderCongelados();
     showToast(_congEditandoMuestra ? 'Muestra actualizada'
-      : (muestras.length > 1 ? `${muestras.length} tubos guardados` : 'Muestra guardada'), 'success');
+      : (nuevos.length > 1 ? `${nuevos.length} tubos guardados` : 'Muestra guardada'), 'success');
   } catch (e) {
     console.error(e);
     showToast(e.message || 'No se pudo guardar la muestra', 'error');
@@ -807,10 +887,8 @@ async function confirmarDescartarMuestra() {
   try {
     const { muestras } = await callEdgeFunction('gestionar-congelados',
       { accion: 'descartar_muestra', id_muestra: _congDescartando, motivo, todo_el_lote: todo });
-    (muestras || []).map(_muestraCongeladaSbToObj).forEach(obj => {
-      const idx = DATA.muestrasCongeladas.findIndex(x => x.ID_Muestra === obj.ID_Muestra);
-      if (idx >= 0) DATA.muestrasCongeladas[idx] = obj;
-    });
+    _congUpsertMuestras(muestras);
+    await _congRecargarUsos((muestras || []).map(x => x.id_lote));
     _congMuestraSel = '';
     closeModal('modal-descartar-muestra');
     renderCongelados();
@@ -819,4 +897,230 @@ async function confirmarDescartarMuestra() {
     console.error(e);
     showToast(e.message || 'No se pudo descartar', 'error');
   } finally { hideLoading(); }
+}
+
+// ── Usar un tubo ─────────────────────────────────────────────
+
+function _congTextoUsar(m) {
+  if (m.Formato === 'Bolitas') return '🧊 Usar · sacar 1 bolita';
+  if (m.Formato === 'Tubo') return '🧊 Usar este tubo';
+  return '🧊 Usar · apuntar lo gastado';
+}
+
+function openModalUsarMuestra(idMuestra) {
+  const m = _congMuestra(idMuestra);
+  if (!m || m.Estado !== 'Disponible') return;
+  _congUsando = idMuestra;
+  setText('usar-muestra-titulo', `${(_CONG_TIPOS[m.Tipo] || {}).icono || '🧊'} ${m.Nombre} · ${m.Posicion}`);
+  let explica;
+  if (m.Formato === 'Bolitas') {
+    const quedan = Math.max(0, (m.Cantidad_Actual || 0) - 1);
+    explica = `Se saca 1 bolita: quedarán ${_congNum(quedan)} en el tubo.` + (quedan === 0 ? ' Era la última: el tubo sale de la caja.' : '');
+  } else if (m.Formato === 'Tubo') {
+    explica = 'El tubo se gasta entero: sale de la caja y la casilla queda libre.';
+  } else {
+    explica = `Quedan ${_congCantidadTexto(m)} · ${m.Descongelaciones || 0} descongelaciones. Se sumará una descongelación.`;
+  }
+  setText('usar-muestra-explica', explica);
+  document.getElementById('usar-muestra-cantidad-grupo').style.display = m.Formato === 'Volumen' ? '' : 'none';
+  setText('usar-muestra-unidad', m.Unidad || '');
+  sv('usar-muestra-cantidad', '');
+  sv('usar-muestra-motivo', '');
+  sv('usar-muestra-otro', '');
+  document.getElementById('usar-muestra-otro').style.display = 'none';
+  openModal('modal-usar-muestra');
+  if (m.Formato === 'Volumen') setTimeout(() => document.getElementById('usar-muestra-cantidad')?.focus(), 80);
+}
+
+async function confirmarUsarMuestra() {
+  const m = _congMuestra(_congUsando);
+  if (!m) return;
+  let motivo = v('usar-muestra-motivo');
+  if (motivo === 'Otro') motivo = v('usar-muestra-otro');
+  if (!motivo) { showToast('Indica para qué lo usas', 'error'); return; }
+  const body = { accion: 'usar_muestra', id_muestra: m.ID_Muestra, motivo };
+  if (m.Formato === 'Volumen') {
+    body.cantidad = v('usar-muestra-cantidad').replace(',', '.');
+    if (!(Number(body.cantidad) > 0)) { showToast('Indica cuánto has gastado', 'error'); return; }
+    if (Number(body.cantidad) > Number(m.Cantidad_Actual)) { showToast(`Solo quedan ${_congCantidadTexto(m)}`, 'error'); return; }
+  }
+  showLoading('Apuntando…');
+  try {
+    const { muestra, uso } = await callEdgeFunction('gestionar-congelados', body);
+    _congUpsertMuestras([muestra]);
+    if (uso) {
+      DATA.usosMuestra.push(_usoMuestraSbToObj(uso));
+      _congMisUsos[uso.id_uso] = Date.now();
+    }
+    if (muestra.estado !== 'Disponible') _congMuestraSel = '';
+    closeModal('modal-usar-muestra');
+    renderCongelados();
+    const obj = _muestraCongeladaSbToObj(muestra);
+    const msg = obj.Estado !== 'Disponible' ? 'Uso apuntado · el tubo sale de la caja'
+      : `Uso apuntado · quedan ${_congCantidadTexto(obj)}`;
+    if (uso) mostrarToastConAccion(msg, '↩︎ Deshacer', `() => _congDeshacerUso('${uso.id_uso}')`, 8000);
+    else showToast(msg, 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || 'No se pudo apuntar el uso', 'error');
+  } finally { hideLoading(); }
+}
+
+/** Aviso con «Deshacer» en la ficha si el último uso del tubo lo apuntó esta pestaña hace poco. */
+function _congRenderDeshacer(m) {
+  const ultimo = (DATA.usosMuestra || []).filter(u => u.ID_Muestra === m.ID_Muestra)
+    .sort((a, b) => (b.Fecha || '').localeCompare(a.Fecha || ''))[0];
+  if (!ultimo || ultimo.Evento !== 'Uso' || !_congMisUsos[ultimo.ID_Uso]) return '';
+  if (Date.now() - _congMisUsos[ultimo.ID_Uso] > _CONG_MIN_DESHACER * 60000) return '';
+  return `<div class="cong-aviso-deshacer">✓ Has apuntado un uso (${_congEsc(ultimo.Motivo)}).
+    <button class="btn btn-secondary btn-sm" onclick="_congDeshacerUso('${ultimo.ID_Uso}')">↩︎ Deshacer</button></div>`;
+}
+
+async function _congDeshacerUso(idUso) {
+  showLoading('Deshaciendo…');
+  try {
+    const { muestra } = await callEdgeFunction('gestionar-congelados', { accion: 'deshacer_uso', id_uso: idUso });
+    _congUpsertMuestras([muestra]);
+    DATA.usosMuestra = DATA.usosMuestra.filter(u => u.ID_Uso !== idUso);
+    delete _congMisUsos[idUso];
+    _congCajaAbierta = muestra.id_caja;
+    _congMuestraSel = muestra.id_muestra;
+    renderCongelados();
+    showToast('Uso deshecho', 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(e.message || 'No se pudo deshacer', 'error');
+  } finally { hideLoading(); }
+}
+
+// ── Historial y árbol de pases ───────────────────────────────
+
+function _congRenderHistorial(m) {
+  const usos = _congUsosDelLote(m.ID_Lote);
+  const nTubos = new Set((DATA.muestrasCongeladas || []).filter(x => x.ID_Lote === m.ID_Lote).map(x => x.ID_Muestra)).size;
+  if (!usos.length) {
+    return `<div class="cong-historial"><div class="cong-historial-tit">Historial</div>
+      <div style="font-size:12px;color:var(--text-muted)">Todavía no se ha usado${nTubos > 1 ? ' ningún tubo de este stock' : ''}.</div></div>`;
+  }
+  const iconos = { 'Uso': '🧊', 'Nuevo stock': '🌱', 'Descarte': '🗑️', 'Ajuste': '✏️' };
+  const visibles = _congHistorialCompleto ? usos : usos.slice(0, 8);
+  const filas = visibles.map(u => {
+    const tubo = _congMuestra(u.ID_Muestra);
+    const gasto = u.Evento === 'Uso' || u.Evento === 'Nuevo stock'
+      ? (u.Cantidad != null ? `−${_congNum(u.Cantidad)} ${u.Unidad === 'tubo' ? 'tubo' : (u.Unidad || '')}`.trim() : '')
+      : '';
+    const queda = u.Restante != null && u.Unidad !== 'tubo' ? `quedan ${_congNum(u.Restante)} ${u.Unidad || ''}`.trim() : '';
+    return `<div class="cong-uso">
+      <div class="cong-uso-fecha">${_congEsc(_congFechaHora(u.Fecha))}</div>
+      <div style="flex:1;min-width:0">
+        <div>${iconos[u.Evento] || '·'} ${_congEsc(u.Motivo || u.Evento)}${nTubos > 1 && tubo ? ` <span class="cong-pos">${_congEsc(tubo.Posicion)}</span>` : ''}</div>
+        <div style="font-size:11px;color:var(--text-soft)">${[u.Autor, gasto, queda].filter(Boolean).map(_congEsc).join(' · ')}</div>
+      </div>
+    </div>`;
+  }).join('');
+  const mas = usos.length > 8
+    ? `<button class="cong-link" style="margin-top:6px" onclick="_congHistorialCompleto=!_congHistorialCompleto;renderCongelados()">${_congHistorialCompleto ? 'Ver menos' : `Ver los ${usos.length}`}</button>`
+    : '';
+  return `<div class="cong-historial"><div class="cong-historial-tit">Historial${nTubos > 1 ? ' del stock' : ''}</div>${filas}${mas}</div>`;
+}
+
+/** Lote → datos para mostrarlo: nombre, pase y un tubo que siga en una caja. */
+function _congInfoLote(idLote) {
+  const tubos = (DATA.muestrasCongeladas || []).filter(x => x.ID_Lote === idLote);
+  if (!tubos.length) return null;
+  const vivo = tubos.find(x => x.Estado === 'Disponible');
+  return { nombre: tubos[0].Nombre, pase: tubos[0].Pase, origen: tubos[0].ID_Lote_Origen, vivo, n: tubos.filter(x => x.Estado === 'Disponible').length };
+}
+
+function _congEnlaceLote(idLote) {
+  const info = _congInfoLote(idLote);
+  if (!info) return '<span style="color:var(--text-muted)">stock borrado</span>';
+  const txt = `${info.pase != null ? 'pase ' + info.pase : info.nombre}${info.n ? '' : ' (agotado)'}`;
+  return info.vivo
+    ? `<button class="cong-link" onclick="_congIrA('${info.vivo.ID_Muestra}')">${_congEsc(txt)}</button>`
+    : `<span class="cong-link" style="cursor:default;opacity:.7">${_congEsc(txt)}</span>`;
+}
+
+/** «Procede de pase 2 ← pase 1» y «Stocks hechos a partir de este: pase 4». */
+function _congRenderArbol(m) {
+  const partes = [];
+  const cadena = [];
+  let actual = m.ID_Lote_Origen;
+  const vistos = new Set([m.ID_Lote]);
+  while (actual && !vistos.has(actual) && cadena.length < 10) {
+    vistos.add(actual);
+    cadena.push(actual);
+    actual = _congInfoLote(actual)?.origen;
+  }
+  if (cadena.length) partes.push('Procede de ' + cadena.map(_congEnlaceLote).join(' ← '));
+  const hijos = [...new Set((DATA.muestrasCongeladas || []).filter(x => x.ID_Lote_Origen === m.ID_Lote).map(x => x.ID_Lote))];
+  if (hijos.length) partes.push('Stocks hechos a partir de este: ' + hijos.map(_congEnlaceLote).join(' '));
+  return partes.join('<br>');
+}
+
+// ── Etiquetas NFC / QR ───────────────────────────────────────
+
+function _congUrlEtiqueta(tipo, id) {
+  return urlEtiqueta(tipo === 'caja' ? { action: 'congelados', caja: id } : { action: 'congelados', congelador: id });
+}
+
+function openModalEtiquetaCongelado(tipo, id) {
+  const caja = tipo === 'caja' ? _congCaja(id) : null;
+  const titulo = caja ? `📦 ${caja.Nombre} · ${_congNombreEquipo(caja.ID_Equipo, false)}` : `🧊 ${_congNombreEquipo(id)}`;
+  const url = _congUrlEtiqueta(tipo, id);
+  setText('etiqueta-cong-titulo', titulo);
+  setText('etiqueta-cong-url', url);
+  setText('etiqueta-cong-explica', caja
+    ? 'Al escanearla se abre esta caja con su cuadrícula: se toca el tubo y se pulsa «Usar».'
+    : 'Al escanearla se abren las cajas de este congelador, sin tener que abrir la puerta para buscar.');
+  setText('etiqueta-cong-consejo', caja
+    ? 'Caja a −20 °C: una etiqueta NFC adhesiva en la tapa suele aguantar. A −80 °C o en nitrógeno, mejor el QR impreso en etiqueta criogénica.'
+    : 'La puerta es metálica: usa una etiqueta NFC «anti-metal» (on-metal) por fuera, o el QR.');
+  const img = document.getElementById('etiqueta-cong-qr');
+  img.style.display = '';
+  img.src = '';
+  img.src = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=10&data=${encodeURIComponent(url)}`;
+  document.getElementById('modal-etiqueta-congelado').dataset.titulo = caja ? caja.Nombre : _congNombreEquipo(id, false);
+  openModal('modal-etiqueta-congelado');
+}
+
+async function copiarUrlEtiquetaCongelado() {
+  const url = document.getElementById('etiqueta-cong-url').textContent;
+  try { await navigator.clipboard.writeText(url); showToast('URL copiada ✓', 'success'); }
+  catch { showToast('No se pudo copiar: selecciona la URL y cópiala a mano', 'error'); }
+}
+
+/** Abre una hoja con el QR y el nombre, lista para imprimir en una etiqueta. */
+function imprimirEtiquetaCongelado() {
+  const modal = document.getElementById('modal-etiqueta-congelado');
+  const titulo = modal.dataset.titulo || '';
+  const qr = document.getElementById('etiqueta-cong-qr').src;
+  const w = window.open('', '_blank');
+  if (!w) { showToast('El navegador ha bloqueado la ventana de impresión', 'error'); return; }
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Etiqueta ${_congEsc(titulo)}</title>
+    <style>body{font-family:sans-serif;margin:16px}.et{display:inline-flex;flex-direction:column;align-items:center;border:1px dashed #999;padding:8px 10px}
+    .et img{width:30mm;height:30mm}.et div{font-size:10pt;font-weight:bold;margin-top:4px;max-width:40mm;text-align:center}
+    @media print{.no{display:none}}</style></head><body>
+    <p class="no" style="font-size:12px;color:#555">Recorta la etiqueta (30 mm de QR). Para −80 °C usa papel de etiqueta criogénica.</p>
+    <div class="et"><img src="${qr}" alt="QR"><div>${_congEsc(titulo)}</div></div>
+    <script>document.querySelector('img').onload = () => setTimeout(() => print(), 200);<\/script></body></html>`);
+  w.document.close();
+}
+
+/** Entrada desde una etiqueta (?action=congelados&caja=… o &congelador=…). */
+function _abrirCongeladosPorNfc(idCaja, idCongelador) {
+  _congBusqueda = '';
+  _congMuestraSel = '';
+  if (idCaja) {
+    const caja = _congCaja(idCaja);
+    if (!caja) { showPage('congelados'); showToast('Esa caja ya no existe en la app', 'error'); return; }
+    _congFiltroEquipo = caja.ID_Equipo;
+    _congCajaAbierta = idCaja;
+    if (!caja.Activa) _congVerRetiradas = true;
+  } else if (idCongelador) {
+    _congFiltroEquipo = idCongelador;
+    _congCajaAbierta = '';
+  }
+  showPage('congelados');
+  renderCongelados();
 }

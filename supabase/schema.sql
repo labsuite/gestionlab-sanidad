@@ -961,3 +961,36 @@ create unique index if not exists uq_muestras_congeladas_casilla
   on muestras_congeladas (id_caja, posicion) where estado = 'Disponible';
 alter table muestras_congeladas enable row level security;
 create policy "muestras_congeladas_select_anon" on muestras_congeladas for select to anon, authenticated using (true);
+
+-- ── Muestras congeladas · parte 3: usos e historial (2026-11-22) ────────
+-- Cada vez que se usa un tubo (o se hace un stock nuevo a partir de él, o se
+-- descarta) queda una fila. `autor` lo pone el servidor con autorRegistro():
+-- nombre corto del docente o nombre del GRUPO para el alumnado (no hay email).
+-- `cantidad` = lo gastado (bolitas o volumen); `restante` = lo que quedó.
+create table if not exists usos_muestra (
+  id_uso        text primary key,
+  id_muestra    text not null references muestras_congeladas(id_muestra) on delete cascade,
+  id_lote       text not null,
+  evento        text not null default 'Uso' check (evento in ('Uso','Nuevo stock','Descarte','Ajuste')),
+  fecha         timestamptz not null default now(),
+  autor         text,
+  motivo        text,
+  cantidad      numeric,
+  restante      numeric,
+  unidad        text,
+  id_lote_nuevo text           -- evento 'Nuevo stock': el lote que se hizo
+);
+create index if not exists idx_usos_muestra_lote on usos_muestra (id_lote);
+create index if not exists idx_usos_muestra_muestra on usos_muestra (id_muestra);
+create index if not exists idx_muestras_congeladas_origen on muestras_congeladas (id_lote_origen);
+alter table usos_muestra enable row level security;
+create policy "usos_muestra_select_anon" on usos_muestra for select to anon, authenticated using (true);
+
+-- 2026-11-22: tipos renombrados — 'Kit o master mix' → 'Reactivo' (master mix,
+-- alícuotas de antibiótico, FBS, enzimas, cebadores…) y 'Suero, plasma o
+-- alícuota' → 'Suero o plasma' (las alícuotas de reactivos van a 'Reactivo').
+update muestras_congeladas set tipo = 'Reactivo' where tipo = 'Kit o master mix';
+update muestras_congeladas set tipo = 'Suero o plasma' where tipo = 'Suero, plasma o alícuota';
+alter table muestras_congeladas drop constraint if exists muestras_congeladas_tipo_check;
+alter table muestras_congeladas add constraint muestras_congeladas_tipo_check
+  check (tipo in ('Cepa','Línea celular','Ácido nucleico','Suero o plasma','Reactivo'));

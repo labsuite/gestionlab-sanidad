@@ -20,7 +20,7 @@ Ver `docs/` para detalles de módulos completados y patrones de implementación:
 - `docs/modulo-residuos.md` — GHS, ciclo de vida de contenedores, consultas, NFC/QR
 - `docs/modulo-reservas.md` — políticas BLOCK/COMPATIBLE, estados, 23 equipos configurados
 - `docs/modulo-registros-uso.md` — registros de calidad por sesión (cabina/autoclave/vitrina de gases), check-in/check-out NFC flexible; cada pestaña se describe entera en `_regConfig`
-- `docs/modulo-congelados.md` — **Muestras congeladas** (bloque «Uso del laboratorio»): congelador (equipo del inventario) → caja → casilla; formatos bolitas / tubo de un uso / volumen; kits de PCR enlazados a Material fungible. Partes 1 (cajas) y 2 (muestras, un registro por tubo agrupados por lote) hechas
+- `docs/modulo-congelados.md` — **Muestras congeladas** (bloque «Uso del laboratorio»): congelador (equipo del inventario) → caja → casilla; formatos bolitas / tubo de un uso / volumen; reactivos enlazados a Material fungible; botón «Usar» abierto al alumnado, historial, árbol de pases y etiquetas NFC/QR por caja y por congelador
 - `docs/modulo-usuarios.md` — columnas Usuarios, lógica alumnos, ciclos/módulos, usuarios _sbOnly
 - `docs/modulo-pedidos.md` — estados pedido/solicitud, recepción de líneas, historial, eliminar ítems
 - `docs/supabase.md` — integración actual + fases 2-4 pendientes
@@ -276,9 +276,9 @@ El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:h
 
 ## Etiquetas NFC/QR — la URL sale de `APP_URL`, nunca de `window.location`
 
-⚠ Los tres generadores de etiqueta (`mostrarUrlNfc` en `js/ubicaciones.js`,
+⚠ Los cuatro generadores de etiqueta (`mostrarUrlNfc` en `js/ubicaciones.js`,
 `mostrarUrlNfcContenedor` en `js/residuos.js`, `openModalNfcRegistro` en
-`js/registros-uso.js`) llaman a `urlEtiqueta(params)` de `js/config.js`, que compone la URL
+`js/registros-uso.js`, `openModalEtiquetaCongelado` en `js/congelados.js`) llaman a `urlEtiqueta(params)` de `js/config.js`, que compone la URL
 sobre la constante `APP_URL`. No volver a usar `window.location.origin + pathname`: la URL se
 graba **físicamente en el chip** y se queda pegada a una puerta durante años, así que basta
 generar la etiqueta desde un host distinto para dejar un tag muerto para siempre.

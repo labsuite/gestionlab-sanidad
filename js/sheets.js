@@ -696,6 +696,23 @@ function _muestraCongeladaSbToObj(m) {
   };
 }
 
+function _usoMuestraSbToObj(u) {
+  const num = x => (x === null || x === undefined) ? null : Number(x);
+  return {
+    ID_Uso: u.id_uso || '',
+    ID_Muestra: u.id_muestra || '',
+    ID_Lote: u.id_lote || '',
+    Evento: u.evento || 'Uso',
+    Fecha: u.fecha || '',
+    Autor: u.autor || '',
+    Motivo: u.motivo || '',
+    Cantidad: num(u.cantidad),
+    Restante: num(u.restante),
+    Unidad: u.unidad || '',
+    ID_Lote_Nuevo: u.id_lote_nuevo || '',
+  };
+}
+
 function _usuarioSbToObj(u) {
   return {
     ID_Usuario: u.id_usuario || '',
@@ -751,7 +768,7 @@ async function loadAllData() {
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
-           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes] = await Promise.all([
+           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes, sbUsosMuestraRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -797,7 +814,8 @@ async function loadAllData() {
       _leerTablaCompleta('tareas_personales', 'id_tarea').then(r => r, () => ({ data: [] })),
       _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('cajas_congelado', 'id_caja').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('muestras_congeladas', 'id_muestra').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('muestras_congeladas', 'id_muestra').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('usos_muestra', 'id_uso').then(r => r, () => ({ data: [] }))
     ]);
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
@@ -837,6 +855,7 @@ async function loadAllData() {
     DATA.registrosVitrina        = (sbRegistrosVitrinaRes?.data || []).map(_registroVitrinaSbToObj);
     DATA.cajasCongelado          = (sbCajasCongeladoRes?.data || []).map(_cajaCongeladoSbToObj);
     DATA.muestrasCongeladas      = (sbMuestrasCongeladasRes?.data || []).map(_muestraCongeladaSbToObj);
+    DATA.usosMuestra             = (sbUsosMuestraRes?.data || []).map(_usoMuestraSbToObj);
 
     // Supabase: ciclos, módulos y asignaciones usuario→módulo
     const sbCiclos      = sbCiclosRes?.data      || [];
