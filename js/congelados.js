@@ -144,7 +144,6 @@ const _CONG_INSTRUCCIONES = {
       'Descongélalo <b>rápido a 37 °C</b> (baño, 1–2 minutos) hasta que quede un cristalito de hielo.',
       'Desinfecta el exterior con etanol 70 % y ábrelo en la cabina de bioseguridad.',
       'Pásalo al medio y centrifuga para quitar el DMSO del medio de congelación.',
-      'Un vial de células descongelado <b>no se puede volver a congelar</b>.',
     ],
     'Ácido nucleico': [
       'El ARN se degrada muy deprisa: guantes, material libre de RNasas y siempre en hielo.',
