@@ -10,13 +10,26 @@
 // equipo sale de ahí, no de mes_inicio/fin_temporada.
 import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
-// Parsea el checklist [{texto, hecho}] recibido en el cuerpo.
-function parsePasos(v: unknown): { texto: string; hecho: boolean }[] | null {
+// Parsea el checklist recibido en el cuerpo. Un paso normal es {texto, hecho}; un paso de
+// COMPROBACIÓN (el plan trae "(criterio: …)") es {texto, criterio, resultado, nota, hecho}:
+// resultado 'cumple' | 'no_cumple' | null, y la nota (qué se vio) solo si no cumple.
+type Paso = { texto: string; hecho: boolean; criterio?: string; resultado?: string | null; nota?: string | null };
+function parsePasos(v: unknown): Paso[] | null {
   if (!Array.isArray(v)) return null;
   return v.map((p) => {
     const o = (p ?? {}) as Record<string, unknown>;
-    return { texto: String(o.texto ?? ""), hecho: o.hecho === true };
+    const texto = String(o.texto ?? "");
+    const criterio = o.criterio ? String(o.criterio).trim() : "";
+    if (!criterio) return { texto, hecho: o.hecho === true };
+    const resultado = o.resultado === "cumple" || o.resultado === "no_cumple" ? String(o.resultado) : null;
+    const nota = resultado === "no_cumple" && o.nota ? String(o.nota).trim() : null;
+    return { texto, criterio, resultado, nota, hecho: !!resultado };
   });
+}
+
+/** Un «no cumple» sin anotar qué se vio no sirve de registro: se rechaza al finalizar. */
+function pasoNoCumpleSinNota(pasos: Paso[] | null): Paso | undefined {
+  return (pasos || []).find((p) => p.resultado === "no_cumple" && !p.nota);
 }
 
 // Evaluaciones en que se usa un equipo: [1, 3] o "1,3" → "1,3". Sin ninguna → null
@@ -107,12 +120,7 @@ Deno.serve(async (req) => {
     const curso = body.curso_academico ? String(body.curso_academico) : null;
     const periodo = body.periodo ? String(body.periodo) : null;
 
-    const pasos = Array.isArray(body.pasos)
-      ? (body.pasos as unknown[]).map((p) => {
-          const o = (p ?? {}) as Record<string, unknown>;
-          return { texto: String(o.texto ?? ""), hecho: o.hecho === true };
-        })
-      : null;
+    const pasos = parsePasos(body.pasos);
 
     // ¿Hay ya una ejecución en curso de este mismo mantenimiento?
     let enCurso: Record<string, unknown> | null = null;
@@ -162,6 +170,8 @@ Deno.serve(async (req) => {
     if (!fecha || !realizadoPor) {
       return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
+    const sinNota = pasoNoCumpleSinNota(pasos);
+    if (sinNota) return jsonError(`Anota qué se ha visto en «${sinNota.texto}», que no cumple el criterio`, 400);
     // El alumnado firma siempre con su grupo (nunca con el nombre que venga del
     // cliente) y deja el registro esperando visto bueno, sin supervisor: lo pone
     // quien lo valide, que es de quien depende la validez del registro.
@@ -331,6 +341,8 @@ Deno.serve(async (req) => {
       actualizado_en: new Date().toISOString(),
     };
     const pasosEd = parsePasos(body.pasos);
+    const sinNotaEd = pasoNoCumpleSinNota(pasosEd);
+    if (sinNotaEd) return jsonError(`Anota qué se ha visto en «${sinNotaEd.texto}», que no cumple el criterio`, 400);
     if (pasosEd) upd.pasos = pasosEd;
 
     const { data, error } = await supabaseAdmin.from("registro_mantenimientos")

@@ -1190,6 +1190,24 @@
       accent-color: var(--accent); cursor: pointer;
     }
     .mant-check-item input:checked + span { color: var(--text-muted); text-decoration: line-through; }
+    /* Pasos de comprobación con criterio: «✓ Cumple» / «✗ No cumple» en vez de casilla */
+    .mant-check-criterio { cursor: default; }
+    .mant-check-criterio:hover { background: none; }
+    .mant-check-cuerpo { flex: 1; min-width: 0; }
+    .mant-check-crit { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .mant-check-botones { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+    .mant-check-botones button {
+      font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 99px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    }
+    .mant-check-criterio.is-cumple .mant-btn-cumple { background: var(--success, #1e8e3e); border-color: var(--success, #1e8e3e); color: #fff; }
+    .mant-check-criterio.is-no_cumple .mant-btn-nocumple { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .mant-check-criterio.is-cumple .mant-check-texto { color: var(--text-muted); }
+    .mant-check-criterio.is-no_cumple { background: var(--danger-light, #fdecea); }
+    .mant-check-nota { margin-top: 8px; }
+    .mant-check-nota label { font-size: 12px; font-weight: 500; }
+    .mant-check-nota textarea { width: 100%; margin-top: 4px; }
+    .mant-check-nota-ayuda { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
     /* Importar profesorado – paso 2: una tarjeta plegable por profesor */
     .importar-prof-details > summary {

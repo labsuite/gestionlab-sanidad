@@ -245,7 +245,34 @@ function _pasosDesdePlan(plan) {
     .map(l => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, '').trim())
     .filter(Boolean);
   const textos = lineas.length ? lineas : [(plan.Operacion || 'Mantenimiento').trim()];
-  return textos.map(t => ({ texto: t, hecho: false }));
+  return textos.map(t => _normPasoMant({ texto: t, hecho: false }));
+}
+
+// Un paso que acaba en "(criterio: …)" —así vienen de los protocolos— es una COMPROBACIÓN:
+// no se marca como hecha, se resuelve con «Cumple» / «No cumple» (y en ese caso, qué se vio).
+const _RE_CRITERIO = /\s*\(\s*criterio\s*:\s*(.*)\)\s*$/i;   // el criterio puede llevar paréntesis dentro
+
+/** Normaliza un paso guardado o recién leído del plan: {texto, hecho, criterio, resultado, nota}.
+ *  Los pasos guardados antes de existir los criterios llevan el criterio dentro del texto. */
+function _normPasoMant(p) {
+  let texto = String(p?.texto || '').trim();
+  let criterio = p?.criterio ? String(p.criterio).trim() : '';
+  if (!criterio) {
+    const m = texto.match(_RE_CRITERIO);
+    if (m) { criterio = m[1].trim(); texto = texto.replace(_RE_CRITERIO, '').trim(); }
+  }
+  const resultado = (p?.resultado === 'cumple' || p?.resultado === 'no_cumple') ? p.resultado : null;
+  return {
+    texto, criterio: criterio || null,
+    hecho: criterio ? !!resultado : p?.hecho === true,
+    resultado: criterio ? resultado : null,
+    nota: criterio && resultado === 'no_cumple' ? String(p?.nota || '') : '',
+  };
+}
+
+/** Pasos de comprobación que no cumplen su criterio. */
+function _pasosNoCumple(pasos) {
+  return (Array.isArray(pasos) ? pasos : []).map(_normPasoMant).filter(p => p.resultado === 'no_cumple');
 }
 
 // ============================================================
@@ -447,7 +474,7 @@ function buildMantenimientoEquipo(equipoId) {
 // MODAL EJECUTAR MANTENIMIENTO (checklist de pasos + guardar a medias)
 // ============================================================
 let _mantEjecActual = null;   // { idPlan, idEquipo, periodo, curso }
-let _mantPasosActual = [];     // [{ texto, hecho }] — fuente de verdad de los textos
+let _mantPasosActual = [];     // [{ texto, hecho, criterio, resultado, nota }] — estado del checklist
 let _mantEditRegistroId = null; // si no es null, el modal está editando un registro ya finalizado
 
 // Deja el modal en modo "ejecutar" (checklist + guardar progreso + finalizar).
@@ -480,7 +507,7 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
 
   const enCurso = getEjecucionMant(idPlan, curso, periodo);
   const pasos = enCurso && Array.isArray(enCurso.Pasos) && enCurso.Pasos.length
-    ? enCurso.Pasos.map(p => ({ texto: String(p.texto || ''), hecho: p.hecho === true }))
+    ? enCurso.Pasos
     : _pasosDesdePlan(plan);
 
   _mantEjecActual = { idPlan, idEquipo, periodo, curso };
@@ -538,30 +565,100 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
 }
 
 function _renderMantChecklist(pasos) {
-  _mantPasosActual = pasos.map(p => ({ texto: String(p.texto || ''), hecho: p.hecho === true }));
+  _mantPasosActual = (pasos || []).map(_normPasoMant);
   const cont = document.getElementById('mant-checklist');
   if (!cont) return;
-  cont.innerHTML = _mantPasosActual.map((p, i) => `
-    <label class="mant-check-item">
-      <input type="checkbox" data-idx="${i}" ${p.hecho ? 'checked' : ''} onchange="_mantChecklistChanged()">
-      <span></span>
+  // Los textos van con textContent (vienen de los planes, no se interpolan como HTML).
+  cont.innerHTML = _mantPasosActual.map((p, i) => p.criterio ? `
+    <div class="mant-check-item mant-check-criterio ${p.resultado ? 'is-' + p.resultado : ''}" data-idx="${i}">
+      <div class="mant-check-cuerpo">
+        <span class="mant-check-texto"></span>
+        <div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>
+        <div class="mant-check-botones">
+          <button type="button" class="mant-btn-cumple" onclick="_mantMarcarCriterio(${i}, 'cumple')">✓ Cumple</button>
+          <button type="button" class="mant-btn-nocumple" onclick="_mantMarcarCriterio(${i}, 'no_cumple')">✗ No cumple</button>
+        </div>
+        <div class="mant-check-nota" style="${p.resultado === 'no_cumple' ? '' : 'display:none'}">
+          <label>¿Qué has visto? *</label>
+          <textarea rows="2" placeholder="Valor medido, lo que no funciona, lo que falta…" oninput="_mantNotaCriterio(${i}, this.value)"></textarea>
+          <div class="mant-check-nota-ayuda">Al finalizar se abrirá el aviso de avería del equipo con esto ya escrito.</div>
+        </div>
+      </div>
+    </div>` : `
+    <label class="mant-check-item" data-idx="${i}">
+      <input type="checkbox" ${p.hecho ? 'checked' : ''} onchange="_mantPasoHecho(${i}, this.checked)">
+      <span class="mant-check-texto"></span>
     </label>`).join('');
-  cont.querySelectorAll('.mant-check-item span').forEach((s, i) => { s.textContent = _mantPasosActual[i].texto; });
+  cont.querySelectorAll('.mant-check-item').forEach(el => {
+    const p = _mantPasosActual[Number(el.dataset.idx)];
+    el.querySelector('.mant-check-texto').textContent = p.texto;
+    const crit = el.querySelector('.mant-check-crit span');
+    if (crit) crit.textContent = p.criterio;
+    const ta = el.querySelector('textarea');
+    if (ta) ta.value = p.nota || '';
+  });
   _mantChecklistChanged();
 }
 
+function _mantPasoHecho(i, hecho) {
+  if (_mantPasosActual[i]) _mantPasosActual[i].hecho = !!hecho;
+  _mantChecklistChanged();
+}
+
+function _mantMarcarCriterio(i, resultado) {
+  const p = _mantPasosActual[i];
+  if (!p) return;
+  p.resultado = p.resultado === resultado ? null : resultado;   // pulsar otra vez lo desmarca
+  p.hecho = !!p.resultado;
+  const el = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"]`);
+  if (el) {
+    el.classList.toggle('is-cumple', p.resultado === 'cumple');
+    el.classList.toggle('is-no_cumple', p.resultado === 'no_cumple');
+    const nota = el.querySelector('.mant-check-nota');
+    if (nota) nota.style.display = p.resultado === 'no_cumple' ? '' : 'none';
+    if (p.resultado === 'no_cumple') el.querySelector('textarea')?.focus();
+  }
+  _mantChecklistChanged();
+}
+
+function _mantNotaCriterio(i, texto) {
+  if (_mantPasosActual[i]) _mantPasosActual[i].nota = texto;
+}
+
 function _mantChecklistChanged() {
-  const items = [...document.querySelectorAll('#mant-checklist input[type=checkbox]')];
-  const done = items.filter(cb => cb.checked).length;
+  const total = _mantPasosActual.length;
+  const done = _mantPasosActual.filter(p => p.hecho).length;
+  const noCumple = _mantPasosActual.filter(p => p.resultado === 'no_cumple').length;
   const lbl = document.getElementById('mant-checklist-progreso');
-  if (lbl) lbl.textContent = items.length ? `${done}/${items.length} pasos` : '';
+  if (lbl) lbl.textContent = total
+    ? `${done}/${total} pasos${noCumple ? ` · ⚠ ${noCumple} no cumple${noCumple > 1 ? 'n' : ''}` : ''}`
+    : '';
 }
 
 function _leerChecklist() {
-  return _mantPasosActual.map((p, i) => ({
-    texto: p.texto,
-    hecho: !!document.querySelector(`#mant-checklist input[data-idx="${i}"]`)?.checked,
-  }));
+  return _mantPasosActual.map(p => p.criterio
+    ? { texto: p.texto, criterio: p.criterio, hecho: !!p.resultado, resultado: p.resultado,
+        nota: p.resultado === 'no_cumple' ? (p.nota || '').trim() : null }
+    : { texto: p.texto, hecho: p.hecho === true });
+}
+
+/** Tras finalizar con alguna comprobación que no cumple: abre el aviso de avería del
+ *  equipo con lo anotado ya escrito. Lo envía la persona (puede ajustar el impacto). */
+function _ofrecerAvisoNoCumple(idEquipo, idPlan, periodo, noCumple) {
+  if (!noCumple.length) return;
+  const plan = DATA.planesMantenimiento.find(p => p.ID_Plan === idPlan);
+  const texto = `Mantenimiento «${plan?.Operacion || 'preventivo'}» (${labelPeriodo(periodo)}): ` +
+    noCumple.map(p => `no cumple «${p.texto}» (criterio: ${p.criterio}). Visto: ${p.nota}`).join(' · ');
+  setTimeout(() => {
+    if (puedeHacer('crearIncidencias')) {
+      openModalIncidenciaEquipo(idEquipo);
+      setTimeout(() => sv('inc-descripcion', texto), 120);
+    } else {
+      openModalAvisoAlumno(idEquipo);
+      sv('aviso-descripcion', texto);
+    }
+    showToast('Una comprobación no cumple: revisa el aviso de avería y envíalo', '');
+  }, 400);
 }
 
 // Quién firma el registro. El alumnado firma con el nombre de su grupo, que se
@@ -636,8 +733,11 @@ async function finalizarMant() {
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
 
   const pasos = _leerChecklist();
+  const sinNota = pasos.find(p => p.resultado === 'no_cumple' && !p.nota);
+  if (sinNota) { showToast(`Anota qué has visto en «${sinNota.texto}», que no cumple el criterio`, 'error'); return; }
   const faltan = pasos.filter(p => !p.hecho).length;
   if (faltan && !confirm(`Quedan ${faltan} paso(s) sin marcar. ¿Dar el mantenimiento por finalizado de todas formas?`)) return;
+  const noCumple = pasos.filter(p => p.resultado === 'no_cumple');
 
   showLoading('Finalizando...');
   try {
@@ -658,6 +758,7 @@ async function finalizarMant() {
       ? 'Registrado. Queda a la espera del visto bueno del profesorado.'
       : 'Mantenimiento finalizado', 'success');
     _refrescarTrasMant();
+    _ofrecerAvisoNoCumple(idEquipo, idPlan, periodo, noCumple);
   } catch (e) {
     showToast(e.message || 'Error al finalizar el registro', 'error');
     console.error(e);
@@ -688,7 +789,7 @@ function openModalEditarRegistroMant(idRegistro) {
     </div>`;
 
   const pasos = Array.isArray(reg.Pasos) && reg.Pasos.length
-    ? reg.Pasos.map(p => ({ texto: String(p.texto || ''), hecho: p.hecho === true }))
+    ? reg.Pasos
     : (plan ? _pasosDesdePlan(plan) : []);
   _renderMantChecklist(pasos);
 
@@ -715,6 +816,9 @@ async function guardarEdicionMant() {
   const quien = document.getElementById('mant-realizado-por').value.trim();
   if (!fecha) { showToast('Indica la fecha de realización', 'error'); return; }
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
+  const pasosEd = _leerChecklist();
+  const sinNota = pasosEd.find(p => p.resultado === 'no_cumple' && !p.nota);
+  if (sinNota) { showToast(`Anota qué has visto en «${sinNota.texto}», que no cumple el criterio`, 'error'); return; }
 
   showLoading('Guardando cambios...');
   try {
@@ -724,14 +828,14 @@ async function guardarEdicionMant() {
       fecha_realizacion: fecha, realizado_por: quien,
       supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
-      pasos: _leerChecklist(),
+      pasos: pasosEd,
     });
     _upsertRegistroMant(_registroMantSbToObj(registro));
     closeModal('modal-registrar-mant');
     showToast('Mantenimiento actualizado', 'success');
     _refrescarTrasMant();
   } catch (e) {
-    showToast('Error al guardar los cambios', 'error');
+    showToast(e.message || 'Error al guardar los cambios', 'error');
     console.error(e);
   }
   hideLoading();
@@ -1544,9 +1648,15 @@ function _renderFilasVistoBueno(lista) {
       : `<strong>${reg.ID_Equipo}</strong>`;
     const pasos = Array.isArray(reg.Pasos) ? reg.Pasos : [];
     const hechos = pasos.filter(p => p.hecho).length;
+    const noCumple = _pasosNoCumple(pasos);
     const pasosTxt = pasos.length
-      ? `<span class="badge ${hechos === pasos.length ? 'badge-green' : 'badge-orange'}" style="font-size:10px">${hechos}/${pasos.length}</span>`
+      ? `<span class="badge ${hechos === pasos.length && !noCumple.length ? 'badge-green' : 'badge-orange'}" style="font-size:10px">${hechos}/${pasos.length}</span>` +
+        (noCumple.length ? `<br><span class="badge badge-red" style="font-size:10px;margin-top:3px;white-space:nowrap">⚠ ${noCumple.length} no cumple${noCumple.length > 1 ? 'n' : ''}</span>` : '')
       : '<span style="color:var(--text-muted)">—</span>';
+    // Lo que no cumplió, a la vista de quien firma (texto del alumnado: escapado).
+    const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const noCumpleTxt = noCumple.map(p =>
+      `<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(p.texto)} — no cumple (${esc(p.criterio)}): ${esc(p.nota || '—')}</div>`).join('');
     const obs = reg.Observaciones
       ? `<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px;white-space:pre-line">${reg.Observaciones}</div>`
       : '';
@@ -1555,7 +1665,7 @@ function _renderFilasVistoBueno(lista) {
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(plan&&plan.Operacion)||''}">${(plan&&plan.Operacion)||'—'}</td>
       <td>${labelPeriodo(reg.Periodo)}</td>
       <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
-      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${obs}</td>
+      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${noCumpleTxt}${obs}</td>
       <td style="text-align:center">${pasosTxt}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary" style="padding:2px 10px;font-size:11px" onclick="darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>
