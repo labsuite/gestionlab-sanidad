@@ -144,6 +144,12 @@ async function guardarNuevaPassword() {
 // ── Cambiar mi contraseña desde el perfil (con sesión iniciada) ──
 
 async function cambiarMiPassword() {
+  // Una cuenta de grupo la comparte toda la clase: cambiarla desde aquí dejaría fuera al
+  // resto y la copia que consulta el docente («🎓 Mis grupos») seguiría con la antigua.
+  if (_esCuentaDeGrupo(currentUser?.email)) {
+    showToast('La contraseña del grupo la cambia vuestro docente', 'error');
+    return;
+  }
   const actual = document.getElementById('perfil-pass-actual')?.value || '';
   const nueva  = document.getElementById('perfil-pass-nueva')?.value || '';
   const nueva2 = document.getElementById('perfil-pass-nueva2')?.value || '';
@@ -182,6 +188,7 @@ function renderPerfil() {
   const email  = currentUser?.email || '—';
   const rol    = (typeof getRealUserRole === 'function') ? getRealUserRole() : '—';
   const enPreview = typeof previewRole !== 'undefined' && !!previewRole;
+  const esGrupo = _esCuentaDeGrupo(currentUser?.email);
   const inputCss = 'width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px';
   const labelCss = 'font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px';
 
@@ -198,6 +205,8 @@ function renderPerfil() {
       <div class="card-header"><div class="card-title">Cambiar contraseña</div></div>
       ${enPreview
         ? `<p style="padding:8px 4px;color:var(--text-muted);font-size:13px">Sal de la vista previa de rol para cambiar tu contraseña.</p>`
+        : esGrupo
+        ? `<p style="padding:8px 4px;color:var(--text-muted);font-size:13px;line-height:1.6">Esta es la cuenta de todo el grupo, así que su contraseña no se cambia desde aquí. Si hace falta cambiarla, pídeselo a vuestro docente: lo hace desde «🎓 Mis grupos» y os da la nueva.</p>`
         : `<form onsubmit="event.preventDefault(); cambiarMiPassword();" style="padding:8px 4px;display:flex;flex-direction:column;gap:12px;max-width:360px">
         <div>
           <label for="perfil-pass-actual" style="${labelCss}">Contraseña actual</label>

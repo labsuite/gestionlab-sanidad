@@ -240,6 +240,13 @@ dos comprueban en el servidor que la fila es de verdad una cuenta de grupo
 cifrada, y pedirla devuelve 400. `resetear_password` también refresca la copia cuando la
 cuenta es de grupo, para que "Mostrar contraseña" no enseñe una que ya no vale.
 
+**«Mi perfil» no cambia la contraseña de un grupo (2026-11-23).** En una cuenta de grupo
+(`_esCuentaDeGrupo`) la tarjeta «Cambiar contraseña» se sustituye por un aviso: la cambia el
+docente desde «🎓 Mis grupos». Si un alumno la cambiaba, dejaba fuera al resto de la clase y la
+copia cifrada que consulta el docente seguía con la antigua. ⚠ El bloqueo es solo de la app:
+el cambio va directo a Supabase Auth (`auth.updateUser`), sin Edge Function por medio, y
+Auth no distingue ese cambio del que hace el docente con la API de administración.
+
 ## "Mis grupos": cada docente ve la cuenta de los suyos (2026-09-24)
 
 Buscar el grupo entre los nueve y abrir el modal 🔑 vale para gestionar, pero no para lo que
