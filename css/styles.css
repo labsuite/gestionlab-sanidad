@@ -1173,7 +1173,7 @@
       display: flex; flex-direction: column; gap: 2px;
       border: 1px solid var(--border); border-radius: var(--radius-sm);
       padding: 6px; margin-top: 6px;
-      max-height: 300px; overflow-y: auto;
+      max-height: max(300px, 50vh); overflow-y: auto;   /* las comprobaciones ocupan más */
     }
     .mant-checklist:empty::after {
       content: "Este plan no tiene pasos definidos.";
