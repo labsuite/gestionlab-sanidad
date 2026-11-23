@@ -247,7 +247,9 @@ function camposRegla(regla) {
     { k: 'referencia', label: 'Segundo valor (referencia)' },
   ];
   return [
-    { k: 'equipo', label: regla.consigna ? 'Consigna del equipo' : 'Equipo (pantalla / programado)' },
+    // Lo que marca la pantalla en ese momento, no la consigna: «Equipo (pantalla /
+    // programado)» invitaba a poner lo programado (Paloma, 2026-11-23).
+    { k: 'equipo', label: regla.consigna ? 'Consigna del equipo' : 'Pantalla del equipo (si no tiene: lo programado)' },
     { k: 'referencia', label: 'Instrumento de referencia' },
   ];
 }

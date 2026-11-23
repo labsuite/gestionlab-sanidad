@@ -392,6 +392,18 @@ function labsDelAlumno() {
     .map(s => (s.trim().match(/\b(\d{3})\b/) || [])[1]).filter(Boolean))];
 }
 
+/**
+ * ¿Tiene el equipo un responsable que de verdad vaya a ver sus avisos? Alguno de los nombres
+ * de «Responsable» tiene que ser una ficha activa de Profesor, Gestor o Administrador. Si no
+ * (campo vacío, o alguien que ya no está), los avisos de avería van a Gestión.
+ */
+function equipoTieneResponsableActivo(equipo) {
+  const nombres = String(equipo?.Responsable || '').split(',').map(n => n.trim().toLowerCase()).filter(Boolean);
+  if (!nombres.length) return false;
+  return DATA.usuarios.some(u => u.Activo !== 'FALSE' && ['Profesor', 'Gestor', 'Administrador'].includes(u.Rol) &&
+    nombres.includes((u.Nombre || '').trim().toLowerCase()));
+}
+
 /** ¿El equipo está en la zona común? (ubicación «205-ZC…», o una ubicación del catálogo de zona común) */
 function equipoEnZonaComun(equipo) {
   const ub = String(equipo?.Ubicacion || '');

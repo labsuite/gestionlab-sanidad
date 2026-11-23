@@ -67,7 +67,7 @@ function renderDashboard() {
     const eq = DATA.equipos.find(e => i.Equipo && (i.Equipo === e.ID_Activo || i.Equipo.startsWith(e.ID_Activo + ' ')));
     if (!eq) return esGestorAdmin;
     if (esProfesor) return esResponsableDeEquipo(eq);
-    return esGestorAdmin && (esResponsableDeEquipo(eq) || !(eq.Responsable || '').trim());
+    return esGestorAdmin && (esResponsableDeEquipo(eq) || !equipoTieneResponsableActivo(eq));
   });
   if (sinAtender.length) {
     const grave = sinAtender.some(i => _impactoAviso(i).grave >= 3);

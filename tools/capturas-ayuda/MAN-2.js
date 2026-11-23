@@ -13,10 +13,14 @@ async (page, { app: APP, salida: SALIDA }) => {
     'adicionesResiduo cajasCongelado ciclosModulos configReservas consultasResiduo contenedoresResiduo documentosProveedor equipos evaluacionesCurso excepcionesResiduoIa fichasAtributos historicoPrecio incidencias intervenciones lineasPedido material materialUbicaciones movimientos muestrasCongeladas pedidos planesMantenimiento propuestasMaterial propuestasUbicacion proveedores registroMantenimientos registrosAutoclave registrosCabina registrosVitrina reservas revisionesInventario sbUsuarios solicitudes tareas tareasIntervencion tiposResiduo ubicaciones userModulos usosMuestra usuarios'
       .split(' ').forEach(k => { DATA[k] = []; });
     currentUser = { email: '1cslcb@gestionlab.cma', name: '1º CS LCB' };
-    DATA.usuarios = [{ ID_Usuario: 'USR-DEMO', Nombre: '1º CS LCB', Email: '1cslcb@gestionlab.cma', Rol: 'Alumno', Activo: 'TRUE', Ubicaciones_Asignadas: 'Lab 205' }];
-    const eq = (id, tipo, marca, modelo, ubic) => _equipoSbToObj({ id_activo: id, tipo_equipo: tipo, marca, modelo, ubicacion: ubic, estado_operativo: 'Operativo' });
+    DATA.usuarios = [
+      { ID_Usuario: 'USR-DEMO', Nombre: '1º CS LCB', Email: '1cslcb@gestionlab.cma', Rol: 'Alumno', Activo: 'TRUE', Ubicaciones_Asignadas: 'Lab 205' },
+      // Responsable ficticio: sin él, la ficha decía «Responsable —» y parecía un equipo sin nadie a cargo.
+      { ID_Usuario: 'USR-DEMO2', Nombre: 'Docente de ejemplo', Email: 'docente@ejemplo.invalid', Rol: 'Profesor', Activo: 'TRUE' },
+    ];
+    const eq = (id, tipo, marca, modelo, ubic, responsable = '') => _equipoSbToObj({ id_activo: id, tipo_equipo: tipo, marca, modelo, ubicacion: ubic, estado_operativo: 'Operativo', responsable });
     DATA.equipos = [
-      eq('BAT-06', 'Baño termostático', 'J.P. Selecta', 'Precisterm', 'Lab 205'),
+      eq('BAT-06', 'Baño termostático', 'J.P. Selecta', 'Precisterm', 'Lab 205', 'Docente de ejemplo'),
       eq('BAT-01', 'Baño termostático', 'J.P. Selecta', '', 'Lab 203'),
       eq('BAL-003', 'Balanza', 'Phoenix Instrument', 'BTC-223', '205-ZC'),
     ];
