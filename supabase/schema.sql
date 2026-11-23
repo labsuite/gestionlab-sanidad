@@ -695,7 +695,11 @@ create policy "contenedores_residuo_select_anon" on contenedores_residuo for sel
 create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon, authenticated using (true);
 create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon, authenticated using (true);
 create policy "excepciones_residuo_ia_select_anon" on excepciones_residuo_ia for select to anon, authenticated using (true);
-create policy "tareas_personales_select_anon" on tareas_personales for select to anon, authenticated using (true);
+-- Recordatorios privados: cada cuenta lee solo los suyos (antes, lectura abierta a anon —
+-- cualquiera con la clave pública veía las tareas de todo el profesorado; cambiado 2026-11-23).
+-- La escritura sigue pasando por la Edge Function gestionar-tarea-personal.
+create policy "tareas_personales_select_propias" on tareas_personales for select to authenticated
+  using (lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 
 -- ============================================================
 -- 9. INVENTARIO COLABORATIVO — PROPUESTAS DE UBICACIÓN (2026-09-16)
