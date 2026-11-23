@@ -24,12 +24,13 @@ const AYUDA_MANUALES = {
     secciones: [
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
       { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-2'] },
+      { titulo: 'Si algo falla', tareas: ['EMP-2'] },
     ],
   },
-  // EMP-6 es común a todos los roles (misma versión en todos los manuales).
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
+  // EMP-6 y EMP-2 son comunes a todos los roles (misma versión en todos los manuales).
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -133,13 +134,13 @@ const AYUDA_TAREAS = {
           ['Estaba empezado', '«Continuar n/m» y seguir desde donde se dejó.'],
           ['Se ha marcado un paso por error', 'desmarcarlo antes de finalizar. Si ya está finalizado, decírselo al profesorado, que puede devolverlo para corregirlo.'],
           ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'no marcarlo, explicarlo en Observaciones y avisar al profesorado. Si falta material, guardar el progreso y terminar otro día.'],
-          ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar ([[EMP-2|La app no guarda lo que apuntas (sesión caducada)]]) y comprobar qué quedó guardado.'],
+          ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar con la misma cuenta del grupo. La ventana reaparece con lo marcado: pulsar otra vez el botón (→ [[EMP-2|La app te pide volver a entrar (sesión caducada)]]).'],
           ['En el móvil, «Registrar» queda fuera de la pantalla en «Pendientes»', 'desplazar la tabla hacia la izquierda, o entrar por la tarjeta del equipo.'],
         ],
         relacionado: [
           ['Antes', [['EQU-1', 'Encontrar un equipo'], ['MAN-1', 'Ver qué mantenimientos tocan'], ['EQU-2', 'Consultar cómo se usa un equipo']]],
           ['Después', [['INC-1', 'Avisar de una avería']]],
-          ['Si falla la app', [['EMP-2', 'La app no guarda lo que apuntas (sesión caducada)']]],
+          ['Si falla la app', [['EMP-2', 'La app te pide volver a entrar (sesión caducada)']]],
         ],
       },
     },
@@ -176,9 +177,9 @@ const AYUDA_TAREAS = {
             alt: 'Pantalla de entrada con el email y la contraseña escritos y el botón Iniciar sesión señalado',
           },
           {
-            texto: '**Qué se ve al entrar.** Arriba del «Panel principal», cuatro cifras: «Preventivos pendientes» son los mantenimientos que tu grupo puede hacer ahora (los de los equipos de vuestros laboratorios y de la zona común); «Incidencias abiertas», «Items bajo mínimo» y «Residuos por clasificar» son de todo el centro. Debajo salen los avisos, por ejemplo los mantenimientos que tocan, y el botón «Registrar consumo de material».',
+            texto: '**Qué se ve al entrar.** El «Panel principal» del grupo enseña lo que le atañe: sus mantenimientos pendientes y los equipos de sus laboratorios y de la zona común que no se pueden usar o tienen un aviso de avería abierto. Arriba, dos cifras: «Preventivos pendientes» (los mantenimientos que tu grupo puede hacer ahora) y «Equipos con aviso o sin poder usarse». Debajo, el botón «Registrar consumo de material», la lista de esos equipos (al pulsar uno se abre su tarjeta en el Inventario) y la de mantenimientos pendientes.',
             img: 'EMP-1/02-panel-principal.png',
-            alt: 'Panel principal de una cuenta de grupo con las cuatro cifras señaladas y la lista de mantenimientos pendientes',
+            alt: 'Panel principal de una cuenta de grupo con sus dos cifras señaladas, la lista de equipos con aviso o sin poder usarse y la de mantenimientos pendientes',
           },
           {
             texto: '**Las secciones del grupo están en el menú** (en el móvil, se abre con «☰», arriba a la izquierda): «Panel principal»; «Equipos» (Inventario y Mantenimiento); «Material fungible» (Inventario); «Uso del laboratorio» (Reservas, Registros de uso y Muestras congeladas); «Residuos» (Guía de residuos y Contenedores); «Catálogo» (Ubicaciones); y «Mi cuenta» («Mi perfil» y «Ayuda»).',
@@ -187,7 +188,7 @@ const AYUDA_TAREAS = {
           },
           {
             texto: '**Comprobar con qué cuenta se ha entrado** antes de registrar nada: al pie del menú salen el nombre del grupo y «Alumno» (también en «Mi cuenta › Mi perfil»). En un ordenador compartido puede seguir abierta la sesión del grupo anterior, y todo lo que se registre saldría a su nombre.',
-            nota: 'En el móvil, el pie del menú queda debajo de «Ayuda»: hay que bajar dentro del menú para verlo.',
+            nota: 'En el móvil, el pie del menú queda debajo de «Ayuda»: hay que bajar hasta el final del menú.',
             imgs: [
               { img: 'EMP-1/04-pie-del-menu.png', alt: 'Pie del menú con el nombre del grupo, el rol Alumno y el botón de cerrar sesión', pie: 'Pie del menú: nombre del grupo, «Alumno» y «↩» para cerrar la sesión.' },
               { img: 'EMP-1/05-mi-perfil.png', alt: 'Mi perfil con el nombre del grupo, su email y el rol Alumno', pie: '«Mi perfil»: los datos de la cuenta con la que se ha entrado.' },
@@ -210,14 +211,14 @@ const AYUDA_TAREAS = {
               '**Residuos**: [[RES-1|consultar la Guía de residuos]] y [[RES-2|apuntar lo que se echa en cada contenedor]].',
               '**Mantenimiento**: [[MAN-2|hacer los mantenimientos internos]] que no están reservados al profesorado, de los equipos de vuestros laboratorios y de la zona común.',
               '**Averías**: [[INC-1|avisar de que un equipo falla]].',
-              '**Inventario**, cuando lo pide el profesorado: [[INV-1|ubicar equipos]], [[INV-2|contar el stock de un sitio]] (si el grupo tiene permiso, y solo en vuestros laboratorios y la zona común) e [[INV-3|inventariar material que no está en la app]].',
+              '**Inventario**, cuando lo pide el profesorado: [[INV-1|ubicar equipos]], [[INV-2|contar el stock de un sitio]] de vuestros laboratorios o de la zona común (si el grupo tiene permiso) e [[INV-3|inventariar material que no está en la app]].',
             ],
           },
           {
             titulo: 'Qué necesita el visto bueno del profesorado',
             items: [
               'Los mantenimientos que finaliza el grupo.',
-              'En el inventario: las ubicaciones de equipos que propone el grupo (salvo que otro grupo haya propuesto exactamente lo mismo para ese equipo: entonces se aplica sin esperar), los recuentos de stock y el material nuevo inventariado.',
+              'En el inventario: las ubicaciones de equipos que propone el grupo (salvo que otro grupo haya propuesto exactamente la misma: entonces se aplica sin esperar), los recuentos de stock y el material nuevo inventariado.',
               'Las reservas, solo si coinciden con otra: entonces las decide Gestión.',
             ],
             nota: 'Hasta que llega el visto bueno, lo registrado no cuenta como hecho, pero tampoco hay que repetirlo.',
@@ -226,7 +227,7 @@ const AYUDA_TAREAS = {
             titulo: 'Lo que no hace el grupo (y a quién pedirlo)',
             items: [
               'Guardar muestras nuevas en el congelador, descartar tubos o cajas, cerrar un contenedor lleno, pedir material o compras: al profesorado.',
-              'Apuntar en un contenedor un residuo que la comprobación de la app no admite, o cuando la app no puede comprobarlo: no se apunta; llamar al profesorado.',
+              'Apuntar en un contenedor un residuo que la app no admite. Si la app dice que no va ahí, no se tira: preguntar al profesorado.',
               'Si se ha olvidado o ha cambiado la contraseña del grupo: la da el profesorado. No hay botón «He olvidado la contraseña».',
             ],
           },
@@ -246,12 +247,12 @@ const AYUDA_TAREAS = {
           ['«Email o contraseña incorrectos»', 'revisar mayúsculas y espacios. Si sigue, pedir la contraseña al profesorado (puede haber cambiado al empezar el curso).'],
           ['«🔒 Acceso no autorizado»', 'la cuenta no está dada de alta en GestionLab. Avisar al profesorado.'],
           ['Al pie del menú sale otro grupo', 'cerrar la sesión y entrar con la vuestra.'],
-          ['La app vuelve sola a la pantalla de entrada, o sale «Tu sesión ha caducado»', 'volver a entrar (→ [[EMP-2|La app no guarda lo que apuntas (sesión caducada)]]).'],
+          ['La app vuelve sola a la pantalla de entrada, o sale «Tu sesión ha caducado»', 'volver a entrar con la misma cuenta (→ [[EMP-2|La app te pide volver a entrar (sesión caducada)]]).'],
           ['No aparece una sección que esperabais', 'el grupo no la tiene; mirar «Qué puede hacer tu grupo» y «Lo que no hace el grupo».'],
         ],
         relacionado: [
           ['Después', [['EMP-6', 'Usar GestionLab en el móvil'], ['EQU-1', 'Encontrar un equipo']]],
-          ['Si falla la app', [['EMP-2', 'La app no guarda lo que apuntas (sesión caducada)']]],
+          ['Si falla la app', [['EMP-2', 'La app te pide volver a entrar (sesión caducada)']]],
         ],
       },
     },
@@ -262,7 +263,59 @@ const AYUDA_TAREAS = {
     pantallas: ['registros-uso', 'congelados', 'material', 'residuos-contenedores', 'perfil'],
     versiones: {},   // la misma versión en los cuatro manuales: se rellena justo debajo
   },
+
+  // ── EMP-2 · común a todos los roles (guion «EMP-2_sesion-caducada.md», 23/11/2026) ──
+  'EMP-2': {
+    pantallas: ['dashboard', 'perfil'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena justo debajo
+  },
 };
+
+(() => {
+  const emp2 = {
+    titulo: 'La app te pide volver a entrar (sesión caducada)',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      'Al abrir la app sale la pantalla de entrada, aunque en ese dispositivo ya se había entrado.',
+      'Al pulsar «Guardar» (o «Finalizar», «Registrar»…) sale «Tu sesión ha caducado. Vuelve a entrar para guardar cambios.» y se abre la pantalla de entrada.',
+      'La app vuelve sola a la pantalla de entrada mientras estaba abierta.',
+      'En los tres casos, la sesión de ese dispositivo ha dejado de valer. Sin sesión, la app no enseña datos ni guarda nada.',
+    ],
+    antes: [
+      'El email y la contraseña de la cuenta con la que se estaba trabajando. Con la cuenta de un grupo, los del grupo.',
+    ],
+    pasos: [
+      {
+        texto: '**No cerrar la app ni recargar la página.** Lo que estaba a medio rellenar solo está en esa pantalla: si se cierra o se recarga, se pierde.',
+      },
+      {
+        texto: '**Entrar con la misma cuenta** con la que se estaba trabajando: email, contraseña e «Iniciar sesión». Si había una ventana a medio rellenar, la pantalla de entrada lo recuerda: «Vuelve a entrar con la misma cuenta: lo que estabas rellenando sigue ahí y podrás guardarlo». Si no, pone solo «Tu sesión ha caducado. Vuelve a entrar.»',
+        img: 'EMP-2/01-entrada-sesion-caducada.png',
+        alt: 'Pantalla de entrada con el aviso de sesión caducada señalado y el mensaje Tu sesión ha caducado abajo',
+      },
+      {
+        texto: '**Revisar que está todo y pulsar otra vez el botón** («Guardar», «Finalizar», «Registrar»…). Reaparece la ventana con todo lo rellenado y el aviso «Ya has vuelto a entrar: pulsa otra vez el botón para guardar». Hasta ese momento, no se ha guardado nada.',
+        nota: 'En el móvil, ese aviso tapa unos segundos los botones de abajo de la ventana: esperar a que desaparezca.',
+        img: 'EMP-2/02-ventana-reaparece.png',
+        alt: 'La ventana del mantenimiento vuelve a aparecer con las observaciones escritas y el aviso Ya has vuelto a entrar',
+      },
+      {
+        texto: '**Si se entra con otra cuenta, lo rellenado se pierde**: la app lo avisa («Has entrado con otra cuenta: lo que estaba sin guardar se ha descartado»). En un dispositivo del laboratorio, entrar con la cuenta del grupo que estaba trabajando, no con otra.',
+      },
+    ],
+    comprobacion: [
+      'Tras pulsar otra vez el botón, sale el mensaje de confirmación de siempre y lo registrado aparece donde tiene que estar. Por ejemplo, un mantenimiento finalizado por un grupo sale «⏳ Espera visto bueno» en la tarjeta del equipo.',
+    ],
+    problemas: [
+      ['No se sabe la contraseña', 'la del grupo la da el profesorado; la personal, la restablece Gestión.'],
+      ['Lo rellenado no reaparece', 'volver a rellenarlo. En registros largos, como un mantenimiento, conviene «💾 Guardar progreso» de vez en cuando: así, si la sesión cae, se pierde poco.'],
+    ],
+    relacionado: [
+      ['Antes', [['EMP-1', 'Entrar en GestionLab']]],
+    ],
+  };
+  AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS['EMP-2'].versiones[r] = emp2; });
+})();
 
 (() => {
   const emp6 = {
@@ -325,7 +378,7 @@ const AYUDA_TAREAS = {
     problemas: [
       ['Al acercar el móvil no pasa nada', 'el NFC está desactivado, el móvil no tiene NFC o la antena está en otra zona del móvil (probar moviéndolo despacio por la parte de atrás). Si no hay manera, leer el QR con la cámara.'],
       ['Se abre la pantalla de entrada', 'no había sesión. Entrar; la app hace después lo que pedía la etiqueta.'],
-      ['Cabina o vitrina con la cuenta del grupo', 'la app distingue por cuenta, no por persona. Si otra persona del grupo lee la etiqueta mientras el grupo tiene una sesión abierta en ese equipo, se abre el formulario para **terminar** esa sesión (si no se quería, «Cancelar»). Que en cada grupo empiece y termine la sesión la misma persona. Si se ha empezado por error, «Deshacer» durante unos segundos.'],
+      ['Cabina o vitrina con la cuenta del grupo', 'la app distingue por cuenta, no por persona. Si otra persona del grupo lee la etiqueta mientras el grupo tiene una sesión abierta en ese equipo, se abre el formulario para terminarla. Si no era para terminar, «Cancelar». Que en cada grupo empiece y termine la sesión la misma persona, que es quien sabe lo que se ha hecho en la cabina. Si se ha empezado por error, «Deshacer» durante unos segundos.'],
       ['«No se encontró un contenedor activo…»', 'el contenedor de esa categoría se ha cerrado y no se ha puesto el de recambio. Avisar al profesorado.'],
       ['En el laboratorio 203, la etiqueta de aguas pide elegir la garrafa', 'hay dos (tinciones y equipos); elegir a mano la que corresponde y avisar al profesorado de que esa etiqueta hay que regrabarla.'],
       ['«Esa caja ya no existe en la app»', 'avisar al profesorado.'],

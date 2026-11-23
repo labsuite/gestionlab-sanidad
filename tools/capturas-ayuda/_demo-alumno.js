@@ -18,13 +18,20 @@ async (page, APP) => {
       eq('BAT-06', 'Baño termostático', 'J.P. Selecta', 'Precisterm', 'Lab 205'),
       eq('BAL-003', 'Balanza', 'Phoenix Instrument', 'BTC-223', '205-ZC'),
       eq('CON-01', 'Congelador -80 °C', 'Ejemplo', '', 'Lab 205'),
+      eq('CEN-08', 'Centrífuga', 'Ortoalresa', 'Digicen 21', 'Lab 203'),
+      eq('MIC-21', 'Microscopio', 'Olympus', 'CX22LED', 'Lab 207'),   // de otro laboratorio: el grupo no lo ve en su panel
     ];
+    DATA.equipos.find(e => e.ID_Activo === 'CEN-08').Estado_Operativo = 'Averiado';
+    DATA.equipos.find(e => e.ID_Activo === 'MIC-21').Estado_Operativo = 'Averiado';
+    DATA.incidencias = [_incidenciaSbToObj({ id_incidencia: 'INC-EJ1', id_equipo: 'BAL-003', reportado_por: '1º CS EJEMPLO',
+      descripcion_problema: 'La pesa de 100 g marca 100,6 g; criterio ± 0,2 g.', impacto: 'Uso limitado', urgencia: 'Normal', estado: 'Abierta', fecha_hora: new Date().toISOString() })];
     const curso = getCursoAcademico();
     const [a1, a2] = curso.split('-');
     DATA.evaluacionesCurso = [[1, `${a1}-09-01`, `${a1}-12-04`], [2, `${a1}-12-05`, `${a2}-03-05`], [3, `${a2}-03-06`, `${a2}-06-04`]]
       .map(([numero, fecha_inicio, fecha_fin]) => _evaluacionCursoSbToObj({ curso_academico: curso, numero, fecha_inicio, fecha_fin }));
     DATA.planesMantenimiento = [
-      _planMantenimientoSbToObj({ id_plan: 'PEJ1', id_equipo: 'BAT-06', tipo_intervencion: 'Interno', periodicidad: 'Trimestral', operacion: 'Descalcificación preventiva', activo: true, solo_profesorado: false, instrucciones: 'Paso' }),
+      _planMantenimientoSbToObj({ id_plan: 'PEJ1', id_equipo: 'BAT-06', tipo_intervencion: 'Interno', periodicidad: 'Trimestral', operacion: 'Descalcificación preventiva', activo: true, solo_profesorado: false,
+        instrucciones: 'Prueba rápida (6.1): display frente a termómetro de referencia, homogeneidad, nivel, cal, cable (criterio: Δ ≤ 1 °C (≤ 0,5 °C en 37 °C); cubeta sin cal)\nDescalcificación preventiva de cubeta y calefactor (vinagre o HCl 10 %) si el agua es de red\nReposición del carbonato de sodio al cambiar el agua (criterio: Calefactor sin cal)' }),
       _planMantenimientoSbToObj({ id_plan: 'PEJ2', id_equipo: 'BAL-003', tipo_intervencion: 'Interno', periodicidad: 'Trimestral', operacion: 'Verificación con pesa', activo: true, solo_profesorado: false, instrucciones: 'Paso' }),
     ];
     // Ubicaciones, material y residuos de ejemplo
