@@ -1869,7 +1869,11 @@ async function guardarAvisoAlumno() {
     DATA.incidencias.push(_incidenciaSbToObj(incidencia));
     // Lo que pasa de verdad: no se manda ningún correo; el aviso aparece en GestionLab.
     const eqAviso = DATA.equipos.find(x => x.ID_Activo === equipoId);
-    const quien = equipoTieneResponsableActivo(eqAviso) ? 'al profesorado responsable del equipo' : 'a la gestión del laboratorio';
+    // El alumnado no lee la lista del profesorado (RLS por rol), así que no puede saber si
+    // el responsable tiene ficha: para él, el mensaje general.
+    const quien = getUserRole() === 'Alumno'
+      ? 'al profesorado responsable del equipo (o, si no tiene, a la gestión del laboratorio)'
+      : equipoTieneResponsableActivo(eqAviso) ? 'al profesorado responsable del equipo' : 'a la gestión del laboratorio';
     showToast(`Aviso enviado. Le aparece en GestionLab ${quien}, y quien abra el equipo verá el aviso. No se manda ningún correo: díselo también en persona.`, 'success');
     closeModal('modal-aviso-alumno');
     renderIncidencias();

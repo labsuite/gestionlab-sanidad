@@ -509,7 +509,7 @@ create table pedidos (
   tipo                                text not null default 'Material',
   gasto_extra_concepto                text,
   gasto_extra_importe                 numeric,
-  token_publico                       text unique,  -- link sin login para que el proveedor suba factura/presupuesto
+  -- (token_publico: se movió a la tabla pedidos_token el 2026-11-23, ver abajo)
   -- Puente con Trebello: la jefa tramita ahí TODOS los pedidos del departamento,
   -- así que el pedido se deposita en su módulo Compras en vez de ir por correo.
   -- doc_enviada_jefatura pasa a marcarlo el servidor cuando el envío responde OK.
@@ -666,12 +666,34 @@ revoke all on credenciales_grupo from anon, authenticated;
 -- ============================================================
 -- 11. POLÍTICAS RLS — lectura para quien ha iniciado sesión
 -- ============================================================
+-- Lectura según el rol (2026-11-23). rol_sesion() da el rol de la sesión desde
+-- public.users (la misma tabla que usan las Edge Functions para los permisos).
+-- Sin fila en users = se trata como Alumno.
+create or replace function public.rol_sesion() returns text
+language sql stable security definer set search_path = public as $$
+  select rol::text from public.users where id = auth.uid() and activo
+$$;
+revoke all on function public.rol_sesion() from public;
+grant execute on function public.rol_sesion() to authenticated;
+
+-- Token del enlace público de cada pedido (subir-factura.html). Solo lo leen las Edge
+-- Functions (service_role): RLS activado y sin políticas. Antes era pedidos.token_publico
+-- y lo podía leer cualquier cuenta con sesión.
+create table if not exists pedidos_token (
+  id_pedido text primary key references pedidos(id_pedido) on delete cascade on update cascade,
+  token     text not null
+);
+alter table pedidos_token enable row level security;
+revoke all on pedidos_token from anon, authenticated;
+
+-- ============================================================
 -- Solo "authenticated" (desde 2026-11-23; hasta entonces también "anon", herencia
 -- del login con Google, y las tablas se podían leer sin entrar). Los nombres de
 -- las políticas conservan el sufijo "_select_anon" por historia. Las escrituras
 -- siguen exigiendo una Edge Function, nunca RLS de escritura desde el cliente.
 
-create policy "proveedores_select_anon" on proveedores for select to authenticated using (true);
+create policy "proveedores_select_personal" on proveedores for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
 create policy "ubicaciones_select_anon" on ubicaciones for select to authenticated using (true);
 create policy "equipos_select_anon" on equipos for select to authenticated using (true);
 create policy "intervenciones_select_anon" on intervenciones for select to authenticated using (true);
@@ -681,11 +703,16 @@ create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for sel
 create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to authenticated using (true);
 create policy "material_select_anon" on material for select to authenticated using (true);
 create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to authenticated using (true);
-create policy "pedidos_select_anon" on pedidos for select to authenticated using (true);
-create policy "lineas_pedido_select_anon" on lineas_pedido for select to authenticated using (true);
-create policy "documentos_proveedor_select_anon" on documentos_proveedor for select to authenticated using (true);
-create policy "solicitudes_select_anon" on solicitudes for select to authenticated using (true);
-create policy "historico_precio_select_anon" on historico_precio for select to authenticated using (true);
+create policy "pedidos_select_personal" on pedidos for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
+create policy "lineas_pedido_select_personal" on lineas_pedido for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
+create policy "documentos_proveedor_select_personal" on documentos_proveedor for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
+create policy "solicitudes_select_personal" on solicitudes for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
+create policy "historico_precio_select_personal" on historico_precio for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno');   -- el alumnado no lee compras ni proveedores
 create policy "movimientos_select_anon" on movimientos for select to authenticated using (true);
 create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to authenticated using (true);
 create policy "config_reservas_select_anon" on config_reservas for select to authenticated using (true);
@@ -693,7 +720,10 @@ create policy "reservas_equipos_select_anon" on reservas_equipos for select to a
 create policy "registros_cabina_select_anon" on registros_cabina for select to authenticated using (true);
 create policy "registros_autoclave_select_anon" on registros_autoclave for select to authenticated using (true);
 create policy "registros_vitrina_select_anon" on registros_vitrina for select to authenticated using (true);
-create policy "usuarios_select_anon" on usuarios for select to authenticated using (true);
+-- El alumnado solo lee su propia fila (la de su grupo): no ve nombres ni emails del profesorado.
+create policy "usuarios_select_por_rol" on usuarios for select to authenticated
+  using (coalesce(public.rol_sesion(), 'Alumno') <> 'Alumno'
+         or lower(email) = lower(coalesce(auth.jwt() ->> 'email', '')));
 create policy "tipos_residuo_select_anon" on tipos_residuo for select to authenticated using (true);
 create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to authenticated using (true);
 create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to authenticated using (true);

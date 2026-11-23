@@ -2,7 +2,7 @@
 // una casa comercial para que suba la factura (no el presupuesto) de un
 // pedido concreto, sin darle acceso al resto de la app. La seguridad la da el
 // `token` (aleatorio, generado por gestionar-pedido/accion=generar_link_publico
-// y guardado en pedidos.token_publico), no una sesión de Supabase Auth — por
+// y guardado en la tabla pedidos_token, que solo lee el servidor), no una sesión de Supabase Auth — por
 // eso este fichero NO usa requireAdminOrGestor/requireStaff. El navegador
 // sigue mandando la anon key como Authorization (igual que hace
 // callEdgeFunction() sin sesión), así que no hace falta desactivar verify_jwt
@@ -42,10 +42,14 @@ Deno.serve(async (req) => {
   if (!idPedido || !token) return jsonError("Enlace no válido", 404);
 
   const supabaseAdmin = adminClient();
-  const { data: pedido } = await supabaseAdmin.from("pedidos").select("*").eq("id_pedido", idPedido).maybeSingle();
+  const [{ data: pedido }, { data: tok }] = await Promise.all([
+    supabaseAdmin.from("pedidos").select("*").eq("id_pedido", idPedido).maybeSingle(),
+    // El token está en `pedidos_token` (solo servidor) desde 2026-11-23.
+    supabaseAdmin.from("pedidos_token").select("token").eq("id_pedido", idPedido).maybeSingle(),
+  ]);
   // Mensaje genérico en todos los casos de token/pedido inválido — no revelar
   // si el pedido existe o no a quien no tiene el token correcto.
-  if (!pedido || !pedido.token_publico || pedido.token_publico !== token) {
+  if (!pedido || !tok?.token || tok.token !== token) {
     return jsonError("Enlace no válido o caducado", 404);
   }
 

@@ -234,15 +234,18 @@ Deno.serve(async (req) => {
   }
 
   if (accion === "generar_link_publico") {
-    const { data: p } = await supabaseAdmin.from("pedidos").select("token_publico").eq("id_pedido", idPedido).maybeSingle();
+    // El token vive en `pedidos_token`, que solo lee el servidor (RLS sin políticas):
+    // en `pedidos` lo podía leer cualquier cuenta con sesión, alumnado incluido (2026-11-23).
+    const { data: p } = await supabaseAdmin.from("pedidos").select("id_pedido").eq("id_pedido", idPedido).maybeSingle();
     if (!p) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
-    if (p.token_publico) return jsonOk({ token: p.token_publico });
+    const { data: t } = await supabaseAdmin.from("pedidos_token").select("token").eq("id_pedido", idPedido).maybeSingle();
+    if (t?.token) return jsonOk({ token: t.token });
 
     const bytes = new Uint8Array(24);
     crypto.getRandomValues(bytes);
     const token = btoa(String.fromCharCode(...bytes)).replace(/[^a-zA-Z0-9]/g, "");
 
-    const { error } = await supabaseAdmin.from("pedidos").update({ token_publico: token }).eq("id_pedido", idPedido);
+    const { error } = await supabaseAdmin.from("pedidos_token").upsert({ id_pedido: idPedido, token });
     if (error) return jsonError(`No se pudo generar el link: ${error.message}`, 400);
     return jsonOk({ token });
   }

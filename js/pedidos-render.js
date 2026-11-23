@@ -532,8 +532,6 @@ async function abrirModalLinkProveedor(pedidoId) {
   showLoading('Generando link...');
   try {
     const { token } = await callEdgeFunction('gestionar-pedido', { accion: 'generar_link_publico', id_pedido: pedidoId });
-    const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-    if (p) p.Token_Publico = token;
     const url = new URL('subir-factura.html', location.href);
     url.search = `?pedido=${encodeURIComponent(pedidoId)}&token=${encodeURIComponent(token)}`;
     document.getElementById('link-prov-url').value = url.href;
