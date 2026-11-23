@@ -66,7 +66,10 @@ const _regConfig = {
     // (los tres son Indelab Flow lan sv); la pestaña los recoge todos para no dejar
     // equipos fuera. "Campana de seguridadd" (CAB-04, con errata en el dato) es una
     // vitrina de gases de recirculación con filtro de carbono — confirmado por la usuaria.
-    tiposEquipo: ['Vitrina de extracción de gases', 'Cabina de extracción de gases', 'Campana de seguridadd'], prefix: 'RV',
+    // CAB-02, «Vitrina de filtración (carbón activo, recirculación)», también se registra aquí
+    // (confirmado por Paloma, 2026-11-23).
+    tiposEquipo: ['Vitrina de extracción de gases', 'Cabina de extracción de gases', 'Campana de seguridadd',
+                  'Vitrina de filtración (carbón activo, recirculación)'], prefix: 'RV',
     label: 'Vitrina de extracción de gases', tabLabel: '🌫️ Vitrina de gases',
     // Como la cabina: presencia continua mientras se trabaja dentro de la vitrina.
     permiteSesionAbierta: true,
