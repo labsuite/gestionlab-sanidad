@@ -381,6 +381,37 @@ function esDeMiAlumnado(emailAutor) {
  * Si no hay datos en Supabase (migración pendiente), usa el campo Ubicaciones_Asignadas de Sheets.
  * La zona común se incluye siempre automáticamente.
  */
+/**
+ * Laboratorios (nº de tres cifras) de la cuenta de grupo que mira, sacados de su ficha
+ * (Ubicaciones_Asignadas, p. ej. "203,205"). Respeta la vista previa de rol.
+ */
+function labsDelAlumno() {
+  const emailNorm = getEffectiveUser().email;
+  const u = DATA.usuarios.find(x => (x.Email || '').toLowerCase().trim() === emailNorm);
+  return [...new Set((u?.Ubicaciones_Asignadas || '').split(',')
+    .map(s => (s.trim().match(/\b(\d{3})\b/) || [])[1]).filter(Boolean))];
+}
+
+/** ¿El equipo está en la zona común? (ubicación «205-ZC…», o una ubicación del catálogo de zona común) */
+function equipoEnZonaComun(equipo) {
+  const ub = String(equipo?.Ubicacion || '');
+  return /(^|[-\s])ZC([-\s.]|$)/i.test(ub) || /zona com[uú]n/i.test(ub) || esZonaComun(ub);
+}
+
+/**
+ * ¿Puede la cuenta de grupo que mira ver y registrar cosas de este equipo? Sí si está en
+ * uno de sus laboratorios o en la zona común — la misma regla que el consumo de stock
+ * (decisión de Paloma, 2026-11-23). Para el resto de roles, siempre sí. El servidor
+ * (gestionar-mantenimiento) aplica la misma regla.
+ */
+function equipoAlAlcanceDelAlumno(equipo) {
+  if (getUserRole() !== 'Alumno') return true;
+  if (!equipo) return false;
+  if (equipoEnZonaComun(equipo)) return true;
+  const lab = (String(equipo.Ubicacion || '').match(/\b(\d{3})\b/) || [])[1];
+  return !!lab && labsDelAlumno().includes(lab);
+}
+
 function getUbicacionesAlumno() {
   const emailNorm = getEffectiveUser().email;
   const zonasComun = DATA.ubicaciones

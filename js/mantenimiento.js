@@ -100,6 +100,13 @@ function planAbiertoAlumnado(plan) {
   return plan.Tipo_Intervencion !== 'Externo' && !_esSoloProfesorado(plan);
 }
 
+/** Planes que ve y registra una cuenta de grupo: los abiertos al alumnado de los equipos de
+ *  sus laboratorios y de la zona común (equipoAlAlcanceDelAlumno, js/config.js). */
+function planDelAlumnado(plan) {
+  if (!planAbiertoAlumnado(plan)) return false;
+  return equipoAlAlcanceDelAlumno(DATA.equipos.find(e => e.ID_Activo === plan.ID_Equipo));
+}
+
 // Devuelve true si la operación es de limpieza/conservación (→ fin de periodo)
 // y false si es calibración/verificación/puesta en marcha (→ inicio de periodo)
 function _esMomentoFin(plan) {
@@ -287,7 +294,7 @@ function _pasosNoCumple(pasos) {
 
 /** ¿Puede el usuario actual abrir el modal de ejecución de este plan? */
 function puedeEjecutarPlanMant(plan) {
-  if (getUserRole() === 'Alumno') return planAbiertoAlumnado(plan);
+  if (getUserRole() === 'Alumno') return planDelAlumnado(plan);
   return puedeHacer('registrarMantenimiento');
 }
 
@@ -365,7 +372,9 @@ function buildMantenimientoEquipo(equipoId) {
   // Protocolo de uso (Markdown → visor plegable con índice y buscador, js/protocolo.js)
   if (equipo.Protocolo_Uso) secciones.push(buildProtocoloUso(equipo.Protocolo_Uso));
 
-  // Planes de mantenimiento
+  // Planes de mantenimiento. Una cuenta de grupo solo ve los de los equipos de sus
+  // laboratorios y de la zona común (equipoAlAlcanceDelAlumno).
+  if (!equipoAlAlcanceDelAlumno(equipo)) return secciones.join('');
   const planes = DATA.planesMantenimiento.filter(p => p.ID_Equipo === equipoId && p.Activo !== 'FALSE');
   if (!planes.length) {
     if (canLog) {
@@ -523,6 +532,9 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
       ${enCurso ? `<div style="margin-top:6px;color:var(--accent)"><strong>▶ Ejecución empezada</strong> el ${formatDate(enCurso.Fecha_Inicio) || '—'}${enCurso.Iniciado_Por ? ' por ' + enCurso.Iniciado_Por : ''} — continúa donde se dejó.
         ${getUserRole() !== 'Alumno' ? `<button class="btn-link" style="margin-left:8px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:11px;text-decoration:underline;padding:0" onclick="descartarEjecucionMant('${enCurso.ID_Registro}')">Descartar y empezar de cero</button>` : ''}</div>` : ''}
     </div>`;
+
+  // Si el equipo tiene un aviso de avería abierto, que se vea antes de empezar.
+  document.getElementById('mant-info-plan').insertAdjacentHTML('beforeend', htmlAvisoEquipo(idEquipo));
 
   _renderMantChecklist(pasos);
 
@@ -1450,7 +1462,7 @@ function renderMantenimiento() {
   equiposScope.forEach(eq => {
     const planes = DATA.planesMantenimiento.filter(p => {
       if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
-      if (esAlumno && !planAbiertoAlumnado(p)) return false;
+      if (esAlumno && !planDelAlumnado(p)) return false;
       return true;
     });
     planes.forEach(plan => {

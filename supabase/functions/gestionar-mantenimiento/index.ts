@@ -60,6 +60,29 @@ function evaluacionesUso(v: unknown): string | null {
 
 const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * ¿El equipo está al alcance de esta cuenta de grupo? Sí si está en uno de sus
+ * laboratorios (usuarios.ubicaciones_asignadas, p. ej. "203,205") o en la zona común
+ * («205-ZC…»): la misma regla que el consumo de stock. Espejo de
+ * equipoAlAlcanceDelAlumno() en js/config.js (decisión de Paloma, 2026-11-23).
+ */
+async function equipoAlAlcanceDeGrupo(supabaseAdmin: any, email: string, idEquipo: string): Promise<boolean> {
+  const [{ data: eq }, { data: usu }] = await Promise.all([
+    supabaseAdmin.from("equipos").select("ubicacion").eq("id_activo", idEquipo).maybeSingle(),
+    supabaseAdmin.from("usuarios").select("ubicaciones_asignadas").ilike("email", email).maybeSingle(),
+  ]);
+  const ub = String(eq?.ubicacion || "");
+  if (/(^|[-\s])ZC([-\s.]|$)/i.test(ub) || /zona com[uú]n/i.test(ub)) return true;
+  if (ub) {
+    const { data: ubCat } = await supabaseAdmin.from("ubicaciones").select("laboratorio_aula").eq("id_ubicacion", ub).maybeSingle();
+    if (/zona com[uú]n/i.test(String(ubCat?.laboratorio_aula || ""))) return true;
+  }
+  const lab = (ub.match(/(\d{3})/) || [])[1];   // el primer grupo de tres cifras es el laboratorio
+  const labs = String(usu?.ubicaciones_asignadas || "").split(",")
+    .map((x) => (x.trim().match(/(\d{3})/) || [])[1]).filter(Boolean);
+  return !!lab && labs.includes(lab);
+}
+
 function generarIdRegistro(): string {
   return "RM" + Date.now().toString(36).toUpperCase().slice(-6);
 }
@@ -110,7 +133,7 @@ Deno.serve(async (req) => {
       }
       const idPlanAlum = String(body.id_plan || "").trim();
       const { data: planAlum } = await supabaseAdmin
-        .from("planes_mantenimiento").select("solo_profesorado, activo, tipo_intervencion")
+        .from("planes_mantenimiento").select("solo_profesorado, activo, tipo_intervencion, id_equipo")
         .eq("id_plan", idPlanAlum).maybeSingle();
       if (!planAlum || planAlum.activo === false) {
         return jsonError("Este mantenimiento no está habilitado para realizarse con alumnado", 403);
@@ -120,6 +143,11 @@ Deno.serve(async (req) => {
       }
       if (planAlum.solo_profesorado) {
         return jsonError("Este mantenimiento está reservado al profesorado", 403);
+      }
+      // Solo equipos de los laboratorios del grupo y de la zona común (se mira el equipo
+      // del plan, no el que diga el navegador).
+      if (!(await equipoAlAlcanceDeGrupo(supabaseAdmin, email, String(planAlum.id_equipo || "")))) {
+        return jsonError("Este equipo no está en los laboratorios de tu grupo: sus mantenimientos los hace otro grupo o el profesorado", 403);
       }
     }
 

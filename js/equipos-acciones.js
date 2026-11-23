@@ -1867,12 +1867,15 @@ async function guardarAvisoAlumno() {
       descripcion_problema: desc, impacto, urgencia: 'Normal',
     });
     DATA.incidencias.push(_incidenciaSbToObj(incidencia));
-    showToast('Aviso enviado. El profesorado será notificado.', 'success');
+    // Lo que pasa de verdad: no se manda ningún correo; el aviso aparece en GestionLab.
+    const eqAviso = DATA.equipos.find(x => x.ID_Activo === equipoId);
+    const quien = (eqAviso?.Responsable || '').trim() ? 'al profesorado responsable del equipo' : 'a la gestión del laboratorio';
+    showToast(`Aviso enviado. Le aparece en GestionLab ${quien}, y quien abra el equipo verá el aviso. No se manda ningún correo: díselo también en persona.`, 'success');
     closeModal('modal-aviso-alumno');
     renderIncidencias();
     renderDashboard();
     updateBadges();
-  } catch(e) { showToast('Error enviando el aviso', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error enviando el aviso', 'error'); console.error(e); }
   hideLoading();
 }
 

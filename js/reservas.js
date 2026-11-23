@@ -384,6 +384,12 @@ function _renderTabGestion() {
 
 // ── Modal: Nueva reserva ──────────────────────────────────────
 
+/** Aviso de avería abierto del equipo elegido, encima de los parámetros de la reserva. */
+function _avisoEquipoReserva(idEquipo) {
+  const par = document.getElementById('reserva-params-container');
+  if (par && idEquipo) par.insertAdjacentHTML('afterbegin', htmlAvisoEquipo(idEquipo));
+}
+
 function openModalNuevaReserva(idEquipo = '') {
   _reservaEditandoId = null;
 
@@ -407,6 +413,7 @@ function openModalNuevaReserva(idEquipo = '') {
   if (idEquipo) {
     _renderParamsReserva(idEquipo);
     _actualizarVerificacion();
+    _avisoEquipoReserva(idEquipo);
   } else {
     const par = document.getElementById('reserva-params-container');
     const res = document.getElementById('reserva-disponibilidad-result');
@@ -429,6 +436,7 @@ function _onFechaInicioChange() {
 function _onCambioEquipoReserva(idEquipo) {
   _renderParamsReserva(idEquipo);
   _actualizarVerificacion();
+  _avisoEquipoReserva(idEquipo);
 }
 
 function _renderParamsReserva(idEquipo) {

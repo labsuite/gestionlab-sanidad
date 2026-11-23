@@ -16,14 +16,14 @@ function renderDashboard() {
   const misEquipos = esProfesor
     ? DATA.equipos.filter(e => esResponsableDeEquipo(e))
     : esAlumno
-      ? DATA.equipos.filter(e => getUbicacionesAlumno().includes(e.Ubicacion))
+      ? DATA.equipos.filter(e => equipoAlAlcanceDelAlumno(e))
       : DATA.equipos;
   const curso = getCursoAcademico();
   // Al alumnado solo le cuentan (y le salen en la tabla) los planes que puede realizar:
   // internos que no estén reservados al profesorado. Ver planAbiertoAlumnado().
   const planesVisibles = eq => DATA.planesMantenimiento.filter(p =>
     p.ID_Equipo === eq.ID_Activo && p.Activo !== 'FALSE' &&
-    (!esAlumno || planAbiertoAlumnado(p)));
+    (!esAlumno || planDelAlumnado(p)));
   let pendientesMant = 0;
   misEquipos.forEach(eq => {
     planesVisibles(eq).forEach(plan => {
@@ -59,6 +59,20 @@ function renderDashboard() {
     : esProfesor
       ? incAbiertas.filter(i => { const eq = DATA.equipos.find(e => i.Equipo && i.Equipo.startsWith(e.ID_Activo)); return eq ? veIncidenciasDeEquipo(eq) : false; })
       : [];
+  // Avisos todavía sin atender (estado «Abierta») de los equipos de los que la persona es
+  // responsable; los de equipos sin responsable, a Gestión. Van primero y en rojo si alguno
+  // dice que el equipo no funciona.
+  const sinAtender = incAbiertas.filter(i => {
+    if (i.Estado !== 'Abierta') return false;
+    const eq = DATA.equipos.find(e => i.Equipo && (i.Equipo === e.ID_Activo || i.Equipo.startsWith(e.ID_Activo + ' ')));
+    if (!eq) return esGestorAdmin;
+    if (esProfesor) return esResponsableDeEquipo(eq);
+    return esGestorAdmin && (esResponsableDeEquipo(eq) || !(eq.Responsable || '').trim());
+  });
+  if (sinAtender.length) {
+    const grave = sinAtender.some(i => _impactoAviso(i).grave >= 3);
+    alertas.innerHTML = `<div class="alert-banner ${grave ? 'danger' : ''}" style="cursor:pointer" onclick="showPage('incidencias')"><div class="alert-icon">🚨</div><div class="alert-content"><div class="alert-title">${sinAtender.length} aviso(s) de avería sin atender ${esProfesor ? 'en equipos de los que eres responsable' : 'en tus equipos o en equipos sin responsable'}</div><div class="alert-text">${sinAtender.slice(0,3).map(i => (i.Equipo || '').split(' ')[0] + ' · ' + _impactoAviso(i).txt).join(' – ')}${sinAtender.length > 3 ? ' y ' + (sinAtender.length-3) + ' más...' : ''}</div></div></div>` + alertas.innerHTML;
+  }
   if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('incidencias')"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.slice(0,3).map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}${incVisibles.length > 3 ? ' y ' + (incVisibles.length-3) + ' más...' : ''}</div></div></div>`;
 
   const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
@@ -255,13 +269,12 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
     }[e.Estado_Operativo] || 'badge-gray';
 
     // Etiqueta adicional: impacto si hay incidencia abierta, o fecha si hay revisión planificada
-    const incAbierta = DATA.incidencias.find(i =>
-      (i.Estado === 'Abierta' || i.Estado === 'En gestión') &&
-      i.Equipo && (i.Equipo === e.ID_Activo || i.Equipo.startsWith(e.ID_Activo + ' '))
-    );
+    const incAbierta = avisosAbiertosEquipo(e.ID_Activo)[0];
     let impactoBadge = '';
     if (incAbierta) {
-      impactoBadge = `<span class="badge badge-orange" style="font-size:10px;margin-left:4px" title="Incidencia ${incAbierta.ID_Incidencia}">⚠️ ${incAbierta.Impacto}</span>`;
+      const imp = _impactoAviso(incAbierta);
+      const etq = imp.grave >= 3 ? 'No funciona (aviso)' : imp.grave === 2 ? 'Uso limitado (aviso)' : 'Aviso abierto';
+      impactoBadge = `<span class="badge ${imp.clase}" style="font-size:10px;margin-left:4px" title="${incAbierta.ID_Incidencia}: ${imp.txt}">${imp.icono} ${etq}</span>`;
     } else if (e.Estado_Operativo === 'Revisión planificada') {
       // Buscar la intervención planificada más reciente para este equipo
       // (las que tienen fecha van primero, ordenadas; las que no, al final)
@@ -279,6 +292,7 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
       }
     }
     const planStatus = (() => {
+      if (!equipoAlAlcanceDelAlumno(e)) return '<span class="text-muted">—</span>';   // otro laboratorio
       const planes = DATA.planesMantenimiento.filter(p => p.ID_Equipo === e.ID_Activo && p.Activo !== 'FALSE');
       if (!planes.length) return '<span class="text-muted">—</span>';
       const curso = getCursoAcademico();
@@ -334,6 +348,45 @@ function _resumenIntervencion(i) {
   return i.Descripcion_Actuacion || i.Observaciones || '—';
 }
 
+// ── Avisos de avería abiertos (decisión de Paloma, 2026-11-23) ─────────────────
+// Quien vaya a usar un equipo tiene que ver que hay un aviso abierto, sobre todo uno de
+// «No funciona». El aviso del alumnado no cambia el estado del equipo (lo decide el
+// docente al atenderlo), así que se enseña aparte: en la fila del inventario, en la
+// ficha, al reservar, al registrar un uso y al hacer un mantenimiento.
+const _IMPACTO_AVISO = {
+  'Equipo fuera de servicio': { txt: 'No funciona / No se puede usar', icono: '🚫', clase: 'badge-red', grave: 3 },
+  'Uso limitado':             { txt: 'Funciona, pero con limitaciones', icono: '⚠️', clase: 'badge-orange', grave: 2 },
+  'No bloquea':               { txt: 'Funciona, pero hay algo que revisar', icono: '⚠️', clase: 'badge-orange', grave: 1 },
+};
+function _impactoAviso(i) {
+  return _IMPACTO_AVISO[i?.Impacto] || { txt: i?.Impacto || 'Aviso abierto', icono: '⚠️', clase: 'badge-orange', grave: 1 };
+}
+
+/** Incidencias abiertas o en gestión del equipo, la más grave primero. */
+function avisosAbiertosEquipo(idEquipo) {
+  return DATA.incidencias
+    .filter(i => (i.Estado === 'Abierta' || i.Estado === 'En gestión') &&
+      i.Equipo && (i.Equipo === idEquipo || i.Equipo.startsWith(idEquipo + ' ')))
+    .sort((a, b) => _impactoAviso(b).grave - _impactoAviso(a).grave);
+}
+
+/** Recuadro con el aviso más grave del equipo (vacío si no hay ninguno). */
+function htmlAvisoEquipo(idEquipo) {
+  const avisos = avisosAbiertosEquipo(idEquipo);
+  if (!avisos.length) return '';
+  const a = avisos[0], imp = _impactoAviso(a);
+  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const desc = String(a.Descripcion_Problema || '');
+  const consejo = imp.grave >= 3
+    ? 'No lo uses hasta que el profesorado lo revise.'
+    : 'Puedes usarlo con cuidado: lee antes lo que se avisó.';
+  return `<div class="aviso-equipo ${imp.grave >= 3 ? 'grave' : ''}">
+    <div><strong>${imp.icono} Aviso abierto: ${esc(imp.txt)}</strong>${a.Estado === 'En gestión' ? ' · el profesorado ya lo está atendiendo' : ''}</div>
+    <div class="aviso-equipo-desc">${formatDate(a.Fecha_Hora) || ''}${a.Reportado_Por ? ' · ' + esc(a.Reportado_Por) : ''}: ${esc(desc.length > 220 ? desc.slice(0, 220) + '…' : desc)}</div>
+    <div class="aviso-equipo-consejo">${consejo}${avisos.length > 1 ? ` (Hay ${avisos.length} avisos abiertos en este equipo.)` : ''}</div>
+  </div>`;
+}
+
 function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
@@ -360,7 +413,7 @@ function buildIntervencionesEquipo(equipoId) {
       ${puedeActuarEnEquipo(equipoId) ? `<button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="event.stopPropagation();registrarDevolucionEquipo('${intFuera.ID_Intervencion}')">📦 Registrar devolución</button>` : ''}
     </div>` : '';
 
-  const panelDetalles = avisoFuera + `
+  const panelDetalles = htmlAvisoEquipo(equipoId) + avisoFuera + `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px">
       <div class="detail-mobile-only">${detalle('Marca / Modelo', [equipo.Marca, equipo.Modelo].filter(Boolean).join(' · '))}</div>
       <div class="detail-mobile-only">${detalle('Ubicación', equipo.Ubicacion)}</div>

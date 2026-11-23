@@ -81,7 +81,14 @@ function formatDate(d) {
 }
 
 function updateBadges() {
-  const abiertas = DATA.incidencias.filter(i => i.Estado === 'Abierta' || i.Estado === 'En gestión').length;
+  // El Profesor cuenta solo las incidencias que ve (las de sus equipos, las que reportó y,
+  // si la tiene marcada, la zona común): las mismas que su lista.
+  const abiertas = DATA.incidencias.filter(i => {
+    if (i.Estado !== 'Abierta' && i.Estado !== 'En gestión') return false;
+    if (getUserRole() !== 'Profesor') return true;
+    const eq = DATA.equipos.find(e => i.Equipo && (i.Equipo === e.ID_Activo || i.Equipo.startsWith(e.ID_Activo + ' ')));
+    return eq ? veIncidenciasDeEquipo(eq) : false;
+  }).length;
   const badgeInc = document.getElementById('badge-incidencias');
   if (badgeInc) { badgeInc.textContent = abiertas; badgeInc.style.display = abiertas > 0 ? '' : 'none'; }
 
@@ -127,7 +134,7 @@ function _updateBadgeMantenimiento() {
     DATA.planesMantenimiento
       .filter(p => {
         if (p.ID_Equipo !== eq.ID_Activo || p.Activo === 'FALSE') return false;
-        if (esAlumno && !planAbiertoAlumnado(p)) return false;
+        if (esAlumno && !planDelAlumnado(p)) return false;
         return true;
       })
       .forEach(plan => {

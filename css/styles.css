@@ -2055,3 +2055,14 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
   .mant-plan-row { flex-wrap: wrap; row-gap: 6px; }
   .mant-plan-row > span:nth-child(3) { flex: 1 1 100% !important; white-space: normal !important; overflow: visible !important; }
 }
+
+/* Aviso de avería abierto en un equipo (htmlAvisoEquipo, js/equipos-render.js) */
+.aviso-equipo {
+  padding: 10px 12px; margin-bottom: 12px; font-size: 13px; line-height: 1.5;
+  background: var(--warning-light); border: 1px solid #e8c98a; border-left: 4px solid #d39b2c;
+  border-radius: var(--radius-sm); color: var(--text);
+}
+.aviso-equipo.grave { background: var(--danger-light); border-color: #e7b4b4; border-left-color: var(--danger); }
+.aviso-equipo.grave strong { color: var(--danger); }
+.aviso-equipo-desc { margin-top: 3px; overflow-wrap: anywhere; }
+.aviso-equipo-consejo { margin-top: 3px; font-weight: 600; }

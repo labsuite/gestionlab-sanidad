@@ -246,6 +246,7 @@ function _renderRegTab(tipo) {
       ${_puedeVerNfcRegistros() ? `<button class="btn btn-secondary" onclick="openModalNfcRegistro('${tipo}','${idEquipoSel}')" style="margin-left:auto">🔗 NFC</button>` : ''}
     </div>
     ${notaManual}
+    ${htmlAvisoEquipo(idEquipoSel)}
     <div class="card" style="padding:10px 18px;margin-bottom:20px;display:inline-block">
       <div style="font-size:20px;font-weight:700;color:var(--accent)">${horas.toFixed(1)} h</div>
       <div style="font-size:11px;color:var(--text-muted)">Horas de uso registradas — apoyo al plan de mantenimiento</div>
