@@ -759,6 +759,14 @@ alter table solicitudes      add column if not exists id_material text reference
 
 create index if not exists idx_movimientos_id_material      on movimientos (id_material);
 create index if not exists idx_historico_precio_id_material on historico_precio (id_material);
+
+-- 2026-11-23: de qué línea del pedido sale cada precio. Un precio por LÍNEA
+-- (no por material: dos líneas del mismo material pueden ser una ampliación
+-- con otro precio). Volver a aplicar la factura actualiza esa fila en vez de
+-- añadir otra. Sin FK, como el resto del histórico (es un log). Null en las
+-- filas antiguas y en las de pedidos.hoja_factura.
+alter table historico_precio add column if not exists id_linea text;
+create index if not exists idx_historico_precio_pedido_linea on historico_precio (id_pedido, id_linea);
 create index if not exists idx_lineas_pedido_id_material    on lineas_pedido (id_material);
 create index if not exists idx_solicitudes_id_material      on solicitudes (id_material);
 

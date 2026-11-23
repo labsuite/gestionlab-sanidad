@@ -481,21 +481,31 @@ Deno.serve(async (req) => {
       const { data: linea, error } = await supabaseAdmin.from("lineas_pedido").update({ precio_unitario: Number(precio) }).eq("id_linea", idLinea).select().single();
       if (error || !linea) continue;
       const idMaterial = linea.id_material ?? await resolverIdMaterial(supabaseAdmin, linea.material);
-      // Un precio por material y pedido: volver a aplicar la misma factura
-      // (o corregir el precio) actualiza la fila en vez de añadir otra — antes
-      // se duplicaba y el «(n=…)» del precio medio salía inflado (visto
-      // 2026-11-23 en PED-MVA66C). La fecha original se conserva.
-      let previa = supabaseAdmin.from("historico_precio").select("id_historico").eq("id_pedido", pedidoId);
-      previa = idMaterial ? previa.eq("id_material", idMaterial) : previa.is("id_material", null).eq("nombre_material", linea.material);
-      const { data: existentes } = await previa;
-      if ((existentes || []).length) {
-        const [primera, ...sobran] = existentes!.map((h: any) => h.id_historico);
-        await supabaseAdmin.from("historico_precio").update({ precio_unitario: Number(precio), proveedor }).eq("id_historico", primera);
-        if (sobran.length) await supabaseAdmin.from("historico_precio").delete().in("id_historico", sobran);
+      // Un precio por LÍNEA: volver a aplicar la misma factura (o corregir el
+      // precio) actualiza su fila en vez de añadir otra — antes se duplicaba y
+      // el «(n=…)» del precio medio salía inflado (PED-MVA66C, 2026-11-23). Por
+      // línea y no por material: dos líneas del mismo material pueden ser una
+      // ampliación con otro precio. La fecha original se conserva.
+      const { data: suya } = await supabaseAdmin.from("historico_precio").select("id_historico")
+        .eq("id_pedido", pedidoId).eq("id_linea", idLinea).limit(1);
+      let idHist = suya?.[0]?.id_historico;
+      if (!idHist) {
+        // Filas de antes de existir id_linea: se adopta una del mismo material
+        // en este pedido que no sea de otra línea (ni de la hoja de la factura).
+        const { data: ped } = await supabaseAdmin.from("pedidos").select("hoja_factura").eq("id_pedido", pedidoId).maybeSingle();
+        const deHoja = new Set((Array.isArray(ped?.hoja_factura) ? ped.hoja_factura : []).map((c: any) => c?.id_historico).filter(Boolean));
+        let q = supabaseAdmin.from("historico_precio").select("id_historico").eq("id_pedido", pedidoId).is("id_linea", null);
+        q = idMaterial ? q.eq("id_material", idMaterial) : q.is("id_material", null).eq("nombre_material", linea.material);
+        const { data: antiguas } = await q;
+        idHist = (antiguas || []).map((h: any) => h.id_historico).find((id: string) => !deHoja.has(id));
+      }
+      if (idHist) {
+        await supabaseAdmin.from("historico_precio")
+          .update({ precio_unitario: Number(precio), proveedor, id_linea: idLinea, id_material: idMaterial }).eq("id_historico", idHist);
       } else {
         await supabaseAdmin.from("historico_precio").insert({
           id_historico: genId("HP"), nombre_material: linea.material, id_material: idMaterial,
-          id_pedido: pedidoId, proveedor, fecha: hoy(), precio_unitario: Number(precio),
+          id_pedido: pedidoId, id_linea: idLinea, proveedor, fecha: hoy(), precio_unitario: Number(precio),
         });
       }
       actualizadas.push(linea);

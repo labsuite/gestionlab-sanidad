@@ -87,7 +87,7 @@ const COLS = {
   lineasPedido:       ['ID_Linea','Pedido','Material','ID_Material','Cantidad_Pedida','Cantidad_Recibida','Estado_Linea','Observaciones','Precio_Unitario','ID_Equipo'],
   ciclosModulos:      ['Ciclo','Modulo'],
   materialUbicaciones:['ID','ID_Material','ID_Ubicacion','Stock_Local','Stock_Minimo_Local','Stock_Optimo_Local','ID_Lote_Padre','Unidad_Lote'],
-  historicoPrecio:    ['ID_Historico','Nombre_Material','ID_Material','ID_Pedido','Proveedor','Fecha','Precio_Unitario'],
+  historicoPrecio:    ['ID_Historico','Nombre_Material','ID_Material','ID_Pedido','ID_Linea','Proveedor','Fecha','Precio_Unitario'],
   tareas:             ['ID_Tarea','Email','Texto','Fecha_Limite','Completada','Fecha_Creacion'],
   planesMantenimiento:    ['ID_Plan','ID_Equipo','Tipo_Intervencion','Periodicidad','Operacion','Activo','Instrucciones','Solo_Profesorado'],
   registroMantenimientos: ['ID_Registro','ID_Plan','ID_Equipo','Curso_Academico','Periodo','Fecha_Realizacion','Realizado_Por','Supervisado_Por','Observaciones','Estado','Pasos','Fecha_Inicio','Iniciado_Por','Actualizado_En'],

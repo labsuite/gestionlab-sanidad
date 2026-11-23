@@ -66,7 +66,7 @@ Expresarla de otra manera o añadir la referencia. Mismo formato de lista; un so
 En «🤖 Factura y datos leídos», los precios de las líneas emparejadas salen **marcados** y se guardan en la línea y en `historico_precio` con **«💾 Guardar precios marcados»** (antes «Aplicar lo seleccionado»; `actualizar_precio` de `gestionar-linea-pedido`). Nada se guarda solo, a propósito: hay que comprobar envase/unidad. Pero ningún camino los pierde ya:
 - **Cerrar / ✕** (`cerrarRevisionExtraccion`): si hay precios marcados distintos del que ya tiene su línea, pregunta si guardarlos.
 - **«Usar en la hoja en lugar de las líneas →»** guarda antes lo marcado y luego abre el editor de la hoja (caso real PEDLG75G9: ese botón cerraba la ventana y los 17 precios emparejados se quedaron sin aplicar).
-- **Un precio por material y pedido** en el histórico: volver a guardar actualiza la fila (conserva la fecha) en vez de añadir otra. Antes se duplicaba (PED-MVA66C, 11 materiales con la fila repetida) y el «(n=…)» del precio medio salía inflado.
+- **Un precio por línea** en el histórico (`historico_precio.id_linea`): volver a guardar actualiza la fila de esa línea (conserva la fecha) en vez de añadir otra. Por línea y no por material, porque dos líneas del mismo material pueden ser una ampliación con otro precio. Las filas antiguas sin `id_linea` se adoptan por material la primera vez (sin tocar las de la hoja de la factura). Antes se duplicaba (PED-MVA66C, 14 filas repetidas, limpiadas a mano el 2026-11-23) y el «(n=…)» del precio medio salía inflado.
 
 ## Estados de pedido (canónicos)
 `Abierto` → `Presupuesto solicitado` → `Presupuesto aprobado` → `Recepción parcial` → `Recepción completa` → `Archivado`

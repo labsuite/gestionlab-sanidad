@@ -403,6 +403,7 @@ function _historicoPrecioSbToObj(h) {
     Nombre_Material: h.nombre_material || '',
     ID_Material: h.id_material || '',
     ID_Pedido: h.id_pedido || '',
+    ID_Linea: h.id_linea || '',
     Proveedor: h.proveedor || '',
     Fecha: h.fecha || '',
     Precio_Unitario: h.precio_unitario != null ? String(h.precio_unitario) : '',
