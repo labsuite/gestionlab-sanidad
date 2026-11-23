@@ -152,7 +152,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     // Ejecutar los mantenimientos internos que no sean "solo profesorado". NO incluye marcar
     // "no aplica"/aplazar (eso es crearIntervenciones), y lo que finalizan queda en
@@ -169,7 +169,7 @@ const PERMISOS = {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias',
           'mantenimiento', 'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
-          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil'],
+          'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
     crearIntervenciones: true,  // permitido, pero filtrado por esResponsableDeEquipo()
@@ -189,7 +189,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: false, configurarReservas: false,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -200,7 +200,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -307,7 +307,7 @@ function _actualizarBannerVistaPrevia() {
   }
 }
 
-function showPage(page) {
+function showPage(page, opts) {
   const p = getPermisos();
   if (!p.nav.includes(page)) { showToast('No tienes permiso para acceder a esta sección', 'error'); return; }
   document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
@@ -323,10 +323,14 @@ function showPage(page) {
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
     contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo',
     'residuos-guia': 'Guía de residuos', 'residuos-contenedores': 'Contenedores de residuos',
-    reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', congelados: 'Muestras congeladas', perfil: 'Mi perfil'
+    reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', congelados: 'Muestras congeladas', perfil: 'Mi perfil', ayuda: 'Ayuda'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
+  if (page === 'ayuda' && typeof renderAyuda === 'function') {
+    if (!opts?.desdeBotonAyuda) _ayudaAlEntrarPorMenu();
+    renderAyuda();
+  }
   if (page === 'inventariar-material' && typeof _invMatAlEntrar === 'function') _invMatAlEntrar();
   // Cada cambio de sección es una entrada del historial, para que el «atrás»
   // del móvil vuelva a la sección anterior en vez de salir de la app.

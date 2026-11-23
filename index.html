@@ -165,6 +165,9 @@
       <div class="nav-item" onclick="showPage('perfil')">
         <span class="nav-icon">👤</span> Mi perfil
       </div>
+      <div class="nav-item" onclick="showPage('ayuda')">
+        <span class="nav-icon">❓</span> Ayuda
+      </div>
     </div>
     <div class="sidebar-footer">
       <button class="btn-vista-previa" id="btn-vista-previa" onclick="abrirVistaPrevia()" style="display:none">
@@ -193,6 +196,7 @@
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" aria-label="Menú">☰</button>
       <div class="topbar-title" id="page-title">Panel principal</div>
       <div class="topbar-actions" id="topbar-actions"></div>
+      <button class="btn-ayuda-pantalla" onclick="abrirAyudaPantalla()" title="Ayuda de esta pantalla" aria-label="Ayuda de esta pantalla">?</button>
     </div>
     <div class="content">
 
@@ -605,6 +609,9 @@
         <div id="perfil-contenido"></div>
       </div>
 
+      <!-- AYUDA (js/ayuda.js) -->
+      <div class="page" id="page-ayuda"></div>
+
       <!-- RESERVAS -->
       <div class="page" id="page-reservas"></div>
       <div class="page" id="page-registros-uso"></div>
@@ -643,6 +650,7 @@
 <script src="js/congelados.js"></script>
 <script src="js/ubicar-equipos.js"></script>
 <script src="js/inventariar-material.js"></script>
+<script src="js/ayuda.js"></script>
 <script>
   loadModales().then(initAuth);
   // mantenimiento.js cargado antes que otros scripts — no necesita init adicional
