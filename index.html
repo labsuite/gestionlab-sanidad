@@ -204,7 +204,7 @@
       <!-- DASHBOARD -->
       <div class="page active" id="page-dashboard">
         <div class="stats-grid" id="stats-grid">
-          <div class="stat-card">
+          <div class="stat-card" data-cifra-centro>
             <div class="stat-icon" style="background:#ecfdf5">♻️</div>
             <div class="stat-body">
               <div class="stat-value" id="stat-residuos-pendientes">—</div>
@@ -218,18 +218,27 @@
               <div class="stat-label">Preventivos pendientes</div>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" data-cifra-centro>
             <div class="stat-icon" style="background:#fdf0f0">⚠️</div>
             <div class="stat-body">
               <div class="stat-value" id="stat-incidencias">—</div>
               <div class="stat-label">Incidencias abiertas</div>
             </div>
           </div>
-          <div class="stat-card" style="cursor:pointer" onclick="openModalConsumo()" title="Registrar consumo rápido">
+          <div class="stat-card" data-cifra-centro style="cursor:pointer" onclick="openModalConsumo()" title="Registrar consumo rápido">
             <div class="stat-icon" style="background:#fdf3e7">🧴</div>
             <div class="stat-body">
               <div class="stat-value" id="stat-stock-bajo">—</div>
               <div class="stat-label">Items bajo mínimo</div>
+            </div>
+          </div>
+          <!-- Solo cuentas de grupo (en lugar de las cifras de todo el centro) -->
+          <div class="stat-card" id="stat-card-equipos-aviso" style="display:none;cursor:pointer"
+               onclick="document.getElementById('card-equipos-aviso')?.scrollIntoView({behavior:'smooth'})">
+            <div class="stat-icon" style="background:#fdf0f0">🚫</div>
+            <div class="stat-body">
+              <div class="stat-value" id="stat-equipos-aviso">—</div>
+              <div class="stat-label">Equipos con aviso o sin poder usarse</div>
             </div>
           </div>
         </div>
@@ -245,6 +254,15 @@
         <div id="alertas-container"></div>
         <div id="alertas-stock-container" style="margin-bottom:20px"></div>
         <div id="tareas-container" style="margin-bottom:20px"></div>
+
+        <!-- Solo cuentas de grupo: equipos de sus laboratorios y de la zona común que no se
+             pueden usar o tienen un aviso abierto (js/equipos-render.js, _renderEquiposAvisoGrupo) -->
+        <div class="card" id="card-equipos-aviso" style="display:none;margin-bottom:20px">
+          <div class="card-header">
+            <div class="card-title">Equipos de tus laboratorios con aviso o sin poder usarse</div>
+          </div>
+          <div id="lista-equipos-aviso"></div>
+        </div>
 
         <div class="card">
           <div class="card-header">

@@ -36,6 +36,7 @@ function renderDashboard() {
     });
   });
   setText('stat-preventivos', pendientesMant);
+  _renderEquiposAvisoGrupo(esAlumno);
 
   const incAbiertas = DATA.incidencias.filter(i => i.Estado === 'Abierta' || i.Estado === 'En gestión');
   setText('stat-incidencias', incAbiertas.length);
@@ -346,6 +347,65 @@ function _resumenIntervencion(i) {
     return tareas.length > 1 ? `${tareas.length} tareas · última: ${ultima.Descripcion}` : ultima.Descripcion;
   }
   return i.Descripcion_Actuacion || i.Observaciones || '—';
+}
+
+// ── Panel principal de las cuentas de grupo (decisión de Paloma, 2026-11-23) ──────
+// Sin las cifras de todo el centro (residuos, incidencias, material bajo mínimo): en su
+// lugar, los equipos de sus laboratorios y de la zona común que no se pueden usar (No
+// operativo, Averiado, Fuera de servicio, fuera del centro) o tienen un aviso abierto.
+const _ESTADOS_SIN_USO = ['No operativo', 'Averiado', 'Fuera de servicio'];
+
+function _renderEquiposAvisoGrupo(esAlumno) {
+  document.querySelectorAll('#stats-grid [data-cifra-centro]').forEach(c => { c.style.display = esAlumno ? 'none' : ''; });
+  const cifra = document.getElementById('stat-card-equipos-aviso');
+  const tarjeta = document.getElementById('card-equipos-aviso');
+  if (cifra) cifra.style.display = esAlumno ? '' : 'none';
+  if (tarjeta) tarjeta.style.display = esAlumno ? '' : 'none';
+  if (!esAlumno) return;
+
+  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const lista = DATA.equipos
+    .filter(e => e.Estado_Operativo !== 'Dado de baja' && equipoAlAlcanceDelAlumno(e))
+    .map(e => {
+      const aviso = avisosAbiertosEquipo(e.ID_Activo)[0];
+      const fuera = intervencionEquipoFuera(e.ID_Activo);
+      const sinUso = _ESTADOS_SIN_USO.includes(e.Estado_Operativo);
+      return (aviso || fuera || sinUso) ? { e, aviso, fuera, sinUso } : null;
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.sinUso || (b.aviso && _impactoAviso(b.aviso).grave >= 3) ? 1 : 0) - (a.sinUso || (a.aviso && _impactoAviso(a.aviso).grave >= 3) ? 1 : 0));
+  setText('stat-equipos-aviso', lista.length);
+
+  const cont = document.getElementById('lista-equipos-aviso');
+  if (!cont) return;
+  if (!lista.length) {
+    cont.innerHTML = `<div class="empty-state" style="padding:20px"><div class="empty-state-icon">✅</div><div class="empty-state-title">Ningún equipo de tus laboratorios tiene avisos ni está fuera de uso</div></div>`;
+    return;
+  }
+  cont.innerHTML = lista.map(({ e, aviso, fuera, sinUso }) => {
+    const etiquetas = [];
+    if (sinUso) etiquetas.push(`<span class="badge badge-red" style="font-size:10px">${esc(e.Estado_Operativo)}</span>`);
+    if (aviso) {
+      const imp = _impactoAviso(aviso);
+      etiquetas.push(`<span class="badge ${imp.clase}" style="font-size:10px">${imp.icono} Aviso: ${esc(imp.txt)}</span>`);
+    }
+    if (fuera) etiquetas.push(`<span class="badge badge-gray" style="font-size:10px">📦 Fuera del centro</span>`);
+    return `<div class="equipo-aviso-fila" onclick="abrirEquipoEnInventario('${esc(e.ID_Activo)}')">
+      <div><strong>${esc(e.ID_Activo)}</strong> · ${esc(e.Tipo_Equipo || '')} <span style="color:var(--text-muted);font-size:12px">${esc(e.Ubicacion || '')}</span></div>
+      <div class="equipo-aviso-etiquetas">${etiquetas.join('')}</div>
+    </div>`;
+  }).join('');
+}
+
+/** Abre el inventario con el equipo buscado y su tarjeta desplegada. */
+function abrirEquipoEnInventario(idEquipo) {
+  showPage('equipos');
+  const s = document.getElementById('search-equipos');
+  if (s) s.value = idEquipo;
+  filtrarEquipos(idEquipo);
+  const fila = document.getElementById('eq-expand-' + idEquipo.replace(/[^a-zA-Z0-9]/g, '_'));
+  if (fila && !fila.classList.contains('open')) fila.classList.add('open');
+  window.scrollTo(0, 0);
 }
 
 // ── Avisos de avería abiertos (decisión de Paloma, 2026-11-23) ─────────────────

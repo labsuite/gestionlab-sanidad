@@ -2084,3 +2084,9 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .ayuda-tabla th, .ayuda-tabla td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
 .ayuda-tabla th { background: var(--bg); font-size: 12px; }
 @media (max-width: 768px) { .ayuda-galeria { grid-template-columns: 1fr 1fr; } }
+
+/* Panel principal de las cuentas de grupo: equipos con aviso o sin poder usarse */
+.equipo-aviso-fila { padding: 10px 16px; border-top: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.equipo-aviso-fila:first-child { border-top: none; }
+.equipo-aviso-fila:hover { background: var(--bg); }
+.equipo-aviso-etiquetas { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
