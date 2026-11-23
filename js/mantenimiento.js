@@ -534,7 +534,7 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
     </div>`;
 
   // Si el equipo tiene un aviso de avería abierto, que se vea antes de empezar.
-  document.getElementById('mant-info-plan').insertAdjacentHTML('beforeend', htmlAvisoEquipo(idEquipo));
+  document.getElementById('mant-info-plan').insertAdjacentHTML('beforeend', htmlAvisoEquipo(idEquipo, 'mantenimiento'));
 
   _renderMantChecklist(pasos);
 
@@ -805,6 +805,16 @@ function _ofrecerAvisoNoCumple(idEquipo, idPlan, periodo, noCumple) {
   const plan = DATA.planesMantenimiento.find(p => p.ID_Plan === idPlan);
   const texto = `Mantenimiento «${plan?.Operacion || 'preventivo'}» (${labelPeriodo(periodo)}): ` +
     noCumple.map(p => `no cumple «${p.texto}» (criterio: ${p.criterio}). Visto: ${p.nota}`).join(' · ');
+  // Si el equipo ya tiene un aviso abierto, lo visto se añade a ese aviso: no se abre otro
+  // por lo mismo (decisión de Paloma, 2026-11-23).
+  const abierto = typeof avisosAbiertosEquipo === 'function' ? avisosAbiertosEquipo(idEquipo)[0] : null;
+  if (abierto) {
+    setTimeout(() => {
+      openModalAnadirAviso(idEquipo, abierto, texto);
+      showToast('Una comprobación no cumple y el equipo ya tiene un aviso abierto: añade lo visto a ese aviso', '');
+    }, 400);
+    return;
+  }
   setTimeout(() => {
     if (puedeHacer('crearIncidencias')) {
       openModalIncidenciaEquipo(idEquipo);

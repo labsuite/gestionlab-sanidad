@@ -161,6 +161,17 @@ casilla sino **✓ Cumple / ✗ No cumple** y debajo el criterio. Detalles:
 - Al finalizar con algún «no cumple» se abre el **aviso de avería** del equipo con lo anotado ya
   escrito (`_ofrecerAvisoNoCumple`): 🚨 «Notificar aviso» para el alumnado, ⚠️ «Reportar
   incidencia» para el profesorado. Se abre, no se envía solo: quien está delante elige el impacto.
+- **Si el equipo ya tiene un aviso abierto, no se abre otro** (decisión de Paloma, 2026-11-23):
+  la misma ventana pasa a modo «Añadir al aviso abierto» (`openModalAnadirAviso`) y lo visto se
+  añade al final de la descripción de ese aviso con fecha y autor (`anadir_a_aviso` en
+  `gestionar-incidencia`, cualquier sesión; el autor lo pone `autorRegistro()`). La gravedad del
+  aviso **solo puede subir**: bajarla es decir que el equipo está mejor, y eso lo decide el
+  profesorado al cerrar (lo impone también el servidor).
+- **Aviso abierto en la ventana del mantenimiento:** el recuadro de arriba (`htmlAvisoEquipo(id,
+  'mantenimiento')`) da el consejo según el tipo, igual que la tabla de la tarea EQU-3 del manual:
+  con «No funciona» el grupo **no hace el mantenimiento** («No hagas este mantenimiento hasta
+  que el profesorado lo revise»); con los otros dos, sigue. Los consejos viven en
+  `_IMPACTO_AVISO` (`js/equipos-render.js`): si se cambian, cambiar también EQU-3 y MAN-2.
 - En la pestaña «Visto bueno» la fila avisa «⚠ N no cumple» y enseña qué paso, su criterio y la
   nota, para que quien firma lo vea.
 

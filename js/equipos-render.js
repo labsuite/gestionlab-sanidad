@@ -413,13 +413,20 @@ function abrirEquipoEnInventario(idEquipo) {
 // «No funciona». El aviso del alumnado no cambia el estado del equipo (lo decide el
 // docente al atenderlo), así que se enseña aparte: en la fila del inventario, en la
 // ficha, al reservar, al registrar un uso y al hacer un mantenimiento.
+// Textos de los tres tipos de aviso iguales a los de la ventana «Notificar aviso», y consejo
+// igual a la tabla de la tarea EQU-3 del manual (decisión de Paloma, 2026-11-23).
 const _IMPACTO_AVISO = {
-  'Equipo fuera de servicio': { txt: 'No funciona / No se puede usar', icono: '🚫', clase: 'badge-red', grave: 3 },
-  'Uso limitado':             { txt: 'Funciona, pero con limitaciones', icono: '⚠️', clase: 'badge-orange', grave: 2 },
-  'No bloquea':               { txt: 'Funciona, pero hay algo que revisar', icono: '⚠️', clase: 'badge-orange', grave: 1 },
+  'Equipo fuera de servicio': { txt: 'No funciona / No se puede usar', icono: '🚫', clase: 'badge-red', grave: 3,
+    consejo: 'No lo uses hasta que el profesorado lo revise.',
+    consejoMantenimiento: 'No hagas este mantenimiento hasta que el profesorado lo revise.' },
+  'Uso limitado':             { txt: 'Funciona, pero con limitaciones', icono: '⚠️', clase: 'badge-orange', grave: 2,
+    consejo: 'Lee el aviso: úsalo solo si la limitación no afecta a lo que vas a hacer. Si dudas, pregunta al profesorado.' },
+  'No bloquea':               { txt: 'Sí, funciona (pero hay algo que revisar)', icono: '⚠️', clase: 'badge-orange', grave: 1,
+    consejo: 'Se puede usar. Lee el aviso por si te afecta.' },
 };
 function _impactoAviso(i) {
-  return _IMPACTO_AVISO[i?.Impacto] || { txt: i?.Impacto || 'Aviso abierto', icono: '⚠️', clase: 'badge-orange', grave: 1 };
+  return _IMPACTO_AVISO[i?.Impacto] || { txt: i?.Impacto || 'Aviso abierto', icono: '⚠️', clase: 'badge-orange', grave: 1,
+    consejo: 'Lee el aviso por si te afecta.' };
 }
 
 /** Incidencias abiertas o en gestión del equipo, la más grave primero. */
@@ -430,16 +437,15 @@ function avisosAbiertosEquipo(idEquipo) {
     .sort((a, b) => _impactoAviso(b).grave - _impactoAviso(a).grave);
 }
 
-/** Recuadro con el aviso más grave del equipo (vacío si no hay ninguno). */
-function htmlAvisoEquipo(idEquipo) {
+/** Recuadro con el aviso más grave del equipo (vacío si no hay ninguno). Con
+ *  contexto 'mantenimiento' (ventana «Ejecutar mantenimiento») cambia el consejo de «No funciona». */
+function htmlAvisoEquipo(idEquipo, contexto) {
   const avisos = avisosAbiertosEquipo(idEquipo);
   if (!avisos.length) return '';
   const a = avisos[0], imp = _impactoAviso(a);
   const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const desc = String(a.Descripcion_Problema || '');
-  const consejo = imp.grave >= 3
-    ? 'No lo uses hasta que el profesorado lo revise.'
-    : 'Puedes usarlo con cuidado: lee antes lo que se avisó.';
+  const consejo = (contexto === 'mantenimiento' && imp.consejoMantenimiento) || imp.consejo;
   return `<div class="aviso-equipo ${imp.grave >= 3 ? 'grave' : ''}">
     <div><strong>${imp.icono} Aviso abierto: ${esc(imp.txt)}</strong>${a.Estado === 'En gestión' ? ' · el profesorado ya lo está atendiendo' : ''}</div>
     <div class="aviso-equipo-desc">${formatDate(a.Fecha_Hora) || ''}${a.Reportado_Por ? ' · ' + esc(a.Reportado_Por) : ''}: ${esc(desc.length > 220 ? desc.slice(0, 220) + '…' : desc)}</div>

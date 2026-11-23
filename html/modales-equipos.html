@@ -612,7 +612,7 @@
 <div class="modal-overlay" id="modal-aviso-alumno">
   <div class="modal" style="max-width:460px">
     <div class="modal-header">
-      <div class="modal-title">Notificar aviso</div>
+      <div class="modal-title" id="aviso-titulo">Notificar aviso</div>
       <button class="modal-close" onclick="closeModal('modal-aviso-alumno')">✕</button>
     </div>
     <div class="modal-body">
@@ -621,6 +621,11 @@
         <div class="form-group">
           <label>Equipo</label>
           <div id="aviso-equipo-label" style="font-weight:500;font-size:13px;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm)"></div>
+        </div>
+        <!-- Solo al añadir a un aviso que ya está abierto -->
+        <div class="form-group" id="aviso-existente-grupo" style="display:none">
+          <label>Aviso abierto</label>
+          <div id="aviso-existente"></div>
         </div>
         <div class="form-group">
           <label>¿Se puede seguir usando el equipo? *</label>
@@ -637,13 +642,13 @@
           </div>
         </div>
         <div class="form-group">
-          <label>Descripción del problema *</label>
+          <label id="aviso-descripcion-label">Descripción del problema *</label>
           <textarea id="aviso-descripcion" style="min-height:80px" placeholder="Describe qué ocurre con el mayor detalle posible..."></textarea>
         </div>
       </div>
       <div class="form-footer">
         <button class="btn btn-secondary" onclick="closeModal('modal-aviso-alumno')">Cancelar</button>
-        <button class="btn btn-primary" onclick="guardarAvisoAlumno()">Enviar aviso</button>
+        <button class="btn btn-primary" id="aviso-btn-enviar" onclick="guardarAvisoAlumno()">Enviar aviso</button>
       </div>
     </div>
   </div>

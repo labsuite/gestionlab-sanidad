@@ -54,6 +54,33 @@ Deno.serve(async (req) => {
   // una incidencia sola: ni completar las tareas de una actuación ni adjuntar la
   // factura. Aquí es donde además se devuelve el equipo a "Operativo", también
   // a propósito — ver docs/modulo-incidencias.md.
+  // Añadir lo visto a un aviso que ya está abierto (desde un mantenimiento que no cumple),
+  // en vez de abrir otro por lo mismo. Cualquier sesión, como «crear». La gravedad solo
+  // puede subir: bajarla (decir que el equipo ya está mejor) es decisión del profesorado.
+  if (accion === "anadir_a_aviso") {
+    const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
+    if (authError) return authError;
+    const idIncidencia = String(body.id_incidencia || "").trim();
+    const texto = String(body.texto || "").trim();
+    if (!idIncidencia || !texto) return jsonError("id_incidencia y texto son obligatorios", 400);
+    const { data: inc } = await supabaseAdmin.from("incidencias").select("*").eq("id_incidencia", idIncidencia).maybeSingle();
+    if (!inc) return jsonError("No se encontró el aviso", 404);
+    if (inc.estado !== "Abierta" && inc.estado !== "En gestión") {
+      return jsonError("Ese aviso ya está cerrado: abre uno nuevo", 400);
+    }
+    const { autor } = await autorRegistro(supabaseAdmin, email, body.reportado_por);
+    const fecha = new Date().toLocaleDateString("es-ES", { timeZone: "Europe/Madrid" });
+    const upd: Record<string, unknown> = {
+      descripcion_problema: `${inc.descripcion_problema || ""}\n\n[${fecha} · ${autor}] ${texto}`,
+    };
+    const GRAVEDAD: Record<string, number> = { "No bloquea": 1, "Uso limitado": 2, "Equipo fuera de servicio": 3 };
+    const nuevo = String(body.impacto || "");
+    if (GRAVEDAD[nuevo] && GRAVEDAD[nuevo] > (GRAVEDAD[inc.impacto] || 0)) upd.impacto = nuevo;
+    const { data, error } = await supabaseAdmin.from("incidencias").update(upd).eq("id_incidencia", idIncidencia).select().single();
+    if (error) return jsonError(`No se pudo añadir al aviso: ${error.message}`, 400);
+    return jsonOk({ incidencia: data });
+  }
+
   if (accion === "cerrar") {
     const { error: authError, user, supabaseAdmin } = await requireStaff(req);
     if (authError) return authError;

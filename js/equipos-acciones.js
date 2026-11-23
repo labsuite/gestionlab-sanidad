@@ -1841,7 +1841,15 @@ function limpiarEquipoIncidencia() {
 // ============================================================
 // AVISO DE ALUMNO — notificación de problema con equipo
 // ============================================================
+let _avisoExistente = null;   // incidencia abierta a la que se añade (modo «Añadir al aviso abierto»)
+
 function openModalAvisoAlumno(equipoId) {
+  _avisoExistente = null;
+  document.getElementById('aviso-titulo').textContent = 'Notificar aviso';
+  document.getElementById('aviso-existente-grupo').style.display = 'none';
+  document.getElementById('aviso-descripcion-label').textContent = 'Descripción del problema *';
+  document.getElementById('aviso-btn-enviar').textContent = 'Enviar aviso';
+  document.querySelectorAll('input[name="aviso-uso"]').forEach(r => { r.disabled = false; });
   const e = DATA.equipos.find(eq => eq.ID_Activo === equipoId);
   document.getElementById('aviso-equipo-id').value = equipoId;
   const label = e ? [e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' · ') : equipoId;
@@ -1852,7 +1860,29 @@ function openModalAvisoAlumno(equipoId) {
   openModal('modal-aviso-alumno');
 }
 
+/** Lo visto en un mantenimiento, a un aviso que ya está abierto en el equipo (no se abre otro).
+ *  Se puede subir la gravedad del aviso, nunca bajarla: decir que ya está bien es del profesorado. */
+function openModalAnadirAviso(equipoId, incidencia, texto) {
+  openModalAvisoAlumno(equipoId);
+  _avisoExistente = incidencia;
+  document.getElementById('aviso-titulo').textContent = 'Añadir al aviso abierto';
+  const grupo = document.getElementById('aviso-existente-grupo');
+  grupo.style.display = '';
+  document.getElementById('aviso-existente').innerHTML = htmlAvisoEquipo(equipoId);
+  document.getElementById('aviso-descripcion-label').textContent = 'Qué añades al aviso *';
+  document.getElementById('aviso-btn-enviar').textContent = 'Añadir al aviso';
+  const orden = ['No bloquea', 'Uso limitado', 'Equipo fuera de servicio'];
+  const actual = orden.indexOf(incidencia.Impacto);
+  document.querySelectorAll('input[name="aviso-uso"]').forEach(r => {
+    const i = orden.indexOf(r.value);
+    r.disabled = actual >= 0 && i < actual;
+    r.checked = r.value === incidencia.Impacto;
+  });
+  sv('aviso-descripcion', texto || '');
+}
+
 async function guardarAvisoAlumno() {
+  if (_avisoExistente) return _guardarAnadirAviso();
   const equipoId  = document.getElementById('aviso-equipo-id').value;
   const impacto   = document.querySelector('input[name="aviso-uso"]:checked')?.value;
   const desc      = v('aviso-descripcion');
@@ -1880,6 +1910,26 @@ async function guardarAvisoAlumno() {
     renderDashboard();
     updateBadges();
   } catch(e) { showToast(e.message || 'Error enviando el aviso', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function _guardarAnadirAviso() {
+  const inc = _avisoExistente;
+  const impacto = document.querySelector('input[name="aviso-uso"]:checked')?.value;
+  const texto = v('aviso-descripcion');
+  if (!texto) { showToast('Escribe qué añades al aviso', 'error'); return; }
+  showLoading('Añadiendo al aviso...');
+  try {
+    const { incidencia } = await callEdgeFunction('gestionar-incidencia', {
+      accion: 'anadir_a_aviso', id_incidencia: inc.ID_Incidencia, texto, impacto,
+    });
+    const i = DATA.incidencias.findIndex(x => x.ID_Incidencia === inc.ID_Incidencia);
+    if (i >= 0) DATA.incidencias[i] = _incidenciaSbToObj(incidencia);
+    _avisoExistente = null;
+    closeModal('modal-aviso-alumno');
+    showToast('Añadido al aviso abierto del equipo. No se manda ningún correo: díselo también en persona.', 'success');
+    renderIncidencias(); renderEquipos(); renderDashboard(); updateBadges();
+  } catch (e) { showToast(e.message || 'No se pudo añadir al aviso', 'error'); console.error(e); }
   hideLoading();
 }
 

@@ -91,6 +91,32 @@ async (page, { app: APP, salida: SALIDA }) => {
   await senal('#mant-info-plan > div');
   await foto('03-comprobar-equipo.png');
 
+  // 3b · Si el equipo tiene un aviso abierto, sale arriba de la ventana con su consejo.
+  //      Se monta un aviso de ejemplo solo para esta captura y luego se quita.
+  await page.evaluate(() => {
+    document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
+    DATA.incidencias = [_incidenciaSbToObj({ id_incidencia: 'INC-EJ2', id_equipo: 'BAT-06', reportado_por: '1º CS EJEMPLO',
+      descripcion_problema: 'No calienta: tras una hora sigue a temperatura ambiente.', impacto: 'Equipo fuera de servicio',
+      urgencia: 'Alta', estado: 'Abierta', fecha_hora: new Date().toISOString() })];
+    window._demo.periodo = getPeriodosEsperados(DATA.planesMantenimiento[0], DATA.equipos[0], window._demo.curso)[0];
+    closeModal('modal-registrar-mant');
+    openModalRegistrarMant(window._demo.PLAN, 'BAT-06', window._demo.periodo, window._demo.curso);
+  });
+  await pausa(500);
+  await page.evaluate(() => {
+    const a = document.querySelector('#mant-info-plan .aviso-equipo');
+    a.classList.add('ayuda-senal'); a.scrollIntoView({ block: 'center' });
+  });
+  await pausa(300);
+  await foto('03b-aviso-abierto.png');
+  await page.evaluate(() => {
+    document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
+    DATA.incidencias = [];
+    closeModal('modal-registrar-mant');
+    openModalRegistrarMant(window._demo.PLAN, 'BAT-06', window._demo.periodo, window._demo.curso);
+  });
+  await pausa(500);
+
   // 4 · Comprobación con calculadora: se teclean equipo y referencia, la app dice si cumple;
   //     lo que el criterio tiene de visual («cubeta sin cal») lo marca la persona.
   await page.evaluate(() => {

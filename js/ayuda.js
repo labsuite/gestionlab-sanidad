@@ -77,6 +77,15 @@ const AYUDA_TAREAS = {
             alt: 'Ventana Ejecutar mantenimiento con los datos del equipo, la operación y el periodo señalados',
           },
           {
+            texto: '**Si arriba sale un aviso de avería abierto, leerlo antes de seguir**:',
+            lista: [
+              '«No funciona / No se puede usar»: «Cancelar» y avisar al profesorado. El mantenimiento no se hace hasta que lo revise, aunque parezca que es justo lo que arreglaría el fallo: eso lo decide el profesorado.',
+              '«Funciona, pero con limitaciones» o «Sí, funciona (pero hay algo que revisar)»: seguir con el mantenimiento. Si algo no cumple por lo mismo que dice el aviso, el mantenimiento sirve para confirmarlo.',
+            ],
+            img: 'MAN-2/03b-aviso-abierto.png',
+            alt: 'Ventana Ejecutar mantenimiento con el recuadro rojo de un aviso abierto No funciona señalado',
+          },
+          {
             texto: '**Hacer cada paso en el equipo y marcar su casilla al terminarlo**, no antes ni todos al final: el registro tiene que decir lo que se hizo, y marcar de memoria al final acaba marcando pasos que no se hicieron. Arriba a la derecha, el contador dice cuántos pasos van.',
           },
           {
@@ -102,6 +111,7 @@ const AYUDA_TAREAS = {
           },
           {
             texto: '**Si alguna comprobación no cumplía, se abre «Notificar aviso»** con la descripción ya rellenada. Elegir en «¿Se puede seguir usando el equipo?» si se puede seguir usando y pulsar «Enviar aviso». El aviso aparece en GestionLab al profesorado responsable del equipo y a quien abra el equipo; no se manda ningún correo.',
+            nota: 'Si el equipo ya tenía un aviso abierto, se abre en cambio «Añadir al aviso abierto»: lo visto se añade a ese aviso («Añadir al aviso») y no se abre otro. Ahí se puede marcar que el equipo está peor que lo que decía el aviso, pero no mejor.',
             img: 'MAN-2/07-aviso-de-averia.png',
             alt: 'Ventana Notificar aviso con la descripción ya escrita y las opciones de si se puede seguir usando el equipo',
           },
@@ -115,7 +125,7 @@ const AYUDA_TAREAS = {
               '**Completar «¿Qué has visto?»**. Si la app ha decidido con las cifras, ya las ha escrito ahí: añadir las condiciones (dónde estaba la sonda o la pesa, cuánto tiempo se dejó estabilizar, qué instrumento de referencia se usó). Si no, marcar «✗ No cumple» y escribir el valor medido, el criterio y las condiciones, con números, no «no va bien». Quien firma y quien repare el equipo trabajan con esos datos.',
               '**Seguir con los demás pasos, salvo que el fallo sea peligroso** (calor, presión, electricidad, piezas que giran) **o el protocolo diga parar**. En ese caso, dejar el equipo como indique el apartado 10 de su protocolo y llamar al profesorado antes de seguir.',
               '**Hacer lo que diga el apartado 10, «Resolución de problemas», del protocolo para ese fallo.** En muchos equipos incluye poner la etiqueta «NO USAR».',
-              '**En el aviso de avería, elegir con criterio si se puede seguir usando**: si los resultados del equipo dejan de ser fiables (una balanza que pesa mal, una estufa fuera de temperatura), elegir «No funciona». Un equipo que mide mal no sirve aunque encienda.',
+              '**En el aviso de avería, elegir con criterio si se puede seguir usando**: si los resultados del equipo dejan de ser fiables (una balanza que pesa mal, una estufa fuera de temperatura), elegir «No funciona». Un equipo que mide mal no sirve aunque encienda. Si el equipo ya tenía un aviso abierto, lo visto se añade a ese aviso: no se abre otro por lo mismo.',
               '**Decírselo además en persona al profesorado.**',
             ],
           },
@@ -128,9 +138,7 @@ const AYUDA_TAREAS = {
         comprobacionImg: { img: 'MAN-2/08-espera-visto-bueno.png', alt: 'Tarjeta del equipo con el mantenimiento en «Espera visto bueno»' },
         problemas: [
           ['No sale «Registrar», solo «Pendiente»', 'ese mantenimiento lo hace el profesorado (🔒 solo profesorado) o una empresa.'],
-          ['El mantenimiento no está en la lista', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno) o que el profesorado lo haya marcado como «no aplica» o lo haya aplazado.'],
-          ['La tarjeta del equipo no enseña su plan de mantenimiento', 'el equipo no está en un laboratorio de tu grupo: cada grupo ve y registra los mantenimientos de los equipos de sus laboratorios y de la zona común. Los de los demás los hace otro grupo o el profesorado.'],
-          ['La tarjeta del equipo enseña un aviso abierto («🚫 No funciona», por ejemplo)', 'léelo y pregunta al profesorado antes de empezar.'],
+          ['El mantenimiento no está en la lista, o la tarjeta del equipo no enseña su plan de mantenimiento', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno), que el profesorado lo haya marcado como «no aplica» o lo haya aplazado, o que el equipo no esté en uno de vuestros laboratorios ni en la zona común (sus mantenimientos los hace otro grupo o el profesorado).'],
           ['Estaba empezado', '«Continuar n/m» y seguir desde donde se dejó.'],
           ['Se ha marcado un paso por error', 'desmarcarlo antes de finalizar. Si ya está finalizado, decírselo al profesorado, que puede devolverlo para corregirlo.'],
           ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'no marcarlo, explicarlo en Observaciones y avisar al profesorado. Si falta material, guardar el progreso y terminar otro día.'],
@@ -495,6 +503,7 @@ function _ayudaHtmlTarea(cod) {
   const bloque = (titulo, html) => html ? `<section class="ayuda-bloque"><h3>${titulo}</h3>${html}</section>` : '';
   const pasos = `<ol class="ayuda-pasos">${v.pasos.map(p => `<li>
       <div>${_ayudaTxt(p.texto)}</div>
+      ${(p.lista || []).length ? _ayudaLista(p.lista) : ''}
       ${p.nota ? `<div class="ayuda-nota">${_ayudaTxt(p.nota)}</div>` : ''}
       ${p.img ? _ayudaImg(p.img, p.alt) : ''}
       ${(p.imgs || []).length ? `<div class="ayuda-galeria">${p.imgs.map(i => `<figure>${_ayudaImg(i.img, i.alt)}<figcaption>${_ayudaTxt(i.pie)}</figcaption></figure>`).join('')}</div>` : ''}
