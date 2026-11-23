@@ -590,7 +590,21 @@ function openModalConceptoFactura(lineaId, pedidoId) {
     'Solo cambia cómo sale ESTA línea en la hoja de pedido (otra forma de expresarlo, la referencia…). En el inventario, las solicitudes y el resto de la app la línea sigue igual. Para cambiar solo el nombre basta una fila sin cantidad ni precio (usa los de la línea). Sin filas = la hoja usa la línea.');
 }
 
-function openModalHojaFactura(pedidoId) {
+// Artículos leídos de la factura → filas del editor. Se preselecciona el
+// material solo si el nombre coincide exacto con uno del catálogo, o si ya
+// estaba enlazado en la hoja guardada con el mismo texto; el resto lo enlaza
+// a mano quien revisa.
+function _conceptosDesdeItemsFactura(items, hojaPrevia) {
+  const norm = s => String(s || '').normalize('NFC').trim().toLowerCase();
+  return items.map(i => {
+    const previo = (hojaPrevia || []).find(c => c.id_material && norm(c.concepto) === norm(i.material));
+    const exacto = DATA.material.find(m => norm(m.Nombre) === norm(i.material));
+    return { concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null,
+             id_material: previo?.id_material || exacto?.ID_Material || null };
+  });
+}
+
+function openModalHojaFactura(pedidoId, conceptosIniciales, notaInicial) {
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   if (!p) return;
   const imp = _importeLineas(DATA.lineasPedido.filter(l => l.Pedido === pedidoId));
@@ -598,12 +612,12 @@ function openModalHojaFactura(pedidoId) {
   // los artículos que leyó (no solo los sin línea: la hoja tiene que salir
   // como la factura entera). El cargo extra (portes…) no: la hoja ya lo añade
   // aparte desde Gasto extra.
-  let conceptos = p.Hoja_Factura || [];
-  let precargado = '';
+  let conceptos = conceptosIniciales || p.Hoja_Factura || [];
+  let precargado = notaInicial || '';
   if (!conceptos.length) {
     const doc = DATA.documentosProveedor.filter(d => d.Pedido === pedidoId && (d.Datos_Extraidos?.items || []).length).pop();
     if (doc) {
-      conceptos = doc.Datos_Extraidos.items.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
+      conceptos = _conceptosDesdeItemsFactura(doc.Datos_Extraidos.items, p.Hoja_Factura);
       precargado = `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Precargado con los ${conceptos.length} artículos leídos en ${_escAttr(doc.Nombre_Archivo || 'la factura')} — revísalo y pulsa Guardar.</div>`;
     } else if (DATA.documentosProveedor.some(d => d.Pedido === pedidoId)) {
       precargado = `<div style="margin-top:6px;font-size:12px;color:var(--warning,#b45309)">La factura subida aún no se ha leído con IA. Cancela, pulsa 🤖 en la factura (Documentación del proveedor) y vuelve aquí: los artículos saldrán ya rellenos.</div>`;
@@ -612,7 +626,7 @@ function openModalHojaFactura(pedidoId) {
   _abrirEditorConceptos('pedido', pedidoId, '', '🧾 Hoja como la factura',
     `Pedido: <strong>${_escAttr(p.Nombre_Lista)}</strong>${imp ? ` · las líneas suman ${imp.toFixed(2)} € sin IVA` : ''}${precargado}`,
     conceptos,
-    'Para cuando la casa comercial factura el pedido con otros artículos: en la hoja de pedido (Word y Trebello) salen estos en lugar de todas las líneas. Las líneas, el inventario y la contabilidad no cambian. Sin filas = la hoja vuelve a usar las líneas.');
+    'Para cuando la casa comercial factura el pedido con otros artículos: en la hoja de pedido (Word y Trebello) salen estos en lugar de todas las líneas. Las líneas y el inventario no cambian. Si enlazas un artículo a su material del catálogo, su precio pasa al histórico de precios (precio medio del material y proveedor más barato). Sin filas = la hoja vuelve a usar las líneas.');
 }
 
 // El selector "¿Qué artículos salen en la hoja?" de la ficha del pedido. Es
@@ -624,7 +638,9 @@ async function elegirArticulosHoja(pedidoId, opcion) {
   const conHojaFactura = (p.Hoja_Factura || []).length > 0;
   if (opcion === 'factura') { openModalHojaFactura(pedidoId); return; }
   if (!conHojaFactura) return;
-  if (!confirm(`La hoja dejará de llevar los ${p.Hoja_Factura.length} artículos de la factura y volverá a usar las líneas del pedido. Se pierden los artículos tecleados.\n\n¿Seguir?`)) return;
+  const nPrecios = p.Hoja_Factura.filter(c => c.id_historico).length;
+  const avisoPrecios = nPrecios ? `\n\nTambién se quitan del histórico de precios los ${nPrecios} precio(s) que venían de estos artículos.` : '';
+  if (!confirm(`La hoja dejará de llevar los ${p.Hoja_Factura.length} artículos de la factura y volverá a usar las líneas del pedido. Se pierden los artículos tecleados.${avisoPrecios}\n\n¿Seguir?`)) return;
   showLoading('Guardando...');
   try {
     await _guardarHojaFactura(pedidoId, []);
@@ -635,13 +651,55 @@ async function elegirArticulosHoja(pedidoId, opcion) {
 
 function _pintarConceptosFactura() {
   const cont = document.getElementById('concfac-filas');
-  cont.innerHTML = _concFacTemp.map((c, i) => `<div style="display:grid;grid-template-columns:1fr 64px 84px 28px;gap:6px;align-items:center">
-      <input type="text" placeholder="Texto de la factura" value="${_escAttr(c.concepto || '')}" oninput="_concFacTemp[${i}].concepto=this.value">
-      <input type="number" min="0" step="any" placeholder="Cant." value="${c.cantidad ?? ''}" oninput="_concFacTemp[${i}].cantidad=this.value===''?null:Number(this.value);_sumaConceptosFactura()">
-      <input type="number" min="0" step="0.01" placeholder="€/ud" value="${c.precio_unitario ?? ''}" oninput="_concFacTemp[${i}].precio_unitario=this.value===''?null:Number(this.value);_sumaConceptosFactura()">
-      <button class="icon-btn danger" title="Quitar" onclick="_concFacTemp.splice(${i},1);_pintarConceptosFactura()">✕</button>
-    </div>`).join('');
+  // Solo en la hoja del pedido entero: los artículos no tienen línea, así que
+  // el material se elige aquí (en modo línea ya es el de la línea).
+  const conMaterial = v('concfac-modo') === 'pedido';
+  const etiqueta = m => `${m.Nombre} · ${m.ID_Material}`;
+  const filas = _concFacTemp.map((c, i) => {
+    const mat = c.id_material && DATA.material.find(m => m.ID_Material === c.id_material);
+    const campoMaterial = conMaterial ? `<div style="display:flex;align-items:center;gap:6px;margin-top:-2px">
+        <input type="text" list="concfac-materiales" style="flex:1;font-size:12px;padding:4px 8px" placeholder="📦 Material del catálogo (opcional, para el precio medio)"
+               value="${_escAttr(mat ? etiqueta(mat) : '')}" oninput="_concFacMaterial(${i}, this.value)">
+        <span id="concfac-mat-estado-${i}" style="font-size:11px;white-space:nowrap">${_concFacEstadoMaterial(c)}</span>
+      </div>` : '';
+    return `<div style="display:flex;flex-direction:column;gap:4px${conMaterial ? ';padding-bottom:6px;border-bottom:1px solid var(--border)' : ''}">
+      <div style="display:grid;grid-template-columns:1fr 64px 84px 28px;gap:6px;align-items:center">
+        <input type="text" placeholder="Texto de la factura" value="${_escAttr(c.concepto || '')}" oninput="_concFacTemp[${i}].concepto=this.value">
+        <input type="number" min="0" step="any" placeholder="Cant." value="${c.cantidad ?? ''}" oninput="_concFacTemp[${i}].cantidad=this.value===''?null:Number(this.value);_sumaConceptosFactura()">
+        <input type="number" min="0" step="0.01" placeholder="€/ud" value="${c.precio_unitario ?? ''}" oninput="_concFacTemp[${i}].precio_unitario=this.value===''?null:Number(this.value);_sumaConceptosFactura();_concFacPintarEstado(${i})">
+        <button class="icon-btn danger" title="Quitar" onclick="_concFacTemp.splice(${i},1);_pintarConceptosFactura()">✕</button>
+      </div>${campoMaterial}
+    </div>`;
+  }).join('');
+  const datalist = conMaterial ? `<datalist id="concfac-materiales">${DATA.material.map(m => `<option value="${_escAttr(etiqueta(m))}"></option>`).join('')}</datalist>` : '';
+  cont.innerHTML = datalist + filas;
   _sumaConceptosFactura();
+}
+
+// Texto del datalist ("Nombre · ID") o nombre exacto → material del catálogo.
+function _concFacMaterial(i, val) {
+  const c = _concFacTemp[i]; if (!c) return;
+  const txt = String(val || '').trim();
+  const id = txt.includes('·') ? txt.split('·').pop().trim() : '';
+  const m = (id && DATA.material.find(x => x.ID_Material === id))
+    || DATA.material.find(x => String(x.Nombre).trim().toLowerCase() === txt.toLowerCase());
+  c.id_material = m ? m.ID_Material : null;
+  c._materialTecleado = txt && !m;
+  _concFacPintarEstado(i);
+}
+
+function _concFacEstadoMaterial(c) {
+  if (c.id_material) {
+    return c.precio_unitario != null && c.precio_unitario > 0
+      ? '<span style="color:var(--success,#15803d)" title="Su precio pasará al histórico">✓ cuenta en el precio medio</span>'
+      : '<span style="color:var(--text-muted)" title="Sin precio no hay nada que guardar en el histórico">✓ enlazado · sin precio</span>';
+  }
+  return c._materialTecleado ? '<span style="color:var(--warning,#b45309)">elige uno de la lista</span>' : '';
+}
+
+function _concFacPintarEstado(i) {
+  const el = document.getElementById(`concfac-mat-estado-${i}`);
+  if (el && _concFacTemp[i]) el.innerHTML = _concFacEstadoMaterial(_concFacTemp[i]);
 }
 
 function _sumaConceptosFactura() {
@@ -676,10 +734,24 @@ async function _guardarConceptosLinea(lineaId, pedidoId, conceptos) {
 }
 
 async function _guardarHojaFactura(pedidoId, conceptos) {
-  const { pedido } = await callEdgeFunction('gestionar-pedido', { accion: 'hoja_factura', id_pedido: pedidoId, conceptos });
+  const res = await callEdgeFunction('gestionar-pedido', { accion: 'hoja_factura', id_pedido: pedidoId, conceptos });
+  const { pedido } = res;
   const idx = DATA.pedidos.findIndex(x => x.ID_Pedido === pedidoId);
   if (idx !== -1) Object.assign(DATA.pedidos[idx], _pedidoSbToObj(pedido));
-  showToast(((pedido.hoja_factura || []).length ? `La hoja llevará los ${pedido.hoja_factura.length} artículos de la factura en lugar de las líneas.` : 'La hoja vuelve a usar las líneas del pedido.') + _avisoTrebello(pedidoId), 'success');
+  // El servidor rehace las filas del histórico que salen de esta hoja.
+  const quitados = new Set(res.historico_quitado || []);
+  DATA.historicoPrecio = (DATA.historicoPrecio || []).filter(h => !quitados.has(h.ID_Historico))
+    .concat((res.historico_nuevo || []).map(_historicoPrecioSbToObj));
+  const nuevos = (res.historico_nuevo || []).length;
+  let precios = '';
+  if (nuevos) precios = ` ${nuevos} precio(s) guardados en el histórico.`;
+  else if (quitados.size) precios = ' Sus precios ya no constan en el histórico.';
+  if (res.omitidos_por_linea) precios += ` ${res.omitidos_por_linea} ya constaba(n) por una línea del pedido y no se repite(n).`;
+  showToast(((pedido.hoja_factura || []).length ? `La hoja llevará los ${pedido.hoja_factura.length} artículos de la factura en lugar de las líneas.` : 'La hoja vuelve a usar las líneas del pedido.') + precios + _avisoTrebello(pedidoId), 'success');
+  if (nuevos || quitados.size) {
+    if (typeof renderMaterial === 'function') renderMaterial();
+    if (typeof renderContabilidad === 'function') renderContabilidad();
+  }
 }
 
 async function guardarConceptoFactura() {
@@ -698,20 +770,20 @@ async function guardarConceptoFactura() {
 
 // Desde la revisión de la factura: los artículos sin línea coincidente que
 // en realidad sustituyen a todo el pedido en la hoja (pedidos.hoja_factura).
-async function asignarSinMatchAHoja() {
+// No guarda directamente: abre el editor con ellos ya puestos, para enlazar
+// cada uno a su material del catálogo (su precio va al histórico) antes de Guardar.
+function asignarSinMatchAHoja() {
   if (!_revExtraccionActual) return;
   const { pedidoId, r } = _revExtraccionActual;
   const items = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-sm-check'))
     .filter(chk => chk.checked).map(chk => r.sin_match[Number(chk.dataset.idx)]).filter(Boolean);
   if (!items.length) { showToast('Marca los artículos de la factura que deben salir en la hoja', 'info'); return; }
-  const conceptos = items.map(i => ({ concepto: i.material, cantidad: i.cantidad ?? null, unidad: i.unidad || null, precio_unitario: i.precio_unitario ?? null }));
-  showLoading('Guardando...');
-  try {
-    await _guardarHojaFactura(pedidoId, conceptos);
-    closeModal('modal-revision-extraccion');
-    verDetallePedido(pedidoId);
-  } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
-  hideLoading();
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  const conceptos = _conceptosDesdeItemsFactura(items, p?.Hoja_Factura);
+  closeModal('modal-revision-extraccion');
+  verDetallePedido(pedidoId);
+  openModalHojaFactura(pedidoId, conceptos,
+    `<div style="margin-top:6px;font-size:12px;color:var(--text-muted)">Los ${conceptos.length} artículos que marcaste en la factura. Enlaza cada uno a su material del catálogo para que su precio cuente, y pulsa Guardar.</div>`);
 }
 
 // ============================================================

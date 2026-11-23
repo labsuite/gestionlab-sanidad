@@ -154,24 +154,83 @@ Deno.serve(async (req) => {
     // líneas (caso real: una "Reparación" facturada como cámaras Neubauer,
     // guantes y disolventes). Solo la hoja (.docx y enviar-a-trebello): las
     // líneas, el inventario y la contabilidad no cambian. [] / null = la hoja usa las líneas.
+    //
+    // Precios (2026-11-23): cada artículo puede enlazarse a un material del
+    // catálogo (`id_material`). Los enlazados con precio pasan a
+    // historico_precio — el precio medio del material y el proveedor más
+    // barato los cuentan como cualquier precio de línea. La hoja es la fuente:
+    // cada artículo guarda el `id_historico` de su fila, y al volver a guardar
+    // se borran las filas de antes (leídas de la BD, no del navegador) y se
+    // crean las de ahora. Guardar la lista vacía las quita todas.
     const num = (v: unknown) => {
       if (v === "" || v === null || v === undefined) return null;
       const n = Number(String(v).replace(",", "."));
       return Number.isFinite(n) ? n : null;
     };
-    const conceptos = (Array.isArray(body.conceptos) ? body.conceptos as Record<string, unknown>[] : [])
+    const { data: previo } = await supabaseAdmin.from("pedidos")
+      .select("hoja_factura, proveedor, fecha_factura").eq("id_pedido", idPedido).maybeSingle();
+    if (!previo) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
+
+    const conceptos: Record<string, unknown>[] = (Array.isArray(body.conceptos) ? body.conceptos as Record<string, unknown>[] : [])
       .map((c) => ({
         concepto: String(c?.concepto ?? "").trim(),
         cantidad: num(c?.cantidad),
         unidad: strField(String(c?.unidad ?? "").trim()),
         precio_unitario: num(c?.precio_unitario),
+        id_material: strField(String(c?.id_material ?? "").trim()),
       }))
       .filter((c) => c.concepto);
+
+    // Solo vale un material que exista de verdad.
+    const idsMat = [...new Set(conceptos.map((c) => c.id_material).filter(Boolean))] as string[];
+    const materiales = new Map<string, string>();
+    if (idsMat.length) {
+      const { data: mats } = await supabaseAdmin.from("material").select("id_material, nombre").in("id_material", idsMat);
+      for (const m of mats || []) materiales.set(m.id_material, m.nombre);
+    }
+
+    const idsPrevios = (Array.isArray(previo.hoja_factura) ? previo.hoja_factura : [])
+      .map((c: any) => c?.id_historico).filter(Boolean) as string[];
+    // Materiales cuyo precio ya consta en este pedido por una LÍNEA (💶 o
+    // «Aplicar lo seleccionado» de la factura): es la misma factura, así que
+    // no se registra dos veces.
+    const { data: delPedido } = await supabaseAdmin.from("historico_precio")
+      .select("id_historico, id_material, fecha").eq("id_pedido", idPedido);
+    const yaPorLineas = new Set((delPedido || [])
+      .filter((h: any) => !idsPrevios.includes(h.id_historico) && h.id_material).map((h: any) => h.id_material));
+    // Al volver a guardar se conserva la fecha con que se registró.
+    const fechaPrevia = (delPedido || []).find((h: any) => idsPrevios.includes(h.id_historico))?.fecha || null;
+    const fecha = previo.fecha_factura || fechaPrevia || hoy();
+
+    const filas: Record<string, unknown>[] = [];
+    let omitidosPorLinea = 0;
+    for (const c of conceptos) {
+      if (c.id_material && !materiales.has(c.id_material as string)) c.id_material = null;
+      const precio = c.precio_unitario as number | null;
+      if (!c.id_material || precio == null || !(precio > 0)) continue;
+      if (yaPorLineas.has(c.id_material)) { omitidosPorLinea++; continue; }
+      const fila = {
+        id_historico: genId("HP"), nombre_material: materiales.get(c.id_material as string),
+        id_material: c.id_material, id_pedido: idPedido,
+        proveedor: previo.proveedor || null, fecha, precio_unitario: precio,
+      };
+      c.id_historico = fila.id_historico;
+      filas.push(fila);
+    }
+
+    if (idsPrevios.length) {
+      const { error: errBorrar } = await supabaseAdmin.from("historico_precio").delete()
+        .in("id_historico", idsPrevios).eq("id_pedido", idPedido);
+      if (errBorrar) return jsonError(`No se pudieron quitar los precios anteriores: ${errBorrar.message}`, 400);
+    }
+    if (filas.length) {
+      const { error: errHist } = await supabaseAdmin.from("historico_precio").insert(filas);
+      if (errHist) return jsonError(`No se pudieron guardar los precios en el histórico: ${errHist.message}`, 400);
+    }
     const { data, error } = await supabaseAdmin.from("pedidos")
       .update({ hoja_factura: conceptos.length ? conceptos : null }).eq("id_pedido", idPedido).select().single();
     if (error) return jsonError(`No se pudo guardar: ${error.message}`, 400);
-    if (!data) return jsonError(`No se encontró el pedido "${idPedido}"`, 404);
-    return jsonOk({ pedido: data });
+    return jsonOk({ pedido: data, historico_nuevo: filas, historico_quitado: idsPrevios, omitidos_por_linea: omitidosPorLinea });
   }
 
   if (accion === "generar_link_publico") {

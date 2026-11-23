@@ -593,9 +593,9 @@ function _bloqueSinMatchEnHoja(sinMatch, pedidoId) {
     </div>
     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
       <span id="revext-sm-suma" data-lineas="${importeLineas}" style="font-size:12px"></span>
-      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Usar en la hoja en lugar de las líneas</button>
+      <button class="btn btn-secondary" style="font-size:12px;padding:4px 12px" onclick="asignarSinMatchAHoja()">Usar en la hoja en lugar de las líneas →</button>
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Solo cambia la hoja de pedido. Las líneas siguen igual en la app y nada entra en el inventario. Se puede revisar o quitar después en la ficha del pedido → Hoja de pedido → «Los de la factura».</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px">Solo cambia la hoja de pedido. Las líneas siguen igual en la app y nada entra en el inventario. En el paso siguiente puedes enlazar cada artículo a su material del catálogo para que su precio cuente en el precio medio. Se puede revisar o quitar después en la ficha del pedido → Hoja de pedido → «Los de la factura».</div>
   </div>`;
 }
 
@@ -813,7 +813,9 @@ function _resumenHojaFactura(p) {
   const suma = (p.Hoja_Factura || []).reduce((s, c) => s + (Number(c.precio_unitario) || 0) * (c.cantidad != null ? Number(c.cantidad) : 1), 0);
   const imp = DATA.lineasPedido.filter(l => l.Pedido === p.ID_Pedido)
     .reduce((s, l) => s + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
-  return `${suma.toFixed(2)} € sin IVA${imp ? (Math.abs(suma - imp) < 0.01 ? ' · ✓ cuadra con las líneas' : ` · ⚠ las líneas suman ${imp.toFixed(2)} €`) : ''}`;
+  const conPrecio = (p.Hoja_Factura || []).filter(c => c.id_historico).length;
+  const precios = conPrecio ? ` · 📦 ${conPrecio} con precio en el histórico` : '';
+  return `${suma.toFixed(2)} € sin IVA${imp ? (Math.abs(suma - imp) < 0.01 ? ' · ✓ cuadra con las líneas' : ` · ⚠ las líneas suman ${imp.toFixed(2)} €`) : ''}${precios}`;
 }
 
 function verDetallePedido(pedidoId) {
