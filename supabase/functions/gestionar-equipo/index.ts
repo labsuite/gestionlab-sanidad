@@ -119,11 +119,11 @@ Deno.serve(async (req) => {
     return jsonOk({ equipo: data });
   }
 
+  // Los equipos no se borran (2026-11-23): el borrado arrastraba en cascada todo su
+  // historial (incidencias, intervenciones, mantenimientos, reservas, registros de uso).
   if (accion === "eliminar") {
-    const { error } = await supabaseAdmin.from("equipos").delete().eq("id_activo", idActivo);
-    if (error) return jsonError(`No se pudo eliminar: ${error.message}`, 400);
-    return jsonOk({ eliminado: idActivo });
+    return jsonError("Los equipos no se borran: para retirarlo, pon su estado en «Dado de baja».", 403);
   }
 
-  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado', 'cambiar_ubicacion', 'cambiar_id' o 'eliminar'", 400);
+  return jsonError("accion debe ser 'crear', 'actualizar', 'actualizar_estado', 'cambiar_ubicacion' o 'cambiar_id'", 400);
 });

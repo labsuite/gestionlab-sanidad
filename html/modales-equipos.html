@@ -147,6 +147,7 @@
             <option>Fuera de servicio</option>
             <option>Dado de baja</option>
           </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Los equipos no se borran: para retirar uno, ponlo en <strong>Dado de baja</strong> y conserva su historial.</div>
         </div>
         <div class="form-group full">
           <label>Observaciones</label>
@@ -172,7 +173,6 @@
         </div>
       </div>
       <div class="form-footer">
-        <button id="btn-eliminar-equipo" class="btn btn-danger" style="display:none;margin-right:auto" onclick="eliminarEquipo()">Eliminar</button>
         <button class="btn btn-secondary" onclick="closeModal('modal-equipo')">Cancelar</button>
         <button class="btn btn-primary" onclick="guardarEquipo()">Guardar equipo</button>
       </div>

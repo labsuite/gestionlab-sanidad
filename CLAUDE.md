@@ -322,6 +322,11 @@ modulos_responsables, fecha_adquisicion, origen_financiacion, proveedor_compra,
 proveedor_servicio_tecnico, estado_operativo, manual_ficha_tecnica, observaciones, coste,
 protocolo_uso, tipo_mantenimiento, mes_inicio_temporada, mes_fin_temporada, evaluaciones_uso.
 
+⚠ **Los equipos no se borran** (decisión de la usuaria, 2026-11-23): no hay botón «Eliminar» y
+`gestionar-equipo` responde 403 a `eliminar`. Borrar un equipo arrastraba en cascada sus
+incidencias, intervenciones, mantenimientos, reservas y registros de uso (el registro de
+calidad). Para retirarlo, estado «Dado de baja». No reintroducir el borrado.
+
 `evaluaciones_uso` (añadido 2026-10-26): en qué evaluaciones se usa el equipo (`"1,3"`;
 vacío = todo el curso). **Sustituye a los meses de temporada**, que ya no se leen: arranque,
 cierre y trimestrales vencen según estas evaluaciones y las fechas de la tabla
