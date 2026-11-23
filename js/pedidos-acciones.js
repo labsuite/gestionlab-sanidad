@@ -1032,6 +1032,19 @@ function _recogerRevisionExtraccion() {
     if (!precio) continue;
     lineasBody.push({ id_linea: idLinea, precio_unitario: precio });
   }
+  // Artículos sin pareja asignados a mano a una línea (_revextAsignarLinea):
+  // mandan sobre el precio de la fila emparejada de esa misma línea, porque ya
+  // llevan la suma si la había.
+  document.querySelectorAll('#revision-extraccion-contenido .revext-asig-check').forEach(chk => {
+    if (!chk.checked) return;
+    const n = chk.dataset.n;
+    const idLinea = document.querySelector(`#revision-extraccion-contenido .revext-asig-linea[data-n="${n}"]`)?.value;
+    const precio = (document.querySelector(`#revision-extraccion-contenido .revext-asig-precio[data-n="${n}"]`)?.value || '').trim();
+    if (!idLinea || !precio) return;
+    const i = lineasBody.findIndex(l => l.id_linea === idLinea);
+    if (i !== -1) lineasBody.splice(i, 1);
+    lineasBody.push({ id_linea: idLinea, precio_unitario: precio });
+  });
   // Texto de la factura para la hoja de pedido (solo las casillas marcadas).
   const conceptos = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-concepto-check'))
     .filter(chk => chk.checked)

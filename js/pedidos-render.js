@@ -652,10 +652,29 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
     const factura = `<div style="font-weight:500">${_escAttr(itemFactura.material || '')}</div>
       <div class="revext-fila-factura">${itemFactura.cantidad ?? '—'}${unidad} × ${precioFactura != null ? Number(precioFactura).toFixed(2) + ' €' : '—'}</div>`;
     if (!m) {
+      // La IA suma en UNA línea los renglones repetidos de la factura (p. ej.
+      // bandejas 12 + 3): el segundo no es "sin línea", va en la fila de arriba.
+      if ((r.matches || []).some(mm => mm.item_detectado?.material === itemFactura.material)) {
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:6px 8px;color:var(--text-muted);text-align:center;vertical-align:top;font-size:11px">${n + 1}</td>
+          <td style="padding:6px 8px;vertical-align:top">${factura}</td>
+          <td style="padding:6px 8px;color:var(--text-muted);font-size:12px" colspan="2">↑ La IA lo ha sumado a la misma línea que la fila de arriba con este artículo</td>
+        </tr>`;
+      }
+      // Sin pareja: se puede asignar a mano a una línea para guardar su precio
+      // (la IA falla a veces: la sonda del termómetro, un patrón McFarland…).
+      const lineasPed = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+      const precioItem = itemFactura.precio_unitario;
       return `<tr style="border-bottom:1px solid var(--border);background:var(--danger-light,#fdf0f0)">
-        <td style="padding:6px 8px;color:var(--text-muted)">${n + 1}</td>
-        <td style="padding:6px 8px">${factura}</td>
-        <td style="padding:6px 8px;color:var(--danger,#b91c1c);font-size:12px" colspan="2">Sin línea en el pedido — ver abajo</td>
+        <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-asig-check" data-n="${n}" disabled style="width:16px;height:16px"></td>
+        <td style="padding:6px 8px;vertical-align:top">${factura}</td>
+        <td style="padding:6px 8px;vertical-align:top">
+          <select class="revext-asig-linea" data-n="${n}" onchange="_revextAsignarLinea(${n})" style="width:100%;font-size:12px">
+            <option value="">Sin línea — ¿asignar a una línea?</option>
+            ${lineasPed.map(l => `<option value="${l.ID_Linea}">${_escAttr(String(l.Material || '').slice(0, 60))}${l.Precio_Unitario ? ` · ${Number(l.Precio_Unitario).toFixed(2)} €` : ' · sin precio'}</option>`).join('')}
+          </select>
+          <div class="revext-asig-nota" data-n="${n}" style="font-size:11px;color:var(--text-muted);margin-top:3px"></div></td>
+        <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-asig-precio" data-n="${n}" data-precio-item="${precioItem ?? ''}" min="0" step="0.01" value="${precioItem ?? ''}" style="width:90px;text-align:right"></td>
       </tr>`;
     }
     const tienePrecio = it.precio_unitario != null;
@@ -695,7 +714,7 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
         ${puedeAnadirDesdeFactura ? `<button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;white-space:nowrap" onclick="anadirLineaDesdeSinMatch(${idx})">+ Añadir línea nueva</button>` : ''}
       </div>`).join('')}
     </div>
-    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Por defecto no se toca nada — usa "+ Añadir línea nueva" solo si de verdad llegó algo que no estaba en el pedido (p.ej. un reactivo no contemplado en el presupuesto). Esto funciona aunque el pedido ya no admita añadir líneas a mano.</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Si en realidad es una de tus líneas y la IA no la ha reconocido, asígnala arriba en su fila («¿asignar a una línea?») y su precio se guardará con los demás. Usa "+ Añadir línea nueva" solo si de verdad llegó algo que no estaba en el pedido (p.ej. un reactivo no contemplado en el presupuesto). Esto funciona aunque el pedido ya no admita añadir líneas a mano.</div>
   </div>${_bloqueSinMatchEnHoja(r.sin_match, pedidoId)}` : '';
 
   const cargoExtra = r.cargo_extra ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -720,6 +739,33 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
   _sumaSinMatchHoja();
   openModal('modal-revision-extraccion');
   _cargarVisorFactura(doc);
+}
+
+// Un artículo sin pareja asignado a mano a una línea. Si esa línea ya tiene
+// precio en una fila de arriba (termómetro «sin sonda» + sonda aparte), se
+// propone la suma; si no, el precio del artículo. Se guarda con lo demás.
+function _revextAsignarLinea(n) {
+  const cont = document.getElementById('revision-extraccion-contenido');
+  const sel = cont.querySelector(`.revext-asig-linea[data-n="${n}"]`);
+  const chk = cont.querySelector(`.revext-asig-check[data-n="${n}"]`);
+  const inp = cont.querySelector(`.revext-asig-precio[data-n="${n}"]`);
+  const nota = cont.querySelector(`.revext-asig-nota[data-n="${n}"]`);
+  const idLinea = sel.value;
+  const base = parseFloat(inp.dataset.precioItem);
+  chk.disabled = !idLinea;
+  chk.checked = !!idLinea;
+  nota.textContent = '';
+  if (!idLinea) { inp.value = isNaN(base) ? '' : base; return; }
+  const arriba = cont.querySelector(`.revext-precio[data-id-linea="${idLinea}"]`);
+  const precioArriba = arriba ? parseFloat(arriba.value) : NaN;
+  if (!isNaN(precioArriba) && !isNaN(base)) {
+    inp.value = Math.round((precioArriba + base) * 100) / 100;
+    nota.textContent = `Esa línea ya tiene ${precioArriba.toFixed(2)} € arriba: se guarda la suma (${precioArriba.toFixed(2)} + ${base.toFixed(2)}). Cambia la cifra si no es así.`;
+    return;
+  }
+  inp.value = isNaN(base) ? '' : base;
+  const linea = DATA.lineasPedido.find(l => l.ID_Linea === idLinea);
+  if (linea?.Precio_Unitario) nota.textContent = `La línea tenía ${Number(linea.Precio_Unitario).toFixed(2)} €: se sustituye por este precio.`;
 }
 
 // Lado izquierdo de la revisión: la propia factura. PDF en <iframe> (visor del
