@@ -1208,6 +1208,26 @@
     .mant-check-nota label { font-size: 12px; font-weight: 500; }
     .mant-check-nota textarea { width: 100%; margin-top: 4px; }
     .mant-check-nota-ayuda { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    /* Calculadora de criterios (js/criterios-calc.js) */
+    .mant-calc { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .mant-calc-regla {
+      border: 1px solid var(--border); border-left: 3px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 10px; background: var(--surface);
+    }
+    .mant-calc-regla.ok { border-left-color: var(--success, #1e8e3e); }
+    .mant-calc-regla.ko { border-left-color: var(--danger); }
+    .mant-calc-tit { font-size: 12px; line-height: 1.4; }
+    .mant-calc-desc { color: var(--text-muted); }
+    .mant-calc-campos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .mant-calc-campo { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; min-width: 0; font-size: 11px; color: var(--text-muted); }
+    .mant-calc-campo.ancho { flex-basis: 100%; }
+    .mant-calc-campo input { width: 100%; font-size: 14px; padding: 5px 8px; }
+    .mant-calc-res { font-size: 12px; font-weight: 600; margin-top: 6px; }
+    .mant-calc-res:empty { display: none; }
+    .mant-calc-regla.ok .mant-calc-res { color: var(--success, #1e8e3e); }
+    .mant-calc-regla.ko .mant-calc-res { color: var(--danger); }
+    .mant-calc-resto { font-size: 12px; color: var(--text-muted); }
+    .mant-calc-resto.destacado { color: var(--text); font-weight: 500; }
 
     /* Importar profesorado – paso 2: una tarjeta plegable por profesor */
     .importar-prof-details > summary {

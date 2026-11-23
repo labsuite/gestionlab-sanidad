@@ -267,6 +267,8 @@ function _normPasoMant(p) {
     hecho: criterio ? !!resultado : p?.hecho === true,
     resultado: criterio ? resultado : null,
     nota: criterio && resultado === 'no_cumple' ? String(p?.nota || '') : '',
+    // Datos tecleados en la calculadora de criterios (js/criterios-calc.js), uno por regla.
+    medidas: criterio && Array.isArray(p?.medidas) ? p.medidas : [],
   };
 }
 
@@ -574,6 +576,7 @@ function _renderMantChecklist(pasos) {
       <div class="mant-check-cuerpo">
         <span class="mant-check-texto"></span>
         <div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>
+        ${_mantCalcHtml(p, i)}
         <div class="mant-check-botones">
           <button type="button" class="mant-btn-cumple" onclick="_mantMarcarCriterio(${i}, 'cumple')">✓ Cumple</button>
           <button type="button" class="mant-btn-nocumple" onclick="_mantMarcarCriterio(${i}, 'no_cumple')">✗ No cumple</button>
@@ -596,8 +599,120 @@ function _renderMantChecklist(pasos) {
     if (crit) crit.textContent = p.criterio;
     const ta = el.querySelector('textarea');
     if (ta) ta.value = p.nota || '';
+    // Calculadora: rellena lo ya guardado y pinta el resultado de cada regla.
+    if (p._calc) p._calc.reglas.forEach((r, j) => {
+      el.querySelectorAll(`.mant-calc-regla[data-r="${j}"] input`).forEach(inp => {
+        inp.value = p._calc.datos[j][inp.dataset.k] ?? '';
+      });
+      _mantCalcPintarRegla(Number(el.dataset.idx), j);
+    });
+    if (p._calc) _mantCalcPintarResto(Number(el.dataset.idx));
   });
   _mantChecklistChanged();
+}
+
+// ── Calculadora de criterios ────────────────────────────────────────────────
+// Si el criterio lleva tolerancias numéricas (analizarCriterio, js/criterios-calc.js),
+// el paso pide los datos —lo que marca el equipo y lo que mide el instrumento— y
+// decide él «Cumple» / «No cumple». Lo que el criterio tenga de cualitativo («junta
+// estanca») lo sigue juzgando la persona: con eso pendiente, un «todo cumple» de la
+// calculadora no marca el paso; un «no cumple» sí, porque ya basta para suspenderlo.
+function _mantCalcHtml(p, i) {
+  if (typeof analizarCriterio !== 'function') return '';
+  const a = analizarCriterio(p.criterio);
+  if (!a.reglas.length) { p._calc = null; return ''; }
+  // Datos guardados: se casan por el texto de la regla, por si el criterio cambió.
+  const datos = a.reglas.map(r => {
+    const g = (p.medidas || []).find(m => m && m.regla === r.texto);
+    if (g) return { equipo: g.equipo ?? '', referencia: g.referencia ?? '', valor: g.valor ?? '', lecturas: g.lecturas ?? '' };
+    // Nominal: el valor nominal ya escrito en la casilla del equipo (se puede cambiar).
+    return { equipo: r.tipo === 'nominal' ? String(r.nominal).replace('.', ',') : '', referencia: '', valor: '', lecturas: '' };
+  });
+  p._calc = { reglas: a.reglas, resto: a.resto, datos, auto: false, notaAuto: '' };
+  // Al reabrir un registro: si la nota empieza por el texto que escribió la calculadora,
+  // se sigue tratando como suyo (se actualiza al cambiar los datos).
+  const autoGuardado = _mantCalcResultados(p)
+    .map((r, j) => r && !r.cumple ? `${a.reglas[j].magnitud}: ${r.detalle}` : null).filter(Boolean).join(' · ');
+  if (autoGuardado && (p.nota || '').startsWith(autoGuardado)) { p._calc.notaAuto = autoGuardado; p._calc.auto = true; }
+  return `<div class="mant-calc">
+    ${a.reglas.map((r, j) => `
+      <div class="mant-calc-regla" data-r="${j}">
+        <div class="mant-calc-tit">🧮 <strong>${_ccEsc(r.magnitud)}</strong> <span class="mant-calc-desc">${_ccEsc(describirRegla(r))}</span></div>
+        <div class="mant-calc-campos">
+          ${camposRegla(r).map(c => `
+            <label class="mant-calc-campo${c.ancho ? ' ancho' : ''}">
+              <span>${_ccEsc(c.label)}${r.unidad && c.k !== 'lecturas' ? ` (${_ccEsc(r.unidad)})` : ''}</span>
+              <input type="text" inputmode="${c.k === 'lecturas' ? 'text' : 'decimal'}" autocomplete="off" data-k="${c.k}"
+                     oninput="_mantCalcInput(${i}, ${j}, '${c.k}', this.value)">
+            </label>`).join('')}
+        </div>
+        <div class="mant-calc-res"></div>
+      </div>`).join('')}
+    ${a.resto.length ? `<div class="mant-calc-resto"></div>` : ''}
+  </div>`;
+}
+
+function _mantCalcInput(i, j, k, valor) {
+  const p = _mantPasosActual[i];
+  if (!p?._calc) return;
+  p._calc.datos[j][k] = valor;
+  _mantCalcPintarRegla(i, j);
+  _mantCalcVeredicto(i);
+}
+
+function _mantCalcResultados(p) {
+  return p._calc.reglas.map((r, j) => calcularRegla(r, p._calc.datos[j]));
+}
+
+function _mantCalcPintarRegla(i, j) {
+  const p = _mantPasosActual[i];
+  const el = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"] .mant-calc-regla[data-r="${j}"]`);
+  if (!p?._calc || !el) return;
+  const res = calcularRegla(p._calc.reglas[j], p._calc.datos[j]);
+  const div = el.querySelector('.mant-calc-res');
+  el.classList.toggle('ok', !!res && res.cumple);
+  el.classList.toggle('ko', !!res && !res.cumple);
+  div.textContent = res ? `${res.cumple ? '✓ Cumple' : '✗ No cumple'} — ${res.detalle}` : '';
+}
+
+function _mantCalcPintarResto(i) {
+  const p = _mantPasosActual[i];
+  const div = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"] .mant-calc-resto`);
+  if (!p?._calc || !div) return;
+  const res = _mantCalcResultados(p);
+  const todasOk = res.every(r => r && r.cumple);
+  div.textContent = (todasOk ? 'Las medidas cumplen. ' : '') +
+    `Comprueba tú: ${p._calc.resto.join(' · ')} — y marca «Cumple» o «No cumple».`;
+  div.classList.toggle('destacado', todasOk);
+}
+
+/** Decide el resultado del paso a partir de la calculadora (ver comentario de arriba). */
+function _mantCalcVeredicto(i) {
+  const p = _mantPasosActual[i];
+  if (!p?._calc) return;
+  const res = _mantCalcResultados(p);
+  const fallos = res.map((r, j) => r && !r.cumple ? `${p._calc.reglas[j].magnitud}: ${r.detalle}` : null).filter(Boolean);
+  const completo = res.every(Boolean);
+  let nuevo;
+  if (fallos.length) nuevo = 'no_cumple';
+  else if (completo && !p._calc.resto.length) nuevo = 'cumple';
+  else nuevo = p._calc.auto ? null : p.resultado;   // lo que puso la persona, se respeta
+
+  // La nota de un «no cumple» calculado se escribe sola con las medidas; si la persona
+  // ya había escrito algo suyo, se le añade delante en vez de pisarlo.
+  if (nuevo === 'no_cumple') {
+    const auto = fallos.join(' · ');
+    const nota = (p.nota || '').trim();
+    if (!nota || nota === p._calc.notaAuto) p.nota = auto;
+    else if (p._calc.notaAuto && nota.startsWith(p._calc.notaAuto)) p.nota = auto + nota.slice(p._calc.notaAuto.length);
+    else if (!nota.includes(auto)) p.nota = auto + ' · ' + nota;
+    p._calc.notaAuto = auto;
+  } else if (p._calc.notaAuto && (p.nota || '').trim() === p._calc.notaAuto) {
+    p.nota = ''; p._calc.notaAuto = '';
+  }
+  p._calc.auto = nuevo !== p.resultado ? nuevo != null : p._calc.auto;
+  if (nuevo !== p.resultado || nuevo === 'no_cumple') _mantAplicarCriterio(i, nuevo, false);
+  _mantCalcPintarResto(i);
 }
 
 function _mantPasoHecho(i, hecho) {
@@ -608,7 +723,14 @@ function _mantPasoHecho(i, hecho) {
 function _mantMarcarCriterio(i, resultado) {
   const p = _mantPasosActual[i];
   if (!p) return;
-  p.resultado = p.resultado === resultado ? null : resultado;   // pulsar otra vez lo desmarca
+  if (p._calc) p._calc.auto = false;   // lo decide la persona
+  _mantAplicarCriterio(i, p.resultado === resultado ? null : resultado, true);   // pulsar otra vez lo desmarca
+}
+
+function _mantAplicarCriterio(i, resultado, enfocar) {
+  const p = _mantPasosActual[i];
+  if (!p) return;
+  p.resultado = resultado;
   p.hecho = !!p.resultado;
   const el = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"]`);
   if (el) {
@@ -616,7 +738,9 @@ function _mantMarcarCriterio(i, resultado) {
     el.classList.toggle('is-no_cumple', p.resultado === 'no_cumple');
     const nota = el.querySelector('.mant-check-nota');
     if (nota) nota.style.display = p.resultado === 'no_cumple' ? '' : 'none';
-    if (p.resultado === 'no_cumple') el.querySelector('textarea')?.focus();
+    const ta = el.querySelector('textarea');
+    if (ta && ta.value !== (p.nota || '')) ta.value = p.nota || '';
+    if (enfocar && p.resultado === 'no_cumple') ta?.focus();
   }
   _mantChecklistChanged();
 }
@@ -638,8 +762,25 @@ function _mantChecklistChanged() {
 function _leerChecklist() {
   return _mantPasosActual.map(p => p.criterio
     ? { texto: p.texto, criterio: p.criterio, hecho: !!p.resultado, resultado: p.resultado,
-        nota: p.resultado === 'no_cumple' ? (p.nota || '').trim() : null }
+        nota: p.resultado === 'no_cumple' ? (p.nota || '').trim() : null,
+        ...(p._calc ? { medidas: _mantCalcMedidas(p) } : {}) }
     : { texto: p.texto, hecho: p.hecho === true });
+}
+
+/** Lo tecleado en la calculadora, para el registro: una entrada por regla con algún dato. */
+function _mantCalcMedidas(p) {
+  return p._calc.reglas.map((r, j) => {
+    const d = p._calc.datos[j];
+    const res = calcularRegla(r, d);
+    const medida = { regla: r.texto, magnitud: r.magnitud, unidad: r.unidad || '' };
+    camposRegla(r).forEach(c => { medida[c.k] = String(d[c.k] ?? '').trim(); });
+    // El nominal ya viene escrito: si es lo único que hay, no es una medida.
+    const tecleado = camposRegla(r).some(c => medida[c.k] !== '' && !(r.tipo === 'nominal' && c.k === 'equipo'));
+    if (!tecleado) return null;
+    medida.cumple = res ? res.cumple : null;
+    medida.detalle = res ? res.detalle : '';
+    return medida;
+  }).filter(Boolean);
 }
 
 /** Tras finalizar con alguna comprobación que no cumple: abre el aviso de avería del
@@ -1665,6 +1806,11 @@ function _renderFilasVistoBueno(lista) {
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const noCumpleTxt = noCumple.map(p =>
       `<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(p.texto)} — no cumple (${esc(p.criterio)}): ${esc(p.nota || '—')}</div>`).join('');
+    // Medidas de la calculadora que cumplen (las que no, ya salen en la nota de arriba):
+    // quien firma ve los números, no solo el veredicto.
+    const medidasTxt = pasos.flatMap(p => Array.isArray(p.medidas) ? p.medidas : [])
+      .filter(m => m && m.cumple === true && m.detalle)
+      .map(m => `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">🧮 ${esc(m.magnitud)}: ${esc(m.detalle)}</div>`).join('');
     const obs = reg.Observaciones
       ? `<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px;white-space:pre-line">${reg.Observaciones}</div>`
       : '';
@@ -1673,7 +1819,7 @@ function _renderFilasVistoBueno(lista) {
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(plan&&plan.Operacion)||''}">${(plan&&plan.Operacion)||'—'}</td>
       <td>${labelPeriodo(reg.Periodo)}</td>
       <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
-      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${noCumpleTxt}${obs}</td>
+      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${noCumpleTxt}${medidasTxt}${obs}</td>
       <td style="text-align:center">${pasosTxt}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary" style="padding:2px 10px;font-size:11px" onclick="darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>

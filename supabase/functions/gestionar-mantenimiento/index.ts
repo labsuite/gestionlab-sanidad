@@ -13,7 +13,24 @@ import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsu
 // Parsea el checklist recibido en el cuerpo. Un paso normal es {texto, hecho}; un paso de
 // COMPROBACIÓN (el plan trae "(criterio: …)") es {texto, criterio, resultado, nota, hecho}:
 // resultado 'cumple' | 'no_cumple' | null, y la nota (qué se vio) solo si no cumple.
-type Paso = { texto: string; hecho: boolean; criterio?: string; resultado?: string | null; nota?: string | null };
+// Una comprobación puede llevar además `medidas`: lo tecleado en la calculadora de
+// criterios (js/criterios-calc.js) — por cada tolerancia numérica del criterio, los
+// datos del equipo y del instrumento y lo que salió. Se guardan como constancia; el
+// resultado del paso sigue siendo `resultado`.
+type Medida = Record<string, string | boolean | null>;
+type Paso = { texto: string; hecho: boolean; criterio?: string; resultado?: string | null; nota?: string | null; medidas?: Medida[] };
+const CAMPOS_MEDIDA = ["regla", "magnitud", "unidad", "equipo", "referencia", "valor", "lecturas", "detalle"];
+function parseMedidas(v: unknown): Medida[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v.slice(0, 12).map((m) => {
+    const o = (m ?? {}) as Record<string, unknown>;
+    const r: Medida = {};
+    for (const k of CAMPOS_MEDIDA) if (o[k] != null && o[k] !== "") r[k] = String(o[k]).slice(0, 300);
+    r.cumple = o.cumple === true ? true : o.cumple === false ? false : null;
+    return r;
+  }).filter((m) => m.regla);
+  return out.length ? out : undefined;
+}
 function parsePasos(v: unknown): Paso[] | null {
   if (!Array.isArray(v)) return null;
   return v.map((p) => {
@@ -23,7 +40,8 @@ function parsePasos(v: unknown): Paso[] | null {
     if (!criterio) return { texto, hecho: o.hecho === true };
     const resultado = o.resultado === "cumple" || o.resultado === "no_cumple" ? String(o.resultado) : null;
     const nota = resultado === "no_cumple" && o.nota ? String(o.nota).trim() : null;
-    return { texto, criterio, resultado, nota, hecho: !!resultado };
+    const medidas = parseMedidas(o.medidas);
+    return { texto, criterio, resultado, nota, hecho: !!resultado, ...(medidas ? { medidas } : {}) };
   });
 }
 

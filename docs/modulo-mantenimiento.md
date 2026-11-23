@@ -164,6 +164,38 @@ casilla sino **✓ Cumple / ✗ No cumple** y debajo el criterio. Detalles:
 - En la pestaña «Visto bueno» la fila avisa «⚠ N no cumple» y enseña qué paso, su criterio y la
   nota, para que quien firma lo vea.
 
+### Calculadora de criterios (2026-11-23)
+
+Si el criterio lleva una tolerancia numérica, el paso trae una **🧮 calculadora**: se teclea lo
+que marca el equipo y lo que mide el instrumento de referencia y ella dice si cumple. No hay que
+configurar nada: `analizarCriterio()` (`js/criterios-calc.js`, funciones puras, se prueban con
+Node) lee el texto del criterio. Formas que entiende:
+
+| Criterio | Tipo | Casillas | Cálculo |
+|---|---|---|---|
+| `±1 °C`, `Consigna ± 3 °C`, `Velocidad ±5 %`, `Δ ≤ 1 °C`, `Error ≤ 0,02 g`, `Diferencia ≤ 1 punto`, `CO₂ ≤ 0,3 % de desviación` | desviación | equipo + referencia | \|equipo − referencia\| ≤ tol; con `%`, relativo a la referencia (salvo CO₂/humedad, donde `%` es la unidad) |
+| `37 ± 0,5 °C`, `0,0 ± 0,4 °C`, `1509 ± 10 rpm (o 1032 ± 10)` | nominal | nominal (ya escrito, editable) + medido | igual; con alternativa, la más cercana a lo programado |
+| `Δ ≤ 1 °C (≤ 0,5 °C en 37 °C)` | desviación | equipo + referencia | la tolerancia estricta si el equipo está a ±1 de 37 |
+| `Diferencia entre la mayor y la menor ≤ 0,8 °C` | rango | lecturas separadas por espacios | mayor − menor |
+| `≥ 0,4 m/s`, `T ≥ 121 °C en meseta`, `CV ≤ 3 %`, `lámpara < 1000 h`, `≤ −5 °C en 45 min` | umbral | valor medido | valor frente al límite |
+
+- **Conservadora a propósito**: lo ambiguo no lleva calculadora y lo juzga la persona —`≤ 1 °C`
+  suelto o `T ≤ 0,5 °C` (¿desviación o temperatura?), `± 2 d` (¿cuánto es d?), `±0,1 / ±10 %`,
+  `≥ 80 % del vacío nominal`, `excentricidad y error ≤ …`, condiciones con «si…». Un criterio
+  se trocea por `;` (y por `, ` si todos los trozos llevan tolerancia); lo que no es calculable
+  («junta estanca») queda como «Comprueba tú: …».
+- **Veredicto**: cualquier medida que no cumple marca el paso **No cumple** y escribe sola la nota
+  con los números (la persona puede añadir lo suyo). Todas cumplen y no queda nada cualitativo →
+  **Cumple**. Todas cumplen pero queda algo cualitativo → no marca nada: lo decide la persona.
+  Los botones siguen funcionando para corregir a mano.
+- Se guarda en el paso como `medidas: [{regla, magnitud, unidad, equipo, referencia | valor |
+  lecturas, cumple, detalle}]` (`parseMedidas` en `gestionar-mantenimiento`); al reabrir (seguir
+  una ejecución, editar un finalizado) las casillas salen rellenas. En «Visto bueno», las medidas
+  que cumplen salen bajo la fila (🧮), para que quien firma vea los números.
+- Al 2026-11-23: 37 criterios distintos / 95 pasos de los planes activos llevan calculadora.
+  Para ampliar a una forma nueva, añadir el patrón en `_ccRegla` y comprobarlo contra todos los
+  criterios reales antes de subirlo.
+
 ## Datos
 - 410 planes activos en `planes_mantenimiento` (2026-08-22; el número crece con el tiempo,
   no usar como referencia fija). Distribución de periodicidad: Anual 172, Semestral 78,
