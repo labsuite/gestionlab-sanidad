@@ -12,7 +12,7 @@
 // - revisión de inventario: cualquiera puede *proponerla* (revision_crear,
 //   gated client-side por Puede_Revisar_Inventario, un flag de datos no de
 //   rol); aplicarla/descartarla es Admin/Gestor/Profesor (requireStaff).
-import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight, identificarUsuario } from "../_shared/auth.ts";
 import { unidadValida, MSG_UNIDAD_NUMERICA } from "../_shared/material.ts";
 
 function genId(prefix: string): string {
@@ -68,6 +68,25 @@ async function registrarMovimiento(supabaseAdmin: any, mat: any, tipo: string, c
   await supabaseAdmin.from("movimientos").insert(datos);
 }
 
+/**
+ * ¿La ubicación es de un laboratorio de esta cuenta de grupo (usuarios.ubicaciones_asignadas,
+ * p. ej. "203,205") o de la zona común? Misma regla que getUbicacionesAlumno() en js/config.js:
+ * el laboratorio sale de «laboratorio_aula» del catálogo de ubicaciones (o del código).
+ */
+async function ubicacionAlAlcanceDeGrupo(supabaseAdmin: any, email: string, idUbicacion: string | null): Promise<boolean> {
+  if (!idUbicacion) return false;
+  const [{ data: ub }, { data: usu }] = await Promise.all([
+    supabaseAdmin.from("ubicaciones").select("laboratorio_aula").eq("id_ubicacion", idUbicacion).maybeSingle(),
+    supabaseAdmin.from("usuarios").select("ubicaciones_asignadas").ilike("email", email).maybeSingle(),
+  ]);
+  const aula = String(ub?.laboratorio_aula || "");
+  if (/zona com[uú]n/i.test(aula) || /(^|[-\s])ZC([-\s.]|$)/i.test(idUbicacion)) return true;
+  const lab = (aula.match(/(\d{3})/) || String(idUbicacion).match(/(\d{3})/) || [])[1];
+  const labs = String(usu?.ubicaciones_asignadas || "").split(",")
+    .map((x: string) => (x.trim().match(/(\d{3})/) || [])[1]).filter(Boolean);
+  return !!lab && labs.includes(lab);
+}
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -83,6 +102,9 @@ Deno.serve(async (req) => {
   const accion = String(body.accion || "");
 
   // ── acciones abiertas a cualquier sesión válida (Alumno incluido) ──
+  // Cuentas de grupo (2026-11-23): el consumo y el recuento, solo en ubicaciones de sus
+  // laboratorios y de la zona común; el recuento, además, solo si el grupo tiene marcada
+  // «Puede revisar inventario». Antes solo lo comprobaba la pantalla.
   if (accion === "consumo" || accion === "traslado" || accion === "asegurar_lote_legacy" || accion === "revision_crear") {
     const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
@@ -90,6 +112,8 @@ Deno.serve(async (req) => {
     // el servidor decide la firma según el rol y nunca guarda su nombre
     // (RGPD, ver docs/proteccion-datos.md).
     const { autor: usuarioNombre } = await autorRegistro(supabaseAdmin, email, body.usuario);
+    const { rol: rolSesion } = await identificarUsuario(supabaseAdmin, email);
+    const esGrupo = rolSesion === "Alumno";
     const idMaterial = String(body.id_material || "").trim();
     if (!idMaterial) return jsonError("id_material es obligatorio", 400);
     const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
@@ -116,6 +140,9 @@ Deno.serve(async (req) => {
       const lotes = await getLotes(supabaseAdmin, idMaterial);
       let loteElegido = loteId ? lotes.find((l: any) => l.id === loteId) : null;
       if (lotes.length > 0 && !loteElegido) return jsonError("Selecciona una ubicación", 400);
+      if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, loteElegido ? loteElegido.id_ubicacion : mat.ubicacion))) {
+        return jsonError("Este material no está en los laboratorios de tu grupo ni en la zona común", 403);
+      }
       await registrarMovimiento(supabaseAdmin, mat, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || ""));
       if (loteElegido) {
         const nuevoLocal = Math.max(0, (Number(loteElegido.stock_local) || 0) - cantidad);
@@ -179,6 +206,12 @@ Deno.serve(async (req) => {
     }
 
     if (accion === "revision_crear") {
+      if (esGrupo) {
+        const { data: ficha } = await supabaseAdmin.from("usuarios").select("puede_revisar_inventario").ilike("email", email).maybeSingle();
+        if (!ficha?.puede_revisar_inventario) {
+          return jsonError("Tu grupo no tiene permiso para contar stock: pídeselo al profesorado", 403);
+        }
+      }
       const stockReal = Number(body.stock_real);
       if (body.stock_real === "" || body.stock_real === undefined || isNaN(stockReal) || stockReal < 0) {
         return jsonError("Introduce la cantidad real que has contado", 400);
@@ -194,8 +227,14 @@ Deno.serve(async (req) => {
         const lote = lotes.find((l: any) => l.id === loteId);
         if (!lote) return jsonError("Ese bote ya no existe. Recarga la página y vuelve a elegir la ubicación.", 400);
         idUbicacion = lote.id_ubicacion;
+        if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, idUbicacion))) {
+          return jsonError("Ese bote no está en los laboratorios de tu grupo ni en la zona común", 403);
+        }
         stockAppFinal = Number(lote.stock_local) || 0;
       } else if (idUbicacion) {
+        if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, idUbicacion))) {
+          return jsonError("Esa ubicación no es de los laboratorios de tu grupo ni de la zona común", 403);
+        }
         const enEseSitio = lotes.filter((l: any) => l.id_ubicacion === idUbicacion);
         if (enEseSitio.length) return jsonError("En esa ubicación ya hay un bote fichado: elígelo en la lista.", 400);
         stockAppFinal = (!lotes.length && mat.ubicacion === idUbicacion) ? (Number(mat.stock_actual) || 0) : 0;
