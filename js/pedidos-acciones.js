@@ -770,14 +770,23 @@ async function guardarConceptoFactura() {
 
 // Desde la revisión de la factura: los artículos sin línea coincidente que
 // en realidad sustituyen a todo el pedido en la hoja (pedidos.hoja_factura).
-// No guarda directamente: abre el editor con ellos ya puestos, para enlazar
-// cada uno a su material del catálogo (su precio va al histórico) antes de Guardar.
-function asignarSinMatchAHoja() {
+// Abre el editor con ellos ya puestos, para enlazar cada uno a su material del
+// catálogo (su precio va al histórico) antes de Guardar. Antes guarda lo marcado
+// arriba (precios de las líneas emparejadas): este botón cerraba la ventana y
+// esos precios se perdían (visto 2026-11-23 en PEDLG75G9).
+async function asignarSinMatchAHoja() {
   if (!_revExtraccionActual) return;
   const { pedidoId, r } = _revExtraccionActual;
   const items = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-sm-check'))
     .filter(chk => chk.checked).map(chk => r.sin_match[Number(chk.dataset.idx)]).filter(Boolean);
   if (!items.length) { showToast('Marca los artículos de la factura que deben salir en la hoja', 'info'); return; }
+  const sel = _recogerRevisionExtraccion();
+  if (sel.lineasBody.length || sel.conceptos.length) {
+    showLoading('Guardando precios...');
+    try { showToast(await _guardarRevisionExtraccion(pedidoId, sel), 'success'); }
+    catch (e) { hideLoading(); showToast('Error guardando precios: ' + e.message, 'error'); console.error(e); return; }
+    hideLoading();
+  }
   const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const conceptos = _conceptosDesdeItemsFactura(items, p?.Hoja_Factura);
   closeModal('modal-revision-extraccion');
@@ -1011,10 +1020,8 @@ async function eliminarDocumentoProveedor(idDocumento, pedidoId) {
 // acción actualizar_precio que ya usa 💶 Precios (js/contabilidad.js), así
 // que también queda registrado en historico_precio. Nunca toca
 // cantidad_recibida ni cantidad_pedida desde aquí (ver abrirModalRevisionExtraccion).
-async function aplicarPreciosExtraccion() {
-  const pedidoId = v('revext-pedido-id');
-  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
-  if (!p) return;
+// Lo marcado en la revisión: precios de las líneas emparejadas y textos para la hoja.
+function _recogerRevisionExtraccion() {
   const checks = Array.from(document.querySelectorAll('#revision-extraccion-contenido .revext-check'));
   const lineasBody = [];
   for (const chk of checks) {
@@ -1033,22 +1040,53 @@ async function aplicarPreciosExtraccion() {
       const texto = input ? input.value.trim() : '';
       return { id_linea: chk.dataset.idLinea, conceptos: texto ? [{ concepto: texto }] : [] };
     });
-  if (!lineasBody.length && !conceptos.length) { showToast('No has seleccionado nada para aplicar', 'info'); return; }
+  return { lineasBody, conceptos };
+}
 
-  showLoading('Aplicando...');
+// Precios marcados que todavía no están en su línea (los ya guardados no cuentan).
+function _preciosSinGuardarRevision() {
+  return _recogerRevisionExtraccion().lineasBody.filter(l => {
+    const linea = DATA.lineasPedido.find(x => x.ID_Linea === l.id_linea);
+    return !linea || Math.abs((parseFloat(linea.Precio_Unitario) || 0) - (parseFloat(l.precio_unitario) || 0)) >= 0.005;
+  });
+}
+
+// Guarda lo marcado sin cerrar nada; devuelve el texto del resumen ('' si no había nada).
+async function _guardarRevisionExtraccion(pedidoId, { lineasBody, conceptos }) {
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
+  if (lineasBody.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'actualizar_precio', pedido: pedidoId, proveedor: p?.Proveedor || '', lineas: lineasBody });
+  if (conceptos.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'concepto_factura', lineas: conceptos });
+  if (!lineasBody.length && !conceptos.length) return '';
+  await loadAllData();
+  const partes = [];
+  if (lineasBody.length) partes.push(`${lineasBody.length} precio(s) en sus líneas y en el histórico`);
+  if (conceptos.length) partes.push(`${conceptos.length} texto(s) de factura para la hoja`);
+  return `Guardado: ${partes.join(' y ')}`;
+}
+
+async function aplicarPreciosExtraccion() {
+  const pedidoId = v('revext-pedido-id');
+  if (!DATA.pedidos.some(x => x.ID_Pedido === pedidoId)) return;
+  const sel = _recogerRevisionExtraccion();
+  if (!sel.lineasBody.length && !sel.conceptos.length) { showToast('No has marcado nada para guardar', 'info'); return; }
+  showLoading('Guardando...');
   try {
-    if (lineasBody.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'actualizar_precio', pedido: pedidoId, proveedor: p.Proveedor || '', lineas: lineasBody });
-    if (conceptos.length) await callEdgeFunction('gestionar-linea-pedido', { accion: 'concepto_factura', lineas: conceptos });
-    await loadAllData();
-    const partes = [];
-    if (lineasBody.length) partes.push(`${lineasBody.length} precio(s)`);
-    if (conceptos.length) partes.push(`${conceptos.length} texto(s) de factura para la hoja`);
-    showToast(`Guardado: ${partes.join(' y ')}`, 'success');
+    showToast(await _guardarRevisionExtraccion(pedidoId, sel), 'success');
     closeModal('modal-revision-extraccion');
     verDetallePedido(pedidoId);
     renderContabilidad(); renderMaterial();
-  } catch (e) { showToast('Error aplicando precios: ' + e.message, 'error'); console.error(e); }
+  } catch (e) { showToast('Error guardando precios: ' + e.message, 'error'); console.error(e); }
   hideLoading();
+}
+
+// Cerrar sin perder precios: si hay marcados que aún no están en su línea, se pregunta.
+async function cerrarRevisionExtraccion() {
+  const pendientes = _preciosSinGuardarRevision();
+  if (pendientes.length && confirm(`Hay ${pendientes.length} precio(s) marcados que todavía no se han guardado en sus líneas ni en el histórico de precios.\n\nAceptar = guardarlos y cerrar\nCancelar = cerrar sin guardar`)) {
+    await aplicarPreciosExtraccion();
+    return;
+  }
+  closeModal('modal-revision-extraccion');
 }
 
 // ============================================================

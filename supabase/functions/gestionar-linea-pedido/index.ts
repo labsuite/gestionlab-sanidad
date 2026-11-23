@@ -480,13 +480,24 @@ Deno.serve(async (req) => {
       if (!idLinea || !precio) continue;
       const { data: linea, error } = await supabaseAdmin.from("lineas_pedido").update({ precio_unitario: Number(precio) }).eq("id_linea", idLinea).select().single();
       if (error || !linea) continue;
-      const hist = {
-        id_historico: genId("HP"), nombre_material: linea.material,
-        id_material: linea.id_material ?? await resolverIdMaterial(supabaseAdmin, linea.material),
-        id_pedido: pedidoId,
-        proveedor, fecha: hoy(), precio_unitario: Number(precio),
-      };
-      await supabaseAdmin.from("historico_precio").insert(hist);
+      const idMaterial = linea.id_material ?? await resolverIdMaterial(supabaseAdmin, linea.material);
+      // Un precio por material y pedido: volver a aplicar la misma factura
+      // (o corregir el precio) actualiza la fila en vez de añadir otra — antes
+      // se duplicaba y el «(n=…)» del precio medio salía inflado (visto
+      // 2026-11-23 en PED-MVA66C). La fecha original se conserva.
+      let previa = supabaseAdmin.from("historico_precio").select("id_historico").eq("id_pedido", pedidoId);
+      previa = idMaterial ? previa.eq("id_material", idMaterial) : previa.is("id_material", null).eq("nombre_material", linea.material);
+      const { data: existentes } = await previa;
+      if ((existentes || []).length) {
+        const [primera, ...sobran] = existentes!.map((h: any) => h.id_historico);
+        await supabaseAdmin.from("historico_precio").update({ precio_unitario: Number(precio), proveedor }).eq("id_historico", primera);
+        if (sobran.length) await supabaseAdmin.from("historico_precio").delete().in("id_historico", sobran);
+      } else {
+        await supabaseAdmin.from("historico_precio").insert({
+          id_historico: genId("HP"), nombre_material: linea.material, id_material: idMaterial,
+          id_pedido: pedidoId, proveedor, fecha: hoy(), precio_unitario: Number(precio),
+        });
+      }
       actualizadas.push(linea);
     }
     for (const idInt of new Set(actualizadas.map((l: any) => l.id_intervencion).filter(Boolean))) {
