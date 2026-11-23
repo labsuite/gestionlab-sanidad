@@ -522,7 +522,9 @@ function renderDetalleProveedor(p) {
         const lineas    = DATA.lineasPedido.filter(l => l.Pedido === ped.ID_Pedido);
         const recibidas = lineas.filter(l => l.Estado_Linea === 'Recibido').length;
         const coste     = lineas.reduce((s,l) => s + (parseFloat(l.Precio_Unitario)||0)*(parseFloat(l.Cantidad_Pedida)||0), parseFloat(ped.Gasto_Extra_Importe) || 0);
-        return `<div class="pedido-card" onclick="verDetallePedido('${ped.ID_Pedido}')">
+        // El detalle del pedido es de quien gestiona pedidos; al Profesor le daba «No tienes permiso»
+        const abrir = puedeHacer('verPedidos') ? ` onclick="verDetallePedido('${ped.ID_Pedido}')"` : ' style="cursor:default"';
+        return `<div class="pedido-card"${abrir}>
           <div class="pedido-card-header">
             <div>
               <div class="pedido-card-title">${ped.Nombre_Lista}</div>
@@ -1574,9 +1576,21 @@ function openModalUsuario() {
   _selectedModulosArray = [];
   _renderGruposChecks('');
   toggleUbicacionesAsignadasField('Profesor');
-  const selRol = document.getElementById('usr-rol');
-  if (selRol) selRol.disabled = false;
+  _prepararSelectRol(false);
   openModal('modal-usuario');
+}
+
+// Solo el Administrador cambia roles (lo impone también gestionar-usuario). El Gestor da
+// de alta fichas de Profesor o Alumno, pero no puede crear Gestores ni Administradores ni
+// cambiarle el rol a una ficha existente; el Profesor solo edita fichas de alumnado.
+function _prepararSelectRol(editando) {
+  const selRol = document.getElementById('usr-rol');
+  if (!selRol) return;
+  const esAdmin = getUserRole() === 'Administrador';
+  Array.from(selRol.options).forEach(o => {
+    o.hidden = !esAdmin && !editando && (o.value === 'Administrador' || o.value === 'Gestor');
+  });
+  selRol.disabled = editando && !esAdmin;
 }
 
 // Muestra u oculta el bloque de ciclo / modulos / labs segun el rol, y lo adapta:
@@ -1650,8 +1664,7 @@ function editUsuario(idx) {
     const cbRev = document.getElementById('usr-puede-revisar');
     if (cbRev) cbRev.checked = u.Rol === 'Alumno' && u.Puede_Revisar_Inventario === 'TRUE';
   }
-  const selRol = document.getElementById('usr-rol');
-  if (selRol) selRol.disabled = (getUserRole() === 'Profesor');
+  _prepararSelectRol(true);
   openModal('modal-usuario');
 }
 

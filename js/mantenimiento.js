@@ -492,7 +492,7 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
       <div><strong>Operación:</strong> ${plan.Operacion || '—'}</div>
       <div><strong>Tipo:</strong> ${plan.Tipo_Intervencion} · ${plan.Periodicidad} · ${labelPeriodo(periodo)}</div>
       ${enCurso ? `<div style="margin-top:6px;color:var(--accent)"><strong>▶ Ejecución empezada</strong> el ${formatDate(enCurso.Fecha_Inicio) || '—'}${enCurso.Iniciado_Por ? ' por ' + enCurso.Iniciado_Por : ''} — continúa donde se dejó.
-        <button class="btn-link" style="margin-left:8px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:11px;text-decoration:underline;padding:0" onclick="descartarEjecucionMant('${enCurso.ID_Registro}')">Descartar y empezar de cero</button></div>` : ''}
+        ${getUserRole() !== 'Alumno' ? `<button class="btn-link" style="margin-left:8px;background:none;border:none;color:var(--danger);cursor:pointer;font-size:11px;text-decoration:underline;padding:0" onclick="descartarEjecucionMant('${enCurso.ID_Registro}')">Descartar y empezar de cero</button>` : ''}</div>` : ''}
     </div>`;
 
   _renderMantChecklist(pasos);

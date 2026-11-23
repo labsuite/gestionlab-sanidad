@@ -129,6 +129,14 @@ WHERE u.rol <> 'Alumno' AND (p.rol IS NULL OR p.rol::text <> u.rol);
 `public.users.rol` es un enum (`user_role`), así que hace falta `::text` para compararlo con el
 `text` de `usuarios.rol`.
 
+**Quién cambia roles (2026-11-23): solo el Administrador.** El Gestor da de alta fichas de
+Profesor o Alumno (el desplegable no le ofrece Gestor ni Administrador) y edita el resto de una
+ficha, pero el rol se le queda bloqueado; el Profesor, igual, y solo en fichas de alumnado. Lo
+impone `gestionar-usuario`: en `crear`, un no-Administrador solo puede crear Profesor/Alumno
+(403 si no); en `actualizar`, si quien edita no es Administrador, el rol se conserva aunque el
+navegador mande otro. Antes un Gestor podía ponerse (o poner a otro) rol Administrador.
+En pantalla lo resuelve `_prepararSelectRol()` (`js/ubicaciones.js`).
+
 **Contraseñas temporales:** la convención que usa el centro para repartirlas no se documenta
 aquí — este repositorio es público. Igual que en `scripts/importar_alumnos.py`, se imprimen una
 vez para repartirlas y nunca se guardan en un fichero. Ojo con el mínimo de 6 caracteres de

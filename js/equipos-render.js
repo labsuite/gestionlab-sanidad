@@ -297,9 +297,10 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
     })();
     const expandId = 'eq-expand-' + e.ID_Activo.replace(/[^a-zA-Z0-9]/g,'_');
     const manualLink = e.Manual_Ficha_Tecnica ? `<a href="#" onclick="abrirDocumento('${e.Manual_Ficha_Tecnica}'); return false;" class="icon-btn" title="Ver manual">📄</a>` : '';
-    // Profesor puede editar e intervenir solo en equipos donde es responsable
-    const puedeEditarEste   = puedeHacer('editarEquipos') ||
-      (getUserRole() === 'Profesor' && esResponsableDeEquipo(e));
+    // Editar la ficha es solo de Admin/Gestor (gestionar-equipo lo exige; al Profesor
+    // responsable le daba 403 al guardar). El Profesor responsable interviene, y sus
+    // evaluaciones las marca con «📅 Evaluaciones» de la ficha desplegada.
+    const puedeEditarEste   = puedeHacer('editarEquipos');
     const puedeIntervenir = puedeHacer('crearIntervenciones') &&
       (getUserRole() !== 'Profesor' || esResponsableDeEquipo(e));
     return `<tr style="cursor:pointer" onclick="toggleEquipoExpand('${expandId}')">

@@ -181,8 +181,8 @@ const PERMISOS = {
     // Material: ve todo, consume/traslada, no edita catálogo ni crea pedidos
     verMaterial: true, editarMaterial: false, registrarConsumo: true,
     verPedidos: false, gestionarPedidos: false, crearSolicitudes: true,
-    // Proveedores: igual que Gestor
-    verProveedores: true, verUbicaciones: true, crearProveedores: true,
+    // Proveedores: los consulta; dar de alta/editar es de Admin/Gestor (gestionar-proveedor)
+    verProveedores: true, verUbicaciones: true, crearProveedores: false,
     // Usuarios: ve todos; edita/borra solo Alumnos (comprobado en ubicaciones.js)
     usuarios: true, crearUsuarios: false,
     configuracion: false, dashboard: true, verTareas: true,

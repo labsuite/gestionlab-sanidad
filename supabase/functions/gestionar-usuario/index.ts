@@ -487,8 +487,13 @@ Deno.serve(async (req) => {
   };
 
   if (accion === "crear") {
-    const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
+    const { error: authError, user, supabaseAdmin } = await requireAdminOrGestor(req);
     if (authError) return authError;
+    // Solo el Administrador reparte los roles de gestión: el Gestor da de alta
+    // profesorado y alumnado, nunca otra cuenta de Gestor o Administrador.
+    if (user?.rol !== "Administrador" && datosBase.rol !== "Profesor" && datosBase.rol !== "Alumno") {
+      return jsonError("Solo un Administrador puede dar de alta cuentas de Gestor o Administrador", 403);
+    }
     const datos = {
       id_usuario: genId("USR-"), activo: true, ...datosBase,
       grupos_asignados: await gruposAsignadosLimpios(supabaseAdmin, body.grupos_asignados, datosBase.rol),
@@ -512,6 +517,9 @@ Deno.serve(async (req) => {
       if (existente.rol !== "Alumno") return jsonError("Solo puedes modificar usuarios con rol Alumno", 403);
       datos.rol = "Alumno"; // un Profesor no puede cambiarle el rol a nadie, aunque lo mande en el body
     }
+    // Cambiar el rol de una ficha existente es solo del Administrador: el Gestor puede
+    // editar el resto de la ficha, pero el rol se queda como estaba aunque lo mande.
+    if (user?.rol !== "Administrador") datos.rol = String(existente.rol);
     // Repartir grupos entre el profesorado es de Admin/Gestor: un Profesor solo
     // llega aquí editando filas de Alumno, que nunca llevan grupos asignados.
     datos.grupos_asignados = await gruposAsignadosLimpios(
