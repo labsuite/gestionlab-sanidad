@@ -1437,6 +1437,10 @@ function renderMantenimiento() {
         <div class="card-header">
           <div class="card-title">Mantenimientos pendientes — Curso ${curso}</div>
           <div class="card-actions">
+            <div class="search-input">
+              <span>🔍</span>
+              <input type="search" placeholder="Buscar equipo..." oninput="filtrarPendientes()" id="filter-pend-equipo">
+            </div>
             <select id="filter-pend-lab" onchange="filtrarPendientes()" style="font-size:12px">
               <option value="">Todos los labs</option>
               ${[...new Set(pendientesList.map(s => s.lab))]
@@ -1502,6 +1506,10 @@ function renderMantenimiento() {
         <div class="card-header">
           <div class="card-title">Mantenimientos realizados — Curso ${curso}</div>
           <div class="card-actions">
+            <div class="search-input">
+              <span>🔍</span>
+              <input type="search" placeholder="Buscar equipo..." oninput="filtrarRealizados()" id="filter-real-equipo">
+            </div>
             <select id="filter-real-lab" onchange="filtrarRealizados()" style="font-size:12px">
               <option value="">Todos los labs</option>
               ${[...new Set(realizadosList.map(s => s.lab))]
@@ -1754,15 +1762,33 @@ function _renderFilasMarcadores(lista) {
   }).join('');
 }
 
+// Buscador de equipo de las pestañas Pendientes y Realizados: casa con el ID, el
+// tipo, la marca, el modelo y la ubicación, sin distinguir mayúsculas ni tildes.
+function _mantSinTildes(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+}
+function _mantEquipoCoincide(equipo, idEquipo, texto) {
+  const q = _mantSinTildes(texto).trim();
+  if (!q) return true;
+  const campos = equipo
+    ? [equipo.ID_Activo, equipo.Tipo_Equipo, equipo.Marca, equipo.Modelo, equipo.Ubicacion]
+    : [idEquipo];
+  const hay = _mantSinTildes(campos.filter(Boolean).join(' '));
+  // Cada palabra tecleada tiene que aparecer (en cualquier orden): «centrífuga 205».
+  return q.split(/\s+/).every(p => hay.includes(p));
+}
+
 function filtrarPendientes() {
   const lab    = document.getElementById('filter-pend-lab')?.value || '';
   const periodo= document.getElementById('filter-pend-periodo')?.value || '';
+  const texto  = document.getElementById('filter-pend-equipo')?.value || '';
   const canLog = puedeHacer('registrarMantenimiento');
   const canMarcar = puedeMarcarPeriodoMant();
 
   let lista = _pendientesCache;
   if (lab)     lista = lista.filter(s => s.lab === lab);
   if (periodo) lista = lista.filter(s => s.periodo === periodo);
+  if (texto)   lista = lista.filter(s => _mantEquipoCoincide(s.equipo, s.equipo?.ID_Activo, texto));
 
   const tbody = document.getElementById('tbody-pendientes');
   const empty = document.getElementById('pend-empty');
@@ -1778,9 +1804,11 @@ function filtrarPlanesTabla(val) {
 function filtrarRealizados() {
   const lab     = document.getElementById('filter-real-lab')?.value || '';
   const periodo = document.getElementById('filter-real-periodo')?.value || '';
+  const texto   = document.getElementById('filter-real-equipo')?.value || '';
   let lista = _realizadosCache;
   if (lab)     lista = lista.filter(s => s.lab === lab);
   if (periodo) lista = lista.filter(s => s.reg.Periodo === periodo);
+  if (texto)   lista = lista.filter(s => _mantEquipoCoincide(s.equipo, s.reg.ID_Equipo, texto));
   const tbody = document.getElementById('tbody-realizados');
   const empty = document.getElementById('real-empty');
   if (tbody) tbody.innerHTML = _renderFilasRealizados(lista);
