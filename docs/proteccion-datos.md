@@ -218,7 +218,20 @@ Ahora las políticas son `to authenticated` y `anon` no tiene permiso de lectura
 ninguna tabla. **No volver a abrir la lectura a `anon`**, ni siquiera para una tabla "sin
 datos personales": es la misma puerta para todas.
 
-Pendiente de decidir: dentro de la sesión, todas las cuentas (también las de grupo) leen
-todas las tablas que la app carga, incluidos los emails del profesorado y el token de los
-pedidos. Las cuentas privadas que siguen cerradas incluso con sesión: `credenciales_grupo`,
-`users` y, cada cual las suyas, `tareas_personales`.
+**Dentro de la sesión, la lectura depende del rol** (también desde el 2026-11-23). Las
+pantallas ya ocultaban al alumnado lo que no es suyo, pero la app descargaba todas las tablas
+para cualquier rol, así que un grupo tenía en su navegador los emails del profesorado y el
+token de los pedidos. Ahora lo decide la base de datos con `rol_sesion()` (rol de la sesión,
+leído de `public.users`):
+
+| Tabla | Alumnado | Profesorado, Gestión y Administración |
+|---|---|---|
+| `usuarios` | solo la fila de su grupo | todas |
+| `pedidos`, `lineas_pedido`, `documentos_proveedor`, `historico_precio`, `solicitudes`, `proveedores` | nada | todas |
+| `pedidos_token` (enlace público de cada pedido) | nada | nada: solo el servidor |
+| `credenciales_grupo`, `users` | nada | nada |
+| `tareas_personales` | las suyas | las suyas |
+| el resto (equipos, planes, material, residuos…) | todas | todas |
+
+Al añadir una tabla: decidir en ese momento quién la lee y escribir la política por rol. Que
+una pantalla no la enseñe **no** protege nada.

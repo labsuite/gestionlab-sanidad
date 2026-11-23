@@ -22,7 +22,9 @@ const CARGAS_AUTOCLAVE    = ['Descontaminación', 'Líquidos', 'Sólidos'];
 const _regConfig = {
   cabina: {
     key: 'registrosCabina', sheet: 'Registros_Cabina', lastCol: 'L',
-    tiposEquipo: ['Cabina de bioseguridad'], prefix: 'RC',
+    // «Cabina de seguridad biológica» es como figura CAB-03 desde la recarga del inventario de
+    // 2026-10; sin él la pestaña decía «no hay ningún equipo» y no dejaba registrar (2026-11-23).
+    tiposEquipo: ['Cabina de bioseguridad', 'Cabina de seguridad biológica'], prefix: 'RC',
     label: 'Cabina de bioseguridad', tabLabel: '🧫 Cabina de bioseguridad',
     // La cabina se usa con presencia continua → tiene sentido abrir sesión al entrar y cerrarla al salir.
     permiteSesionAbierta: true,
