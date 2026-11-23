@@ -93,7 +93,7 @@ async (page, { app: APP, salida: SALIDA }) => {
     document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
     const paso = document.querySelector('#mant-checklist [data-idx="0"]');
     const pon = (k, v) => { const inp = paso.querySelector(`.mant-calc input[data-k="${k}"]`); if (inp) { inp.value = v; inp.dispatchEvent(new Event('input')); } };
-    pon('equipo', '37,0'); pon('referencia', '36,8');
+    pon('equipo', '37,0'); pon('referencia', '36,84');
     _mantMarcarCriterio(0, 'cumple');
     paso.querySelector('.mant-btn-cumple').classList.add('ayuda-senal');
     paso.querySelector('.mant-calc').classList.add('ayuda-senal');
@@ -119,7 +119,7 @@ async (page, { app: APP, salida: SALIDA }) => {
   // 6 · Observaciones y «Finalizar»
   await page.evaluate(() => {
     document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
-    document.getElementById('mant-observaciones').value = 'Agua de red. Descalcificado con vinagre.';
+    document.getElementById('mant-observaciones').value = 'Termómetro de referencia: TER-02. Agua de red; descalcificado con vinagre.';
     document.getElementById('mant-btn-principal').classList.add('ayuda-senal');
     document.getElementById('mant-btn-principal').scrollIntoView({ block: 'end' });
   });

@@ -22,7 +22,7 @@ const AYUDA_MANUALES = {
     titulo: 'Manual del alumnado',
     intro: 'Lo que hace tu grupo en GestionLab, contado como tareas de laboratorio. Entras con la cuenta del grupo, y lo que registras sale a nombre del grupo.',
     secciones: [
-      { titulo: 'Mantenimiento de los equipos', tareas: ['MAN-2'] },
+      { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-2'] },
     ],
   },
   Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [] },
@@ -77,7 +77,7 @@ const AYUDA_TAREAS = {
             texto: '**Hacer cada paso en el equipo y marcar su casilla al terminarlo**, no antes ni todos al final: el registro tiene que decir lo que se hizo, y marcar de memoria al final acaba marcando pasos que no se hicieron. Arriba a la derecha, el contador dice cuántos pasos van.',
           },
           {
-            texto: '**En las comprobaciones** (los pasos que llevan «Criterio:» debajo): medir y comparar con el criterio. Si el paso trae 🧮, escribir lo que marca el equipo y lo que mide el instrumento de referencia: la app hace la cuenta y dice si cumple; si no cumple, marca ella «✗ No cumple» y escribe las cifras en «¿Qué has visto?». Lo que no se mide con números aparece como «Comprueba tú: …»: mirarlo y pulsar «✓ Cumple» o «✗ No cumple». Si se pulsa el botón equivocado, pulsarlo otra vez lo desmarca.',
+            texto: '**En las comprobaciones** (los pasos que llevan «Criterio:» debajo): medir, comparar con el criterio y pulsar «✓ Cumple» o «✗ No cumple». Si el criterio lleva números, el paso trae 🧮 y pide lo que marca el equipo y lo que mide el instrumento de referencia: **anotar las dos lecturas completas, tal como salen (todos los decimales, sin redondear)**. La app hace la cuenta y decide sola si cumple; si no cumple, marca ella «✗ No cumple» y escribe las cifras en «¿Qué has visto?». Lo que no se mide con números aparece como «Comprueba tú: …»: mirarlo y pulsar «✓ Cumple» o «✗ No cumple». Si se pulsa el botón equivocado, pulsarlo otra vez lo desmarca.',
             img: 'MAN-2/04-comprobacion-con-calculadora.png',
             alt: 'Comprobación con calculadora: lectura del equipo y del termómetro de referencia, la app dice que cumple y se pulsa Cumple',
           },
@@ -90,7 +90,7 @@ const AYUDA_TAREAS = {
             texto: '**Si hay que parar**: «💾 Guardar progreso». Otro día, en la tarjeta del equipo saldrá «Continuar n/m» con lo que ya estaba marcado. Lo puede continuar cualquier grupo: el progreso es del equipo, no del grupo.',
           },
           {
-            texto: '**Escribir en «Observaciones»** lo que no esté en los pasos, como un paso que no se pudo hacer y por qué, algo raro en el equipo o los valores medidos si el protocolo pide anotarlos. «Fecha de realización» ya trae la de hoy y «Realizado por» ya trae el nombre del grupo.',
+            texto: '**Escribir en «Observaciones»** el código del instrumento de referencia que se ha usado (por ejemplo, TER-02 o TAC-01), para saber qué comprobaciones revisar si un día ese instrumento resulta estar mal; y lo que no esté en los pasos, como un paso que no se pudo hacer y por qué, algo raro en el equipo o los valores medidos si el protocolo pide anotarlos. «Fecha de realización» ya trae la de hoy y «Realizado por» ya trae el nombre del grupo.',
             img: 'MAN-2/06-observaciones-y-finalizar.png',
             alt: 'Parte de abajo de la ventana: fecha, realizado por, observaciones, aviso de visto bueno y botón Finalizar señalado',
           },
@@ -98,7 +98,7 @@ const AYUDA_TAREAS = {
             texto: '**Pulsar «Finalizar».** Si queda un paso sin marcar, la app pide confirmación («Quedan … paso(s) sin marcar»): confirmar solo si ese paso no aplica a este equipo y está explicado en Observaciones. Al terminar sale «Registrado. Queda a la espera del visto bueno del profesorado.»',
           },
           {
-            texto: '**Si alguna comprobación no cumplía, se abre «Notificar aviso»** con la descripción ya rellenada. Elegir en «¿Se puede seguir usando el equipo?» si se puede seguir usando y pulsar «Enviar aviso».',
+            texto: '**Si alguna comprobación no cumplía, se abre «Notificar aviso»** con la descripción ya rellenada. Elegir en «¿Se puede seguir usando el equipo?» si se puede seguir usando y pulsar «Enviar aviso». El aviso aparece en GestionLab al profesorado responsable del equipo y a quien abra el equipo; no se manda ningún correo.',
             img: 'MAN-2/07-aviso-de-averia.png',
             alt: 'Ventana Notificar aviso con la descripción ya escrita y las opciones de si se puede seguir usando el equipo',
           },
@@ -108,8 +108,8 @@ const AYUDA_TAREAS = {
             titulo: 'Si una comprobación no cumple',
             numerada: true,
             items: [
-              '**Antes de marcar «✗ No cumple», revisar cómo se ha hecho la comprobación**: lo que pida el protocolo (equipo nivelado o a temperatura, material de referencia correcto y limpio, lectura en las mismas unidades que el criterio). Si hay un error de procedimiento, corregirlo y repetir una vez. Si no lo hay, **no repetir hasta que salga bien**: un resultado que no cumple es un dato, y repetir hasta que cumpla lo esconde.',
-              '**Marcar «✗ No cumple» y escribir en «¿Qué has visto?» el valor medido, el criterio y las condiciones**, con números («lectura: …; criterio: …; condiciones: …»), no «no va bien». Quien firma y quien repare el equipo trabajan con esos datos.',
+              '**Antes de marcar «✗ No cumple», revisar cómo se ha hecho la comprobación**: lo que pida el protocolo (equipo nivelado o a temperatura, material de referencia correcto y limpio, lectura en las mismas unidades que el criterio). Si hay un error de procedimiento, corregirlo y repetir una vez. Si no lo hay, **no repetir hasta que salga bien ni cambiar las cifras para que la app diga «Cumple»**: un resultado que no cumple es un dato, y repetir o retocar hasta que cumpla lo esconde.',
+              '**Completar «¿Qué has visto?»**. Si la app ha decidido con las cifras, ya las ha escrito ahí: añadir las condiciones (dónde estaba la sonda o la pesa, cuánto tiempo se dejó estabilizar, qué instrumento de referencia se usó). Si no, marcar «✗ No cumple» y escribir el valor medido, el criterio y las condiciones, con números, no «no va bien». Quien firma y quien repare el equipo trabajan con esos datos.',
               '**Seguir con los demás pasos, salvo que el fallo sea peligroso** (calor, presión, electricidad, piezas que giran) **o el protocolo diga parar**. En ese caso, dejar el equipo como indique el apartado 10 de su protocolo y llamar al profesorado antes de seguir.',
               '**Hacer lo que diga el apartado 10, «Resolución de problemas», del protocolo para ese fallo.** En muchos equipos incluye poner la etiqueta «NO USAR».',
               '**En el aviso de avería, elegir con criterio si se puede seguir usando**: si los resultados del equipo dejan de ser fiables (una balanza que pesa mal, una estufa fuera de temperatura), elegir «No funciona». Un equipo que mide mal no sirve aunque encienda.',
@@ -126,16 +126,18 @@ const AYUDA_TAREAS = {
         problemas: [
           ['No sale «Registrar», solo «Pendiente»', 'ese mantenimiento lo hace el profesorado (🔒 solo profesorado) o una empresa.'],
           ['El mantenimiento no está en la lista', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno) o que el profesorado lo haya marcado como «no aplica» o lo haya aplazado.'],
+          ['La tarjeta del equipo no enseña su plan de mantenimiento', 'el equipo no está en un laboratorio de tu grupo: cada grupo ve y registra los mantenimientos de los equipos de sus laboratorios y de la zona común. Los de los demás los hace otro grupo o el profesorado.'],
+          ['La tarjeta del equipo enseña un aviso abierto («🚫 No funciona», por ejemplo)', 'léelo y pregunta al profesorado antes de empezar.'],
           ['Estaba empezado', '«Continuar n/m» y seguir desde donde se dejó.'],
           ['Se ha marcado un paso por error', 'desmarcarlo antes de finalizar. Si ya está finalizado, decírselo al profesorado, que puede devolverlo para corregirlo.'],
           ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'no marcarlo, explicarlo en Observaciones y avisar al profesorado. Si falta material, guardar el progreso y terminar otro día.'],
-          ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar ([[EMP-2|La app no guarda lo que apuntas]]) y comprobar qué quedó guardado.'],
+          ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar ([[EMP-2|La app no guarda lo que apuntas (sesión caducada)]]) y comprobar qué quedó guardado.'],
           ['En el móvil, «Registrar» queda fuera de la pantalla en «Pendientes»', 'desplazar la tabla hacia la izquierda, o entrar por la tarjeta del equipo.'],
         ],
         relacionado: [
           ['Antes', [['EQU-1', 'Encontrar un equipo'], ['MAN-1', 'Ver qué mantenimientos tocan'], ['EQU-2', 'Consultar cómo se usa un equipo']]],
           ['Después', [['INC-1', 'Avisar de una avería']]],
-          ['Si falla la app', [['EMP-2', 'La app no guarda lo que apuntas']]],
+          ['Si falla la app', [['EMP-2', 'La app no guarda lo que apuntas (sesión caducada)']]],
         ],
       },
     },
