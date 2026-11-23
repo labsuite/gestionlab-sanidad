@@ -442,6 +442,7 @@ function showApp() {
 
   showPage(p.dashboard ? 'dashboard' : (p.nav[0] || 'equipos'));
   _checkPendingNfcAction();
+  if (typeof _restaurarVentanasTrasSesion === 'function') _restaurarVentanasTrasSesion();
 }
 
 function aplicarPermisosUI() {

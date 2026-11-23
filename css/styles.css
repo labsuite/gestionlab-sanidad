@@ -2066,3 +2066,9 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
 .aviso-equipo.grave strong { color: var(--danger); }
 .aviso-equipo-desc { margin-top: 3px; overflow-wrap: anywhere; }
 .aviso-equipo-consejo { margin-top: 3px; font-weight: 600; }
+
+/* Aviso de sesión caducada en la pantalla de entrada (js/auth.js, _sesionCaducada) */
+.auth-aviso-sesion {
+  margin: 4px 0 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; text-align: left;
+  background: var(--warning-light); border: 1px solid #e8c98a; border-radius: var(--radius-sm); color: var(--text);
+}

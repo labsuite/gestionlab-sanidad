@@ -10,8 +10,9 @@
 async function initAuth() {
   _sbMigracion.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') {
+      if (_cerrandoSesionAMano) { _cerrandoSesionAMano = false; _mostrarPantallaLogin(); }
+      else _sesionCaducada();
       currentUser = null;
-      _mostrarPantallaLogin();
     } else if (event === 'PASSWORD_RECOVERY') {
       _mostrarPantallaNuevaPassword();
     }
@@ -67,7 +68,7 @@ async function initAuth() {
 async function _onSessionReady(session) {
   currentUser = { email: (session.user.email || '').toLowerCase().trim() };
   try {
-    await loadAllData();
+    if (await loadAllData() === false) return;   // sin sesión válida: ya está en la entrada
     const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === currentUser.email);
     if (u?.Nombre) currentUser.name = u.Nombre;
     showApp();
@@ -106,6 +107,8 @@ async function signOut() {
   // scope 'local': cierra solo ESTE dispositivo. Por defecto supabase-js revoca
   // todas las sesiones de la cuenta, y en una cuenta de grupo eso deja sin
   // sesión a toda la clase a la vez (siguen viendo datos, pero nada se guarda).
+  _cerrandoSesionAMano = true;
+  _ventanasApartadasPorSesion = null;
   await _sbMigracion.auth.signOut({ scope: 'local' });
   currentUser = null;
   previewRole = null;
@@ -226,6 +229,45 @@ function renderPerfil() {
 }
 
 // ── Helpers ──────────────────────────────────────────────────
+
+// ── Sesión caducada (2026-11-23) ─────────────────────────────
+// La pantalla de entrada se pone DETRÁS de las ventanas (modales), así que una ventana
+// abierta la tapaba: quien estaba rellenando algo solo veía «Tu sesión ha caducado» y, para
+// llegar a la entrada, tenía que cerrar la ventana y perder lo rellenado. Ahora la ventana
+// se aparta sin borrarse y vuelve, tal cual, al entrar de nuevo con la misma cuenta.
+let _ventanasApartadasPorSesion = null;   // { email, ids }
+let _cerrandoSesionAMano = false;
+
+function _sesionCaducada() {
+  const abiertas = [...document.querySelectorAll('.modal-overlay.open')];
+  if (abiertas.length) {
+    _ventanasApartadasPorSesion = { email: currentUser?.email || '', ids: abiertas.map(m => m.id) };
+    abiertas.forEach(m => m.classList.remove('open'));
+  }
+  const aviso = document.getElementById('auth-aviso-sesion');
+  if (aviso) {
+    aviso.textContent = abiertas.length
+      ? 'Tu sesión ha caducado. Vuelve a entrar con la misma cuenta: lo que estabas rellenando sigue ahí y podrás guardarlo.'
+      : 'Tu sesión ha caducado. Vuelve a entrar.';
+    aviso.style.display = '';
+  }
+  _mostrarPantallaLogin();
+}
+
+/** Al entrar de nuevo (showApp): devuelve las ventanas apartadas si es la misma cuenta. */
+function _restaurarVentanasTrasSesion() {
+  const aviso = document.getElementById('auth-aviso-sesion');
+  if (aviso) aviso.style.display = 'none';
+  const v = _ventanasApartadasPorSesion;
+  _ventanasApartadasPorSesion = null;
+  if (!v) return;
+  if ((currentUser?.email || '') !== v.email) {
+    showToast('Has entrado con otra cuenta: lo que estaba sin guardar se ha descartado', '');
+    return;
+  }
+  v.ids.forEach(id => document.getElementById(id)?.classList.add('open'));
+  showToast('Ya has vuelto a entrar: pulsa otra vez el botón para guardar', 'success');
+}
 
 function _mostrarPantallaLogin() {
   const app  = document.getElementById('app');

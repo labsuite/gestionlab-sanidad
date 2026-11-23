@@ -18,7 +18,7 @@ async function callEdgeFunction(nombre, body) {
   // app seguía pintando los datos y parecía funcionar hasta que se intentaba guardar
   // algo: hay que decirlo claro y devolver a la pantalla de login.
   if (!session?.access_token) {
-    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
+    if (typeof _sesionCaducada === 'function') _sesionCaducada();
     throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');
   }
   const enviar = () => fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/${nombre}`, {
@@ -45,7 +45,7 @@ async function callEdgeFunction(nombre, body) {
   }
   const data = await r.json().catch(() => ({}));
   if (r.status === 401) {
-    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
+    if (typeof _sesionCaducada === 'function') _sesionCaducada();
     throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');
   }
   if (!r.ok) throw new Error(data.error || `Error del servidor (${r.status})`);
@@ -762,8 +762,8 @@ async function loadAllData() {
   // pedidos sin entrar). Sin sesión válida, la carga devolvería todo vacío: a la entrada.
   const { data: { session: _sesionCarga } } = await _sbMigracion.auth.getSession();
   if (!_sesionCarga?.access_token) {
-    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
-    return;
+    if (typeof _sesionCaducada === 'function') _sesionCaducada();
+    return false;
   }
   showLoading('Cargando datos...');
   try {
@@ -827,6 +827,14 @@ async function loadAllData() {
       _leerTablaCompleta('muestras_congeladas', 'id_muestra').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('usos_muestra', 'id_uso').then(r => r, () => ({ data: [] }))
     ]);
+
+    // Sesión que el navegador cree válida pero el servidor rechaza (contraseña cambiada,
+    // sesión revocada): sin lectura anónima, todo llegaría vacío. A la entrada, sin pisar DATA.
+    if (sbEquiposRes?.error && (sbEquiposRes.status === 401 || /jwt|token/i.test(sbEquiposRes.error.message || ''))) {
+      hideLoading();
+      if (typeof _sesionCaducada === 'function') _sesionCaducada();
+      return false;
+    }
 
     DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
     DATA.intervenciones          = (sbIntervencionesRes?.data || []).map(_intervencionSbToObj);

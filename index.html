@@ -37,6 +37,7 @@
     <div class="auth-logo">🧪</div>
     <h1>GestionLab</h1>
     <p>CIFP Manuel Antonio · Vigo<br>Accede con tu cuenta de GestionLab</p>
+    <div id="auth-aviso-sesion" class="auth-aviso-sesion" style="display:none"></div>
     <form onsubmit="event.preventDefault(); signIn();" style="display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:8px">
       <div>
         <label for="login-email" style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Email</label>
@@ -50,7 +51,7 @@
       </div>
       <button type="submit" class="btn btn-primary" id="btn-login" style="margin-top:4px;width:100%;padding:10px">Iniciar sesión</button>
       <p style="font-size:11px;color:var(--text-muted);margin:2px 0 0;line-height:1.5;text-align:center">
-        ¿Has olvidado la contraseña? Pide a la gestión del laboratorio que te la restablezca.
+        ¿Has olvidado la contraseña? Si es la cuenta de tu grupo, pídesela a tu profesor/a; si es la tuya, pide a la gestión del laboratorio que te la restablezca.
       </p>
     </form>
   </div>
