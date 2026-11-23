@@ -22,6 +22,19 @@ const TABLAS: Record<string, { tabla: string; prefix: string; campos: string[]; 
   },
 };
 
+// Fecha y hora "de pared" en el laboratorio. Las Edge Functions corren en UTC, así que
+// `toTimeString()`/`toISOString()` daban 1 h menos en invierno y 2 en verano — y la hora de
+// fin, que pone el navegador, sí iba en hora local (sesiones de "2 h" que duraron un minuto).
+function ahoraEnVigo(): { fecha: string; hora: string } {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Europe/Madrid", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+    }).formatToParts(new Date()).map((x) => [x.type, x.value]),
+  );
+  return { fecha: `${p.year}-${p.month}-${p.day}`, hora: `${p.hour}:${p.minute}` };
+}
+
 function strField(v: unknown) {
   return (v === "" || v === null || v === undefined) ? null : String(v);
 }
@@ -60,11 +73,11 @@ Deno.serve(async (req) => {
       if (!cfg.sesionAbierta) return jsonError("Este tipo de equipo no admite sesión abierta", 400);
       const idEquipo = String(body.id_equipo || "").trim();
       if (!idEquipo) return jsonError("id_equipo es obligatorio", 400);
-      const ahora = new Date();
+      const ahora = ahoraEnVigo();
       const idRegistro = await nextIdReg(supabaseAdmin, tabla, prefix);
       const datos = {
         id_registro: idRegistro, id_equipo: idEquipo, usuario: email,
-        fecha: ahora.toISOString().split("T")[0], hora_inicio: ahora.toTimeString().slice(0, 5),
+        fecha: ahora.fecha, hora_inicio: ahora.hora,
         estado: "Abierta",
       };
       const { data, error } = await supabaseAdmin.from(tabla).insert(datos).select().single();
