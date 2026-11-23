@@ -143,6 +143,26 @@ Antes el alumnado necesitaba que cada plan estuviera marcado `con_alumnado` (lis
   Edge Function `gestionar-mantenimiento` (bloque `!esStaff`) en el servidor, que rechaza por
   separado los externos y los `solo_profesorado`.
 
+## Comprobaciones con criterio: «Cumple» / «No cumple» (2026-11-23)
+
+Un paso de las instrucciones que acaba en `(criterio: …)` —así llegan de los protocolos vía
+`recargar_protocolos_planes.py`— es una **comprobación**. En «Ejecutar mantenimiento» no lleva
+casilla sino **✓ Cumple / ✗ No cumple** y debajo el criterio. Detalles:
+
+- El criterio se separa del texto con `_RE_CRITERIO` (`js/mantenimiento.js`); admite paréntesis
+  dentro del criterio («Δ ≤ 1 °C (≤ 0,5 °C en 37 °C)»). Los pasos guardados antes, con el
+  criterio dentro del texto, se reinterpretan solos (`_normPasoMant`).
+- En `registro_mantenimientos.pasos` un paso de comprobación es
+  `{texto, criterio, resultado: 'cumple'|'no_cumple'|null, nota, hecho}` (`hecho` = tiene
+  resultado). Los demás siguen siendo `{texto, hecho}`.
+- **No cumple ⇒ nota obligatoria** («¿Qué has visto?»): lo exige la pantalla y también
+  `gestionar-mantenimiento` (`pasoNoCumpleSinNota`) al finalizar y al editar.
+- Al finalizar con algún «no cumple» se abre el **aviso de avería** del equipo con lo anotado ya
+  escrito (`_ofrecerAvisoNoCumple`): 🚨 «Notificar aviso» para el alumnado, ⚠️ «Reportar
+  incidencia» para el profesorado. Se abre, no se envía solo: quien está delante elige el impacto.
+- En la pestaña «Visto bueno» la fila avisa «⚠ N no cumple» y enseña qué paso, su criterio y la
+  nota, para que quien firma lo vea.
+
 ## Datos
 - 410 planes activos en `planes_mantenimiento` (2026-08-22; el número crece con el tiempo,
   no usar como referencia fija). Distribución de periodicidad: Anual 172, Semestral 78,
