@@ -707,8 +707,11 @@ function _mantCalcVeredicto(i) {
     else if (p._calc.notaAuto && nota.startsWith(p._calc.notaAuto)) p.nota = auto + nota.slice(p._calc.notaAuto.length);
     else if (!nota.includes(auto)) p.nota = auto + ' · ' + nota;
     p._calc.notaAuto = auto;
-  } else if (p._calc.notaAuto && (p.nota || '').trim() === p._calc.notaAuto) {
-    p.nota = ''; p._calc.notaAuto = '';
+  } else if (p._calc.notaAuto) {
+    // Ya no falla: fuera las cifras viejas de la nota; lo que escribió la persona se queda.
+    const nota = (p.nota || '').trim();
+    if (nota.startsWith(p._calc.notaAuto)) p.nota = nota.slice(p._calc.notaAuto.length).replace(/^\s*·\s*/, '');
+    p._calc.notaAuto = '';
   }
   p._calc.auto = nuevo !== p.resultado ? nuevo != null : p._calc.auto;
   if (nuevo !== p.resultado || nuevo === 'no_cumple') _mantAplicarCriterio(i, nuevo, false);

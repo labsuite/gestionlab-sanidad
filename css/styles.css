@@ -1221,7 +1221,7 @@
     .mant-calc-campos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
     .mant-calc-campo { display: flex; flex-direction: column; gap: 2px; flex: 1 1 140px; min-width: 0; font-size: 11px; color: var(--text-muted); }
     .mant-calc-campo.ancho { flex-basis: 100%; }
-    .mant-calc-campo input { width: 100%; font-size: 14px; padding: 5px 8px; }
+    .mant-calc-campo input { width: 100%; min-height: 36px; font-size: 15px; padding: 6px 10px; box-sizing: border-box; }
     .mant-calc-res { font-size: 12px; font-weight: 600; margin-top: 6px; }
     .mant-calc-res:empty { display: none; }
     .mant-calc-regla.ok .mant-calc-res { color: var(--success, #1e8e3e); }
