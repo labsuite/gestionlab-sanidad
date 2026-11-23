@@ -6,7 +6,7 @@
 // eliminar/recogida) también son Admin/Gestor (canEdit en
 // renderResiduosContenedores; el Profesor solo puede "+ Añadir residuo").
 // "resolver_consulta" es Admin/Gestor.
-import { requireValidSession, requireAdminOrGestor, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { requireValidSession, requireAdminOrGestor, autorRegistro, identificarUsuario, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 function generarId(prefijo: string): string {
   return prefijo + Date.now().toString(36).toUpperCase().slice(-6);
@@ -359,6 +359,15 @@ Deno.serve(async (req) => {
     // "registrar igualmente" tras un bloqueo de la IA: salta SOLO la capa IA,
     // nunca la validación determinista de Nivel 1/2 de abajo.
     const iaOverride = body.ia_override === true;
+    // El alumnado nunca salta la comprobación de la IA (ni «La IA se equivoca — registrar
+    // igualmente» ni «Registrar sin comprobar»): si duda, llama al profesorado.
+    // Decisión de Paloma, 2026-11-23.
+    if (iaOverride) {
+      const { rol } = await identificarUsuario(supabaseAdmin, email);
+      if (rol === "Alumno") {
+        return jsonError("Tu grupo no puede registrarlo sin la comprobación de la IA. Si dudas, llama al profesorado.", 403);
+      }
+    }
     // true solo cuando el override viene de un bloqueo real de la IA (no de "IA no
     // disponible"): así queda registrado en excepciones_residuo_ia y alimenta el prompt.
     const registrarExcepcion = body.registrar_excepcion === true;
@@ -443,8 +452,10 @@ Deno.serve(async (req) => {
       const [{ data: catalogo }, { data: contenedoresActivos }, { data: excepcionesFilas }] = await Promise.all([
         supabaseAdmin.from("tipos_residuo").select("nombre, riesgo, contenedor_tipo, descripcion"),
         supabaseAdmin.from("contenedores_residuo").select("categoria, lab, formato").eq("estado", "activo"),
+        // Solo los registros forzados que Gestión ha APROBADO enseñan a la IA
+        // (decisión de Paloma, 2026-11-23); los pendientes y descartados, no.
         supabaseAdmin.from("excepciones_residuo_ia").select("id_residuo, descripcion_libre, motivo_ia")
-          .eq("categoria_contenedor", contenedorActual.categoria || ""),
+          .eq("categoria_contenedor", contenedorActual.categoria || "").eq("estado", "aprobada"),
       ]);
 
       const excepcionesTipoIds = [...new Set((excepcionesFilas || []).map((e: { id_residuo: string | null }) => e.id_residuo).filter(Boolean))];
@@ -652,7 +663,7 @@ Deno.serve(async (req) => {
   }
 
   // ── Tipos de residuo (Admin/Gestor) ──
-  const { error: authError, supabaseAdmin } = await requireAdminOrGestor(req);
+  const { error: authError, user: usuarioGestion, supabaseAdmin } = await requireAdminOrGestor(req);
   if (authError) return authError;
 
   if (accion === "crear_tipo" || accion === "actualizar_tipo") {
@@ -689,6 +700,24 @@ Deno.serve(async (req) => {
       return jsonError(`No se pudo eliminar: ${error.message}`, 400);
     }
     return jsonOk({ eliminado: idResiduo });
+  }
+
+  // Revisión de un registro forzado contra la IA: «aprobada» lo convierte en ejemplo
+  // para la IA; «descartada» lo deja solo como auditoría. Lo decide Gestión.
+  if (accion === "revisar_excepcion_ia") {
+    const idExcepcion = String(body.id_excepcion || "").trim();
+    if (!idExcepcion) return jsonError("id_excepcion es obligatorio", 400);
+    const estado = body.aprobar === true ? "aprobada" : "descartada";
+    const { data, error } = await supabaseAdmin.from("excepciones_residuo_ia")
+      .update({
+        estado,
+        revisado_por: nombreCorto(usuarioGestion?.nombre || "") || usuarioGestion?.email || null,
+        fecha_revision: new Date().toISOString(),
+      })
+      .eq("id_excepcion", idExcepcion).select().single();
+    if (error) return jsonError(`No se pudo revisar: ${error.message}`, 400);
+    if (!data) return jsonError(`No se encontró el registro "${idExcepcion}"`, 404);
+    return jsonOk({ excepcion: data });
   }
 
   if (accion === "resolver_consulta") {

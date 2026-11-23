@@ -548,6 +548,8 @@ function _excepcionResiduoIaSbToObj(e) {
     Motivo_IA: e.motivo_ia || '',
     Usuario: e.usuario || '',
     Fecha: (e.fecha || '').slice(0, 10),
+    Estado: e.estado || 'pendiente',
+    Revisado_Por: e.revisado_por || '',
   };
 }
 

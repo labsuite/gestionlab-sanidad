@@ -701,14 +701,17 @@ function _mostrarBloqueoIaAdicion(mensaje, contenedorSugerido) {
       <div id="adic-ia-msg" style="margin-top:6px;white-space:pre-wrap"></div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary" type="button" style="font-size:12px;padding:5px 12px" onclick="closeModal('modal-adicion-res')">Entendido, no lo tiro</button>
-        <button class="btn btn-danger" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">La IA se equivoca — registrar igualmente</button>
+        ${getUserRole() === 'Alumno' ? '' : `<button class="btn btn-danger" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">La IA se equivoca — registrar igualmente</button>`}
       </div>
-      <div style="margin-top:6px;font-size:11px;color:#9a3412">Si lo registras igualmente, quedará anotado para que Gestión revise la clasificación.</div>
+      <div style="margin-top:6px;font-size:11px;color:#9a3412">${getUserRole() === 'Alumno'
+        ? 'Si dudas, no lo tires: llama al profesorado.'
+        : 'Si lo registras igualmente, quedará anotado y Gestión decidirá si la IA aprende este caso.'}</div>
     </div>`;
   let txt = mensaje || 'Este residuo no parece compatible con el contenedor.';
   if (contenedorSugerido && !/^\s*ningun/i.test(contenedorSugerido)) txt += `\n\nContenedor adecuado: ${contenedorSugerido}`;
   document.getElementById('adic-ia-msg').textContent = txt;
-  document.getElementById('adic-forzar-ia').onclick = () => guardarAdicion(true, mensaje || '', true);
+  const btnForzar = document.getElementById('adic-forzar-ia');
+  if (btnForzar) btnForzar.onclick = () => guardarAdicion(true, mensaje || '', true);
 }
 
 function _mostrarIaNoVerificado(mensaje) {
@@ -721,11 +724,13 @@ function _mostrarIaNoVerificado(mensaje) {
       <div id="adic-ia-msg" style="margin-top:6px;white-space:pre-wrap"></div>
       <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-secondary" type="button" style="font-size:12px;padding:5px 12px" onclick="closeModal('modal-adicion-res')">Cancelar</button>
-        <button class="btn btn-primary" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">Registrar sin comprobar</button>
+        ${getUserRole() === 'Alumno' ? '' : `<button class="btn btn-primary" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">Registrar sin comprobar</button>`}
       </div>
+      ${getUserRole() === 'Alumno' ? '<div style="margin-top:6px;font-size:11px">Sin la comprobación, tu grupo no puede registrarlo: llama al profesorado.</div>' : ''}
     </div>`;
   document.getElementById('adic-ia-msg').textContent = mensaje || 'La IA no está disponible en este momento.';
-  document.getElementById('adic-forzar-ia').onclick = () => guardarAdicion(true, '(IA no disponible)', false);
+  const btnSin = document.getElementById('adic-forzar-ia');
+  if (btnSin) btnSin.onclick = () => guardarAdicion(true, '(IA no disponible)', false);
 }
 
 // ── Cerrar contenedor (lleno → crear nuevo vacío) ────────────
@@ -874,6 +879,7 @@ function renderPanelConsultasResiduo() {
   const pendientes = DATA.consultasResiduo.filter(c => c.Estado === 'Pendiente')
     .sort((a, b) => (b.Prioridad === 'Alta') - (a.Prioridad === 'Alta'));
   const excepciones = (DATA.excepcionesResiduoIa || [])
+    .filter(e => (e.Estado || 'pendiente') === 'pendiente')
     .slice().sort((a, b) => (b.Fecha || '').localeCompare(a.Fecha || ''));
 
   if (!esStaff || (!pendientes.length && !excepciones.length)) {
@@ -919,7 +925,7 @@ function renderPanelConsultasResiduo() {
         🤖 Adiciones registradas pese al aviso de la IA
         <span class="badge badge-orange" style="font-size:11px">${excepciones.length}</span>
       </div>
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Alguien pulsó "registrar igualmente" tras un bloqueo de la IA al añadir a un contenedor. Revisa que la clasificación del contenedor y del tipo de residuo sea correcta.</div>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Alguien pulsó "registrar igualmente" tras un bloqueo de la IA al añadir a un contenedor. Revisa la clasificación: si el registro era correcto, <strong>✓ Aprobar</strong> hace que la IA aprenda este caso; si no, <strong>✗ Descartar</strong> lo deja solo anotado. Mientras está pendiente, la IA no aprende nada de él.</div>
       ${excepciones.slice(0, 12).map(e => {
         const tr = e.ID_Residuo ? DATA.tiposResiduo.find(t => t.ID_Residuo === e.ID_Residuo) : null;
         const que = tr?.Nombre || e.Descripcion_Libre || e.ID_Residuo || '(sin detalle)';
@@ -927,6 +933,10 @@ function renderPanelConsultasResiduo() {
           <div style="font-size:13px;font-weight:500">${que} → contenedor «${e.Categoria_Contenedor || '—'}»</div>
           ${e.Motivo_IA ? `<div style="font-size:12px;color:var(--text-muted);font-style:italic;margin:2px 0">La IA objetó: "${e.Motivo_IA.slice(0,180)}${e.Motivo_IA.length>180?'…':''}"</div>` : ''}
           <div style="font-size:12px;color:var(--text-muted)">👤 ${e.Usuario || '—'} &nbsp;·&nbsp; 📅 ${formatDate(e.Fecha)||e.Fecha||'—'}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button class="btn btn-primary" style="font-size:11px;padding:4px 12px" onclick="revisarExcepcionResiduoIa('${e.ID_Excepcion}', true)">✓ Aprobar</button>
+            <button class="btn btn-secondary" style="font-size:11px;padding:4px 12px" onclick="revisarExcepcionResiduoIa('${e.ID_Excepcion}', false)">✗ Descartar</button>
+          </div>
         </div>`;
       }).join('')}
     </div>`;
@@ -944,6 +954,20 @@ function abrirModalTipoDesdeConsulta(idxConsulta) {
       cb.checked = (cb.value === c.Categoria_IA);
     });
   }
+}
+
+/** Gestión aprueba (la IA aprende el caso) o descarta un registro forzado contra la IA. */
+async function revisarExcepcionResiduoIa(idExcepcion, aprobar) {
+  if (!aprobar && !confirm('¿Descartar? Queda anotado, pero la IA no aprenderá este caso.')) return;
+  showLoading(aprobar ? 'Aprobando...' : 'Descartando...');
+  try {
+    const { excepcion } = await callEdgeFunction('gestionar-residuo', { accion: 'revisar_excepcion_ia', id_excepcion: idExcepcion, aprobar });
+    const i = (DATA.excepcionesResiduoIa || []).findIndex(e => e.ID_Excepcion === idExcepcion);
+    if (i >= 0 && excepcion) DATA.excepcionesResiduoIa[i] = _excepcionResiduoIaSbToObj(excepcion);
+    renderPanelConsultasResiduo();
+    showToast(aprobar ? 'Aprobado: la IA tendrá en cuenta este caso' : 'Descartado', 'success');
+  } catch (e) { showToast(e.message || 'No se pudo guardar la revisión', 'error'); console.error(e); }
+  hideLoading();
 }
 
 async function resolverConsultaResiduo(idx) {

@@ -374,6 +374,11 @@ create table if not exists excepciones_residuo_ia (
   fecha                 timestamptz not null default now()
 );
 alter table excepciones_residuo_ia enable row level security;
+-- Revisión de Gestión (2026-11-23): un registro forzado no enseña nada a la IA hasta que
+-- Gestión lo aprueba. 'pendiente' | 'aprobada' | 'descartada'.
+alter table excepciones_residuo_ia add column if not exists estado text not null default 'pendiente';
+alter table excepciones_residuo_ia add column if not exists revisado_por text;
+alter table excepciones_residuo_ia add column if not exists fecha_revision timestamptz;
 
 -- ============================================================
 -- 5. RESERVAS DE EQUIPOS
