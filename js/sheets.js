@@ -758,6 +758,14 @@ async function _leerTablaCompleta(tabla, pk) {
 }
 
 async function loadAllData() {
+  // Desde 2026-11-23 las tablas solo se leen CON sesión (RLS «to authenticated»; antes
+  // también con la clave pública, y cualquiera podía leer nombres, emails y el token de los
+  // pedidos sin entrar). Sin sesión válida, la carga devolvería todo vacío: a la entrada.
+  const { data: { session: _sesionCarga } } = await _sbMigracion.auth.getSession();
+  if (!_sesionCarga?.access_token) {
+    if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
+    return;
+  }
   showLoading('Cargando datos...');
   try {
     const [sbCiclosRes, sbModulosRes, sbModuloCicloRes, sbUserModulosRes, sbUsuariosRes,

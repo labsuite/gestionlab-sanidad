@@ -282,7 +282,7 @@ create table evaluaciones_curso (
   check (fecha_fin >= fecha_inicio)
 );
 alter table evaluaciones_curso enable row level security;
-create policy evaluaciones_curso_select_anon on evaluaciones_curso for select to anon, authenticated using (true);
+create policy evaluaciones_curso_select_anon on evaluaciones_curso for select to authenticated using (true);
 
 -- Migración: ejecución de mantenimientos por pasos, con guardado a medias.
 -- Una fila puede quedar 'en_curso' (checklist a medias, sin fecha_realizacion) y pasar a
@@ -650,9 +650,12 @@ alter default privileges in schema public grant all on tables to service_role;
 alter default privileges in schema public grant all on sequences to service_role;
 
 grant select, insert, update, delete on all tables in schema public to authenticated;
-grant select on all tables in schema public to anon;
+-- Sin sesión no se lee NADA (2026-11-23). Antes anon tenía lectura y, con las
+-- políticas «to anon», cualquiera con la clave pública (que va en el JS de la app)
+-- leía nombres y emails del profesorado, cuentas de grupo y el token de los pedidos.
+revoke select on all tables in schema public from anon;
 alter default privileges in schema public grant select, insert, update, delete on tables to authenticated;
-alter default privileges in schema public grant select on tables to anon;
+alter default privileges in schema public revoke select on tables from anon;
 
 -- Excepción: `credenciales_grupo` no la toca nunca el navegador (guarda las
 -- contraseñas cifradas de las cuentas de grupo). RLS sin políticas ya lo impide;
@@ -661,45 +664,41 @@ alter default privileges in schema public grant select on tables to anon;
 revoke all on credenciales_grupo from anon, authenticated;
 
 -- ============================================================
--- 11. POLÍTICAS RLS — catálogos no sensibles, lectura pública
+-- 11. POLÍTICAS RLS — lectura para quien ha iniciado sesión
 -- ============================================================
--- Lectura libre para "anon" (mientras el login siga siendo Google OAuth
--- directo, todas las lecturas usan la anon key) y también "authenticated"
--- (una vez el login pase a Supabase Auth real, el cliente adjunta el JWT de
--- sesión en vez de la anon key — sin "authenticated" aquí, cualquier persona
--- que iniciase sesión de verdad se quedaría sin poder leer nada, porque las
--- políticas "to anon" no aplican a sesiones autenticadas). Las escrituras
--- siguen exigiendo Admin/Gestor vía Edge Function, nunca directo desde el
--- cliente con RLS de escritura.
+-- Solo "authenticated" (desde 2026-11-23; hasta entonces también "anon", herencia
+-- del login con Google, y las tablas se podían leer sin entrar). Los nombres de
+-- las políticas conservan el sufijo "_select_anon" por historia. Las escrituras
+-- siguen exigiendo una Edge Function, nunca RLS de escritura desde el cliente.
 
-create policy "proveedores_select_anon" on proveedores for select to anon, authenticated using (true);
-create policy "ubicaciones_select_anon" on ubicaciones for select to anon, authenticated using (true);
-create policy "equipos_select_anon" on equipos for select to anon, authenticated using (true);
-create policy "intervenciones_select_anon" on intervenciones for select to anon, authenticated using (true);
-create policy "incidencias_select_anon" on incidencias for select to anon, authenticated using (true);
-create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to anon, authenticated using (true);
-create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to anon, authenticated using (true);
-create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to anon, authenticated using (true);
-create policy "material_select_anon" on material for select to anon, authenticated using (true);
-create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to anon, authenticated using (true);
-create policy "pedidos_select_anon" on pedidos for select to anon, authenticated using (true);
-create policy "lineas_pedido_select_anon" on lineas_pedido for select to anon, authenticated using (true);
-create policy "documentos_proveedor_select_anon" on documentos_proveedor for select to anon, authenticated using (true);
-create policy "solicitudes_select_anon" on solicitudes for select to anon, authenticated using (true);
-create policy "historico_precio_select_anon" on historico_precio for select to anon, authenticated using (true);
-create policy "movimientos_select_anon" on movimientos for select to anon, authenticated using (true);
-create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to anon, authenticated using (true);
-create policy "config_reservas_select_anon" on config_reservas for select to anon, authenticated using (true);
-create policy "reservas_equipos_select_anon" on reservas_equipos for select to anon, authenticated using (true);
-create policy "registros_cabina_select_anon" on registros_cabina for select to anon, authenticated using (true);
-create policy "registros_autoclave_select_anon" on registros_autoclave for select to anon, authenticated using (true);
-create policy "registros_vitrina_select_anon" on registros_vitrina for select to anon, authenticated using (true);
-create policy "usuarios_select_anon" on usuarios for select to anon, authenticated using (true);
-create policy "tipos_residuo_select_anon" on tipos_residuo for select to anon, authenticated using (true);
-create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to anon, authenticated using (true);
-create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to anon, authenticated using (true);
-create policy "consultas_residuo_select_anon" on consultas_residuo for select to anon, authenticated using (true);
-create policy "excepciones_residuo_ia_select_anon" on excepciones_residuo_ia for select to anon, authenticated using (true);
+create policy "proveedores_select_anon" on proveedores for select to authenticated using (true);
+create policy "ubicaciones_select_anon" on ubicaciones for select to authenticated using (true);
+create policy "equipos_select_anon" on equipos for select to authenticated using (true);
+create policy "intervenciones_select_anon" on intervenciones for select to authenticated using (true);
+create policy "incidencias_select_anon" on incidencias for select to authenticated using (true);
+create policy "tareas_intervencion_select_anon" on tareas_intervencion for select to authenticated using (true);
+create policy "planes_mantenimiento_select_anon" on planes_mantenimiento for select to authenticated using (true);
+create policy "registro_mantenimientos_select_anon" on registro_mantenimientos for select to authenticated using (true);
+create policy "material_select_anon" on material for select to authenticated using (true);
+create policy "material_ubicaciones_select_anon" on material_ubicaciones for select to authenticated using (true);
+create policy "pedidos_select_anon" on pedidos for select to authenticated using (true);
+create policy "lineas_pedido_select_anon" on lineas_pedido for select to authenticated using (true);
+create policy "documentos_proveedor_select_anon" on documentos_proveedor for select to authenticated using (true);
+create policy "solicitudes_select_anon" on solicitudes for select to authenticated using (true);
+create policy "historico_precio_select_anon" on historico_precio for select to authenticated using (true);
+create policy "movimientos_select_anon" on movimientos for select to authenticated using (true);
+create policy "revisiones_inventario_select_anon" on revisiones_inventario for select to authenticated using (true);
+create policy "config_reservas_select_anon" on config_reservas for select to authenticated using (true);
+create policy "reservas_equipos_select_anon" on reservas_equipos for select to authenticated using (true);
+create policy "registros_cabina_select_anon" on registros_cabina for select to authenticated using (true);
+create policy "registros_autoclave_select_anon" on registros_autoclave for select to authenticated using (true);
+create policy "registros_vitrina_select_anon" on registros_vitrina for select to authenticated using (true);
+create policy "usuarios_select_anon" on usuarios for select to authenticated using (true);
+create policy "tipos_residuo_select_anon" on tipos_residuo for select to authenticated using (true);
+create policy "contenedores_residuo_select_anon" on contenedores_residuo for select to authenticated using (true);
+create policy "adiciones_residuo_select_anon" on adiciones_residuo for select to authenticated using (true);
+create policy "consultas_residuo_select_anon" on consultas_residuo for select to authenticated using (true);
+create policy "excepciones_residuo_ia_select_anon" on excepciones_residuo_ia for select to authenticated using (true);
 -- Recordatorios privados: cada cuenta lee solo los suyos (antes, lectura abierta a anon —
 -- cualquiera con la clave pública veía las tareas de todo el profesorado; cambiado 2026-11-23).
 -- La escritura sigue pasando por la Edge Function gestionar-tarea-personal.
@@ -742,7 +741,7 @@ create index if not exists idx_propuestas_ubic_estado on propuestas_ubicacion_eq
 create index if not exists idx_propuestas_ubic_equipo on propuestas_ubicacion_equipo (id_equipo);
 
 alter table propuestas_ubicacion_equipo enable row level security;
-create policy "propuestas_ubicacion_equipo_select_anon" on propuestas_ubicacion_equipo for select to anon, authenticated using (true);
+create policy "propuestas_ubicacion_equipo_select_anon" on propuestas_ubicacion_equipo for select to authenticated using (true);
 
 -- ============================================================
 -- 10. ENLACE ESTABLE DE LOS HISTORIALES DEL FUNGIBLE (2026-09-16)
@@ -803,7 +802,7 @@ alter table material add column if not exists atributos jsonb not null default '
 create index if not exists idx_atributos_material_categoria on atributos_material (categoria);
 
 alter table atributos_material enable row level security;
-create policy "atributos_material_select_anon" on atributos_material for select to anon, authenticated using (true);
+create policy "atributos_material_select_anon" on atributos_material for select to authenticated using (true);
 
 -- Cuarentena del material propuesto por el alumnado. No hay columna "nombre":
 -- ese es justo el campo que no se le pide a nadie (se compone de nombre_base +
@@ -838,7 +837,7 @@ create table if not exists propuestas_material (
 
 create index if not exists idx_propuestas_material_estado on propuestas_material (estado);
 alter table propuestas_material enable row level security;
-create policy "propuestas_material_select_anon" on propuestas_material for select to anon, authenticated using (true);
+create policy "propuestas_material_select_anon" on propuestas_material for select to authenticated using (true);
 
 -- ── Material común (2026-10-04) ──────────────────────────────────────────
 -- Guantes, papel secante, EPI…: se compran desde los laboratorios, en la misma
@@ -933,7 +932,7 @@ create table if not exists cajas_congelado (
 );
 create index if not exists idx_cajas_congelado_equipo on cajas_congelado (id_equipo);
 alter table cajas_congelado enable row level security;
-create policy "cajas_congelado_select_anon" on cajas_congelado for select to anon, authenticated using (true);
+create policy "cajas_congelado_select_anon" on cajas_congelado for select to authenticated using (true);
 
 -- ── Muestras congeladas · parte 2: muestras (2026-11-22) ────────────────
 -- Una fila por TUBO/VIAL físico: cada uno ocupa una casilla de una caja.
@@ -977,7 +976,7 @@ create index if not exists idx_muestras_congeladas_lote on muestras_congeladas (
 create unique index if not exists uq_muestras_congeladas_casilla
   on muestras_congeladas (id_caja, posicion) where estado = 'Disponible';
 alter table muestras_congeladas enable row level security;
-create policy "muestras_congeladas_select_anon" on muestras_congeladas for select to anon, authenticated using (true);
+create policy "muestras_congeladas_select_anon" on muestras_congeladas for select to authenticated using (true);
 
 -- ── Muestras congeladas · parte 3: usos e historial (2026-11-22) ────────
 -- Cada vez que se usa un tubo (o se hace un stock nuevo a partir de él, o se
@@ -1001,7 +1000,7 @@ create index if not exists idx_usos_muestra_lote on usos_muestra (id_lote);
 create index if not exists idx_usos_muestra_muestra on usos_muestra (id_muestra);
 create index if not exists idx_muestras_congeladas_origen on muestras_congeladas (id_lote_origen);
 alter table usos_muestra enable row level security;
-create policy "usos_muestra_select_anon" on usos_muestra for select to anon, authenticated using (true);
+create policy "usos_muestra_select_anon" on usos_muestra for select to authenticated using (true);
 
 -- 2026-11-22: tipos renombrados — 'Kit o master mix' → 'Reactivo' (master mix,
 -- alícuotas de antibiótico, FBS, enzimas, cebadores…) y 'Suero, plasma o
