@@ -683,6 +683,15 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
       </tr>`;
     }
     const tienePrecio = it.precio_unitario != null;
+    // Si la línea ya tiene precio guardado (otra revisión o una corrección a
+    // mano, p. ej. termómetro + sonda), la fila sale DESMARCADA: volver a
+    // guardar lo leído por la IA desharía esa corrección.
+    const precioGuardado = parseFloat(DATA.lineasPedido.find(l => l.ID_Linea === m.id_linea)?.Precio_Unitario);
+    const yaGuardado = !isNaN(precioGuardado) && precioGuardado > 0;
+    const marcado = tienePrecio && !yaGuardado;
+    const notaGuardado = yaGuardado
+      ? `<div style="font-size:11px;color:var(--text-muted)">${Math.abs(precioGuardado - (it.precio_unitario ?? NaN)) < 0.005 ? '✓ ya guardado' : `guardado: ${precioGuardado.toFixed(2)} €`}</div>`
+      : '';
     // Sin semáforo rojo/verde: no hay forma de saber desde la factura si esta
     // línea se cuenta por unidad suelta o por envase (eso es un criterio tuyo).
     // Si el servidor dividió el precio del envase entre sus unidades
@@ -691,11 +700,11 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
       ? `<div style="font-size:11px;color:var(--success,#16a34a)">${it.precio_envase_original.toFixed(2)} € ÷ ${it.unidades_por_envase} = ${it.precio_unitario.toFixed(2)} €/ud</div>`
       : '';
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${tienePrecio ? 'checked' : 'disabled'} style="width:16px;height:16px"></td>
+      <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-check" data-id-linea="${m.id_linea}" ${marcado ? 'checked' : ''} ${tienePrecio ? '' : 'disabled'} style="width:16px;height:16px"></td>
       <td style="padding:6px 8px;vertical-align:top">${factura}</td>
       <td style="padding:6px 8px;vertical-align:top">→ ${_escAttr(m.material_linea)}
         <div class="revext-fila-factura">pedido ${m.cantidad_pedida ?? '—'} · recibido ${m.cantidad_recibida || 0}</div>${_celdaConceptoFactura(m)}</td>
-      <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right">${precioPorUnidad}</td>
+      <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-precio" data-id-linea="${m.id_linea}" min="0" step="0.01" value="${tienePrecio ? it.precio_unitario : ''}" style="width:90px;text-align:right">${precioPorUnidad}${notaGuardado}</td>
     </tr>`;
   }).join('');
 
