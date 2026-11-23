@@ -665,6 +665,11 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
       // (la IA falla a veces: la sonda del termómetro, un patrón McFarland…).
       const lineasPed = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
       const precioItem = itemFactura.precio_unitario;
+      // Ni emparejado por texto ni en sin_match: la IA lo juntó con otro
+      // artículo en una línea, sumando cantidades y PROMEDIANDO precios
+      // (PEDLG75G9: dos patrones McFarland 50,90 y 129,70 → 90,30).
+      const sumadoAOtra = !(r.sin_match || []).some(s => s.material === itemFactura.material);
+      const notaInicial = sumadoAOtra ? '⚠ La IA lo ha juntado con otro artículo en una línea, promediando el precio. Revisa esa fila o asígnalo aquí a su línea.' : '';
       return `<tr style="border-bottom:1px solid var(--border);background:var(--danger-light,#fdf0f0)">
         <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-asig-check" data-n="${n}" disabled style="width:16px;height:16px"></td>
         <td style="padding:6px 8px;vertical-align:top">${factura}</td>
@@ -673,7 +678,7 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
             <option value="">Sin línea — ¿asignar a una línea?</option>
             ${lineasPed.map(l => `<option value="${l.ID_Linea}">${_escAttr(String(l.Material || '').slice(0, 60))}${l.Precio_Unitario ? ` · ${Number(l.Precio_Unitario).toFixed(2)} €` : ' · sin precio'}</option>`).join('')}
           </select>
-          <div class="revext-asig-nota" data-n="${n}" style="font-size:11px;color:var(--text-muted);margin-top:3px"></div></td>
+          <div class="revext-asig-nota" data-n="${n}" style="font-size:11px;color:var(--text-muted);margin-top:3px">${notaInicial}</div></td>
         <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-asig-precio" data-n="${n}" data-precio-item="${precioItem ?? ''}" min="0" step="0.01" value="${precioItem ?? ''}" style="width:90px;text-align:right"></td>
       </tr>`;
     }
