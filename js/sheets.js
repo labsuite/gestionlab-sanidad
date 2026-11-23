@@ -14,9 +14,9 @@ async function callEdgeFunction(nombre, body) {
   const { data: { session } } = await _sbMigracion.auth.getSession();
   // Sin sesión NO se manda la clave anónima como si fuese un token: el servidor
   // la rechaza con un 401 genérico y quien usa la app solo ve "Error al …".
-  // Como las tablas se leen con la clave anónima (RLS de solo lectura), la app
-  // sigue pintando los datos y parece funcionar hasta que se intenta guardar
-  // algo — así que hay que decirlo claro y devolver a la pantalla de login.
+  // Hasta 2026-11-23 las tablas se leían también sin sesión (clave anónima), así que la
+  // app seguía pintando los datos y parecía funcionar hasta que se intentaba guardar
+  // algo: hay que decirlo claro y devolver a la pantalla de login.
   if (!session?.access_token) {
     if (typeof _mostrarPantallaLogin === 'function') _mostrarPantallaLogin();
     throw new Error('Tu sesión ha caducado. Vuelve a entrar para guardar cambios.');

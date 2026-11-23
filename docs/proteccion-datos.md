@@ -206,3 +206,19 @@ laboratorio exige saber quién fue?**
 
 Ante la duda, la respuesta es **no**: un registro sin nombre sigue sirviendo para
 gestionar el laboratorio; uno con nombre hay que justificarlo, protegerlo y borrarlo.
+
+## 9. Quién puede leer los datos
+
+**Solo quien ha iniciado sesión** (desde el 2026-11-23). Hasta ese día las tablas tenían
+políticas de lectura para `anon`, herencia del login con Google, y la clave anónima va
+dentro del JavaScript de la app: cualquiera, sin entrar, podía leer nombres y emails del
+profesorado (`usuarios`), quién hizo cada registro, las cuentas de grupo y el token
+público de los pedidos (con el que se puede subir una factura como si fuera el proveedor).
+Ahora las políticas son `to authenticated` y `anon` no tiene permiso de lectura sobre
+ninguna tabla. **No volver a abrir la lectura a `anon`**, ni siquiera para una tabla "sin
+datos personales": es la misma puerta para todas.
+
+Pendiente de decidir: dentro de la sesión, todas las cuentas (también las de grupo) leen
+todas las tablas que la app carga, incluidos los emails del profesorado y el token de los
+pedidos. Las cuentas privadas que siguen cerradas incluso con sesión: `credenciales_grupo`,
+`users` y, cada cual las suyas, `tareas_personales`.

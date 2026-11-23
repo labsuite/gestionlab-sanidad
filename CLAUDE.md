@@ -228,11 +228,16 @@ cada caso en `docs/proteccion-datos.md`.
 
 ## "Lee bien pero no deja guardar" = la sesión ha caducado
 
-⚠ Las tablas se leen con la **clave anónima** (hay políticas RLS de solo lectura para
-`anon`), pero escribir pasa siempre por una Edge Function, que exige el token de la sesión.
-Por eso una sesión caducada no vacía la pantalla: la app pinta todos los datos como
-siempre y solo falla al guardar. Pasa sobre todo en los dispositivos compartidos de las
-cuentas de **grupo**, que se quedan abiertos días.
+⚠ **Desde 2026-11-23 las tablas solo se leen con sesión** (políticas RLS `to authenticated`
+y sin permiso de lectura para `anon`). Antes se leían también con la **clave anónima**, que
+va en el JS de la app: cualquiera, sin entrar, podía leer nombres y emails del profesorado,
+cuentas de grupo y el token público de los pedidos. **No volver a dar lectura a `anon`.**
+`loadAllData()` sin sesión manda a la pantalla de entrada.
+
+Antes de ese cambio, una sesión caducada no vaciaba la pantalla: la app pintaba los datos y
+solo fallaba al guardar (de ahí el nombre de este apartado). Escribir pasa siempre por una
+Edge Function, que exige el token de la sesión. Pasa sobre todo en los dispositivos
+compartidos de las cuentas de **grupo**, que se quedan abiertos días.
 
 `callEdgeFunction()` (`js/sheets.js`) ya **no** manda la clave anónima como si fuese el
 token cuando no hay sesión — eso producía un 401 "Sesión inválida o caducada" que cada
