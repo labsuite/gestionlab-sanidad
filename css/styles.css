@@ -2072,3 +2072,15 @@ mark.proto-hl { background: #ffe58a; color: inherit; padding: 0 1px; border-radi
   margin: 4px 0 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; text-align: left;
   background: var(--warning-light); border: 1px solid #e8c98a; border-radius: var(--radius-sm); color: var(--text);
 }
+
+/* Ayuda: varias capturas en un paso y tablas del guion */
+.ayuda-galeria { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 10px; }
+.ayuda-galeria figure { margin: 0; }
+.ayuda-galeria .ayuda-captura { margin-top: 0; max-width: 100%; }
+.ayuda-galeria figcaption { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+.ayuda-p { margin: 0 0 8px; }
+.ayuda-tabla-wrap { overflow-x: auto; }
+.ayuda-tabla { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ayuda-tabla th, .ayuda-tabla td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; vertical-align: top; }
+.ayuda-tabla th { background: var(--bg); font-size: 12px; }
+@media (max-width: 768px) { .ayuda-galeria { grid-template-columns: 1fr 1fr; } }

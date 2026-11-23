@@ -22,12 +22,14 @@ const AYUDA_MANUALES = {
     titulo: 'Manual del alumnado',
     intro: 'Lo que hace tu grupo en GestionLab, contado como tareas de laboratorio. Entras con la cuenta del grupo, y lo que registras sale a nombre del grupo.',
     secciones: [
+      { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
       { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-2'] },
     ],
   },
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [] },
+  // EMP-6 es común a todos los roles (misma versión en todos los manuales).
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -142,7 +144,200 @@ const AYUDA_TAREAS = {
       },
     },
   },
+
+  // ── EMP-1 · versión alumnado (guion «EMP-1_entrar-y-que-puede-hacer.md», 23/11/2026) ──
+  // Listas de «Qué puede hacer tu grupo» y del visto bueno contrastadas con lo que acepta el
+  // servidor para una cuenta de grupo el 23/11/2026 (cambios respecto al guion: mantenimiento
+  // y recuento acotados a sus laboratorios y la zona común; ubicaciones con doble
+  // verificación; residuos sin «registrar igualmente»).
+  'EMP-1': {
+    pantallas: ['dashboard', 'perfil'],
+    versiones: {
+      Alumno: {
+        titulo: 'Entrar en GestionLab y saber qué puede hacer tu grupo',
+        quien: [
+          'Tu grupo, con la cuenta del grupo (por ejemplo, «1º CS LCB»). La cuenta es de toda la clase: no hay cuentas personales del alumnado.',
+          'La misma cuenta puede estar abierta a la vez en varios móviles y ordenadores.',
+        ],
+        cuando: [
+          'La primera vez que vais a usar GestionLab en el curso, cuando el profesorado os da la cuenta y la contraseña del grupo.',
+          'Después, en cada dispositivo la sesión se queda abierta y no hay que volver a escribir la contraseña. En los ordenadores del laboratorio que se comparten, se entra al empezar la práctica y se sale al terminarla (paso 5).',
+        ],
+        antes: [
+          'El email de la cuenta del grupo y su contraseña, que os da el profesorado en clase. No es la contraseña de la Xunta: GestionLab tiene las suyas.',
+        ],
+        pasos: [
+          {
+            texto: '**Abrir GestionLab.** En el móvil, mejor instalada como app (→ [[EMP-6|Usar GestionLab en el móvil]]). En un ordenador, en el navegador: labsuite.github.io/gestionlab-sanidad.',
+          },
+          {
+            texto: '**Escribir el email y la contraseña del grupo** en «Email» y «Contraseña» y pulsar «Iniciar sesión». Se abre el «Panel principal».',
+            img: 'EMP-1/01-pantalla-de-entrada.png',
+            alt: 'Pantalla de entrada con el email y la contraseña escritos y el botón Iniciar sesión señalado',
+          },
+          {
+            texto: '**Qué se ve al entrar.** Arriba del «Panel principal», cuatro cifras: «Preventivos pendientes» son los mantenimientos que tu grupo puede hacer ahora (los de los equipos de vuestros laboratorios y de la zona común); «Incidencias abiertas», «Items bajo mínimo» y «Residuos por clasificar» son de todo el centro. Debajo salen los avisos, por ejemplo los mantenimientos que tocan, y el botón «Registrar consumo de material».',
+            img: 'EMP-1/02-panel-principal.png',
+            alt: 'Panel principal de una cuenta de grupo con las cuatro cifras señaladas y la lista de mantenimientos pendientes',
+          },
+          {
+            texto: '**Las secciones del grupo están en el menú** (en el móvil, se abre con «☰», arriba a la izquierda): «Panel principal»; «Equipos» (Inventario y Mantenimiento); «Material fungible» (Inventario); «Uso del laboratorio» (Reservas, Registros de uso y Muestras congeladas); «Residuos» (Guía de residuos y Contenedores); «Catálogo» (Ubicaciones); y «Mi cuenta» («Mi perfil» y «Ayuda»).',
+            img: 'EMP-1/03-menu.png',
+            alt: 'Menú lateral abierto en el móvil con las secciones de una cuenta de grupo',
+          },
+          {
+            texto: '**Comprobar con qué cuenta se ha entrado** antes de registrar nada: al pie del menú salen el nombre del grupo y «Alumno» (también en «Mi cuenta › Mi perfil»). En un ordenador compartido puede seguir abierta la sesión del grupo anterior, y todo lo que se registre saldría a su nombre.',
+            nota: 'En el móvil, el pie del menú queda debajo de «Ayuda»: hay que bajar dentro del menú para verlo.',
+            imgs: [
+              { img: 'EMP-1/04-pie-del-menu.png', alt: 'Pie del menú con el nombre del grupo, el rol Alumno y el botón de cerrar sesión', pie: 'Pie del menú: nombre del grupo, «Alumno» y «↩» para cerrar la sesión.' },
+              { img: 'EMP-1/05-mi-perfil.png', alt: 'Mi perfil con el nombre del grupo, su email y el rol Alumno', pie: '«Mi perfil»: los datos de la cuenta con la que se ha entrado.' },
+            ],
+          },
+          {
+            texto: '**Al terminar la práctica en un ordenador compartido del laboratorio, cerrar la sesión**, para que el siguiente grupo no registre a vuestro nombre: botón «↩» al pie del menú, junto al nombre del grupo, y aceptar «¿Cerrar sesión en este dispositivo?». Solo se cierra en ese dispositivo: el resto de la clase sigue dentro. En el móvil propio, en cambio, dejarla abierta: las etiquetas NFC/QR solo registran con la sesión iniciada (→ [[EMP-6|Usar GestionLab en el móvil]]).',
+            nota: 'En una tableta en horizontal el menú se queda estrecho, solo con iconos, y el «↩» no se ve: girar la tableta en vertical y abrir el menú con «☰».',
+          },
+        ],
+        extras: [
+          {
+            titulo: 'Qué puede hacer tu grupo',
+            intro: 'Cada punto enlaza a su tarea del manual.',
+            items: [
+              '**Equipos**: [[EQU-1|encontrarlos]], [[EQU-2|consultar su protocolo y su manual]], [[EQU-3|saber si se pueden usar]], [[EQU-4|reservarlos y empezar y terminar el uso de la reserva]].',
+              '**Registros de uso**: [[USO-1|apuntar el trabajo en la cabina de bioseguridad y en la vitrina de gases]], y [[USO-2|cada ciclo de autoclave]].',
+              '**Muestras congeladas**: [[MUE-1|encontrarlas]] y [[MUE-2|usarlas]] (sacar una bolita, gastar un tubo o tomar volumen). Un uso apuntado por error se puede deshacer durante 15 minutos; pasado ese tiempo, lo corrige el profesorado.',
+              '**Material**: [[STO-1|encontrarlo]], [[STO-2|apuntar lo que se gasta]] (de vuestros laboratorios y de la zona común) y [[STO-3|llevarlo de un sitio a otro]].',
+              '**Residuos**: [[RES-1|consultar la Guía de residuos]] y [[RES-2|apuntar lo que se echa en cada contenedor]].',
+              '**Mantenimiento**: [[MAN-2|hacer los mantenimientos internos]] que no están reservados al profesorado, de los equipos de vuestros laboratorios y de la zona común.',
+              '**Averías**: [[INC-1|avisar de que un equipo falla]].',
+              '**Inventario**, cuando lo pide el profesorado: [[INV-1|ubicar equipos]], [[INV-2|contar el stock de un sitio]] (si el grupo tiene permiso, y solo en vuestros laboratorios y la zona común) e [[INV-3|inventariar material que no está en la app]].',
+            ],
+          },
+          {
+            titulo: 'Qué necesita el visto bueno del profesorado',
+            items: [
+              'Los mantenimientos que finaliza el grupo.',
+              'En el inventario: las ubicaciones de equipos que propone el grupo (salvo que otro grupo haya propuesto exactamente lo mismo para ese equipo: entonces se aplica sin esperar), los recuentos de stock y el material nuevo inventariado.',
+              'Las reservas, solo si coinciden con otra: entonces las decide Gestión.',
+            ],
+            nota: 'Hasta que llega el visto bueno, lo registrado no cuenta como hecho, pero tampoco hay que repetirlo.',
+          },
+          {
+            titulo: 'Lo que no hace el grupo (y a quién pedirlo)',
+            items: [
+              'Guardar muestras nuevas en el congelador, descartar tubos o cajas, cerrar un contenedor lleno, pedir material o compras: al profesorado.',
+              'Apuntar en un contenedor un residuo que la comprobación de la app no admite, o cuando la app no puede comprobarlo: no se apunta; llamar al profesorado.',
+              'Si se ha olvidado o ha cambiado la contraseña del grupo: la da el profesorado. No hay botón «He olvidado la contraseña».',
+            ],
+          },
+          {
+            titulo: 'Normas de la cuenta del grupo',
+            items: [
+              '**La contraseña es solo para la clase.** No se le da a nadie de fuera del grupo. Si creéis que la sabe alguien que no debe, decídselo al profesorado, que la cambia.',
+              '**Lo que registráis sale a nombre del grupo, no de una persona, y está hecho así a propósito.** No escribáis nombres de personas en observaciones, notas ni descripciones.',
+              '**Registrad solo lo que se ha hecho de verdad.** El registro es la prueba de que se hizo, y lo que firma el profesorado se apoya en él.',
+            ],
+          },
+        ],
+        comprobacion: [
+          'Se ve el Panel principal, y al pie del menú salen el nombre de vuestro grupo y «Alumno».',
+        ],
+        problemas: [
+          ['«Email o contraseña incorrectos»', 'revisar mayúsculas y espacios. Si sigue, pedir la contraseña al profesorado (puede haber cambiado al empezar el curso).'],
+          ['«🔒 Acceso no autorizado»', 'la cuenta no está dada de alta en GestionLab. Avisar al profesorado.'],
+          ['Al pie del menú sale otro grupo', 'cerrar la sesión y entrar con la vuestra.'],
+          ['La app vuelve sola a la pantalla de entrada, o sale «Tu sesión ha caducado»', 'volver a entrar (→ [[EMP-2|La app no guarda lo que apuntas (sesión caducada)]]).'],
+          ['No aparece una sección que esperabais', 'el grupo no la tiene; mirar «Qué puede hacer tu grupo» y «Lo que no hace el grupo».'],
+        ],
+        relacionado: [
+          ['Después', [['EMP-6', 'Usar GestionLab en el móvil'], ['EQU-1', 'Encontrar un equipo']]],
+          ['Si falla la app', [['EMP-2', 'La app no guarda lo que apuntas (sesión caducada)']]],
+        ],
+      },
+    },
+  },
+
+  // ── EMP-6 · común a todos los roles (guion «EMP-6_movil-y-etiquetas.md», 23/11/2026) ──
+  'EMP-6': {
+    pantallas: ['registros-uso', 'congelados', 'material', 'residuos-contenedores', 'perfil'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena justo debajo
+  },
 };
+
+(() => {
+  const emp6 = {
+    titulo: 'Usar GestionLab en el móvil: instalarla y leer las etiquetas NFC/QR',
+    quien: [
+      'Cualquier cuenta: la del grupo o la tuya. Una etiqueta no da más permisos que los que ya tiene la cuenta con la que se lee.',
+    ],
+    cuando: [
+      '**Una vez**: al empezar a usar GestionLab en tu móvil, para instalarla.',
+      '**Cada vez** que vayas a usar algo que lleva etiqueta: la cabina de bioseguridad, la vitrina de gases, el autoclave, una caja o un congelador de muestras, un armario del que te llevas material o un contenedor de residuos.',
+    ],
+    antes: [
+      'El móvil con conexión. Sin conexión, la app abre, pero sin datos.',
+      'El NFC del móvil activado, si lo tiene. Si no tiene NFC, la cámara para leer el QR.',
+      'La sesión de GestionLab iniciada en ese móvil (→ [[EMP-1|Entrar en GestionLab]]).',
+    ],
+    pasos: [
+      {
+        texto: '**Instalar (una vez).** Abrir GestionLab en el navegador del móvil (labsuite.github.io/gestionlab-sanidad) y añadirla a la pantalla de inicio. En Chrome o Edge, menú «⋮» → «Instalar aplicación» o «Añadir a pantalla de inicio»; en iPhone, con Safari, «Compartir» → «Añadir a pantalla de inicio». Queda con su icono, se abre sin la barra del navegador y se actualiza sola.',
+      },
+      {
+        texto: '**Entrar y dejar la sesión abierta en ese móvil.** Las etiquetas solo registran con la sesión iniciada. Si no la hay, al leer la etiqueta se abre la pantalla de entrada: al entrar, la app hace lo que pedía la etiqueta. En el móvil propio, no cerrar la sesión con «↩».',
+        img: 'EMP-1/01-pantalla-de-entrada.png',
+        alt: 'Pantalla de entrada de GestionLab, la que sale al leer una etiqueta sin sesión',
+      },
+      {
+        texto: '**Leer la etiqueta**: acercar la parte de atrás del móvil a la pegatina NFC, o enfocar el QR con la cámara.',
+      },
+      {
+        texto: '**Comprobar en la pantalla que se ha abierto lo que esperabas** (el equipo, la caja o el contenedor correctos) antes de seguir. Lo que abre cada etiqueta está en la tabla de abajo.',
+        imgs: [
+          { img: 'EMP-6/01-cabina-sesion-empezada.png', alt: 'Registros de uso de la cabina con la sesión recién empezada y el aviso con el botón Deshacer', pie: 'Cabina o vitrina: la sesión empezada, con «Deshacer» durante unos segundos.' },
+          { img: 'EMP-6/02-autoclave-registro.png', alt: 'Ventana Registrar ciclo del autoclave con el equipo ya elegido', pie: 'Autoclave: «Registrar ciclo», con el autoclave ya elegido.' },
+          { img: 'EMP-6/03-caja-de-muestras.png', alt: 'Caja del congelador abierta con sus tubos', pie: 'Caja de muestras: la caja abierta, para buscar y usar el tubo.' },
+          { img: 'EMP-6/04-armario-que-te-llevas.png', alt: 'Ventana ¿Qué te llevas? con el material del armario', pie: 'Armario: «¿Qué te llevas?», con el material de ese armario.' },
+          { img: 'EMP-6/05-contenedor-anadir-residuo.png', alt: 'Ventana Añadir residuo del contenedor biosanitario del laboratorio 205', pie: 'Contenedor: «Añadir residuo» del contenedor de esa categoría en ese laboratorio.' },
+        ],
+      },
+    ],
+    extras: [
+      {
+        titulo: 'Qué hace cada etiqueta',
+        tabla: {
+          cabeceras: ['Etiqueta', 'Qué abre', 'Tarea'],
+          filas: [
+            ['Cabina de bioseguridad, vitrina de gases', 'La primera lectura **empieza** la sesión de trabajo en ese equipo; la siguiente abre el formulario para **terminarla**', '[[USO-1|Apuntar un uso de la cabina o de la vitrina]]'],
+            ['Autoclave', 'El registro del ciclo, con el autoclave ya elegido', '[[USO-2|Apuntar un ciclo de autoclave]]'],
+            ['Caja o congelador de muestras', 'La caja, lista para buscar el tubo y usarlo (con la del congelador, todas sus cajas)', '[[MUE-1|Encontrar una muestra]] · [[MUE-2|Usar una muestra]]'],
+            ['Armario', '«¿Qué te llevas?»: el material de ese armario, para llevarlo a otro sitio', '[[STO-3|Llevar material de un sitio a otro]]'],
+            ['Contenedor de residuos', '«Añadir residuo» del contenedor de esa categoría en ese laboratorio', '[[RES-2|Echar un residuo y apuntarlo]]'],
+          ],
+        },
+        nota: 'Los equipos no tienen etiqueta que abra su ficha: se buscan por el código (→ [[EQU-1|Encontrar un equipo]]).',
+      },
+    ],
+    comprobacion: [
+      'La app instalada se abre desde su icono, sin la barra del navegador.',
+      'Al leer una etiqueta se abre la ventana de la tabla, con el equipo, la caja, el armario o el contenedor de esa etiqueta.',
+    ],
+    problemas: [
+      ['Al acercar el móvil no pasa nada', 'el NFC está desactivado, el móvil no tiene NFC o la antena está en otra zona del móvil (probar moviéndolo despacio por la parte de atrás). Si no hay manera, leer el QR con la cámara.'],
+      ['Se abre la pantalla de entrada', 'no había sesión. Entrar; la app hace después lo que pedía la etiqueta.'],
+      ['Cabina o vitrina con la cuenta del grupo', 'la app distingue por cuenta, no por persona. Si otra persona del grupo lee la etiqueta mientras el grupo tiene una sesión abierta en ese equipo, se abre el formulario para **terminar** esa sesión (si no se quería, «Cancelar»). Que en cada grupo empiece y termine la sesión la misma persona. Si se ha empezado por error, «Deshacer» durante unos segundos.'],
+      ['«No se encontró un contenedor activo…»', 'el contenedor de esa categoría se ha cerrado y no se ha puesto el de recambio. Avisar al profesorado.'],
+      ['En el laboratorio 203, la etiqueta de aguas pide elegir la garrafa', 'hay dos (tinciones y equipos); elegir a mano la que corresponde y avisar al profesorado de que esa etiqueta hay que regrabarla.'],
+      ['«Esa caja ya no existe en la app»', 'avisar al profesorado.'],
+      ['Recargar la página después de leer una etiqueta', 'no repite lo que hizo: no se duplica el registro.'],
+    ],
+    relacionado: [
+      ['Antes', [['EMP-1', 'Entrar en GestionLab']]],
+      ['Después', [['USO-1', 'Apuntar un uso de la cabina o de la vitrina'], ['USO-2', 'Apuntar un ciclo de autoclave'], ['MUE-2', 'Usar una muestra'], ['STO-3', 'Llevar material de un sitio a otro'], ['RES-2', 'Echar un residuo y apuntarlo']]],
+    ],
+  };
+  AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS['EMP-6'].versiones[r] = emp6; });
+})();
 
 // ── Estado de la página ────────────────────────────────────────────
 let _ayudaManual = null;     // rol cuyo manual se está viendo
@@ -249,8 +444,16 @@ function _ayudaHtmlTarea(cod) {
       <div>${_ayudaTxt(p.texto)}</div>
       ${p.nota ? `<div class="ayuda-nota">${_ayudaTxt(p.nota)}</div>` : ''}
       ${p.img ? _ayudaImg(p.img, p.alt) : ''}
+      ${(p.imgs || []).length ? `<div class="ayuda-galeria">${p.imgs.map(i => `<figure>${_ayudaImg(i.img, i.alt)}<figcaption>${_ayudaTxt(i.pie)}</figcaption></figure>`).join('')}</div>` : ''}
     </li>`).join('')}</ol>`;
-  const extras = (v.extras || []).map(x => bloque(_ayudaEsc(x.titulo), _ayudaLista(x.items, x.numerada))).join('');
+  // Bloques extra del guion: una lista (items) o una tabla (tabla: { cabeceras, filas }),
+  // con una nota opcional debajo.
+  const tabla = t => `<div class="ayuda-tabla-wrap"><table class="ayuda-tabla"><thead><tr>${t.cabeceras.map(c => `<th>${_ayudaEsc(c)}</th>`).join('')}</tr></thead>
+    <tbody>${t.filas.map(f => `<tr>${f.map(c => `<td>${_ayudaTxt(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const extras = (v.extras || []).map(x => bloque(_ayudaEsc(x.titulo),
+    (x.intro ? `<p class="ayuda-p">${_ayudaTxt(x.intro)}</p>` : '') +
+    (x.tabla ? tabla(x.tabla) : _ayudaLista(x.items, x.numerada)) +
+    (x.nota ? `<p class="ayuda-p">${_ayudaTxt(x.nota)}</p>` : ''))).join('');
   const problemas = (v.problemas || []).length ? `<ul class="ayuda-lista">${v.problemas.map(([q, r]) =>
     `<li><strong>${_ayudaTxt(q)}</strong>: ${_ayudaTxt(r)}</li>`).join('')}</ul>` : '';
   const relacionado = (v.relacionado || []).length ? `<ul class="ayuda-lista ayuda-relacionado">${v.relacionado.map(([etq, refs]) =>
