@@ -28,6 +28,7 @@ async function loadModales() {
     'html/modales-reservas.html',
     'html/modales-registros.html',
     'html/modales-congelados.html',
+    'html/modales-verif-pipetas.html',
     'html/modal-vista-previa.html'
   ];
   try {
@@ -159,7 +160,7 @@ function _updateBadgeMantenimiento() {
 // ============================================================
 const PERMISOS = {
   Alumno: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'material', 'ubicaciones', 'mantenimiento', 'verif-pipetas', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: false, editarEquipos: false, crearIntervenciones: false,
     // Ejecutar los mantenimientos internos que no sean "solo profesorado". NO incluye marcar
     // "no aplica"/aplazar (eso es crearIntervenciones), y lo que finalizan queda en
@@ -175,7 +176,7 @@ const PERMISOS = {
   Profesor: {
     // Páginas visibles
     nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias',
-          'mantenimiento', 'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
+          'mantenimiento', 'verif-pipetas', 'material', 'solicitudes', 'proveedores', 'proveedor-detalle',
           'ubicaciones', 'usuarios', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     // Equipos: ve todos, pero solo edita e interviene en los suyos (comprobado en render)
     editarEquipos: false,       // controla el botón "Nuevo equipo"
@@ -196,7 +197,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: false, configurarReservas: false,
   },
   Gestor: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'verif-pipetas', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -207,7 +208,7 @@ const PERMISOS = {
     reservarEquipos: true, gestionarReservas: true, configurarReservas: true,
   },
   Administrador: {
-    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
+    nav: ['dashboard', 'equipos', 'equipo-detalle', 'ubicar-equipos', 'inventariar-material', 'intervenciones', 'incidencias', 'material', 'solicitudes', 'pedidos', 'pedido-detalle', 'proveedores', 'proveedor-detalle', 'ubicaciones', 'usuarios', 'contabilidad', 'mantenimiento', 'verif-pipetas', 'residuos-guia', 'residuos-contenedores', 'reservas', 'registros-uso', 'congelados', 'perfil', 'ayuda'],
     verIntervenciones: true, editarEquipos: true, crearIntervenciones: true, crearIncidencias: true,
     registrarMantenimiento: true,
     gestionarIncidencias: true, configuracion: true, usuarios: true, dashboard: true,
@@ -328,12 +329,13 @@ function showPage(page, opts) {
     incidencias: 'Incidencias', material: 'Material fungible', movimientos: 'Movimientos de material',
     solicitudes: 'Solicitudes de material', pedidos: 'Pedidos', 'pedido-detalle': 'Detalle del pedido',
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
-    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo',
+    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo', 'verif-pipetas': 'Verificación de micropipetas',
     'residuos-guia': 'Guía de residuos', 'residuos-contenedores': 'Contenedores de residuos',
     reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', congelados: 'Muestras congeladas', perfil: 'Mi perfil', ayuda: 'Ayuda'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
   if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
+  if (page === 'verif-pipetas' && typeof renderVerifPipetas === 'function') renderVerifPipetas();
   if (page === 'ayuda' && typeof renderAyuda === 'function') {
     if (!opts?.desdeBotonAyuda) _ayudaAlEntrarPorMenu();
     renderAyuda();

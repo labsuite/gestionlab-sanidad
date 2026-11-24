@@ -1,0 +1,55 @@
+<!-- Verificación anual de las micropipetas (js/verif-pipetas.js, 2026-11-24) -->
+
+<!-- Preparación del curso -->
+<div class="modal-overlay" id="modal-verif-prep">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <div class="modal-title" id="vp-prep-titulo">Preparación del curso</div>
+      <button class="modal-close" onclick="closeModal('modal-verif-prep')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="vp-prep-cuerpo"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-verif-prep')">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarVerifPrep()">Guardar la preparación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sesión de verificación -->
+<div class="modal-overlay" id="modal-verif-sesion">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <div class="modal-title" id="vp-ses-titulo">Sesión de verificación</div>
+      <button class="modal-close" onclick="closeModal('modal-verif-sesion')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="vp-ses-cuerpo"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="vpElegirArchivo('sesion')">📥 Importar de la página de recogida</button>
+        <button class="btn btn-secondary" onclick="closeModal('modal-verif-sesion')">Cerrar</button>
+        <button class="btn btn-primary" id="vp-ses-guardar" onclick="guardarVerifSesion()">Guardar la sesión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Verificación de una pipeta (sobre «Ejecutar mantenimiento») -->
+<div class="modal-overlay" id="modal-verif-pipeta">
+  <div class="modal" style="max-width:780px">
+    <div class="modal-header">
+      <div class="modal-title" id="vp-ver-titulo">Verificación de la pipeta</div>
+      <button class="modal-close" onclick="cerrarVerifPipeta()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="vp-ver-cuerpo"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="vpElegirArchivo('pipeta')">📥 Importar de la página de recogida</button>
+        <button class="btn btn-primary" onclick="cerrarVerifPipeta()">Volver a la revisión</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="vp-archivo" accept=".json,application/json" style="display:none" onchange="vpLeerArchivo(this)">

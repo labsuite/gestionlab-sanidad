@@ -372,6 +372,19 @@ function buildMantenimientoEquipo(equipoId) {
   // Protocolo de uso (Markdown → visor plegable con índice y buscador, js/protocolo.js)
   if (equipo.Protocolo_Uso) secciones.push(buildProtocoloUso(equipo.Protocolo_Uso));
 
+  // Micropipetas: fecha y resultado de la última verificación, con el error sistemático y el CV
+  // de cada volumen (lo que dice la etiqueta de la pipeta).
+  if (typeof ultimaVerificacionPipeta === 'function' && (DATA.verifParametros || []).some(p => p.id_activo === equipoId)) {
+    const ult = ultimaVerificacionPipeta(equipoId);
+    const c = ult?.Verificacion?.calculo;
+    const parV = DATA.verifParametros.find(p => p.id_activo === equipoId);
+    const tornillo = parV?.ajuste_respuesta
+      ? `<div class="vp-guia">Tornillo de ajuste bajo la tapa del émbolo: <strong>${parV.ajuste_respuesta === 'si' ? 'sí tiene' : 'no tiene'}</strong> (${_vpEsc(parV.ajuste_respuesta_por || '')})</div>` : '';
+    secciones.push(`<div class="vp-ficha">🧪 <strong>Última verificación:</strong> ${c
+      ? `${formatDate(ult.Fecha_Realizacion)} · ${_vpBadgeResultado(c.resultado)}${ult.Estado === 'pendiente_vb' ? ' <span class="badge badge-orange">⏳ visto bueno</span>' : ''}<div class="vp-guia">${_vpEsc(resumenVerificacion(c))}</div>`
+      : '<span style="color:var(--text-muted)">ninguna registrada en GestionLab</span>'}${tornillo}</div>`);
+  }
+
   // Planes de mantenimiento. Una cuenta de grupo solo ve los de los equipos de sus
   // laboratorios y de la zona común (equipoAlAlcanceDelAlumno).
   if (!equipoAlAlcanceDelAlumno(equipo)) return secciones.join('');
@@ -491,6 +504,7 @@ let _mantEditRegistroId = null; // si no es null, el modal está editando un reg
 // Deja el modal en modo "ejecutar" (checklist + guardar progreso + finalizar).
 function _resetModalMantUI() {
   _mantEditRegistroId = null;
+  if (typeof vpPrepararRevision === 'function') vpPrepararRevision(null);
   const t = document.getElementById('mant-modal-title');
   if (t) t.textContent = 'Ejecutar mantenimiento';
   const bp = document.getElementById('mant-btn-progreso');
@@ -536,7 +550,10 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
   // Si el equipo tiene un aviso de avería abierto, que se vea antes de empezar.
   document.getElementById('mant-info-plan').insertAdjacentHTML('beforeend', htmlAvisoEquipo(idEquipo, 'mantenimiento'));
 
+  // Micropipetas: la verificación la calcula la app y marca ella sus pasos (js/verif-pipetas.js).
+  const conVerif = typeof vpPrepararRevision === 'function' && vpPrepararRevision(plan, enCurso, curso);
   _renderMantChecklist(pasos);
+  if (conVerif) vpMarcarPasosRevision();
 
   document.getElementById('mant-id-plan').value    = idPlan;
   document.getElementById('mant-id-equipo').value  = idEquipo;
@@ -583,7 +600,15 @@ function _renderMantChecklist(pasos) {
   const cont = document.getElementById('mant-checklist');
   if (!cont) return;
   // Los textos van con textContent (vienen de los planes, no se interpolan como HTML).
-  cont.innerHTML = _mantPasosActual.map((p, i) => p.criterio ? `
+  cont.innerHTML = _mantPasosActual.map((p, i) => typeof vpPasoAuto === 'function' && vpPasoAuto(p.texto) ? `
+    <div class="mant-check-item mant-check-auto ${p.resultado ? 'is-' + p.resultado : p.hecho ? 'is-cumple' : ''}" data-idx="${i}">
+      <span class="mant-check-auto-icono">${p.resultado === 'no_cumple' ? '❌' : (p.resultado === 'cumple' || p.hecho) ? '✅' : '⏳'}</span>
+      <div class="mant-check-cuerpo">
+        <span class="mant-check-texto"></span>
+        ${p.criterio ? '<div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>' : ''}
+        <div class="mant-check-auto-nota">🧪 Lo marca la app con el resultado de la verificación</div>
+      </div>
+    </div>` : p.criterio ? `
     <div class="mant-check-item mant-check-criterio ${p.resultado ? 'is-' + p.resultado : ''}" data-idx="${i}">
       <div class="mant-check-cuerpo">
         <span class="mant-check-texto"></span>
@@ -855,6 +880,7 @@ async function guardarProgresoMant() {
       id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
       pasos: _leerChecklist(), iniciado_por: _nombreUsuarioActual(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
+      verificacion: typeof vpVerificacionParaGuardar === 'function' ? vpVerificacionParaGuardar() : undefined,
     });
     DATA.registroMantenimientos = DATA.registroMantenimientos.filter(r =>
       !(r.ID_Plan === idPlan && r.Curso_Academico === curso && r.Periodo === periodo &&
@@ -897,23 +923,37 @@ async function finalizarMant() {
   const quien = document.getElementById('mant-realizado-por').value.trim();
   if (!fecha) { showToast('Indica la fecha de realización', 'error'); return; }
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
+  // Micropipetas: sin resultado de la verificación (OK o RETIRAR) no se finaliza.
+  if (typeof vpPuedeFinalizar === 'function' && !vpPuedeFinalizar()) return;
 
   const pasos = _leerChecklist();
   const sinNota = pasos.find(p => p.resultado === 'no_cumple' && !p.nota);
   if (sinNota) { showToast(`Anota qué has visto en «${sinNota.texto}», que no cumple el criterio`, 'error'); return; }
   const faltan = pasos.filter(p => !p.hecho).length;
   if (faltan && !confirm(`Quedan ${faltan} paso(s) sin marcar. ¿Dar el mantenimiento por finalizado de todas formas?`)) return;
-  const noCumple = pasos.filter(p => p.resultado === 'no_cumple');
+  // Los pasos de la verificación de una pipeta no abren aviso: si sale RETIRAR, la incidencia
+  // la abre el servidor con los valores.
+  const noCumple = pasos.filter(p => p.resultado === 'no_cumple' && !(typeof vpPasoAuto === 'function' && vpPasoAuto(p.texto)));
 
   showLoading('Finalizando...');
   try {
-    const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
+    const { registro, incidencia } = await callEdgeFunction('gestionar-mantenimiento', {
       accion: 'finalizar',
       id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
       pasos, fecha_realizacion: fecha, realizado_por: quien,
       supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
+      verificacion: typeof vpVerificacionParaGuardar === 'function' ? vpVerificacionParaGuardar() : undefined,
     });
+    if (incidencia) {
+      // Pipeta retirada: incidencia abierta (o añadida a la que había) y equipo fuera de servicio.
+      const inc = _incidenciaSbToObj(incidencia);
+      const ii = DATA.incidencias.findIndex(x => x.ID_Incidencia === inc.ID_Incidencia);
+      if (ii >= 0) DATA.incidencias[ii] = inc; else DATA.incidencias.push(inc);
+      const eq = DATA.equipos.find(e => e.ID_Activo === idEquipo);
+      if (eq) eq.Estado_Operativo = 'Fuera de servicio';
+      setTimeout(() => showToast(`Pipeta RETIRADA: incidencia ${inc.ID_Incidencia} abierta y ${idEquipo} fuera de servicio. Ponle la etiqueta «NO USAR».`, 'error'), 600);
+    }
     // El servidor borra cualquier marcador no_aplica/aplazado del mismo periodo.
     DATA.registroMantenimientos = DATA.registroMantenimientos.filter(r =>
       !(r.ID_Plan === idPlan && r.Curso_Academico === curso && r.Periodo === periodo &&
@@ -1839,12 +1879,15 @@ function _renderFilasVistoBueno(lista) {
     const obs = reg.Observaciones
       ? `<div style="font-size:11px;color:var(--text-muted);font-style:italic;margin-top:2px;white-space:pre-line">${reg.Observaciones}</div>`
       : '';
+    const vc = reg.Verificacion?.calculo;
+    const verTxt = vc && typeof resumenVerificacion === 'function'
+      ? `<div style="font-size:11px;margin-top:3px">🧪 Verificación: ${_vpBadgeResultado(vc.resultado)} <span style="color:var(--text-muted)">${esc(resumenVerificacion(vc))}</span></div>` : '';
     return `<tr>
       <td>${eqTxt}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(plan&&plan.Operacion)||''}">${(plan&&plan.Operacion)||'—'}</td>
       <td>${labelPeriodo(reg.Periodo)}</td>
       <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
-      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${noCumpleTxt}${medidasTxt}${obs}</td>
+      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${verTxt}${noCumpleTxt}${medidasTxt}${obs}</td>
       <td style="text-align:center">${pasosTxt}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary" style="padding:2px 10px;font-size:11px" onclick="darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>
@@ -2095,7 +2138,8 @@ async function exportarModeloCalidad(cursoAcademico) {
       const realizadas = periodosUnicos
         .map(p => {
           const reg = getRegistroMant(plan.ID_Plan, curso, p);
-          if (reg) return formatDate(reg.Fecha_Realizacion);
+          // Micropipetas: el resultado de la verificación (OK / AJUSTADA / RETIRADA) junto a la revisión.
+          if (reg) return formatDate(reg.Fecha_Realizacion) + (reg.Verificacion?.calculo?.calidad ? ` (verificación: ${reg.Verificacion.calculo.calidad})` : '');
           const m = getMarcadorMant(plan.ID_Plan, curso, p);
           if (!m) return '';
           if (m.Estado === 'aplazado') {

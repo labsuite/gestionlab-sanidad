@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recogida de datos · verificación de micropipetas</title>
+<!--
+  Página de recogida de datos de la verificación de micropipetas (GestionLab).
+  La genera la app («Verificación de pipetas» → «Página para recoger datos sin conexión»)
+  con las pipetas, sus volúmenes y sus límites de ese momento. SOLO recoge y comprueba los
+  datos (mismas reglas que la app); NO calcula ni decide: eso lo hace GestionLab al importar
+  el archivo que se descarga aquí. Funciona sin conexión.
+-->
+<style>
+  :root { --borde:#d9d4cb; --suave:#6f6a62; --mal:#c0392b; --aviso:#9a6200; --acento:#2f6b4f; --fondo:#f6f3ee; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--fondo); color: #222; font-size: 14px; }
+  header { background: var(--acento); color: #fff; padding: 14px 16px; }
+  header h1 { margin: 0; font-size: 17px; }
+  header p { margin: 4px 0 0; font-size: 12px; opacity: .9; }
+  main { max-width: 820px; margin: 0 auto; padding: 12px 16px 90px; }
+  .tarjeta { background: #fff; border: 1px solid var(--borde); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+  h2 { font-size: 15px; margin: 0 0 8px; }
+  h3 { font-size: 13px; margin: 14px 0 6px; }
+  .pestanas { display: flex; gap: 6px; margin: 12px 0 0; }
+  .pestanas button { flex: 1; padding: 10px; border: 1px solid var(--borde); background: #fff; border-radius: 8px; font-weight: 600; cursor: pointer; }
+  .pestanas button.activa { border: 2px solid var(--acento); color: var(--acento); }
+  label { display: block; font-size: 12px; color: var(--suave); margin: 8px 0 3px; }
+  input, select { font-size: 15px; padding: 7px 8px; border: 1px solid var(--borde); border-radius: 6px; background: #fff; }
+  input.mal { border-color: var(--mal); background: #fdf0ef; }
+  input.dudoso { border-color: #e0a73a; }
+  .msg { display: block; font-size: 11px; min-height: 0; }
+  .msg.err { color: var(--mal); } .msg.aviso { color: var(--aviso); }
+  .fila { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: flex-start; }
+  .campo { display: inline-flex; flex-direction: column; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; color: var(--suave); padding: 4px; }
+  td { padding: 4px; border-top: 1px solid #eee; vertical-align: top; }
+  td input { width: 92px; }
+  .guia { font-size: 11px; color: var(--suave); }
+  .boton { padding: 9px 14px; border-radius: 8px; border: 1px solid var(--borde); background: #fff; font-weight: 600; cursor: pointer; }
+  .boton.primario { background: var(--acento); color: #fff; border-color: var(--acento); }
+  .enlace { background: none; border: none; color: var(--acento); text-decoration: underline; cursor: pointer; padding: 0; font-size: 13px; }
+  .pie { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--borde); padding: 10px 16px; display: flex; gap: 10px; justify-content: space-between; align-items: center; }
+  .pie span { font-size: 12px; color: var(--suave); }
+  .aviso-caja { background: #fff6e5; border: 1px solid #f0d49a; border-radius: 8px; padding: 8px 10px; font-size: 12px; margin: 8px 0; }
+  .volumen { border: 1px solid var(--borde); border-radius: 8px; padding: 8px 10px; margin: 10px 0; }
+  .oculto { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Verificación de micropipetas · recogida de datos</h1>
+  <p id="cab-info"></p>
+</header>
+<main>
+  <div class="aviso-caja">Esta página <strong>solo recoge y comprueba los datos</strong>. Los cálculos y la decisión (OK, completar, ajustar o retirar) los hace GestionLab al importar el archivo: allí se revisa todo antes de guardar. Lo escrito se conserva en este navegador aunque se cierre la página.</div>
+  <div class="pestanas">
+    <button id="tab-sesion" onclick="verTab('sesion')">Sesión del día</button>
+    <button id="tab-pipetas" onclick="verTab('pipetas')">Pipetas</button>
+  </div>
+  <section id="sec-sesion"></section>
+  <section id="sec-pipetas" class="oculto"></section>
+</main>
+<div class="pie"><span id="pie-estado"></span><button class="boton primario" onclick="descargar()">Descargar el archivo</button></div>
+
+<script>
+/*__DATOS__*/
+</script>
+<script>
+/*__VALIDACION__*/
+</script>
+<script>
+// ── Estado (se guarda en este navegador) ─────────────────────────────────────
+const CLAVE = 'gl-verif-recogida-' + DATOS.curso;
+let estado;
+try { estado = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) { estado = null; }
+if (!estado || estado.formato !== FORMATO_ARCHIVO) estado = { formato: FORMATO_ARCHIVO, incluirSesion: true, sesion: nuevaSesion(), pipetas: [] };
+function nuevaSesion() {
+  return { fecha: new Date().toISOString().slice(0, 10), bloque: '', personas: '', datos: {
+    temperatura: '', balanzas: ['BAL-003'], tubos: {}, blanco_inicio: '', abs_P: ['', '', '', '', ''],
+    comprobaciones: {}, lecturas_cv: Array(10).fill(''), blanco_final: '', validacion: null } };
+}
+function guardarLocal() {
+  try { localStorage.setItem(CLAVE, JSON.stringify(estado)); } catch (e) { /* sin almacenamiento: se sigue igual */ }
+  const nErr = document.querySelectorAll('input.mal').length;
+  document.getElementById('pie-estado').textContent = nErr ? `${nErr} dato(s) que no cumplen (en rojo)` : 'Guardado en este navegador';
+}
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function get(path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), estado); }
+function put(path, v) {
+  const ks = path.split('.'); let o = estado;
+  ks.slice(0, -1).forEach((k, i) => { if (o[k] == null || typeof o[k] !== 'object') o[k] = /^\d+$/.test(ks[i + 1]) ? [] : {}; o = o[k]; });
+  o[ks[ks.length - 1]] = v;
+}
+function campo(path, tipo, ctx, ph) {
+  return `<span class="campo"><input inputmode="decimal" data-path="${esc(path)}" data-tipo="${tipo}" data-ctx='${esc(JSON.stringify(ctx || {}))}' value="${esc(get(path) ?? '')}" placeholder="${esc(ph || '')}" oninput="alEscribir(this)" onblur="comprobar(this)"><span class="msg"></span></span>`;
+}
+function texto(path, ph) { return `<input style="width:100%" data-path="${esc(path)}" data-tipo="texto" value="${esc(get(path) ?? '')}" placeholder="${esc(ph || '')}" oninput="alEscribir(this)">`; }
+function alEscribir(el) { put(el.dataset.path, el.value); if (el.dataset.tipo !== 'texto') comprobar(el, true); guardarLocal(); }
+function comprobar(el, escribiendo) {
+  if (el.dataset.tipo === 'texto') return;
+  const msg = el.parentElement.querySelector('.msg');
+  const r = el.value.trim() === '' ? {} : comprobarDato(el.dataset.tipo, el.value, { ...JSON.parse(el.dataset.ctx || '{}'), opcional: true });
+  const aviso = r.aviso && !(escribiendo && /tres decimales/.test(r.aviso)) ? r.aviso : '';
+  el.classList.toggle('mal', !!r.error); el.classList.toggle('dudoso', !r.error && !!aviso);
+  msg.textContent = r.error || aviso || ''; msg.className = 'msg ' + (r.error ? 'err' : aviso ? 'aviso' : '');
+}
+function comprobarTodo(sec) { document.querySelectorAll(`#${sec} input[data-tipo]`).forEach(el => { if (el.value) comprobar(el); }); guardarLocal(); }
+function verTab(t) {
+  ['sesion', 'pipetas'].forEach(x => { document.getElementById('sec-' + x).classList.toggle('oculto', x !== t); document.getElementById('tab-' + x).classList.toggle('activa', x === t); });
+  t === 'sesion' ? pintarSesion() : pintarPipetas();
+}
+
+// ── Sesión del día ──────────────────────────────────────────────────────────
+function pintarSesion() {
+  const s = estado.sesion, d = s.datos;
+  const tubos = DATOS.tubos.filter(t => !s.bloque || String(t.bloque) === String(s.bloque));
+  const bloques = [...new Set(DATOS.tubos.map(t => String(t.bloque)).filter(Boolean))];
+  const m = p => campo(p, 'masa', {}, 'g');
+  const a = p => campo(p, 'absorbancia', {}, '0,000');
+  const comp = (tipo, html) => `<tr><td><strong>${tipo === 'S-C2' ? 'S-C (2.º lote)' : tipo}</strong></td><td>${html}</td><td>${a(`sesion.datos.comprobaciones.${tipo}.A`)}</td></tr>`;
+  d.validacion = d.validacion || null;
+  document.getElementById('sec-sesion').innerHTML = `<div class="tarjeta">
+    <label><input type="checkbox" ${estado.incluirSesion ? 'checked' : ''} onchange="estado.incluirSesion=this.checked;guardarLocal();pintarSesion()" style="width:auto"> Este archivo lleva los datos de la sesión del día</label>
+    ${estado.incluirSesion ? `
+    <div class="fila">
+      <div><label>Fecha</label><input type="date" data-path="sesion.fecha" data-tipo="texto" value="${esc(s.fecha)}" oninput="alEscribir(this)"></div>
+      <div><label>Bloque</label><select onchange="estado.sesion.bloque=this.value;guardarLocal();pintarSesion()"><option value="">—</option>${bloques.map(b => `<option ${String(s.bloque) === b ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select></div>
+      <div><label>Temperatura del agua (°C, entera)</label>${campo('sesion.datos.temperatura', 'temperatura', {}, '22')}</div>
+    </div>
+    <label>Quién dirige y grupos (sin nombres del alumnado)</label>${texto('sesion.personas')}
+    <label>Balanzas de los tubos y de las pesadas</label>
+    <div class="fila">${DATOS.balanzas.map(b => `<label style="display:flex;gap:6px;align-items:center;color:#222"><input type="checkbox" style="width:auto" ${d.balanzas.includes(b.id) ? 'checked' : ''} ${b.s ? '' : 'disabled'} onchange="balanza('${b.id}',this.checked)"> ${b.id} (${esc(b.nombre)})${b.s ? '' : ' · sin repetibilidad medida'}</label>`).join('')}</div>
+    <h3>Tubos de disoluciones: masa cerrados antes de abrirlos y al cerrarlos al final (g)</h3>
+    ${tubos.length ? `<table><tr><th>Tubo</th><th>Ahora</th><th>Al final</th></tr>${tubos.map(t => `<tr><td><strong>${esc(t.disolucion)}</strong><div class="guia">bloque ${esc(t.bloque || '—')}</div></td><td>${m(`sesion.datos.tubos.${t.id}.m_ahora`)}</td><td>${m(`sesion.datos.tubos.${t.id}.m_cierre`)}</td></tr>`).join('')}</table>` : '<p class="guia">No hay tubos registrados en la preparación del curso.</p>'}
+    <h3>Blanco y recta del día</h3>
+    <div class="fila"><div><label>Blanco al empezar</label>${campo('sesion.datos.blanco_inicio', 'blanco', {}, '0,000')}</div></div>
+    <table><tr><th>Punto</th><th>A leída</th></tr>${[0, 1, 2, 3, 4].map(i => `<tr><td>P${i + 1}</td><td>${a(`sesion.datos.abs_P.${i}`)}</td></tr>`).join('')}</table>
+    <h3>Diluciones de comprobación (masas en g)</h3>
+    <table><tr><th>Disolución</th><th>Masas</th><th>A</th></tr>
+      ${comp('S-A', `${m('sesion.datos.comprobaciones.S-A.m1')} + ${m('sesion.datos.comprobaciones.S-A.m2')}<br>${m('sesion.datos.comprobaciones.S-A.m3')} + ${m('sesion.datos.comprobaciones.S-A.m4')}`)}
+      ${comp('S-B', `${m('sesion.datos.comprobaciones.S-B.m')} + ${m('sesion.datos.comprobaciones.S-B.m_agua')}`)}
+      ${comp('S-C', `${m('sesion.datos.comprobaciones.S-C.m')} + ${m('sesion.datos.comprobaciones.S-C.m_agua')}`)}
+      ${DATOS.hay_lote2 ? comp('S-C2', `${m('sesion.datos.comprobaciones.S-C2.m')} + ${m('sesion.datos.comprobaciones.S-C2.m_agua')}`) : ''}
+    </table>
+    <h3>CV de lectura: diez lecturas (vaciando y rellenando la cubeta)</h3>
+    <div class="fila">${d.lecturas_cv.map((_, i) => a(`sesion.datos.lecturas_cv.${i}`)).join('')}</div>
+    <h3>Blanco al final</h3>${campo('sesion.datos.blanco_final', 'blanco', {}, '0,000')}
+    <h3>Validación del método (la primera sesión del curso)</h3>
+    <label><input type="checkbox" style="width:auto" ${d.validacion ? 'checked' : ''} onchange="estado.sesion.datos.validacion=this.checked?{grav200:[],fot200:[],llenado:[],balanzas:{}}:null;guardarLocal();pintarSesion()"> Esta sesión incluye la validación</label>
+    ${d.validacion ? validacionHtml() : ''}` : ''}
+  </div>`;
+  comprobarTodo('sec-sesion');
+}
+function validacionHtml() {
+  const v = estado.sesion.datos.validacion;
+  const rel = (arr, n, vacio) => { while (arr.length < n) arr.push(vacio()); return arr; };
+  rel(v.grav200, 10, () => ({ m: '' })); rel(v.fot200, 10, () => ({ m: '', A: '' })); rel(v.llenado, 3, () => '');
+  return `<div class="guia">Comparación con la gravimetría a 200 µl: 10 pesadas y 10 réplicas fotométricas (S-C, tubos de 1,000 g).</div>
+    <table><tr><th>#</th><th>Balanza (g)</th><th>Agua del tubo (g)</th><th>A</th></tr>${v.grav200.map((_, i) => `<tr><td>${i + 1}</td><td>${campo(`sesion.datos.validacion.grav200.${i}.m`, 'masa')}</td><td>${campo(`sesion.datos.validacion.fot200.${i}.m`, 'masa')}</td><td>${campo(`sesion.datos.validacion.fot200.${i}.A`, 'absorbancia')}</td></tr>`).join('')}</table>
+    <div class="guia" style="margin-top:8px">Llenado de la cubeta: P3 con 0,7, 1,0 y 1,2 ml</div>
+    <div class="fila">${[0, 1, 2].map(i => campo(`sesion.datos.validacion.llenado.${i}`, 'absorbancia')).join('')}</div>
+    ${['BAL-001', 'BAL-005'].map(id => { const p = (v.balanzas[id] = v.balanzas[id] || []); while (p.length < 10) p.push('');
+      return `<div class="guia" style="margin-top:8px">${id}: 10 pesadas del mismo microtubo con 1 g de agua (si se va a usar)</div><div class="fila">${p.map((_, i) => campo(`sesion.datos.validacion.balanzas.${id}.${i}`, 'masa')).join('')}</div>`; }).join('')}`;
+}
+function balanza(id, on) {
+  const b = estado.sesion.datos.balanzas;
+  if (on && !b.includes(id)) b.push(id); if (!on && b.includes(id)) b.splice(b.indexOf(id), 1);
+  guardarLocal();
+}
+
+// ── Pipetas ─────────────────────────────────────────────────────────────────
+function pintarPipetas() {
+  const cont = document.getElementById('sec-pipetas');
+  const opciones = DATOS.pipetas.map(p => `<option value="${esc(p.id)}">${esc(p.id)} · ${esc(p.marca)} · ${esc(p.rango)}</option>`).join('');
+  cont.innerHTML = `<div class="tarjeta"><label>Añadir una pipeta</label>
+      <div class="fila"><select id="nueva-pipeta"><option value="">Elige…</option>${opciones}</select><button class="boton" onclick="anadirPipeta()">Añadir</button></div></div>`
+    + estado.pipetas.map((p, pi) => pipetaHtml(p, pi)).join('');
+  comprobarTodo('sec-pipetas');
+}
+function anadirPipeta() {
+  const id = document.getElementById('nueva-pipeta').value;
+  if (!id) return;
+  if (estado.pipetas.some(p => p.id_activo === id)) { alert('Esa pipeta ya está en el archivo'); return; }
+  estado.pipetas.push({ id_activo: id, v_bajo_elegido: null, puntas: '', observaciones: '', volumenes: {} });
+  guardarLocal(); pintarPipetas();
+}
+function pipetaHtml(p, pi) {
+  const d = DATOS.pipetas.find(x => x.id === p.id_activo);
+  if (!d) return `<div class="tarjeta">${esc(p.id_activo)}: no está en esta página (descárgala de nuevo desde la app).</div>`;
+  const vols = d.volumenes.map(v => (v.clave === 'bajo' && p.v_bajo_elegido ? { ...v, v: p.v_bajo_elegido } : v));
+  return `<div class="tarjeta"><h2>${esc(d.id)} <span class="guia">${esc(d.marca)} · ${esc(d.rango)}${d.canales > 1 ? ' · 8 canales' : ''}</span></h2>
+    ${d.confirmar ? `<div class="aviso-caja">⚠ ${esc(d.confirmar)}</div>` : ''}
+    ${d.opciones_bajo ? `<label>Volumen bajo según lo grabado</label><div class="fila">${d.opciones_bajo.map(v => `<label style="display:flex;gap:6px;color:#222"><input type="radio" style="width:auto" name="vb-${pi}" ${Number(p.v_bajo_elegido) === v ? 'checked' : ''} onchange="estado.pipetas[${pi}].v_bajo_elegido=${v};guardarLocal();pintarPipetas()"> ${v} µl</label>`).join('')}</div>` : ''}
+    ${vols.map(v => volumenHtml(p, pi, d, v)).join('')}
+    <label>Puntas usadas</label>${texto(`pipetas.${pi}.puntas`)}
+    <label>Observaciones</label>${texto(`pipetas.${pi}.observaciones`)}
+    <p><button class="enlace" onclick="if(confirm('¿Quitar ${esc(d.id)} del archivo?')){estado.pipetas.splice(${pi},1);guardarLocal();pintarPipetas()}">Quitar esta pipeta del archivo</button></p></div>`;
+}
+function volumenHtml(p, pi, d, v) {
+  const dv = (p.volumenes[v.clave] = p.volumenes[v.clave] || { sesion: 'archivo', lote_sc: '1', canales: [] });
+  while (dv.canales.length < d.canales) dv.canales.push({ replicas: [] });
+  const fot = v.metodo === 'fotométrico';
+  const z = null;   // sin cálculo: la masa entregada se comprueba en GestionLab con la Z de la sesión
+  return `<div class="volumen"><strong>${esc(String(v.v).replace('.', ','))} µl</strong> (${v.clave === 'nominal' ? 'nominal' : 'volumen bajo'}) · ${esc(v.metodo)}${fot ? ` · ${esc(v.disolucion)} · tubos de ${esc(Number(v.masa_tabla).toFixed(3).replace('.', ','))} g de agua` : ''}
+    <div class="fila"><div><label>Sesión</label><select onchange="estado.pipetas[${pi}].volumenes['${v.clave}'].sesion=this.value;guardarLocal()">
+      <option value="archivo" ${dv.sesion === 'archivo' ? 'selected' : ''}>La de este archivo</option>
+      ${DATOS.sesiones.map(s => `<option value="${esc(s.id)}" ${dv.sesion === s.id ? 'selected' : ''}>${esc(s.fecha)} (ya en GestionLab)</option>`).join('')}</select></div>
+      ${fot && v.disolucion === 'S-C' && DATOS.hay_lote2 ? `<div><label>Lote de S-C</label><select onchange="estado.pipetas[${pi}].volumenes['${v.clave}'].lote_sc=this.value;guardarLocal()"><option value="1">1.er lote</option><option value="2" ${dv.lote_sc === '2' ? 'selected' : ''}>2.º lote</option></select></div>` : ''}</div>
+    ${dv.canales.map((c, ci) => {
+      while (c.replicas.length < 4) c.replicas.push({ m: '', A: '' });
+      const base = `pipetas.${pi}.volumenes.${v.clave}.canales.${ci}.replicas`;
+      return `${d.canales > 1 ? `<h3>Canal ${ci + 1}</h3>` : ''}<table><tr><th>#</th><th>${fot ? 'Agua del tubo (g)' : 'Masa entregada (g)'}</th>${fot ? '<th>A</th>' : ''}</tr>
+        ${c.replicas.map((_, i) => `<tr><td>${i + 1}</td><td>${campo(`${base}.${i}.m`, fot ? 'masa_tubo' : 'masa', fot ? { masa_tabla: v.masa_tabla } : { v_ajustado: v.v, z })}</td>${fot ? `<td>${campo(`${base}.${i}.A`, 'absorbancia')}</td>` : ''}</tr>`).join('')}</table>
+        ${c.replicas.length < CRITERIOS.max_replicas ? `<button class="enlace" onclick="masReplicas(${pi},'${v.clave}',${ci})">+ Hasta 10 réplicas (las 5 a 10, con punta nueva)</button>` : ''}`;
+    }).join('')}</div>`;
+}
+function masReplicas(pi, clave, ci) {
+  const r = estado.pipetas[pi].volumenes[clave].canales[ci].replicas;
+  while (r.length < CRITERIOS.max_replicas) r.push({ m: '', A: '' });
+  guardarLocal(); pintarPipetas();
+}
+
+// ── Archivo para GestionLab ─────────────────────────────────────────────────
+function descargar() {
+  const nErr = document.querySelectorAll('input.mal').length;
+  if (nErr && !confirm(`Hay ${nErr} dato(s) que no cumplen (en rojo). GestionLab no los guardará sin corregirlos. ¿Descargar igualmente?`)) return;
+  const archivo = { tipo: 'gestionlab-verif-pipetas', formato: FORMATO_ARCHIVO, curso: DATOS.curso, generada: DATOS.generada,
+    exportado: new Date().toISOString(), sesion: estado.incluirSesion ? estado.sesion : null, pipetas: estado.pipetas };
+  const blob = new Blob([JSON.stringify(archivo, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `verificacion-pipetas-${(estado.sesion?.fecha || new Date().toISOString().slice(0, 10))}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+document.getElementById('cab-info').textContent = `Curso ${DATOS.curso} · página generada el ${DATOS.generada.slice(0, 10).split('-').reverse().join('/')} · ${DATOS.pipetas.length} pipetas`;
+verTab('sesion');
+</script>
+</body>
+</html>
