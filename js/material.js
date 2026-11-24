@@ -276,7 +276,7 @@ function renderFilaMaterial(m) {
   let html = `<tr class="equipo-row expandable" id="${rowId}" style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')">
     <td><strong>${m.ID_Material}</strong></td>
     <td>
-      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}${avisoEsteril}${m.Reutilizable ? ` <span title="Reutilizable: no se gasta, no se apunta consumo" style="margin-left:4px;font-size:11px;color:var(--text-muted);white-space:nowrap">♻️ Reutilizable</span>` : ''}
+      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}${avisoEsteril}
     </td>
     <td><span class="badge badge-gray">${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</span></td>
     <td>${ubiLabel}</td>
@@ -284,6 +284,7 @@ function renderFilaMaterial(m) {
       <div class="stock-bar-wrap">
         <div class="stock-bar"><div class="stock-bar-fill" style="width:${pct}%;background:${color}"></div></div>
         <span class="stock-val" style="color:${color}">${getStockLabel(m)}</span>
+        ${m.Reutilizable ? `<span title="Reutilizable: no se gasta, no se apunta consumo" style="font-size:11px;color:var(--text-muted);white-space:nowrap">♻️ Reutilizable</span>` : ''}
       </div>
     </td>
     <td style="font-size:12px;color:var(--text-muted)">${getMinOptLabel(m)}</td>
