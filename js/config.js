@@ -218,16 +218,38 @@ function getNombreUbicacion(idUbicacion) {
   return desc ? `${u.ID_Ubicacion} – ${desc}` : (u.Laboratorio_Aula ? `${u.ID_Ubicacion} – Lab ${u.Laboratorio_Aula}` : u.ID_Ubicacion);
 }
 
-/** "Zona común · Reactivos · Inferior" — zona/subzona (y apellido del laboratorio) sin el código. */
+// La descripción es donde se apunta qué guarda el armario ("Puntas y tubos",
+// "Medios de cultivo…"): desde 2026-11-24 sale SIEMPRE junto a la subzona,
+// no solo cuando falta la subzona. Una descripción muy larga se acorta a su
+// primera frase para que quepa en un desplegable (la entera, en Ubicaciones).
+function _textoDescUbicacion(d, max = 80) {
+  d = (d || '').trim().replace(/\s+/g, ' ');
+  if (d.length > max) d = d.split(/\.\s/)[0];
+  if (d.length > max) d = d.slice(0, max).replace(/[\s,;]+\S*$/, '') + '…';
+  return d.replace(/\.$/, '');
+}
+
+function _juntarPartesUbicacion(lista) {
+  const partes = [];
+  lista.forEach(p => {
+    p = (p || '').trim().replace(/\.$/, '');
+    const k = p.toLowerCase();
+    if (p && !partes.some(x => x.toLowerCase().includes(k))) partes.push(p);
+  });
+  return partes;
+}
+
+/** "1º Cajón · Micropipetas" — el hueco dentro de su zona: subzona y descripción. */
+function huecoUbicacion(u) {
+  if (!u) return '';
+  return _juntarPartesUbicacion([u.Subzona, _textoDescUbicacion(u.Descripcion_Completa)]).join(' · ');
+}
+
+/** "Zona común · Reactivos · Inferior" — zona, subzona y descripción (y apellido del laboratorio) sin el código. */
 function descripcionUbicacion(u) {
   if (!u) return '';
   const apellidoLab = ((u.Laboratorio_Aula || '').match(/^\d{3}\s*-\s*(.+)$/) || [])[1] || '';
-  const partes = [];
-  [apellidoLab, u.Zona, u.Subzona || u.Descripcion_Completa].forEach(p => {
-    p = (p || '').trim();
-    if (p && !partes.some(x => x.toLowerCase() === p.toLowerCase())) partes.push(p);
-  });
-  return partes.join(' · ');
+  return _juntarPartesUbicacion([apellidoLab, u.Zona, u.Subzona, _textoDescUbicacion(u.Descripcion_Completa)]).join(' · ');
 }
 
 // ============================================================

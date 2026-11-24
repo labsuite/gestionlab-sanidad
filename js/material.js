@@ -228,7 +228,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
     items = items.filter(m => {
       if ((m.Ubicacion||'').toLowerCase().includes(q)) return true;
       const ubi = DATA.ubicaciones.find(u => u.ID_Ubicacion === m.Ubicacion);
-      if (ubi && ((ubi.Zona||'').toLowerCase().includes(q) || (ubi.Subzona||'').toLowerCase().includes(q) || (ubi.Laboratorio_Aula||'').toLowerCase().includes(q))) return true;
+      if (ubi && ((ubi.Zona||'').toLowerCase().includes(q) || (ubi.Subzona||'').toLowerCase().includes(q) || (ubi.Descripcion_Completa||'').toLowerCase().includes(q) || (ubi.Laboratorio_Aula||'').toLowerCase().includes(q))) return true;
       return getMatUbics(m.ID_Material).some(l => (l.ID_Ubicacion||'').toLowerCase().includes(q) || getNombreUbicacion(l.ID_Ubicacion).toLowerCase().includes(q));
     });
   }
@@ -1450,7 +1450,7 @@ function _ubicsConMaterial(matIds, idOrigen) {
 }
 
 function _nombreSitio(u) {
-  return [u.Subzona, u.Descripcion_Completa].filter(Boolean)[0] || u.Zona || u.ID_Ubicacion;
+  return huecoUbicacion(u) || u.Zona || u.ID_Ubicacion;
 }
 
 function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
@@ -1810,7 +1810,8 @@ function buscarDestinoSubdiv(i, query) {
     (u.ID_Ubicacion.toLowerCase().includes(q) ||
      (u.Laboratorio_Aula || '').toLowerCase().includes(q) ||
      (u.Zona || '').toLowerCase().includes(q) ||
-     (u.Subzona || '').toLowerCase().includes(q))
+     (u.Subzona || '').toLowerCase().includes(q) ||
+     (u.Descripcion_Completa || '').toLowerCase().includes(q))
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {

@@ -84,14 +84,12 @@ function _ubicLabsUsuario() {
 function _ubicEtiqueta(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '—';
-  const partes = [u.Zona, u.Subzona].filter(Boolean);
-  if (!partes.length) partes.push(u.Descripcion_Completa || '');
-  return [...partes.filter(Boolean), u.ID_Ubicacion].join(' · ');
+  return [u.Zona, huecoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
 }
 
 /** Etiqueta corta para el desplegable, ya agrupado por zona: "Encimera · 201-1.1" */
 function _ubicEtiquetaCorta(u) {
-  return [u.Subzona || u.Descripcion_Completa || '', u.ID_Ubicacion].filter(Boolean).join(' · ');
+  return [huecoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
 }
 
 function _ubicNombreEquipo(eq) {
