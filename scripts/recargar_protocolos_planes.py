@@ -18,8 +18,12 @@ así que registros e historial siguen colgando de él. Exige que los planes acti
 del JSONL coincidan uno a uno; si cambia otra cosa (operación, tipo, solo profesorado),
 se para y hay que hacer la recarga completa.
 
+Con `--solo=<ruta.csv>` solo se recargan los equipos cuyo `id_activo` está en la primera
+columna de ese CSV (p. ej. `--solo=verificacion_micropipetas.csv`, ruta relativa a la carpeta
+de origen): el resto del JSONL no se toca aunque haya cambiado (cambios de otra conversación).
+
 Simulación por defecto; `--aplicar` escribe todo en UNA transacción.
-Uso: python scripts/recargar_protocolos_planes.py [--en-sitio] [--aplicar]
+Uso: python scripts/recargar_protocolos_planes.py [--en-sitio] [--solo=archivo.csv] [--aplicar]
 """
 import collections
 import csv
@@ -41,6 +45,7 @@ PERIODICIDADES = {'Mensual', 'Trimestral', 'Semestral', 'Anual', 'Bianual', 'Tri
 
 APLICAR = '--aplicar' in sys.argv
 EN_SITIO = '--en-sitio' in sys.argv
+SOLO = next((a.split('=', 1)[1] for a in sys.argv if a.startswith('--solo=')), None)
 conn = conectar()
 cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -74,6 +79,14 @@ def parar_si_problemas():
 print('MODO:', 'APLICAR' if APLICAR else 'SIMULACIÓN (nada se escribe)')
 prot = [json.loads(l) for l in open(CARPETA + 'protocolos.jsonl', encoding='utf-8')]
 mant = [json.loads(l) for l in open(CARPETA + 'mantenimientos.jsonl', encoding='utf-8')]
+if SOLO:
+    ruta_solo = SOLO if (':' in SOLO or SOLO.startswith('/')) else CARPETA + SOLO
+    with open(ruta_solo, encoding='utf-8-sig') as f:
+        filas = list(csv.reader(f))
+    ids_solo = {r[0].strip() for r in filas[1:] if r and r[0].strip()}
+    prot = [p for p in prot if p['id_activo'] in ids_solo]
+    mant = [m for m in mant if m['id_equipo'] in ids_solo]
+    print(f'SOLO {len(ids_solo)} equipos de {SOLO}: {len(prot)} protocolos y {len(mant)} planes del JSONL')
 equipos = {r['id_activo']: r for r in q("select id_activo, estado_operativo, protocolo_uso from equipos")}
 bajas = {i for i, e in equipos.items() if e['estado_operativo'] == 'Dado de baja'}
 

@@ -58,6 +58,7 @@ let DATA = {
   pedidos: [], lineasPedido: [], ciclosModulos: [],
   materialUbicaciones: [], historicoPrecio: [], tareas: [],
   planesMantenimiento: [], registroMantenimientos: [], evaluacionesCurso: [],
+  verifParametros: [], verifPreparaciones: [], verifSesiones: [],
   tiposResiduo: [], contenedoresResiduo: [], adicionesResiduo: [],
   revisionesInventario: [], consultasResiduo: [], excepcionesResiduoIa: [],
   propuestasUbicacion: [], propuestasMaterial: [], fichasAtributos: [],

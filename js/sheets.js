@@ -247,6 +247,8 @@ function _registroMantSbToObj(r) {
     Iniciado_Por: r.iniciado_por || '',
     Aplazado_A: r.aplazado_a || '',
     Actualizado_En: r.actualizado_en || '',
+    // Verificación de una micropipeta (réplicas, cálculo y resultado), solo en sus revisiones
+    Verificacion: r.verificacion && typeof r.verificacion === 'object' ? r.verificacion : null,
   };
 }
 
@@ -779,7 +781,8 @@ async function loadAllData() {
            sbTiposResiduoRes, sbContenedoresResiduoRes, sbAdicionesResiduoRes, sbConsultasResiduoRes,
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
-           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes, sbUsosMuestraRes] = await Promise.all([
+           sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes, sbUsosMuestraRes,
+           sbVerifParamRes, sbVerifPrepRes, sbVerifSesRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -826,7 +829,12 @@ async function loadAllData() {
       _sbMigracion.from('evaluaciones_curso').select('*').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('cajas_congelado', 'id_caja').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('muestras_congeladas', 'id_muestra').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('usos_muestra', 'id_uso').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('usos_muestra', 'id_uso').then(r => r, () => ({ data: [] })),
+      // Verificación de micropipetas (2026-11-24): se guardan tal cual (snake_case), porque
+      // los usa el módulo de cálculo compartido con el servidor (verif_pipetas.js).
+      _leerTablaCompleta('verif_pipetas_parametros', 'id_activo').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('verif_preparaciones', 'id').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('verif_sesiones', 'id').then(r => r, () => ({ data: [] }))
     ]);
 
     // Sesión que el navegador cree válida pero el servidor rechaza (contraseña cambiada,
@@ -856,6 +864,9 @@ async function loadAllData() {
     DATA.tareas                  = (sbTareasPersonalesRes?.data || []).map(_tareaPersonalSbToObj);
     DATA.planesMantenimiento     = (sbPlanesRes?.data || []).map(_planMantenimientoSbToObj);
     DATA.evaluacionesCurso       = (sbEvaluacionesCursoRes?.data || []).map(_evaluacionCursoSbToObj);
+    DATA.verifParametros         = sbVerifParamRes?.data || [];
+    DATA.verifPreparaciones      = sbVerifPrepRes?.data || [];
+    DATA.verifSesiones           = sbVerifSesRes?.data || [];
     DATA.registroMantenimientos  = (sbRegistroMantRes?.data || []).map(_registroMantSbToObj);
     DATA.tiposResiduo            = (sbTiposResiduoRes?.data || []).map(_tipoResiduoSbToObj);
     DATA.contenedoresResiduo     = (sbContenedoresResiduoRes?.data || []).map(_contenedorResiduoSbToObj);

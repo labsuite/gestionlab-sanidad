@@ -9,6 +9,8 @@
 // evaluaciones de un curso): solo Admin/Gestor. Desde 2026-10-26 la temporada de un
 // equipo sale de ahí, no de mes_inicio/fin_temporada.
 import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import * as VP from "../_shared/verif_pipetas.js";
+import { calcularVerificacionRegistro, limpiarVerificacion, calculoParaGuardar, parametrosParaGuardar, textoIncidenciaRetirada } from "../_shared/verif_pipetas_srv.ts";
 
 // Parsea el checklist recibido en el cuerpo. Un paso normal es {texto, hecho}; un paso de
 // COMPROBACIÓN (el plan trae "(criterio: …)") es {texto, criterio, resultado, nota, hecho}:
@@ -179,12 +181,73 @@ Deno.serve(async (req) => {
       enCurso = data && data[0] ? data[0] : null;
     }
 
+    // ── Verificación anual de una micropipeta (2026-11-24) ──────────────────
+    // En la revisión anual (Pretemporada) y en el bianual «Cambio de juntas y verificación»
+    // de una pipeta con datos de verificación, el servidor recalcula la verificación con los
+    // datos de la base (CSV, preparación, sesiones), marca él los pasos de verificación y no
+    // deja finalizar sin resultado OK o RETIRAR. El cálculo es el mismo de la pantalla
+    // (_shared/verif_pipetas.js). Ver docs/modulo-verificacion-pipetas.md.
+    let pasosGuardar = pasos;
+    // deno-lint-ignore no-explicit-any
+    let verifGuardar: any = undefined;
+    // deno-lint-ignore no-explicit-any
+    let verifCalc: any = null;
+    {
+      const { data: planV } = await supabaseAdmin.from("planes_mantenimiento")
+        .select("id_equipo, periodicidad, instrucciones").eq("id_plan", idPlan).maybeSingle();
+      const lineas = String(planV?.instrucciones || "").split(/\r?\n/);
+      const esPlanVerif = !!planV && ["Pretemporada", "Bianual"].includes(planV.periodicidad) &&
+        lineas.some((l) => VP.pasoVerificacion(l.trim()));
+      if (esPlanVerif) {
+        const equipoV = String(planV.id_equipo);
+        // deno-lint-ignore no-explicit-any
+        const previa: any = (enCurso as any)?.verificacion || null;
+        // deno-lint-ignore no-explicit-any
+        const ver: any = limpiarVerificacion(body.verificacion) || limpiarVerificacion(previa) || { fases: [{ tipo: "inicial", volumenes: {} }] };
+        // Volumen bajo elegible (PIP-005: «100 o 200 µl según lo grabado»)
+        const opcionesBajo = VP.opcionesVolumenBajo(planV.instrucciones);
+        if (!opcionesBajo || !opcionesBajo.includes(ver.v_bajo_elegido)) ver.v_bajo_elegido = null;
+        // Repetición tras el AJUSTE (6.7): el ajuste lo hace el profesorado; firma el servidor.
+        if (ver.fases.length > 1) {
+          const previaTras = previa?.fases?.[1];
+          if (previaTras?.ajustada_en) {
+            ver.fases[1].ajustada_por = previaTras.ajustada_por; ver.fases[1].ajustada_en = previaTras.ajustada_en;
+          } else {
+            if (!esStaff) return jsonError("El ajuste de la pipeta lo hace el profesorado", 403);
+            const soloInicial = await calcularVerificacionRegistro(supabaseAdmin, equipoV, curso, { ...ver, fases: [ver.fases[0]] }, planV.periodicidad === "Bianual");
+            if (soloInicial?.calc?.resultado !== "AJUSTAR") {
+              return jsonError("Solo se repite tras ajustar cuando la verificación ha dado AJUSTAR", 400);
+            }
+            ver.fases[1].ajustada_por = nombreCorto(nombreUsuario) || nombreUsuario;
+            ver.fases[1].ajustada_en = new Date().toISOString();
+          }
+        }
+        const r = await calcularVerificacionRegistro(supabaseAdmin, equipoV, curso, ver, planV.periodicidad === "Bianual");
+        if (r) {
+          verifCalc = r.calc;
+          verifGuardar = { ...ver, sin_cribado: planV.periodicidad === "Bianual", calculo: calculoParaGuardar(r.calc),
+            parametros: parametrosParaGuardar(r.par), calculado_en: new Date().toISOString(),
+            incidencia: previa?.incidencia || null };
+          if (pasosGuardar) pasosGuardar = VP.marcarPasosVerificacion(pasosGuardar, r.calc);
+          if (ver.v_bajo_elegido && ver.v_bajo_elegido !== Number(r.par.v_bajo_elegido)) {
+            await supabaseAdmin.from("verif_pipetas_parametros").update({
+              v_bajo_elegido: ver.v_bajo_elegido, v_bajo_elegido_por: esStaff ? (nombreCorto(nombreUsuario) || nombreUsuario) : firmaGrupo,
+              v_bajo_elegido_en: new Date().toISOString(),
+            }).eq("id_activo", equipoV);
+          }
+          if (accion !== "guardar_progreso" && !r.calc.final) {
+            return jsonError(`La verificación de la pipeta no tiene resultado todavía: ${VP.resumenPendiente(r.calc)}. Guarda el progreso y termínala antes de finalizar.`, 400);
+          }
+        }
+      }
+    }
+
     if (accion === "guardar_progreso") {
       const ahora = new Date().toISOString();
       const obsProgreso = body.observaciones ? String(body.observaciones) : null;
       if (enCurso) {
         const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
-          .update({ pasos, observaciones: obsProgreso, actualizado_en: ahora })
+          .update({ pasos: pasosGuardar, observaciones: obsProgreso, actualizado_en: ahora, ...(verifGuardar !== undefined ? { verificacion: verifGuardar } : {}) })
           .eq("id_registro", enCurso.id_registro as string).select().single();
         if (error) return jsonError(`No se pudo guardar el progreso: ${error.message}`, 400);
         return jsonOk({ registro: data });
@@ -200,7 +263,8 @@ Deno.serve(async (req) => {
       const datos = {
         id_registro: generarIdRegistro(), id_plan: idPlan, id_equipo: idEquipo,
         curso_academico: curso, periodo,
-        estado: "en_curso", pasos, observaciones: obsProgreso,
+        estado: "en_curso", pasos: pasosGuardar, observaciones: obsProgreso,
+        ...(verifGuardar !== undefined ? { verificacion: verifGuardar } : {}),
         fecha_inicio: ahora.slice(0, 10),
         iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : firmaGrupo,
         actualizado_en: ahora,
@@ -216,7 +280,7 @@ Deno.serve(async (req) => {
     if (!fecha || !realizadoPor) {
       return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
-    const sinNota = pasoNoCumpleSinNota(pasos);
+    const sinNota = pasoNoCumpleSinNota(pasosGuardar);
     if (sinNota) return jsonError(`Anota qué se ha visto en «${sinNota.texto}», que no cumple el criterio`, 400);
     // El alumnado firma siempre con su grupo (nunca con el nombre que venga del
     // cliente) y deja el registro esperando visto bueno, sin supervisor: lo pone
@@ -230,7 +294,8 @@ Deno.serve(async (req) => {
       estado: esStaff ? "finalizado" : "pendiente_vb",
       actualizado_en: new Date().toISOString(),
     };
-    if (pasos) comun.pasos = pasos;
+    if (pasosGuardar) comun.pasos = pasosGuardar;
+    if (verifGuardar !== undefined) comun.verificacion = verifGuardar;
 
     // Un marcador 'no_aplica'/'aplazado' del mismo periodo deja de tener sentido
     // en cuanto se registra como hecho: se elimina.
@@ -242,16 +307,54 @@ Deno.serve(async (req) => {
       await d;
     }
 
+    let guardado;
     if (enCurso) {
       const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
         .update(comun).eq("id_registro", enCurso.id_registro as string).select().single();
       if (error) return jsonError(`No se pudo finalizar: ${error.message}`, 400);
-      return jsonOk({ registro: data });
+      guardado = data;
+    } else {
+      const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
+        .insert({ id_registro: generarIdRegistro(), id_plan: idPlan, ...comun }).select().single();
+      if (error) return jsonError(`No se pudo registrar: ${error.message}`, 400);
+      guardado = data;
     }
-    const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
-      .insert({ id_registro: generarIdRegistro(), id_plan: idPlan, ...comun }).select().single();
-    if (error) return jsonError(`No se pudo registrar: ${error.message}`, 400);
-    return jsonOk({ registro: data });
+    // Verificación con resultado RETIRAR: incidencia de la pipeta con lo que ha fallado y
+    // equipo «Fuera de servicio» hasta que se resuelva (encargo, apartado 8). Si ya tiene un
+    // aviso abierto, se añade a ese (no se abre otro por lo mismo) y sube a «no funciona».
+    // deno-lint-ignore no-explicit-any
+    let incidencia: any = null;
+    if (verifCalc && /^RETIRAR/.test(verifCalc.resultado) && !verifGuardar?.incidencia) {
+      const idEq = String(guardado.id_equipo);
+      const texto = textoIncidenciaRetirada(idEq, verifCalc);
+      const autor = esStaff ? (nombreCorto(nombreUsuario) || nombreUsuario) : firmaGrupo;
+      const { data: abiertas } = await supabaseAdmin.from("incidencias").select("*")
+        .eq("id_equipo", idEq).in("estado", ["Abierta", "En gestión"]).order("fecha_hora", { ascending: false }).limit(1);
+      if (abiertas && abiertas[0]) {
+        const inc = abiertas[0];
+        const fecha = new Date().toLocaleDateString("es-ES", { timeZone: "Europe/Madrid" });
+        const { data } = await supabaseAdmin.from("incidencias").update({
+          descripcion_problema: `${inc.descripcion_problema || ""}\n\n[${fecha} · ${autor}] ${texto}`,
+          impacto: "Equipo fuera de servicio",
+        }).eq("id_incidencia", inc.id_incidencia).select().single();
+        incidencia = data;
+      } else {
+        const { data } = await supabaseAdmin.from("incidencias").insert({
+          id_incidencia: "INC-" + Date.now().toString(36).toUpperCase().slice(-6),
+          id_equipo: idEq, reportado_por: autor, descripcion_problema: texto,
+          impacto: "Equipo fuera de servicio", urgencia: "Alta", estado: "Abierta",
+        }).select().single();
+        incidencia = data;
+      }
+      await supabaseAdmin.from("equipos").update({ estado_operativo: "Fuera de servicio" }).eq("id_activo", idEq);
+      if (incidencia) {
+        const v = { ...(guardado.verificacion || {}), incidencia: incidencia.id_incidencia };
+        const { data } = await supabaseAdmin.from("registro_mantenimientos").update({ verificacion: v })
+          .eq("id_registro", guardado.id_registro).select().single();
+        if (data) guardado = data;
+      }
+    }
+    return jsonOk({ registro: guardado, ...(incidencia ? { incidencia } : {}) });
   }
 
   // ── Visto bueno a un mantenimiento registrado por alumnado ────────────
