@@ -278,6 +278,7 @@ function _materialSbToObj(m) {
     Observaciones: m.observaciones || '',
     Gestion_Automatica: m.gestion_automatica ? 'TRUE' : 'FALSE',
     Material_Comun: m.material_comun === true,
+    Reutilizable: m.reutilizable === true,
   };
 }
 

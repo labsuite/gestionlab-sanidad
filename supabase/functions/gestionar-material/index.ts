@@ -103,6 +103,8 @@ async function esUbicacionZonaComun(supabaseAdmin: any, idUbicacion: string | nu
 const MSG_DESDE_ALMACEN = "La zona común es un almacén: desde allí no se apunta gasto. " +
   "Lleva antes el envase al laboratorio donde trabajas (🔀 Trasladar) y apúntalo allí al abrirlo.";
 const MSG_ALMACEN_A_ALMACEN = "Desde la zona común (el almacén) solo se puede llevar a un laboratorio";
+const MSG_REUTILIZABLE = "Es material reutilizable: no se gasta, así que no se apunta consumo. " +
+  "Si se rompe o se pierde, avisa al profesorado.";
 
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
@@ -153,6 +155,8 @@ Deno.serve(async (req) => {
     if (accion === "consumo") {
       const cantidad = Number(body.cantidad);
       if (!cantidad || cantidad <= 0) return jsonError("Introduce una cantidad válida", 400);
+      // Decisión de Paloma (2026-11-24): el material reutilizable no se gasta.
+      if (mat.reutilizable === true) return jsonError(MSG_REUTILIZABLE, 400);
       const loteId = strField(body.lote_id);
       const lotes = await getLotes(supabaseAdmin, idMaterial);
       let loteElegido = loteId ? lotes.find((l: any) => l.id === loteId) : null;
@@ -512,6 +516,10 @@ Deno.serve(async (req) => {
         // campo y no deben desmarcar un material común sin querer.
         ...(body.material_comun !== undefined
           ? { material_comun: body.material_comun === true || body.material_comun === "TRUE" }
+          : {}),
+        // Igual: solo si llega, para no desmarcar sin querer un material reutilizable.
+        ...(body.reutilizable !== undefined
+          ? { reutilizable: body.reutilizable === true || body.reutilizable === "TRUE" }
           : {}),
       };
 

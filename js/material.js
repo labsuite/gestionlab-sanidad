@@ -276,7 +276,7 @@ function renderFilaMaterial(m) {
   let html = `<tr class="equipo-row expandable" id="${rowId}" style="cursor:pointer" onclick="toggleMatUbics('${m.ID_Material}')">
     <td><strong>${m.ID_Material}</strong></td>
     <td>
-      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}${avisoEsteril}
+      <span class="expand-icon" id="expand-mat-${safeId}">▶</span> ${m.Nombre}${avisoEsteril}${m.Reutilizable ? ` <span title="Reutilizable: no se gasta, no se apunta consumo" style="margin-left:4px;font-size:11px;color:var(--text-muted);white-space:nowrap">♻️ Reutilizable</span>` : ''}
     </td>
     <td><span class="badge badge-gray">${m.Categoria ? m.Categoria.split(' — ')[0] : '—'}</span></td>
     <td>${ubiLabel}</td>
@@ -322,7 +322,7 @@ function renderFilaMaterial(m) {
         </td>
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
-          ${esZonaComun(l.ID_Ubicacion) ? '' : `<button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Apuntar un envase abierto aquí">📦</button>`}
+          ${esZonaComun(l.ID_Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Apuntar un envase abierto aquí">📦</button>`}
           ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}','lote:${l.ID}')" title="Contar stock en esta ubicación">🔢</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir/alicuotar">✂️</button>` : ''}
@@ -349,7 +349,7 @@ function renderFilaMaterial(m) {
       </td>
       <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLeg || '—'} / ${opLeg || '—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
-        ${esZonaComun(m.Ubicacion) ? '' : `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Apuntar un envase abierto">📦</button>`}
+        ${esZonaComun(m.Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Apuntar un envase abierto">📦</button>`}
         ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaMaterial('${m.ID_Material}')" title="Entrada">📥</button>` : ''}
         ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir/alicuotar">✂️</button>` : ''}
         ${m.Ubicacion ? `<button class="icon-btn" onclick="trasladarDesdeLegacy('${m.ID_Material}')" title="Trasladar a otra ubicación">🔀</button>` : ''}
@@ -829,6 +829,7 @@ function openModalMaterial() {
   ['mat-id','mat-nombre','mat-unidad','mat-unidades-extra','mat-ubicacion','mat-referencia','mat-observaciones','mat-ubicacion-search'].forEach(id => sv(id, ''));
   sv('mat-categoria', ''); sv('mat-stock', '0'); sv('mat-minimo', '0'); sv('mat-optimo', '0'); sv('mat-proveedor', '');
   const comunChkNuevo = document.getElementById('mat-comun'); if (comunChkNuevo) comunChkNuevo.checked = false;
+  const reutChkNuevo = document.getElementById('mat-reutilizable'); if (reutChkNuevo) reutChkNuevo.checked = false;
   clearUbicacionMat();
   const sel = document.getElementById('mat-proveedor');
   if (sel) sel.innerHTML = '<option value="">Seleccionar...</option>' + DATA.proveedores.filter(p => p.Activo !== 'FALSE').map(p => `<option value="${p.Nombre_Proveedor}">${p.Nombre_Proveedor}</option>`).join('');
@@ -898,6 +899,7 @@ function editMaterial(idx) {
   sv('mat-stock', m.Stock_Actual); sv('mat-minimo', m.Stock_Minimo); sv('mat-optimo', m.Stock_Optimo);
   sv('mat-observaciones', m.Observaciones);
   const comunChk = document.getElementById('mat-comun'); if (comunChk) comunChk.checked = m.Material_Comun === true;
+  const reutChk = document.getElementById('mat-reutilizable'); if (reutChk) reutChk.checked = m.Reutilizable === true;
   if (m.Ubicacion) {
     document.getElementById('mat-ubicacion').value = m.Ubicacion;
   }
@@ -984,7 +986,7 @@ function openModalConsumo() {
   const grp = document.getElementById('consumo-search-group');
   if (grp) grp.style.display = '';
   // El gasto es el envase que se abre, entero (norma de Paloma, 2026-11-23): normalmente, 1.
-  sv('consumo-cantidad', '1'); sv('consumo-motivo', ''); sv('consumo-obs', '');
+  _prepararCantidadConsumo(null); sv('consumo-motivo', ''); sv('consumo-obs', '');
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
   // Limpiar bote fijo (puede venir de openModalConsumoLote anterior)
@@ -1008,11 +1010,31 @@ function openModalConsumoMaterial(matId) {
 }
 
 const MSG_GASTO_ALMACEN = 'La zona común es un almacén: desde allí no se apunta gasto. Lleva antes el envase a tu laboratorio (🔀 Trasladar) y apúntalo allí al abrirlo.';
+const MSG_GASTO_REUTILIZABLE = 'Es material reutilizable: no se gasta, así que no se apunta consumo. Si se rompe o se pierde, avisa al profesorado.';
+
+/** ¿Se cuenta por unidades sueltas («unidad/es», «ud/s»)? Entonces el gasto de un envase
+ *  abierto son todas las unidades que traía, no «1». */
+function _seCuentaPorUnidades(unidad) {
+  return /^(unidad|ud\b|uds\b|ud\/)/i.test(String(unidad || '').trim());
+}
+
+/** Rótulo y valor de la cantidad según cómo se cuenta el material (2026-11-24). */
+function _prepararCantidadConsumo(mat) {
+  const porUnidades = _seCuentaPorUnidades(mat?.Unidad);
+  const lab = document.getElementById('consumo-cantidad-label');
+  const ayuda = document.getElementById('consumo-cantidad-ayuda');
+  if (lab) lab.textContent = porUnidades ? 'Unidades del envase abierto *' : 'Envases abiertos *';
+  if (ayuda) ayuda.textContent = porUnidades
+    ? 'Este material se cuenta por unidades: apunta todas las que traía el envase que has abierto.'
+    : 'Normalmente, 1. Lo que vas usando de un envase abierto no se apunta.';
+  sv('consumo-cantidad', porUnidades ? '' : '1');
+}
 
 function openModalConsumoLote(loteId) {
   const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
   if (!lote) return;
   if (esZonaComun(lote.ID_Ubicacion)) { showToast(MSG_GASTO_ALMACEN, 'error'); return; }
+  if (DATA.material.find(m => m.ID_Material === lote.ID_Material)?.Reutilizable) { showToast(MSG_GASTO_REUTILIZABLE, 'error'); return; }
   openModalConsumoMaterial(lote.ID_Material);
   // Guardar el LOTE fijo en un input hidden dedicado (no la ubicación: puede
   // haber más de un bote en la misma ubicación, p.ej. madre + alícuotas)
@@ -1038,6 +1060,13 @@ function _mostrarSelectorUbicConsumo(matId) {
   if (sel0) sel0.innerHTML = '';
   const todos = getMatUbics(matId);
   const mat0 = DATA.material.find(m => m.ID_Material === matId);
+  if (mat0?.Reutilizable) {
+    showToast(MSG_GASTO_REUTILIZABLE, 'error');
+    if (sel0) sel0.innerHTML = '<option value="">Reutilizable: no se apunta gasto</option>';
+    ubiGrp.style.display = '';
+    return;
+  }
+  _prepararCantidadConsumo(mat0);
   const noDisponible = (msg, opcion) => {
     showToast(msg, 'error');
     const sel = document.getElementById('consumo-ubicacion-sel');
@@ -1219,6 +1248,7 @@ async function guardarMaterial() {
       stock_actual: stockGlobal, stock_minimo: minStock, stock_optimo: optStock,
       observaciones: v('mat-observaciones'), gestion_automatica: gestionAuto, lotes: lotesBody,
       material_comun: !!document.getElementById('mat-comun')?.checked,
+      reutilizable: !!document.getElementById('mat-reutilizable')?.checked,
     });
 
     if (esEdicion) DATA.material[editingRow.rowIndex] = _materialSbToObj(material);
@@ -1266,6 +1296,7 @@ async function guardarConsumo() {
   const loteSel  = loteFijo || document.getElementById('consumo-ubicacion-sel')?.value || '';
   const loteElegido = loteSel ? DATA.materialUbicaciones.find(l => l.ID === loteSel) : null;
 
+  if (mat.Reutilizable) { showToast(MSG_GASTO_REUTILIZABLE, 'error'); return; }
   // La zona común es un almacén: de allí no se apunta gasto (lo comprueba también el servidor)
   if ((loteElegido && esZonaComun(loteElegido.ID_Ubicacion)) || (!lotes.length && esZonaComun(mat.Ubicacion))) {
     showToast(MSG_GASTO_ALMACEN, 'error'); return;

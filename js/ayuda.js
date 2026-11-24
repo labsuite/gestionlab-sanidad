@@ -313,7 +313,7 @@ const AYUDA_TAREAS = {
         pasos: [
           {
             texto: '**Al abrir el envase, abrir el registro de consumo.** En el «Panel principal», botón «📦 Registrar consumo de material» («¿Has abierto un envase? Apúntalo ahora»). O en «Material fungible › Inventario»: desplegar el material y pulsar «📦» en la línea del bote que se ha abierto; así el material y el bote ya van elegidos.',
-            nota: 'Los botes del almacén (zona común) no tienen «📦»: desde allí solo se trasladan.',
+            nota: 'Los botes del almacén (zona común) no tienen «📦»: desde allí solo se trasladan. Tampoco el material marcado «♻️ Reutilizable» (vidrio, gradillas, pinzas…), que no se gasta.',
           },
           {
             texto: '**Elegir el material y el bote del que se ha cogido**, es decir, el sitio del laboratorio donde estaba: escribir el nombre en «Material» y elegirlo de la lista. Si el material está en más de un sitio de vuestros laboratorios, sale «¿De dónde has cogido el envase?»: elegir ese sitio. El stock se lleva por sitio: si se elige otro bote, un sitio queda con más de lo que hay y otro con menos. Si solo está en un sitio, la app lo elige sola.',
@@ -322,6 +322,7 @@ const AYUDA_TAREAS = {
           },
           {
             texto: '**En «Envases abiertos», los envases que se han abierto**: normalmente, 1, que ya viene puesto.',
+            nota: 'Si el material se cuenta por unidades sueltas («unidad/es»), el campo se llama «Unidades del envase abierto» y viene vacío: poner todas las unidades que traía el envase.',
           },
           {
             texto: '**En «Motivo», la práctica.** Sin nombres de personas.',

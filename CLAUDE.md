@@ -59,6 +59,7 @@ ya no lo usa nada; se puede revocar si se quiere.
 - `limpiar_logins_huerfanos.py` — borra de Supabase Auth los logins sin fila en `usuarios` ni en `public.users`; `DRY_RUN` por defecto
 - `corregir_inventario_2026_09.py` — corrección puntual (una vez) de los materiales con un número como unidad y fusión de 4 duplicados; simulación por defecto, `--aplicar` para guardar
 - `normalizar_unidades_material.py` — unifica cómo se escriben las unidades (caja/s, bote/s…) y las categorías de material, y limpia las propuestas pendientes con un número en la unidad; simulación por defecto, `--aplicar` para guardar
+- `marcar_material_reutilizable.py` — crea `material.reutilizable` y marca el material que no se gasta (vidrio por unidades + lista por nombre); ya ejecutado el 2026-11-24, idempotente; simulación por defecto, `--aplicar` para guardar
 - `recolocar_residuos_2026_10.py` — recolocación (una vez, ya ejecutada) del catálogo de residuos según las normas del gestor de 2026-10-01; simulación por defecto, `--aplicar` para guardar
 - `recargar_protocolos_planes.py` — recarga `equipos.protocolo_uso` y los planes de mantenimiento desde `protocolos.jsonl` / `mantenimientos.jsonl` de la carpeta de protocolos: los planes activos pasan a inactivos (nunca se borran), los equipos «Dado de baja» no reciben planes, los registros de planes activos pasan al plan nuevo de la misma periodicidad (si alguno no tiene equivalente, no escribe nada) y guarda antes una copia CSV en esa carpeta. Con `--en-sitio` no crea ni desactiva planes: solo reescribe protocolos e `instrucciones` en el plan activo que ya existe (mismo equipo y periodicidad), para cuando únicamente cambian los pasos; se para si cambia otra cosa. Simulación por defecto, `--aplicar` para guardar
 - `anonimizar_propuestas.py` — borra el email de quien propuso en las propuestas ya resueltas; ejecutar al cerrar cada curso
@@ -478,6 +479,15 @@ de consumo no los ofrece y `consumo` de `gestionar-material` lo rechaza (`esUbic
 Desde la zona común solo se traslada, y **solo a un laboratorio** (lo exige también el servidor
 en `traslado` y `transferencia_masiva`; `corregir_ubicacion` no, porque arregla un error de
 inventario). Tareas STO-1/2/3 de la Ayuda.
+
+**Material reutilizable** (2026-11-24): vidrio, gradillas, pinzas, aspiradores… no se gastan
+(se rompen o se dan de baja). Columna `material.reutilizable` (casilla «♻️ Reutilizable» en la
+ficha, marca junto al nombre en la lista): sin 📦 y `consumo` lo rechaza. Relleno inicial con
+`scripts/marcar_material_reutilizable.py` (74 materiales); desde entonces se marca **a mano en la
+ficha**, no se deduce. Lo que se rompe se corrige en la ficha (Gestor/Admin).
+**Consumibles contados por unidades** («unidad/es», «ud/s»: cartuchos, filtros…): su stock va
+en unidades, y al abrir una caja se apuntan **todas las unidades que traía**; el registro lo pide
+como «Unidades del envase abierto», sin el 1 por defecto (`_prepararCantidadConsumo`).
 
 ### Recontar lo que ya está fichado: 🔢 Contar stock, por ubicación
 

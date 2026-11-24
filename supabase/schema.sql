@@ -876,6 +876,9 @@ create policy "propuestas_material_select_anon" on propuestas_material for selec
 -- una partida "Material común" y al enviar a Trebello sale en una hoja aparte
 -- (misma factura). Ver "Material común" en docs/modulo-pedidos.md.
 alter table material      add column if not exists material_comun boolean not null default false;
+-- Material que no se gasta (vidrio, gradillas, pinzas…): sin «📦», el servidor no le admite consumo.
+-- Relleno inicial: scripts/marcar_material_reutilizable.py (2026-11-24); después, a mano en la ficha.
+alter table material      add column if not exists reutilizable boolean not null default false;
 -- null = hereda de material.material_comun; true/false = forzado en esta línea.
 alter table lineas_pedido add column if not exists material_comun boolean;
 -- uuid de la segunda hoja en Trebello (la de material común), igual que trebello_pedido_id.

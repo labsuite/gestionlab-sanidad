@@ -68,6 +68,13 @@
           <div style="font-size:11px;color:var(--text-muted);margin-top:3px;margin-left:24px">Lo usan otros ciclos (guantes, papel…). Se pide con lo demás, pero en contabilidad va a la partida "Material común" y en Trebello sale en una hoja aparte.</div>
         </div>
         <div class="form-group full">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:normal">
+            <input type="checkbox" id="mat-reutilizable" style="width:16px;height:16px;accent-color:var(--accent)">
+            <span>♻️ Reutilizable</span>
+          </label>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px;margin-left:24px">No se gasta (vidrio, gradillas, pinzas…): no se le apunta consumo. Si se rompe o se pierde, se corrige el stock en esta ficha.</div>
+        </div>
+        <div class="form-group full">
           <label>Observaciones</label>
           <textarea id="mat-observaciones" placeholder=""></textarea>
         </div>
@@ -107,8 +114,9 @@
           <div style="font-size:11px;color:var(--text-muted);margin-top:4px">El sitio del laboratorio donde estaba. El almacén (zona común) no sale: lo que hay allí se traslada antes al laboratorio.</div>
         </div>
         <div class="form-group">
-          <label>Envases abiertos *</label>
-          <input id="consumo-cantidad" type="number" min="1" step="1" placeholder="Normalmente, 1">
+          <label id="consumo-cantidad-label">Envases abiertos *</label>
+          <input id="consumo-cantidad" type="number" min="1" step="1">
+          <div id="consumo-cantidad-ayuda" style="font-size:11px;color:var(--text-muted);margin-top:4px">Normalmente, 1. Lo que vas usando de un envase abierto no se apunta.</div>
         </div>
         <div class="form-group">
           <label>Motivo (opcional)</label>
