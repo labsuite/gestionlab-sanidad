@@ -23,14 +23,16 @@ const AYUDA_MANUALES = {
     intro: 'Lo que hace tu grupo en GestionLab, contado como tareas de laboratorio. Entras con la cuenta del grupo, y lo que registras sale a nombre del grupo.',
     secciones: [
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
+      { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-2', 'STO-3'] },
       { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-2'] },
       { titulo: 'Si algo falla', tareas: ['EMP-2'] },
     ],
   },
-  // EMP-6 y EMP-2 son comunes a todos los roles (misma versión en todos los manuales).
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  // EMP-6, EMP-2, STO-1 y STO-3 son comunes a todos los roles (misma versión en todos los
+  // manuales). STO-2 de momento solo tiene la versión del alumnado.
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -56,7 +58,7 @@ const AYUDA_TAREAS = {
           '**El equipo delante** y el código de su etiqueta (por ejemplo, BAL-003).',
           '**Los pasos leídos enteros antes de tocar nada** («▸ Cómo»). Así se sabe qué material hace falta y cuánto tiempo lleva, y no se queda el equipo a medio revisar.',
           '**El protocolo del equipo abierto.** Muchos pasos citan un apartado entre paréntesis, por ejemplo «(6.2)»: está en el protocolo, en la tarjeta del equipo («📖 Protocolo de uso»). → [[EQU-2|Consultar cómo se usa un equipo]]',
-          '**El material que piden los pasos**, reunido antes de empezar. Por ejemplo, el termómetro de referencia (TER-01 a TER-04) y el tacómetro (TAC-01), que están en la zona común (205-ZC).',
+          '**El material que piden los pasos**, reunido antes de empezar. Por ejemplo, el termómetro de referencia (TER-01 a TER-04) y el tacómetro (TAC-01), que están en la zona común (205-ZC), el almacén.',
           'Si no va a dar tiempo a terminar en la sesión, se puede guardar a medias y seguir otro día.',
         ],
         pasos: [
@@ -138,7 +140,7 @@ const AYUDA_TAREAS = {
         comprobacionImg: { img: 'MAN-2/08-espera-visto-bueno.png', alt: 'Tarjeta del equipo con el mantenimiento en «Espera visto bueno»' },
         problemas: [
           ['No sale «Registrar», solo «Pendiente»', 'ese mantenimiento lo hace el profesorado (🔒 solo profesorado) o una empresa.'],
-          ['El mantenimiento no está en la lista, o la tarjeta del equipo no enseña su plan de mantenimiento', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno), que el profesorado lo haya marcado como «no aplica» o lo haya aplazado, o que el equipo no esté en uno de vuestros laboratorios ni en la zona común (sus mantenimientos los hace otro grupo o el profesorado).'],
+          ['El mantenimiento no está en la lista, o la tarjeta del equipo no enseña su plan de mantenimiento', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno), que el profesorado lo haya marcado como «no aplica» o lo haya aplazado, o que el equipo no esté en uno de vuestros laboratorios ni en la zona común, el almacén (sus mantenimientos los hace otro grupo o el profesorado).'],
           ['Estaba empezado', '«Continuar n/m» y seguir desde donde se dejó.'],
           ['Se ha marcado un paso por error', 'desmarcarlo antes de finalizar. Si ya está finalizado, decírselo al profesorado, que puede devolverlo para corregirlo.'],
           ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'no marcarlo, explicarlo en Observaciones y avisar al profesorado. Si falta material, guardar el progreso y terminar otro día.'],
@@ -185,7 +187,7 @@ const AYUDA_TAREAS = {
             alt: 'Pantalla de entrada con el email y la contraseña escritos y el botón Iniciar sesión señalado',
           },
           {
-            texto: '**Qué se ve al entrar.** El «Panel principal» del grupo enseña lo que le atañe: sus mantenimientos pendientes y los equipos de sus laboratorios y de la zona común que no se pueden usar o tienen un aviso de avería abierto. Arriba, dos cifras: «Preventivos pendientes» (los mantenimientos que tu grupo puede hacer ahora) y «Equipos con aviso o sin poder usarse». Debajo, el botón «Registrar consumo de material», la lista de esos equipos (al pulsar uno se abre su tarjeta en el Inventario) y la de mantenimientos pendientes.',
+            texto: '**Qué se ve al entrar.** El «Panel principal» del grupo enseña lo que le atañe: sus mantenimientos pendientes y los equipos de sus laboratorios y de la zona común (el almacén, 205-ZC) que no se pueden usar o tienen un aviso de avería abierto. Arriba, dos cifras: «Preventivos pendientes» (los mantenimientos que tu grupo puede hacer ahora) y «Equipos con aviso o sin poder usarse». Debajo, el botón «Registrar consumo de material» («¿Has abierto un envase? Apúntalo ahora»), la lista de esos equipos (al pulsar uno se abre su tarjeta en el Inventario) y la de mantenimientos pendientes.',
             img: 'EMP-1/02-panel-principal.png',
             alt: 'Panel principal de una cuenta de grupo con sus dos cifras señaladas, la lista de equipos con aviso o sin poder usarse y la de mantenimientos pendientes',
           },
@@ -215,11 +217,11 @@ const AYUDA_TAREAS = {
               '**Equipos**: [[EQU-1|encontrarlos]], [[EQU-2|consultar su protocolo y su manual]], [[EQU-3|saber si se pueden usar]], [[EQU-4|reservarlos y empezar y terminar el uso de la reserva]].',
               '**Registros de uso**: [[USO-1|apuntar el trabajo en la cabina de bioseguridad y en la vitrina de gases]], y [[USO-2|cada ciclo de autoclave]].',
               '**Muestras congeladas**: [[MUE-1|encontrarlas]] y [[MUE-2|usarlas]] (sacar una bolita, gastar un tubo o tomar volumen). Un uso apuntado por error se puede deshacer durante 15 minutos; pasado ese tiempo, lo corrige el profesorado.',
-              '**Material**: [[STO-1|encontrarlo]], [[STO-2|apuntar lo que se gasta]] (de vuestros laboratorios y de la zona común) y [[STO-3|llevarlo de un sitio a otro]].',
+              '**Material**: [[STO-1|encontrarlo]], [[STO-3|llevarlo del almacén (la zona común, 205-ZC) al laboratorio donde trabajáis]], y [[STO-2|apuntar el gasto en el momento de abrir un envase nuevo]] en vuestros laboratorios.',
               '**Residuos**: [[RES-1|consultar la Guía de residuos]] y [[RES-2|apuntar lo que se echa en cada contenedor]].',
-              '**Mantenimiento**: [[MAN-2|hacer los mantenimientos internos]] que no están reservados al profesorado, de los equipos de vuestros laboratorios y de la zona común.',
+              '**Mantenimiento**: [[MAN-2|hacer los mantenimientos internos]] que no están reservados al profesorado, de los equipos de vuestros laboratorios y de la zona común (el almacén).',
               '**Averías**: [[INC-1|avisar de que un equipo falla]].',
-              '**Inventario**, cuando lo pide el profesorado: [[INV-1|ubicar equipos]], [[INV-2|contar el stock de un sitio]] de vuestros laboratorios o de la zona común (si el grupo tiene permiso) e [[INV-3|inventariar material que no está en la app]].',
+              '**Inventario**, cuando lo pide el profesorado: [[INV-1|ubicar equipos]], [[INV-2|contar el stock de un sitio]] de vuestros laboratorios o del almacén de la zona común (si el grupo tiene permiso) e [[INV-3|inventariar material que no está en la app]].',
             ],
           },
           {
@@ -277,7 +279,175 @@ const AYUDA_TAREAS = {
     pantallas: ['dashboard', 'perfil'],
     versiones: {},   // la misma versión en los cuatro manuales: se rellena justo debajo
   },
+
+  // ── STO-1 · común (guion «STO-1_encontrar-material.md», 23/11/2026) ──
+  'STO-1': {
+    pantallas: ['material'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+
+  // ── STO-2 · versión alumnado (guion «STO-2_apuntar-gasto.md», normas de Paloma del 23/11/2026) ──
+  'STO-2': {
+    pantallas: ['dashboard', 'material'],
+    versiones: {
+      Alumno: {
+        titulo: 'Apuntar el gasto al abrir un envase nuevo',
+        quien: [
+          'Tu grupo, con la cuenta del grupo. El gasto queda a nombre del grupo.',
+          'Solo de los botes de vuestros laboratorios. **La zona común (205-ZC) es un almacén**: lo que hay allí no se gasta allí, se lleva al laboratorio donde se trabaja (→ [[STO-3|Llevar material de un sitio a otro]]), y desde la zona común no se apunta gasto.',
+        ],
+        cuando: [
+          '**En el momento de abrir un envase que estaba sin abrir** (un bote, una bolsa, una caja). No al final de la práctica: si se deja para luego, se olvida.',
+        ],
+        extrasAntes: [
+          {
+            titulo: 'Qué se apunta',
+            items: [
+              '**El envase que se abre, entero.** No se apuntan fracciones (mililitros, gramos, puntas sueltas): lo que se va usando de un envase abierto no se apunta. El siguiente gasto se apunta cuando se abra el siguiente envase.',
+            ],
+          },
+        ],
+        antes: [
+          'El envase nuevo en el laboratorio. Si estaba en el almacén, primero se traslada al laboratorio (→ [[STO-3|Llevar material de un sitio a otro]]).',
+        ],
+        pasos: [
+          {
+            texto: '**Al abrir el envase, abrir el registro de consumo.** En el «Panel principal», botón «📦 Registrar consumo de material» («¿Has abierto un envase? Apúntalo ahora»). O en «Material fungible › Inventario»: desplegar el material y pulsar «📦» en la línea del bote que se ha abierto; así el material y el bote ya van elegidos.',
+            nota: 'Los botes del almacén (zona común) no tienen «📦»: desde allí solo se trasladan.',
+          },
+          {
+            texto: '**Elegir el material y el bote del que se ha cogido**, es decir, el sitio del laboratorio donde estaba: escribir el nombre en «Material» y elegirlo de la lista. Si el material está en más de un sitio de vuestros laboratorios, sale «¿De dónde has cogido el envase?»: elegir ese sitio. El stock se lleva por sitio: si se elige otro bote, un sitio queda con más de lo que hay y otro con menos. Si solo está en un sitio, la app lo elige sola.',
+            img: 'STO-2/01-registro-de-consumo.png',
+            alt: 'Registrar consumo con el material elegido, el sitio de donde se ha cogido el envase y 1 envase abierto señalados',
+          },
+          {
+            texto: '**En «Envases abiertos», los envases que se han abierto**: normalmente, 1, que ya viene puesto.',
+          },
+          {
+            texto: '**En «Motivo», la práctica.** Sin nombres de personas.',
+          },
+          {
+            texto: '**Pulsar «Registrar consumo».** Sale «Gasto apuntado» con el stock que queda del material.',
+          },
+        ],
+        comprobacion: [
+          'El stock de ese bote ha bajado en los envases abiertos, y en el historial del material aparece el gasto a nombre del grupo (en «Material fungible › Inventario», desplegar el material y pulsar «ver historial»: la línea «📦 Salida» con la cantidad, el motivo y el nombre del grupo).',
+        ],
+        comprobacionImg: { img: 'STO-2/02-historial.png', alt: 'Historial del material con el gasto del grupo señalado: Salida, 1, Práctica de PCR y el nombre del grupo' },
+        problemas: [
+          ['«Este material solo está en el almacén (zona común)»', 'el envase está en el almacén: trasladarlo antes a vuestro laboratorio (→ [[STO-3|Llevar material de un sitio a otro]]) y apuntarlo allí al abrirlo.'],
+          ['«Este material no está disponible en tus ubicaciones asignadas»', 'ese envase es de otro laboratorio. Avisar al profesorado.'],
+          ['Se ha apuntado mal (cantidad, material o bote)', 'avisar al profesorado para que lo corrija.'],
+          ['El stock de la app no llega (el bote nunca baja de cero)', 'apuntarlo igualmente y avisar al profesorado. El stock no cuadraba.'],
+          ['Era el último envase', 'avisar al profesorado, que es quien lo pide.'],
+        ],
+        relacionado: [
+          ['Antes', [['STO-3', 'Llevar material de un sitio a otro'], ['STO-1', 'Encontrar un material']]],
+          ['Cuando lo pide el profesorado', [['INV-2', 'Contar el stock de un sitio']]],
+        ],
+      },
+    },
+  },
+
+  // ── STO-3 · común (guion «STO-3_llevar-material.md», 23/11/2026) ──
+  'STO-3': {
+    pantallas: ['material'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
 };
+
+(() => {
+  const sto1 = {
+    titulo: 'Encontrar un material y ver cuánto hay y dónde',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      'Antes de una práctica, para saber si hay bastante de un reactivo o de un fungible y dónde está.',
+      'Cuando no se encuentra algo en el armario donde se esperaba.',
+    ],
+    antes: ['El nombre del material, su categoría o su referencia.'],
+    pasos: [
+      {
+        texto: '**Buscar el material** en «Material fungible › Inventario»: escribir el nombre en «Buscar material...» (busca también por categoría, código y referencia del proveedor). Para ver solo lo de un sitio, escribir el laboratorio o el código en «Filtrar por ubicación...» (por ejemplo, 203 o 205-ZC).',
+        nota: '**La zona común (205-ZC) es un almacén**: lo que hay allí se lleva al laboratorio para usarlo (→ [[STO-3|Llevar material de un sitio a otro]]).',
+        img: 'STO-1/01-buscar-material.png',
+        alt: 'Inventario de material fungible con «puntas» escrito en el buscador y el material encontrado señalado',
+      },
+      {
+        texto: '**Leer la barra de stock**: verde, hay bastante; ámbar, está en el mínimo o por debajo; rojo, no queda. Al lado de la barra, lo que hay en total; a la derecha, el mínimo y el óptimo.',
+        img: 'STO-1/02-barra-de-stock.png',
+        alt: 'Tres materiales con la barra de stock señalada: verde, ámbar y roja',
+      },
+      {
+        texto: '**Pulsar el material para desplegarlo y ver cada bote**: una línea por sitio, con «📍», el código y el nombre del sitio (laboratorio, armario, balda), cuánto hay en cada uno y «☣️ ESTÉRIL» si es de uso estéril. Los botes del almacén llevan «Zona común» en el nombre del sitio.',
+        img: 'STO-1/03-material-desplegado.png',
+        alt: 'Material desplegado con una línea por bote y la línea de antigüedad señaladas',
+      },
+      {
+        texto: '**Coger primero lo más antiguo**: la última línea, «🗓 Antigüedad», dice desde cuándo está cada tanda (por ejemplo, «sept 2026 (3 caja/s)»). Antes de usarlo, mirar la caducidad en el envase.',
+        nota: 'La antigüedad es del material entero, no de cada bote: la app no sabe en qué sitio está cada tanda. El envase sí lo dice. «ver historial» enseña cada entrada, traslado y gasto del material.',
+      },
+    ],
+    comprobacion: ['Se sabe en qué sitio está el bote que se va a usar, y en ese sitio está.'],
+    problemas: [
+      ['No aparece', 'probar con otro nombre, con la categoría o con la referencia del envase. Y comprobar que no queda nada escrito en «Filtrar por ubicación...».'],
+      ['No está en la app pero sí en el laboratorio', 'cuando el profesorado lo pida, se inventaría (→ [[INV-3|Inventariar material que no está en la app]]).'],
+      ['La app dice que hay y no hay, o al revés', 'no cambiar nada por vuestra cuenta. Avisar al profesorado: es un fallo del stock, que se corrige con un recuento.'],
+      ['Está en ámbar o en rojo, o se ha acabado', 'avisar al profesorado, que es quien lo pide.'],
+    ],
+    relacionado: [
+      ['Después', [['STO-3', 'Llevar material de un sitio a otro'], ['STO-2', 'Apuntar el gasto al abrir un envase nuevo']]],
+      ['Cuando lo pide el profesorado', [['INV-2', 'Contar el stock de un sitio'], ['INV-3', 'Inventariar material nuevo']]],
+    ],
+  };
+  const sto3 = {
+    titulo: 'Llevar material de un sitio a otro (y apuntarlo)',
+    quien: ['Cualquier cuenta. Con la cuenta de un grupo, el traslado queda a nombre del grupo.'],
+    cuando: [
+      '**Cada vez que se coge material del almacén para llevarlo al laboratorio donde se trabaja.** La zona común (205-ZC) es un almacén: lo que hay allí no se gasta allí, se lleva al laboratorio. El gasto se apunta después, en el laboratorio, al abrir el envase (→ [[STO-2|Apuntar el gasto al abrir un envase nuevo]]).',
+      'Cada vez que un material cambia de sitio dentro del laboratorio (de un armario a otro).',
+      'Si no se apunta, el siguiente lo busca donde ya no está y el stock de cada sitio queda mal.',
+    ],
+    antes: ['El sitio exacto donde se va a dejar (el armario, no solo el laboratorio).'],
+    pasos: [
+      {
+        texto: '**Leer la etiqueta del armario de donde se coge** (→ [[EMP-6|Usar GestionLab en el móvil]]): se abre «¿Qué te llevas?» con lo que hay en ese armario. Es la forma más rápida.',
+        nota: 'Sin etiqueta: en «Material fungible › Inventario», desplegar el material y pulsar «🔀» en la línea del bote del que se coge. Se abre «🔀 Trasladar material», con un solo material; el resto es igual.',
+      },
+      {
+        texto: '**Marcar lo que se coge y cuánto**: «+» en cada material hasta lo que te llevas. Lo que no se coge se deja en 0.',
+        img: 'STO-3/01-que-te-llevas.png',
+        alt: '¿Qué te llevas? desde un armario del almacén (zona común), con 2 cajas de puntas de pipeta marcadas',
+      },
+      {
+        texto: '**Elegir el destino donde se deja de verdad**, en «¿A dónde los llevas?». Si ese material ya está en algún sitio, la app propone esos sitios primero («📍 Donde ya hay — toca para elegirlo»): dejarlo junto a lo que ya hay, para no repartir el mismo material por varios armarios. Si no, «➕ Otro sitio (donde aún no hay)» y elegir el laboratorio y el sitio.',
+        nota: 'Desde el almacén (la zona común) solo se puede llevar material a un laboratorio: la zona común no sale como destino.',
+        img: 'STO-3/02-destino-donde-ya-hay.png',
+        alt: 'Destino del traslado con los sitios donde ya hay de ese material señalados',
+      },
+      {
+        texto: '**Pulsar «✅ Confirmar traslado»** («🔀 Trasladar» si se entró por el bote). La app comprueba todo antes de mover nada: si de algo no hay bastante, no traslada ninguno. Sale el aviso del traslado con el sitio de destino.',
+        img: 'STO-3/03-traslado-confirmado.png',
+        alt: 'Material desplegado tras el traslado: el bote del almacén ha bajado y el del laboratorio ha subido, con el aviso de traslado abajo',
+      },
+    ],
+    comprobacion: [
+      'En el inventario de material, ese material aparece en el sitio de destino con lo que se ha llevado, y en el de origen ha bajado. En su historial, la línea «🔀 Traslado» con quien lo hizo.',
+    ],
+    problemas: [
+      ['«No hay bastante» y no se traslada nada', 'revisar las cantidades. Si la app tiene menos de lo que hay de verdad, avisar al profesorado: el stock no cuadraba.'],
+      ['El sitio de destino no está en la app', 'elegir el más cercano que exista y avisar al profesorado, que crea las ubicaciones.'],
+      ['Se ha llevado al sitio equivocado', 'hacer otro traslado al sitio correcto.'],
+    ],
+    relacionado: [
+      ['Antes', [['EMP-6', 'Usar GestionLab en el móvil: etiquetas de armario'], ['STO-1', 'Encontrar un material']]],
+      ['Después', [['STO-2', 'Apuntar el gasto al abrir un envase nuevo']]],
+    ],
+  };
+  AYUDA_ORDEN_MANUALES.forEach(r => {
+    AYUDA_TAREAS['STO-1'].versiones[r] = sto1;
+    AYUDA_TAREAS['STO-3'].versiones[r] = sto3;
+  });
+})();
 
 (() => {
   const emp2 = {
@@ -512,10 +682,12 @@ function _ayudaHtmlTarea(cod) {
   // con una nota opcional debajo.
   const tabla = t => `<div class="ayuda-tabla-wrap"><table class="ayuda-tabla"><thead><tr>${t.cabeceras.map(c => `<th>${_ayudaEsc(c)}</th>`).join('')}</tr></thead>
     <tbody>${t.filas.map(f => `<tr>${f.map(c => `<td>${_ayudaTxt(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const extras = (v.extras || []).map(x => bloque(_ayudaEsc(x.titulo),
+  // `extrasAntes` va después de «Cuándo» (p. ej. «Qué se apunta» de STO-2); `extras`, tras los pasos.
+  const extrasDe = lista => (lista || []).map(x => bloque(_ayudaEsc(x.titulo),
     (x.intro ? `<p class="ayuda-p">${_ayudaTxt(x.intro)}</p>` : '') +
     (x.tabla ? tabla(x.tabla) : _ayudaLista(x.items, x.numerada)) +
     (x.nota ? `<p class="ayuda-p">${_ayudaTxt(x.nota)}</p>` : ''))).join('');
+  const extras = extrasDe(v.extras);
   const problemas = (v.problemas || []).length ? `<ul class="ayuda-lista">${v.problemas.map(([q, r]) =>
     `<li><strong>${_ayudaTxt(q)}</strong>: ${_ayudaTxt(r)}</li>`).join('')}</ul>` : '';
   const relacionado = (v.relacionado || []).length ? `<ul class="ayuda-lista ayuda-relacionado">${v.relacionado.map(([etq, refs]) =>
@@ -528,6 +700,7 @@ function _ayudaHtmlTarea(cod) {
       <h2 class="ayuda-h1">${_ayudaEsc(v.titulo)}</h2>
       ${bloque('Quién', _ayudaLista(v.quien))}
       ${bloque('Cuándo', _ayudaLista(v.cuando))}
+      ${extrasDe(v.extrasAntes)}
       ${bloque('Antes de empezar', _ayudaLista(v.antes))}
       ${bloque('Pasos', pasos)}
       ${extras}

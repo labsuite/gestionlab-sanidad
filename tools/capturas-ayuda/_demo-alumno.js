@@ -37,15 +37,30 @@ async (page, APP) => {
     // Ubicaciones, material y residuos de ejemplo
     DATA.ubicaciones = [
       _ubicacionSbToObj({ id_ubicacion: '205-ZC-1.1', laboratorio_aula: '205 - Zona común', zona: 'Armario 1', subzona: 'Balda 1', descripcion_completa: 'Zona común · Armario 1 · Balda 1', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '205-ZC-2.1', laboratorio_aula: '205 - Zona común', zona: 'Reactivos', subzona: 'Inferior', descripcion_completa: 'Zona común · Reactivos · Inferior', activa: true }),
       _ubicacionSbToObj({ id_ubicacion: '205-1.7', laboratorio_aula: '205', zona: 'Poyata 1', subzona: 'Cajón 7', descripcion_completa: 'Lab 205 · Poyata 1 · Cajón 7', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '205-2.3', laboratorio_aula: '205', zona: 'Armario 2', subzona: 'Balda 3', descripcion_completa: 'Lab 205 · Armario 2 · Balda 3', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '203-1.2', laboratorio_aula: '203', zona: 'Armario 1', subzona: 'Balda 2', descripcion_completa: 'Lab 203 · Armario 1 · Balda 2', activa: true }),
     ];
     DATA.material = [
-      _materialSbToObj({ id_material: 'MATEJ1', nombre: 'Puntas de pipeta 200 µL', categoria: 'Material fungible', unidad: 'caja/s', stock_actual: 6, stock_minimo: 2, stock_optimo: 8 }),
-      _materialSbToObj({ id_material: 'MATEJ2', nombre: 'Guantes de nitrilo talla M', categoria: 'EPI y seguridad', unidad: 'caja/s', stock_actual: 1, stock_minimo: 3, stock_optimo: 10 }),
+      _materialSbToObj({ id_material: 'MATEJ1', nombre: 'Puntas de pipeta 200 µL', categoria: 'Material fungible — puntas, tubos, placas, Eppendorf...', unidad: 'caja/s', stock_actual: 7, stock_minimo: 2, stock_optimo: 8 }),
+      _materialSbToObj({ id_material: 'MATEJ2', nombre: 'Guantes de nitrilo talla M', categoria: 'EPI y seguridad — guantes, gafas, batas, mascarillas...', unidad: 'caja/s', stock_actual: 1, stock_minimo: 3, stock_optimo: 10 }),
+      _materialSbToObj({ id_material: 'MATEJ3', nombre: 'Agarosa', categoria: 'Reactivo de biología molecular — extracción de ácidos nucleicos, electroforesis, cultivo celular...', unidad: 'bote/s', stock_actual: 0, stock_minimo: 1, stock_optimo: 2 }),
     ];
     DATA.materialUbicaciones = [
-      _materialUbicacionSbToObj({ id: 'LUEJ1', id_material: 'MATEJ1', id_ubicacion: '205-ZC-1.1', stock_local: 6, stock_minimo_local: 2, stock_optimo_local: 8 }),
+      _materialUbicacionSbToObj({ id: 'LUEJ1', id_material: 'MATEJ1', id_ubicacion: '205-ZC-1.1', stock_local: 4, stock_minimo_local: 2, stock_optimo_local: 6 }),
+      _materialUbicacionSbToObj({ id: 'LUEJ3', id_material: 'MATEJ1', id_ubicacion: '205-1.7', stock_local: 2, stock_minimo_local: 1, stock_optimo_local: 2 }),
+      _materialUbicacionSbToObj({ id: 'LUEJ4', id_material: 'MATEJ1', id_ubicacion: '203-1.2', stock_local: 1, stock_minimo_local: 0, stock_optimo_local: 2 }),
       _materialUbicacionSbToObj({ id: 'LUEJ2', id_material: 'MATEJ2', id_ubicacion: '205-ZC-1.1', stock_local: 1, stock_minimo_local: 3, stock_optimo_local: 10 }),
+      _materialUbicacionSbToObj({ id: 'LUEJ5', id_material: 'MATEJ3', id_ubicacion: '205-ZC-2.1', stock_local: 0, stock_minimo_local: 1, stock_optimo_local: 2 }),
+    ];
+    // Historial de las puntas: dos recepciones (sept y nov), un traslado y un gasto del grupo
+    const mov = (id, tipo, cantidad, fecha, motivo, usuario) => _movimientoSbToObj({ id_movimiento: id, material: 'Puntas de pipeta 200 µL', id_material: 'MATEJ1', tipo, cantidad, fecha, motivo, usuario });
+    DATA.movimientos = [
+      mov('MOVEJ1', 'Entrada', 4, `${a1}-09-15`, 'Recepción del pedido', 'Docente de ejemplo'),
+      mov('MOVEJ2', 'Entrada', 4, `${a1}-11-05`, 'Recepción del pedido', 'Docente de ejemplo'),
+      mov('MOVEJ3', 'Traslado', 2, `${a1}-11-10`, 'NFC · De: 205-ZC-1.1 → 205-1.7', '1º CS EJEMPLO'),
+      mov('MOVEJ4', 'Salida', 1, `${a1}-11-20`, 'Práctica de PCR', '1º CS EJEMPLO'),
     ];
     DATA.tiposResiduo = [
       _tipoResiduoSbToObj({ id_residuo: 'RESEJ1', nombre: 'Puntas de pipeta contaminadas', riesgo: '', contenedor_tipo: 'Biosanitario', lab: '205', zona: '' }),
