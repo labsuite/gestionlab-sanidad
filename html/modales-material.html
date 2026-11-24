@@ -89,7 +89,7 @@
       <button class="modal-close" onclick="closeModal('modal-consumo')">✕</button>
     </div>
     <div class="modal-body">
-      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">Busca el material y anota cuánto has usado.</p>
+      <p style="font-size:13px;color:var(--text-soft);margin-bottom:16px">Apúntalo al abrir un envase que estaba sin abrir (un bote, una bolsa, una caja). Se apunta el envase entero: lo que vas usando de un envase abierto no se apunta.</p>
       <div class="form-grid" style="gap:14px">
         <div class="form-group" id="consumo-search-group">
           <label>Material *</label>
@@ -102,17 +102,17 @@
           <div id="consumo-material-selected" style="display:none;margin-top:8px;padding:8px 12px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;color:var(--accent);font-weight:500"></div>
         </div>
         <div class="form-group" id="consumo-ubicacion-group" style="display:none">
-          <label>Ubicación del consumo</label>
+          <label>¿De dónde has cogido el envase?</label>
           <select id="consumo-ubicacion-sel"></select>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Este material está en varias ubicaciones. Indica dónde lo has usado.</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:4px">El sitio del laboratorio donde estaba. El almacén (zona común) no sale: lo que hay allí se traslada antes al laboratorio.</div>
         </div>
         <div class="form-group">
-          <label>Cantidad consumida *</label>
-          <input id="consumo-cantidad" type="number" min="0.01" step="0.01" placeholder="Ej: 1, 0.5...">
+          <label>Envases abiertos *</label>
+          <input id="consumo-cantidad" type="number" min="1" step="1" placeholder="Normalmente, 1">
         </div>
         <div class="form-group">
           <label>Motivo (opcional)</label>
-          <input id="consumo-motivo" placeholder="Ej: Práctica PCR, control cultivos...">
+          <input id="consumo-motivo" placeholder="La práctica, sin nombres de personas. Ej: Práctica de PCR">
         </div>
         <div class="form-group">
           <label>Observaciones</label>

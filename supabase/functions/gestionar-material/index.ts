@@ -87,6 +87,23 @@ async function ubicacionAlAlcanceDeGrupo(supabaseAdmin: any, email: string, idUb
   return !!lab && labs.includes(lab);
 }
 
+/**
+ * ¿La ubicación es de la zona común (205-ZC), que es un almacén? Mismo criterio que
+ * esZonaComun() de js/config.js: el código o las palabras del catálogo de ubicaciones.
+ */
+async function esUbicacionZonaComun(supabaseAdmin: any, idUbicacion: string | null): Promise<boolean> {
+  if (!idUbicacion) return false;
+  if (/(^|[-\s])ZC([-\s.]|$)/i.test(idUbicacion)) return true;
+  const { data: ub } = await supabaseAdmin.from("ubicaciones")
+    .select("laboratorio_aula, zona, subzona, descripcion_completa").eq("id_ubicacion", idUbicacion).maybeSingle();
+  const texto = [ub?.laboratorio_aula, ub?.zona, ub?.subzona, ub?.descripcion_completa].join(" ").toLowerCase();
+  return /(común|comun|almacén|almacen)/.test(texto);
+}
+
+const MSG_DESDE_ALMACEN = "La zona común es un almacén: desde allí no se apunta gasto. " +
+  "Lleva antes el envase al laboratorio donde trabajas (🔀 Trasladar) y apúntalo allí al abrirlo.";
+const MSG_ALMACEN_A_ALMACEN = "Desde la zona común (el almacén) solo se puede llevar a un laboratorio";
+
 Deno.serve(async (req) => {
   const preflight = handleCorsPreflight(req);
   if (preflight) return preflight;
@@ -140,8 +157,13 @@ Deno.serve(async (req) => {
       const lotes = await getLotes(supabaseAdmin, idMaterial);
       let loteElegido = loteId ? lotes.find((l: any) => l.id === loteId) : null;
       if (lotes.length > 0 && !loteElegido) return jsonError("Selecciona una ubicación", 400);
-      if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, loteElegido ? loteElegido.id_ubicacion : mat.ubicacion))) {
-        return jsonError("Este material no está en los laboratorios de tu grupo ni en la zona común", 403);
+      // Norma de Paloma (2026-11-23): la zona común es un almacén. Lo que hay allí se lleva al
+      // laboratorio donde se trabaja y el gasto se apunta allí, al abrir el envase. Para todos
+      // los roles: desde la zona común solo se traslada.
+      const ubicacionGasto = loteElegido ? loteElegido.id_ubicacion : mat.ubicacion;
+      if (await esUbicacionZonaComun(supabaseAdmin, ubicacionGasto)) return jsonError(MSG_DESDE_ALMACEN, 400);
+      if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, ubicacionGasto))) {
+        return jsonError("Este material no está en los laboratorios de tu grupo", 403);
       }
       await registrarMovimiento(supabaseAdmin, mat, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || ""));
       if (loteElegido) {
@@ -169,6 +191,13 @@ Deno.serve(async (req) => {
       const idDestinoUbicacion = String(body.id_destino_ubicacion || "").trim();
       if (!loteDestinoId && !idDestinoUbicacion) return jsonError("Selecciona el destino", 400);
       if (!loteDestinoId && idDestinoUbicacion === loteOrigen.id_ubicacion) return jsonError("El destino es el mismo sitio que el origen", 400);
+      // De la zona común (el almacén), solo a un laboratorio. Antes solo lo comprobaba la pantalla.
+      if (await esUbicacionZonaComun(supabaseAdmin, loteOrigen.id_ubicacion)) {
+        const idUbicDestino = loteDestinoId
+          ? (await supabaseAdmin.from("material_ubicaciones").select("id_ubicacion").eq("id", loteDestinoId).maybeSingle()).data?.id_ubicacion
+          : idDestinoUbicacion;
+        if (await esUbicacionZonaComun(supabaseAdmin, idUbicDestino)) return jsonError(MSG_ALMACEN_A_ALMACEN, 400);
+      }
 
       // Una alícuota (bote hija) llevada a otro sitio sigue siendo alícuota de su
       // madre: entera, se mueve el propio bote; una parte, se reparte en otra hija.
@@ -256,7 +285,8 @@ Deno.serve(async (req) => {
 
   // ── traslado de varios materiales de un armario a otro (NFC) ──
   // Igual que "traslado": lo puede hacer cualquier sesión, alumnado incluido
-  // (llevar material de la zona común a su sitio). Firma según el rol.
+  // (llevar material de la zona común a su sitio). Firma según el rol. De la zona
+  // común, solo a un laboratorio (lo comprueba también el servidor desde 2026-11-23).
   if (accion === "transferencia_masiva") {
     const { error: authError, email, supabaseAdmin } = await requireValidSession(req);
     if (authError) return authError;
@@ -267,6 +297,9 @@ Deno.serve(async (req) => {
     if (!idOrigen || !idDestino) return jsonError("Origen y destino son obligatorios", 400);
     if (idOrigen === idDestino) return jsonError("El destino es el mismo sitio que el origen", 400);
     if (!items.length) return jsonError("Introduce la cantidad de al menos un material", 400);
+    if (await esUbicacionZonaComun(supabaseAdmin, idOrigen) && await esUbicacionZonaComun(supabaseAdmin, idDestino)) {
+      return jsonError(MSG_ALMACEN_A_ALMACEN, 400);
+    }
     // Se comprueba todo antes de mover nada: si un material no tiene bastante, no
     // se queda el traslado a medias con los anteriores ya movidos.
     for (const item of items) {

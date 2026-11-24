@@ -467,6 +467,18 @@ Detalles a respetar al tocarlo:
   ubicación — `asegurarLoteLegacy()` —, o `sincronizarStock()` lo borra al
   recalcular el total como suma de lotes.
 
+### La zona común es un almacén: de allí no se apunta gasto (2026-11-23)
+
+Normas de material de Paloma: **el gasto se apunta al abrir un envase** (bote, bolsa, caja) que
+estaba sin abrir, y el gasto es **el envase entero** (sin fracciones; el registro trae «Envases
+abiertos» = 1). La **zona común (205-ZC) es un almacén**: lo que hay allí se traslada al
+laboratorio donde se trabaja, y el gasto se apunta allí. Por eso, **para ningún rol**, se puede
+apuntar consumo desde un bote de la zona común: los botes del almacén no tienen 📦, el registro
+de consumo no los ofrece y `consumo` de `gestionar-material` lo rechaza (`esUbicacionZonaComun`).
+Desde la zona común solo se traslada, y **solo a un laboratorio** (lo exige también el servidor
+en `traslado` y `transferencia_masiva`; `corregir_ubicacion` no, porque arregla un error de
+inventario). Tareas STO-1/2/3 de la Ayuda.
+
 ### Recontar lo que ya está fichado: 🔢 Contar stock, por ubicación
 
 Para material que **ya está en la app**, el alumnado no pasa por "Inventariar": con la

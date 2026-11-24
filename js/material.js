@@ -262,7 +262,7 @@ function renderFilaMaterial(m) {
   // en goteros en el mismo estante son 2 lotes pero 1 sola ubicación.
   const ubiCount = lotes.length > 0 ? new Set(lotes.map(l => l.ID_Ubicacion)).size : (m.Ubicacion ? 1 : 0);
   const ubiLabel = ubiCount > 0
-    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${ubiCount} ubicación${ubiCount > 1 ? 'es' : ''}</span>`
+    ? `<span style="font-size:11px;color:var(--accent);font-weight:500">${ubiCount} ${ubiCount > 1 ? 'ubicaciones' : 'ubicación'}</span>`
     : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
 
   const rowId = `mat-row-${safeId}`;
@@ -322,7 +322,7 @@ function renderFilaMaterial(m) {
         </td>
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
-          <button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Consumo en esta ubicación">📦</button>
+          ${esZonaComun(l.ID_Ubicacion) ? '' : `<button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Apuntar un envase abierto aquí">📦</button>`}
           ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}','lote:${l.ID}')" title="Contar stock en esta ubicación">🔢</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir/alicuotar">✂️</button>` : ''}
@@ -349,7 +349,7 @@ function renderFilaMaterial(m) {
       </td>
       <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLeg || '—'} / ${opLeg || '—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
-        <button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Registrar consumo">📦</button>
+        ${esZonaComun(m.Ubicacion) ? '' : `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Apuntar un envase abierto">📦</button>`}
         ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaMaterial('${m.ID_Material}')" title="Entrada">📥</button>` : ''}
         ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir/alicuotar">✂️</button>` : ''}
         ${m.Ubicacion ? `<button class="icon-btn" onclick="trasladarDesdeLegacy('${m.ID_Material}')" title="Trasladar a otra ubicación">🔀</button>` : ''}
@@ -528,12 +528,20 @@ function openModalHistorialMaterial(idMaterial) {
   if (!movs.length) {
     contenido.innerHTML = bloqueAntiguedad + `<div style="padding:24px;text-align:center;color:var(--text-muted);font-size:13px">Sin movimientos registrados para este ítem.</div>`;
   } else {
+    // Cada tipo con su etiqueta (antes todo lo que no era Entrada salía como «Salida», también
+    // los traslados) y quién lo hizo: el grupo o el docente, como se guardó.
+    const _e = t => _esc(String(t ?? ''));
+    const etiqueta = t => ({
+      Entrada: '<span class="badge badge-green" style="font-size:10px">📥 Entrada</span>',
+      Salida: '<span class="badge badge-orange" style="font-size:10px">📦 Salida</span>',
+      Traslado: '<span class="badge badge-blue" style="font-size:10px">🔀 Traslado</span>',
+    })[t] || `<span class="badge badge-gray" style="font-size:10px">${_e(t || '—')}</span>`;
     contenido.innerHTML = bloqueAntiguedad + movs.map(m => `
       <div style="display:grid;grid-template-columns:90px 110px 48px 1fr;gap:8px;align-items:center;font-size:12px;padding:7px 0;border-bottom:1px solid var(--border-light,#f0f0f0)">
         <span style="color:var(--text-muted)">${formatDate(m.Fecha)||'—'}</span>
-        <span>${m.Tipo === 'Entrada' ? '<span class="badge badge-green" style="font-size:10px">📥 Entrada</span>' : '<span class="badge badge-orange" style="font-size:10px">📦 Salida</span>'}</span>
+        <span>${etiqueta(m.Tipo)}</span>
         <strong>${m.Cantidad||'—'}</strong>
-        <span style="color:var(--text-soft)">${m.Motivo||'—'}</span>
+        <span style="color:var(--text-soft)">${_e(m.Motivo||'—')}${m.Usuario ? `<div style="font-size:11px;color:var(--text-muted)">${_e(m.Usuario)}</div>` : ''}</span>
       </div>`).join('');
   }
   openModal('modal-historial-material');
@@ -975,7 +983,8 @@ function openModalConsumo() {
   document.getElementById('consumo-search').value = '';
   const grp = document.getElementById('consumo-search-group');
   if (grp) grp.style.display = '';
-  sv('consumo-cantidad', ''); sv('consumo-motivo', ''); sv('consumo-obs', '');
+  // El gasto es el envase que se abre, entero (norma de Paloma, 2026-11-23): normalmente, 1.
+  sv('consumo-cantidad', '1'); sv('consumo-motivo', ''); sv('consumo-obs', '');
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (ubiGrp) ubiGrp.style.display = 'none';
   // Limpiar bote fijo (puede venir de openModalConsumoLote anterior)
@@ -998,9 +1007,12 @@ function openModalConsumoMaterial(matId) {
   _mostrarSelectorUbicConsumo(matId);
 }
 
+const MSG_GASTO_ALMACEN = 'La zona común es un almacén: desde allí no se apunta gasto. Lleva antes el envase a tu laboratorio (🔀 Trasladar) y apúntalo allí al abrirlo.';
+
 function openModalConsumoLote(loteId) {
   const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
   if (!lote) return;
+  if (esZonaComun(lote.ID_Ubicacion)) { showToast(MSG_GASTO_ALMACEN, 'error'); return; }
   openModalConsumoMaterial(lote.ID_Material);
   // Guardar el LOTE fijo en un input hidden dedicado (no la ubicación: puede
   // haber más de un bote en la misma ubicación, p.ej. madre + alícuotas)
@@ -1020,19 +1032,36 @@ function openModalConsumoLote(loteId) {
 function _mostrarSelectorUbicConsumo(matId) {
   const ubiGrp = document.getElementById('consumo-ubicacion-group');
   if (!ubiGrp) return;
-  let lotes = getMatUbics(matId);
-
-  // Alumno: filtrar a sus ubicaciones asignadas + zona común
+  // Vaciar lo que quedara de otro material: un material sin botes no rellena el select,
+  // y guardarConsumo() leería de él un bote ajeno.
+  const sel0 = document.getElementById('consumo-ubicacion-sel');
+  if (sel0) sel0.innerHTML = '';
+  const todos = getMatUbics(matId);
+  const mat0 = DATA.material.find(m => m.ID_Material === matId);
+  const noDisponible = (msg, opcion) => {
+    showToast(msg, 'error');
+    const sel = document.getElementById('consumo-ubicacion-sel');
+    if (sel) sel.innerHTML = `<option value="">${opcion}</option>`;
+    ubiGrp.style.display = '';
+  };
+  // Material sin botes (stock en la propia ficha) guardado en la zona común
+  if (!todos.length && mat0 && esZonaComun(mat0.Ubicacion)) {
+    noDisponible(MSG_GASTO_ALMACEN, 'Está en el almacén: trasládalo antes'); return;
+  }
+  // La zona común es un almacén: de allí no se apunta gasto, para ningún rol.
+  let lotes = todos.filter(l => !esZonaComun(l.ID_Ubicacion));
+  // Alumno: además, solo los de sus laboratorios
   if (getUserRole() === 'Alumno') {
     const permitidas = getUbicacionesAlumno();
     lotes = lotes.filter(l => permitidas.includes(l.ID_Ubicacion));
-    if (!lotes.length) {
-      showToast('Este material no está disponible en tus ubicaciones asignadas', 'error');
-      const sel = document.getElementById('consumo-ubicacion-sel');
-      if (sel) sel.innerHTML = '<option value="">No disponible en tus ubicaciones</option>';
-      ubiGrp.style.display = '';
-      return;
+  }
+  if (todos.length && !lotes.length) {
+    if (todos.some(l => esZonaComun(l.ID_Ubicacion))) {
+      noDisponible('Este material solo está en el almacén (zona común): desde allí no se apunta gasto. Lleva antes el envase a tu laboratorio (🔀 Trasladar) y apúntalo allí al abrirlo.', 'Solo está en el almacén: trasládalo antes');
+    } else {
+      noDisponible('Este material no está disponible en tus ubicaciones asignadas', 'No disponible en tus ubicaciones');
     }
+    return;
   }
 
   if (lotes.length <= 1) {
@@ -1237,6 +1266,12 @@ async function guardarConsumo() {
   const loteSel  = loteFijo || document.getElementById('consumo-ubicacion-sel')?.value || '';
   const loteElegido = loteSel ? DATA.materialUbicaciones.find(l => l.ID === loteSel) : null;
 
+  // La zona común es un almacén: de allí no se apunta gasto (lo comprueba también el servidor)
+  if ((loteElegido && esZonaComun(loteElegido.ID_Ubicacion)) || (!lotes.length && esZonaComun(mat.Ubicacion))) {
+    showToast(MSG_GASTO_ALMACEN, 'error'); return;
+  }
+  if (lotes.length > 0 && !loteElegido) { showToast('Elige de dónde has cogido el envase', 'error'); return; }
+
   // Alumno: validar que la ubicación del bote elegido sea de las permitidas
   if (getUserRole() === 'Alumno') {
     const permitidas = getUbicacionesAlumno();
@@ -1256,9 +1291,9 @@ async function guardarConsumo() {
     });
     await loadAllData();
     const matFinal = DATA.material.find(m => m.ID_Material === matId);
-    showToast(`Consumo registrado. Stock: ${getStockTotal(matFinal)} ${matFinal?.Unidad || ''}`, 'success');
+    showToast(`Gasto apuntado. Stock: ${getStockTotal(matFinal)} ${matFinal?.Unidad || ''}`, 'success');
     closeModal('modal-consumo'); renderAll();
-  } catch(e) { showToast('Error registrando consumo', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error registrando consumo', 'error'); console.error(e); }
   hideLoading();
 }
 
@@ -1325,7 +1360,7 @@ function openModalTransferenciaArmario(ubicacionId) {
         <div style="flex:1;min-width:130px">
           <div style="font-size:13px;font-weight:500;line-height:1.3">${mat.Nombre}</div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
-            <span class="badge badge-gray" style="font-size:10px">${mat.Categoria || '—'}</span>&nbsp;
+            <span class="badge badge-gray" style="font-size:10px">${(mat.Categoria || '—').split(' — ')[0]}</span>&nbsp;
             Disponible: <strong>${stockOrigen}</strong> ${mat.Unidad || ''}
           </div>
         </div>
@@ -1802,7 +1837,7 @@ async function guardarSubdivision() {
       destinos: filas.map(f => ({ id_ubicacion: f.idUbicacion, cantidad: f.cantidad, unidad: f.unidad.trim(), stock_min: f.stockMin, stock_opt: f.stockOpt, esteril: !!f.esteril })),
     });
     await loadAllData();
-    showToast(`Repartido en ${filas.length} ubicación${filas.length > 1 ? 'es' : ''}`, 'success');
+    showToast(`Repartido en ${filas.length} ${filas.length > 1 ? 'ubicaciones' : 'ubicación'}`, 'success');
     closeModal('modal-subdividir-lote');
     renderMaterial(); renderDashboard(); updateBadges();
   } catch(e) { showToast(e.message || 'Error al subdividir', 'error'); console.error(e); }
