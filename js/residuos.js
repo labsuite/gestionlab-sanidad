@@ -683,7 +683,8 @@ async function guardarAdicion(iaOverride = false, motivoIa = '', registrarExcepc
     renderResiduosContenedores();
     renderPanelConsultasResiduo();
     _updateBadgeResiduos();
-    showToast(iaOverride ? 'Residuo registrado (aviso de la IA anotado para Gestión)' : 'Residuo registrado', 'success');
+    // Se apunta antes de echarlo (25/11/2026): con el registro hecho, ya se puede echar.
+    showToast(iaOverride ? 'Registrado (aviso de la IA anotado para Gestión): ya puedes echarlo' : 'Registrado: ya puedes echarlo en el contenedor', 'success');
   } catch(e) {
     showToast(e.message || 'Error al guardar', 'error');
   } finally {
@@ -726,7 +727,6 @@ function _mostrarIaNoVerificado(mensaje) {
         <button class="btn btn-secondary" type="button" style="font-size:12px;padding:5px 12px" onclick="closeModal('modal-adicion-res')">Cancelar</button>
         ${getUserRole() === 'Alumno' ? '' : `<button class="btn btn-primary" type="button" id="adic-forzar-ia" style="font-size:12px;padding:5px 12px">Registrar sin comprobar</button>`}
       </div>
-      ${getUserRole() === 'Alumno' ? '<div style="margin-top:6px;font-size:11px">Sin la comprobación, tu grupo no puede registrarlo: llama al profesorado.</div>' : ''}
     </div>`;
   document.getElementById('adic-ia-msg').textContent = mensaje || 'La IA no está disponible en este momento.';
   const btnSin = document.getElementById('adic-forzar-ia');

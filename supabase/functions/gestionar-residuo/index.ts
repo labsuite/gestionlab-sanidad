@@ -361,12 +361,12 @@ Deno.serve(async (req) => {
     const iaOverride = body.ia_override === true;
     // El alumnado nunca salta la comprobación de la IA (ni «La IA se equivoca — registrar
     // igualmente» ni «Registrar sin comprobar»): si duda, llama al profesorado.
-    // Decisión de Paloma, 2026-11-23.
-    if (iaOverride) {
-      const { rol } = await identificarUsuario(supabaseAdmin, email);
-      if (rol === "Alumno") {
-        return jsonError("Tu grupo no puede registrarlo sin la comprobación de la IA. Si dudas, llama al profesorado.", 403);
-      }
+    // Decisiones de Paloma del 23 y el 25/11/2026: sin la IA, un residuo descrito con
+    // palabras propias no lo registra un grupo (uno de la lista sí, con las reglas de abajo).
+    const { rol: rolSesion } = await identificarUsuario(supabaseAdmin, email);
+    const esGrupo = rolSesion === "Alumno";
+    if (iaOverride && esGrupo) {
+      return jsonError("Tu grupo no puede registrarlo sin la comprobación de la IA. No lo eches: pregunta al profesorado.", 403);
     }
     // true solo cuando el override viene de un bloqueo real de la IA (no de "IA no
     // disponible"): así queda registrado en excepciones_residuo_ia y alimenta el prompt.
@@ -493,7 +493,10 @@ Deno.serve(async (req) => {
         if (!residuo) {
           return jsonOk({
             ia_no_verificado: true,
-            mensaje: "No se ha podido comprobar la compatibilidad con la IA en este momento. Si estás seguro, puedes registrarlo igualmente; si no, deja el residuo etiquetado en la zona de residuos pendientes y avisa a tu profesor/a.",
+            // El residuo se apunta ANTES de echarlo (25/11/2026): si no se puede comprobar, no se echa.
+            mensaje: esGrupo
+              ? "No se ha podido comprobar con la IA en este momento, y sin esa comprobación tu grupo no puede registrar un residuo descrito con palabras propias. No lo eches: vuelve a intentarlo más tarde o pregunta al profesorado. Si el residuo está en la lista, elígelo de la lista: la app lo comprueba con sus reglas aunque la IA no responda."
+              : "No se ha podido comprobar con la IA en este momento. Si estás seguro de que va aquí, puedes registrarlo sin comprobar; si no, no lo eches: déjalo cerrado y rotulado y vuelve a intentarlo más tarde.",
             detalle: body.debug === true ? detalle : undefined,
           });
         }
