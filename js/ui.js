@@ -56,13 +56,14 @@ function showLoading(msg = 'Cargando...') {
 }
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
-function showToast(msg, type = '') {
+// `duracion` (ms) para avisos largos que hay que poder leer (por defecto, 3 s).
+function showToast(msg, type = '', duracion = 3000) {
   const c = document.getElementById('toasts');
   const t = document.createElement('div');
   t.className = 'toast ' + type;
   t.textContent = msg;
   c.appendChild(t);
-  setTimeout(() => t.remove(), 3000);
+  setTimeout(() => t.remove(), duracion);
 }
 
 function mostrarToastConAccion(msg, labelBtn, callback, duracion = 5000) {

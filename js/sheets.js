@@ -621,11 +621,15 @@ function _registroCabinaSbToObj(r) {
     Hora_Inicio: (r.hora_inicio || '').slice(0, 5),
     Hora_Fin: (r.hora_fin || '').slice(0, 5),
     Practica_Tecnica: r.practica_tecnica || '',
-    Nivel_Riesgo: r.nivel_riesgo || '',
+    Nivel_Riesgo: r.nivel_riesgo || '',          // antiguo (BSL): ya no se escribe
+    Grupo_Riesgo: r.grupo_riesgo || '',
     Verificacion_Previa: r.verificacion_previa || '',
+    Desinfeccion_Inicial: r.desinfeccion_inicial || '',
     Descontaminacion_Posterior: r.descontaminacion_posterior || '',
+    Minutos_UV: r.minutos_uv ?? '',
     Incidencias: r.incidencias || '',
     Estado: r.estado || 'Abierta',
+    Correcciones: Array.isArray(r.correcciones) ? r.correcciones : [],
   };
 }
 
@@ -639,9 +643,18 @@ function _registroAutoclaveSbToObj(r) {
     Hora_Fin: (r.hora_fin || '').slice(0, 5),
     Programa_Ciclo: r.programa_ciclo || '',
     Tipo_Carga: r.tipo_carga || '',
-    Resultado_Control: r.resultado_control || '',
+    Resultado_Control: r.resultado_control || '',  // antiguo (indicadores juntos): ya no se escribe
+    Temperatura_Max: r.temperatura_max ?? '',
+    Presion_Max: r.presion_max ?? '',
+    Cinta_Indicadora: r.cinta_indicadora || '',
+    Integrador_Quimico: r.integrador_quimico || '',
+    Indicador_Biologico: r.indicador_biologico || '',
+    Resultado_Biologico: r.resultado_biologico || '',
+    Fecha_Lectura_Biologico: r.fecha_lectura_biologico || '',
+    Biologico_Leido_Por: r.biologico_leido_por || '',
     Incidencias: r.incidencias || '',
     Estado: r.estado || 'Cerrada',
+    Correcciones: Array.isArray(r.correcciones) ? r.correcciones : [],
   };
 }
 
@@ -659,6 +672,7 @@ function _registroVitrinaSbToObj(r) {
     Limpieza_Posterior: r.limpieza_posterior || '',
     Incidencias: r.incidencias || '',
     Estado: r.estado || 'Abierta',
+    Correcciones: Array.isArray(r.correcciones) ? r.correcciones : [],
   };
 }
 

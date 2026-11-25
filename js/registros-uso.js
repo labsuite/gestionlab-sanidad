@@ -7,17 +7,30 @@
 // Los campos se pintan, se leen y se validan de forma genérica a partir de
 // `campos[]`, así que añadir un equipo nuevo no toca ninguna función de render.
 //
-//   campo      nombre de la columna en DATA / COLS (`Practica_Tecnica`)
+// Sustituyen a las hojas en papel de la cabina, las vitrinas y los autoclaves (decisión de
+// Paloma del 23/11/2026): recogen lo que pedía cada hoja (apartado 11 de sus protocolos).
+// Un registro cerrado solo lo corrige Gestión (Gestor/Administrador), y queda constancia de
+// quién, cuándo, por qué y qué ponía antes (`Correcciones`, ver gestionar-registro-uso).
+//
+//   campo      nombre de la propiedad en DATA (`Practica_Tecnica`)
 //   api        nombre de la columna en Supabase (`practica_tecnica`)
 //   label      cabecera en el historial y en el informe
 //   labelForm  etiqueta dentro del modal (por defecto, `label`)
-//   tipo       'text' | 'select' | 'check'  ('check' guarda 'Sí' / 'No')
+//   tipo       'text' | 'number' | 'select' | 'check'  ('check' guarda 'Sí' / 'No')
+//   fase       'inicio': se pide ya al arrancar (ciclo de autoclave); el resto, al terminar
 //   full       ocupa el ancho completo del form-grid-2
 //   requerido  bloquea el guardado si viene vacío
 //   permiteOtro  añade opción "Otro" + campo de texto libre (select)
+//   mostrar    (r) => texto para el historial y el informe (por defecto, el valor)
+//   soloHistorial + soloSiHay  columna antigua: no está en el formulario y solo sale en el
+//              historial si algún registro la tiene rellena
 
-const PROGRAMAS_AUTOCLAVE = ['121°C / 15 min', '121°C / 20 min'];
-const CARGAS_AUTOCLAVE    = ['Descontaminación', 'Líquidos', 'Sólidos'];
+// Programas habituales del apartado 7 del protocolo de los autoclaves (no tienen programas
+// guardados: temperatura y minutos se ajustan en cada ciclo). Cualquier otro, con «Otro».
+const PROGRAMAS_AUTOCLAVE = ['121 °C / 20 min', '121 °C / 30 min', '121 °C / 45 min', '121 °C / 60 min', '134 °C / 10 min', '134 °C / 3 min'];
+const CARGAS_AUTOCLAVE    = ['Material', 'Medios', 'Residuos'];
+const INDICADORES_QUIMICOS = ['Viró', 'No viró', 'No se puso'];
+const _COMPROBACIONES_PREVIAS = 'Comprobaciones previas hechas (apartado 4 del protocolo)';
 
 const _regConfig = {
   cabina: {
@@ -30,34 +43,60 @@ const _regConfig = {
     permiteSesionAbierta: true,
     // Trazabilidad del modelo de calidad: quién usó la cabina debe quedar ligado a su ciclo/módulo.
     mostrarCicloModulo: true,
+    labelIncidencias: 'Alarmas e incidencias',
+    placeholderIncidencias: 'Alarmas que hayan saltado, derrames u otras incidencias (opcional)',
     campos: [
       { campo: 'Practica_Tecnica', api: 'practica_tecnica', label: 'Práctica / técnica',
         tipo: 'text', full: true, requerido: true, placeholder: 'ej. Siembra en medio de cultivo' },
-      { campo: 'Nivel_Riesgo', api: 'nivel_riesgo', label: 'Nivel de riesgo',
-        labelForm: 'Nivel de riesgo del agente manipulado', tipo: 'select', requerido: true,
-        opciones: ['No aplica', 'BSL-1', 'BSL-2', 'BSL-3'] },
-      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Verificación previa',
-        labelForm: 'Verificación previa del flujo', tipo: 'check' },
-      { campo: 'Descontaminacion_Posterior', api: 'descontaminacion_posterior', label: 'Descontaminación posterior',
-        labelForm: 'Descontaminación posterior realizada', tipo: 'check' }
+      // Laboratorios de nivel de contención 2: no se trabajan agentes del grupo 3.
+      { campo: 'Grupo_Riesgo', api: 'grupo_riesgo', label: 'Grupo de riesgo',
+        labelForm: 'Grupo de riesgo del agente', tipo: 'select', requerido: true,
+        opciones: ['No aplica', '1', '2'] },
+      { campo: 'Minutos_UV', api: 'minutos_uv', label: 'UV (min)',
+        labelForm: 'Minutos de UV (si se ha usado)', tipo: 'number', entero: true, placeholder: 'ej. 15' },
+      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Comprobaciones previas',
+        labelForm: _COMPROBACIONES_PREVIAS, tipo: 'check' },
+      { campo: 'Desinfeccion_Inicial', api: 'desinfeccion_inicial', label: 'Desinfección inicial',
+        labelForm: 'Desinfección inicial hecha', tipo: 'check' },
+      { campo: 'Descontaminacion_Posterior', api: 'descontaminacion_posterior', label: 'Desinfección final',
+        labelForm: 'Desinfección final hecha', tipo: 'check' },
+      { campo: 'Nivel_Riesgo', api: 'nivel_riesgo', label: 'Nivel de riesgo (registros antiguos)',
+        soloHistorial: true, soloSiHay: true },
     ]
   },
   autoclave: {
     key: 'registrosAutoclave', sheet: 'Registros_Autoclave', lastCol: 'K',
     tiposEquipo: ['Autoclave'], prefix: 'RA',
     label: 'Autoclave', tabLabel: '♨️ Autoclave',
-    // El autoclave es un ciclo automático: se registra al ponerlo en marcha, no hay presencia que "cerrar" después.
-    permiteSesionAbierta: false,
+    // El ciclo se apunta al arrancarlo (queda «en marcha», como una sesión abierta) y se completa
+    // al terminar, antes de abrir. Lo completa cualquiera: el ciclo es del autoclave.
+    permiteSesionAbierta: true, arranqueConDatos: true, cierraCualquiera: true,
     // Trazabilidad del modelo de calidad: quién usó el autoclave debe quedar ligado a su ciclo/módulo.
     mostrarCicloModulo: true,
+    placeholderIncidencias: 'Mensajes de error del panel (el código tal como sale) u otras incidencias del ciclo (opcional)',
     campos: [
-      { campo: 'Programa_Ciclo', api: 'programa_ciclo', label: 'Programa / ciclo',
-        tipo: 'select', opciones: PROGRAMAS_AUTOCLAVE, permiteOtro: true },
+      { campo: 'Programa_Ciclo', api: 'programa_ciclo', label: 'Programa',
+        labelForm: 'Programa (temperatura y minutos)', tipo: 'select', fase: 'inicio', requerido: true,
+        opciones: PROGRAMAS_AUTOCLAVE, permiteOtro: true },
       { campo: 'Tipo_Carga', api: 'tipo_carga', label: 'Tipo de carga',
-        tipo: 'select', opciones: CARGAS_AUTOCLAVE },
-      { campo: 'Resultado_Control', api: 'resultado_control', label: 'Resultado del control',
-        labelForm: 'Resultado del control biológico/químico', tipo: 'select', full: true,
-        opciones: ['No aplica', 'Correcto', 'No correcto'] }
+        tipo: 'select', fase: 'inicio', requerido: true, opciones: CARGAS_AUTOCLAVE, permiteOtro: true },
+      { campo: 'Temperatura_Max', api: 'temperatura_max', label: 'T máx (°C)',
+        labelForm: 'Temperatura máxima alcanzada (°C)', tipo: 'number', requerido: true, placeholder: 'ej. 121,5' },
+      { campo: 'Presion_Max', api: 'presion_max', label: 'P máx (bar)',
+        labelForm: 'Presión máxima alcanzada (bar)', tipo: 'number', requerido: true, placeholder: 'ej. 1,1' },
+      { campo: 'Cinta_Indicadora', api: 'cinta_indicadora', label: 'Cinta indicadora',
+        tipo: 'select', requerido: true, opciones: INDICADORES_QUIMICOS },
+      { campo: 'Integrador_Quimico', api: 'integrador_quimico', label: 'Integrador químico',
+        tipo: 'select', requerido: true, opciones: INDICADORES_QUIMICOS },
+      // El resultado se apunta al leerlo, 24–48 h después (openModalBiologico).
+      { campo: 'Indicador_Biologico', api: 'indicador_biologico', label: 'Indicador biológico',
+        labelForm: 'Lleva indicador biológico (su resultado se apunta al leerlo, 24–48 h después)',
+        tipo: 'check', fase: 'inicio',
+        mostrar: r => r.Indicador_Biologico !== 'Sí' ? '—'
+          : r.Resultado_Biologico ? `${r.Resultado_Biologico} (leído el ${_fmtFechaReg(r.Fecha_Lectura_Biologico)})`
+          : '⏳ Pendiente de leer' },
+      { campo: 'Resultado_Control', api: 'resultado_control', label: 'Indicadores (registros antiguos)',
+        soloHistorial: true, soloSiHay: true },
     ]
   },
   vitrina: {
@@ -80,13 +119,37 @@ const _regConfig = {
       { campo: 'Productos_Quimicos', api: 'productos_quimicos', label: 'Productos / reactivos',
         labelForm: 'Productos / reactivos manipulados', tipo: 'text', full: true, requerido: true,
         placeholder: 'ej. Ácido clorhídrico, xileno' },
-      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Verificación previa',
-        labelForm: 'Verificación previa de la extracción (caudal y pantalla a la altura marcada)', tipo: 'check' },
+      { campo: 'Verificacion_Previa', api: 'verificacion_previa', label: 'Comprobaciones previas',
+        labelForm: _COMPROBACIONES_PREVIAS, tipo: 'check' },
       { campo: 'Limpieza_Posterior', api: 'limpieza_posterior', label: 'Limpieza posterior',
         labelForm: 'Limpieza y retirada de material al terminar', tipo: 'check' }
     ]
   }
 };
+
+// Textos que cambian entre una sesión (cabina, vitrina) y un ciclo (autoclave).
+function _txtReg(cfg) {
+  return cfg.arranqueConDatos
+    ? { abiertas: 'Ciclos en marcha', cerrar: '■ Completar ciclo', registro: 'ciclo' }
+    : { abiertas: 'Sesiones abiertas', cerrar: '■ Cerrar sesión', registro: 'sesión' };
+}
+
+/** Campos del formulario según el momento: 'inicio' (arrancar un ciclo) o el resto. */
+function _camposFormReg(tipo, modo) {
+  return _regConfig[tipo].campos.filter(c => !c.soloHistorial && (modo !== 'inicio' || c.fase === 'inicio'));
+}
+
+/** Columnas del historial / informe: las antiguas solo si alguna fila las tiene. */
+function _camposHistorialReg(tipo, filas) {
+  return _regConfig[tipo].campos.filter(c => !c.soloSiHay || filas.some(r => r[c.campo]));
+}
+
+function _valorReg(c, r) {
+  if (c.mostrar) return c.mostrar(r);
+  const v = r[c.campo];
+  if (v === '' || v === null || v === undefined) return '—';
+  return c.tipo === 'number' ? String(v).replace('.', ',') : v;
+}
 
 const _regTipos = Object.keys(_regConfig);
 
@@ -231,9 +294,17 @@ function _renderRegTab(tipo) {
   const horas = _horasAcumuladasReg(tipo, equipos.length > 1 ? idEquipoSel : '');
   const abiertasHtml = _renderSesionesAbiertasReg(tipo);
 
-  let botonPrincipal = `<button class="btn btn-primary" onclick="openModalSesionRegistro('${tipo}')">+ Registrar ciclo</button>`;
+  let botonPrincipal = '';
   let notaManual = '';
-  if (cfg.permiteSesionAbierta) {
+  if (cfg.arranqueConDatos) {
+    // Un ciclo en marcha en este autoclave lo completa cualquiera (el ciclo es del autoclave).
+    const idxMarcha = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipoSel);
+    botonPrincipal = idxMarcha >= 0
+      ? `<button class="btn btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idxMarcha})">■ Completar ciclo</button>`
+      : `<button class="btn btn-primary" onclick="openModalSesionRegistro('${tipo}','${idEquipoSel}',true)">▶ Arrancar ciclo</button>
+         <button class="btn btn-secondary" onclick="openModalSesionRegistro('${tipo}','${idEquipoSel}')">📝 Registrar ciclo completo</button>`;
+    notaManual = `<div style="font-size:11px;color:var(--text-muted);margin:0 0 20px">Apunta el ciclo al arrancarlo ("▶ Arrancar ciclo" o la etiqueta del autoclave) y complétalo al terminar, antes de abrir: hora de fin, temperatura y presión máximas e indicadores. Si lleva indicador biológico, su resultado se apunta al leerlo, 24–48 h después.</div>`;
+  } else if (cfg.permiteSesionAbierta) {
     const email = getEffectiveUser().email;
     const idxAbierta = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipoSel && (r.Usuario || '').toLowerCase().trim() === email);
     botonPrincipal = idxAbierta >= 0
@@ -257,6 +328,7 @@ function _renderRegTab(tipo) {
       <div style="font-size:11px;color:var(--text-muted)">Horas de uso registradas — apoyo al plan de mantenimiento</div>
     </div>
     ${abiertasHtml}
+    ${_renderBiologicosPendientes(tipo)}
     <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 8px">Historial</div>
     ${_renderHistorialReg(tipo)}
   `;
@@ -272,27 +344,47 @@ function _renderSesionesAbiertasReg(tipo) {
   if (!cfg.permiteSesionAbierta) return '';
   const email = getEffectiveUser().email;
   const esGestor = _puedeGestionarRegistros();
+  const txt = _txtReg(cfg);
   const abiertas = DATA[cfg.key]
     .map((r, idx) => ({ r, idx }))
-    .filter(({ r }) => r.Estado === 'Abierta' && (esGestor || (r.Usuario || '').toLowerCase().trim() === email));
+    .filter(({ r }) => r.Estado === 'Abierta' && (esGestor || cfg.cierraCualquiera || (r.Usuario || '').toLowerCase().trim() === email));
 
   if (!abiertas.length) return '';
 
   const filas = abiertas.map(({ r, idx }) => {
     const esPropia = (r.Usuario || '').toLowerCase().trim() === email;
+    const datosCiclo = cfg.arranqueConDatos ? [r.Programa_Ciclo, r.Tipo_Carga].filter(Boolean).map(x => ' · ' + x).join('') : '';
     return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
         <div style="font-size:13px;font-weight:600">${_nombreEquipoReg(r.ID_Equipo)}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${_fmtFechaReg(r.Fecha)} · desde las ${r.Hora_Inicio}${!esPropia ? ` · 👤 ${r.Usuario}` : ''}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${_fmtFechaReg(r.Fecha)} · desde las ${r.Hora_Inicio}${datosCiclo}${!esPropia ? ` · 👤 ${(r.Usuario || '').split('@')[0]}` : ''}</div>
       </div>
       <div style="display:flex;gap:6px">
-        ${(esPropia || esGestor) ? `<button class="btn btn-sm btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idx})">■ Cerrar sesión</button>` : ''}
+        ${(esPropia || esGestor || cfg.cierraCualquiera) ? `<button class="btn btn-sm btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idx})">${txt.cerrar}</button>` : ''}
         ${esGestor ? `<button class="btn btn-sm btn-secondary" onclick="descartarSesionAbierta('${tipo}', ${idx})">🗑️ Descartar</button>` : ''}
       </div>
     </div>`;
   }).join('');
 
-  return `<div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Sesiones abiertas</div>${filas}`;
+  return `<div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">${txt.abiertas}</div>${filas}`;
+}
+
+/** Ciclos de autoclave con indicador biológico cuyo resultado aún no se ha apuntado. */
+function _renderBiologicosPendientes(tipo) {
+  if (tipo !== 'autoclave') return '';
+  const cfg = _regConfig[tipo];
+  const pend = DATA[cfg.key]
+    .filter(r => r.Estado === 'Cerrada' && r.Indicador_Biologico === 'Sí' && !r.Resultado_Biologico)
+    .sort((a, b) => `${a.Fecha}T${a.Hora_Inicio}`.localeCompare(`${b.Fecha}T${b.Hora_Inicio}`));
+  if (!pend.length) return '';
+  const filas = pend.map(r => `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-size:13px;font-weight:600">${_nombreEquipoReg(r.ID_Equipo)}</div>
+        <div style="font-size:12px;color:var(--text-muted)">Ciclo del ${_fmtFechaReg(r.Fecha)} a las ${r.Hora_Inicio}${[r.Programa_Ciclo, r.Tipo_Carga].filter(Boolean).map(x => ' · ' + x).join('')}</div>
+      </div>
+      <button class="btn btn-sm btn-primary" onclick="openModalBiologico('${r.ID_Registro}')">🧫 Apuntar resultado</button>
+    </div>`).join('');
+  return `<div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 8px">Indicadores biológicos por leer</div>${filas}`;
 }
 
 function _renderHistorialReg(tipo) {
@@ -304,25 +396,30 @@ function _renderHistorialReg(tipo) {
     .slice()
     .sort((a, b) => `${b.Fecha}T${b.Hora_Inicio}`.localeCompare(`${a.Fecha}T${a.Hora_Inicio}`));
 
-  if (!cerradas.length) return `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin sesiones registradas todavía</div></div>`;
+  if (!cerradas.length) return `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">Sin ${cfg.arranqueConDatos ? 'ciclos' : 'sesiones'} registrados todavía</div></div>`;
 
+  const campos = _camposHistorialReg(tipo, cerradas);
+  const gestion = _puedeGestionarRegistros();
   // Sin overflow:hidden en línea: pisaba la regla .card:has(table) { overflow-x: auto }
   // de css/styles.css y la tabla se recortaba por la derecha (se perdía Incidencias).
   return `<div class="card" style="padding:0">
     <table><thead><tr>
       <th>Fecha</th><th>Horario</th><th>Usuario</th>
       ${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}
-      ${cfg.campos.map(c => `<th>${c.label}</th>`).join('')}
-      <th>Incidencias</th>
+      ${campos.map(c => `<th>${c.label}</th>`).join('')}
+      <th>${cfg.labelIncidencias || 'Incidencias'}</th>
+      ${gestion ? '<th></th>' : ''}
     </tr></thead>
     <tbody>
       ${cerradas.map(r => `<tr>
-        <td>${_fmtFechaReg(r.Fecha)}</td>
+        <td style="white-space:nowrap">${_fmtFechaReg(r.Fecha)}${(r.Correcciones || []).length
+          ? `<br><button class="badge badge-orange" style="border:none;cursor:pointer;font-size:10px;margin-top:3px" onclick="verCorreccionesReg('${tipo}','${r.ID_Registro}')" title="Ver qué se corrigió, quién y cuándo">✏️ Corregido</button>` : ''}</td>
         <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
         <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
         ${cfg.mostrarCicloModulo ? `<td style="font-size:12px;min-width:180px;max-width:240px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
-        ${cfg.campos.map(c => `<td style="font-size:12px">${r[c.campo] || '—'}</td>`).join('')}
+        ${campos.map(c => `<td style="font-size:12px">${_valorReg(c, r)}</td>`).join('')}
         <td style="font-size:12px">${r.Incidencias || '—'}</td>
+        ${gestion ? `<td><button class="btn btn-sm btn-secondary" style="white-space:nowrap" onclick="openModalCorregirRegistro('${tipo}','${r.ID_Registro}')" title="Corregir este registro (queda constancia del cambio)">✏️ Corregir</button></td>` : ''}
       </tr>`).join('')}
     </tbody></table>
   </div>`;
@@ -332,6 +429,8 @@ function _renderHistorialReg(tipo) {
 //
 // Se pintan desde `cfg.campos` (ver _regConfig), sin ramas por tipo de equipo.
 // Los checkboxes van todos juntos al final, en una sola columna a ancho completo.
+// `_regCtx.modo`: 'inicio' (arrancar un ciclo: solo los campos de `fase: 'inicio'`),
+// 'completo' (registro entero), 'cierre' (cerrar / completar) o 'correccion' (Gestión).
 
 function _idCampoSesion(c) { return `reg-campo-${c.api}`; }
 
@@ -342,7 +441,7 @@ function _renderUnCampoSesion(c, valores) {
   const etiqueta = `<label>${label}${c.requerido ? ' *' : ''}</label>`;
   const clase = `form-group${c.full ? ' full' : ''}`;
   const id = _idCampoSesion(c);
-  const valor = valores[c.campo] || '';
+  const valor = valores[c.campo] ?? '';
 
   if (c.tipo === 'select') {
     const opciones = c.permiteOtro ? [...c.opciones, 'Otro'] : c.opciones;
@@ -351,36 +450,54 @@ function _renderUnCampoSesion(c, valores) {
     const otro = c.permiteOtro
       ? `<input type="text" id="${id}-otro" placeholder="Especifica el valor" value="${esPreset ? '' : _attrCampoSesion(valor)}" style="margin-top:6px;${selValue === 'Otro' ? '' : 'display:none'}">`
       : '';
+    // Un campo obligatorio empieza sin elegir: que nadie lo deje en la primera opción sin mirarlo.
+    const vacia = c.requerido ? `<option value="" ${selValue ? '' : 'selected'}>— Elige —</option>` : '';
     return `<div class="${clase}">
       ${etiqueta}
       <select id="${id}" ${c.permiteOtro ? `onchange="_onCampoOtroChange('${c.api}')"` : ''}>
-        ${opciones.map(o => `<option value="${o}" ${selValue === o ? 'selected' : ''}>${o}</option>`).join('')}
+        ${vacia}${opciones.map(o => `<option value="${o}" ${selValue === o ? 'selected' : ''}>${o}</option>`).join('')}
       </select>
       ${otro}
     </div>`;
   }
 
+  // Números con coma o punto (el teclado del móvil pone la coma): el servidor los convierte.
+  const valorTxt = c.tipo === 'number' ? String(valor).replace('.', ',') : valor;
   return `<div class="${clase}">
     ${etiqueta}
-    <input type="text" id="${id}" value="${_attrCampoSesion(valor)}" placeholder="${c.placeholder || ''}">
+    <input type="text" id="${id}" value="${_attrCampoSesion(valorTxt)}" placeholder="${c.placeholder || ''}"${c.tipo === 'number' ? ` inputmode="${c.entero ? 'numeric' : 'decimal'}"` : ''}>
   </div>`;
 }
 
-function _renderCamposSesion(tipo, valores = {}) {
+function _renderCamposSesion(tipo, valores = {}, modo = 'completo') {
   const el = document.getElementById('reg-sesion-campos');
   if (!el) return;
-  const cfg = _regConfig[tipo];
-  const checks = cfg.campos.filter(c => c.tipo === 'check');
-  const resto  = cfg.campos.filter(c => c.tipo !== 'check');
+  const campos = _camposFormReg(tipo, modo);
+  const checks = campos.filter(c => c.tipo === 'check');
+  const resto  = campos.filter(c => c.tipo !== 'check');
 
   const bloqueChecks = checks.length ? `<div class="form-group full" style="display:flex;flex-direction:column;gap:10px;margin-top:4px;min-width:0">
       ${checks.map(c => `<label style="display:flex;align-items:flex-start;gap:8px;font-weight:400;margin:0;cursor:pointer;min-width:0"><input type="checkbox" id="${_idCampoSesion(c)}" style="margin-top:3px;flex-shrink:0" ${valores[c.campo] === 'Sí' ? 'checked' : ''}> <span style="min-width:0">${c.labelForm || c.label}</span></label>`).join('')}
     </div>` : '';
 
+  // Al corregir un ciclo con indicador biológico, también su resultado.
+  const biologico = (modo === 'correccion' && tipo === 'autoclave' && (valores.Indicador_Biologico === 'Sí' || valores.Resultado_Biologico))
+    ? `<div class="form-group">
+        <label>Resultado del indicador biológico</label>
+        <select id="reg-campo-resultado_biologico">
+          ${['', 'Negativo', 'Positivo'].map(o => `<option value="${o}" ${valores.Resultado_Biologico === o ? 'selected' : ''}>${o || '— Sin leer —'}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Fecha de lectura</label>
+        <input type="date" id="reg-campo-fecha_lectura_biologico" value="${valores.Fecha_Lectura_Biologico || ''}">
+      </div>` : '';
+
   el.innerHTML = `
     <div class="form-grid-2" style="margin-top:12px">
       ${resto.map(c => _renderUnCampoSesion(c, valores)).join('')}
       ${bloqueChecks}
+      ${biologico}
     </div>`;
 }
 
@@ -391,9 +508,9 @@ function _onCampoOtroChange(api) {
   otro.style.display = sel.value === 'Otro' ? '' : 'none';
 }
 
-function _leerCamposSesion(tipo) {
+function _leerCamposSesion(tipo, modo = 'completo') {
   const out = {};
-  for (const c of _regConfig[tipo].campos) {
+  for (const c of _camposFormReg(tipo, modo)) {
     const id = _idCampoSesion(c);
     if (c.tipo === 'check') {
       out[c.campo] = document.getElementById(id)?.checked ? 'Sí' : 'No';
@@ -408,9 +525,12 @@ function _leerCamposSesion(tipo) {
 
 // ── Modal: nueva sesión completa / cerrar sesión ─────────────
 
-function openModalSesionRegistro(tipo, idEquipoPreset = '') {
-  _regCtx = { tipo, idx: null };
+/** Registro entero (sesión o ciclo de una vez) o, con `arrancar`, el arranque de un ciclo de
+ *  autoclave: solo hora de inicio, programa, tipo de carga y si lleva indicador biológico. */
+function openModalSesionRegistro(tipo, idEquipoPreset = '', arrancar = false) {
   const cfg = _regConfig[tipo];
+  const modo = arrancar && cfg.arranqueConDatos ? 'inicio' : 'completo';
+  _regCtx = { tipo, idx: null, modo };
   const equipos = _equiposDeTipo(tipo);
 
   const sel = document.getElementById('reg-sesion-equipo');
@@ -421,28 +541,49 @@ function openModalSesionRegistro(tipo, idEquipoPreset = '') {
   const ahora = new Date();
   sv('reg-sesion-fecha', ahora.toISOString().split('T')[0]);
   sv('reg-sesion-hora-inicio', ahora.toTimeString().slice(0, 5));
-  sv('reg-sesion-hora-fin', cfg.permiteSesionAbierta ? ahora.toTimeString().slice(0, 5) : '');
+  // Una sesión entera se apunta al terminar (fin = ahora); un ciclo entero, con sus horas reales.
+  sv('reg-sesion-hora-fin', cfg.arranqueConDatos ? '' : ahora.toTimeString().slice(0, 5));
   sv('reg-sesion-incidencias', '');
-  _renderCamposSesion(tipo);
-  _actualizarLabelHoraFin(cfg);
+  _renderCamposSesion(tipo, {}, modo);
+  _prepararModalReg(cfg, modo);
 
-  document.getElementById('modal-reg-sesion-title').textContent = cfg.permiteSesionAbierta
-    ? `Registrar sesión completa — ${cfg.label}`
-    : `Registrar ciclo — ${cfg.label}`;
-  document.getElementById('reg-sesion-btn-guardar').textContent = cfg.permiteSesionAbierta ? 'Registrar sesión' : 'Registrar ciclo';
+  document.getElementById('modal-reg-sesion-title').textContent = modo === 'inicio'
+    ? `Arrancar ciclo — ${cfg.label}`
+    : cfg.arranqueConDatos ? `Registrar ciclo completo — ${cfg.label}` : `Registrar sesión completa — ${cfg.label}`;
+  document.getElementById('reg-sesion-btn-guardar').textContent = modo === 'inicio'
+    ? 'Arrancar ciclo' : cfg.arranqueConDatos ? 'Registrar ciclo' : 'Registrar sesión';
   openModal('modal-reg-sesion');
+}
+
+/** Lo que cambia del modal según el momento: hora de fin, avisos, incidencias y motivo. */
+function _prepararModalReg(cfg, modo) {
+  document.getElementById('reg-sesion-hora-fin-grupo').style.display = modo === 'inicio' ? 'none' : '';
+  document.getElementById('reg-sesion-hora-fin-label').textContent = modo === 'correccion' ? 'Hora fin' : 'Hora fin *';
+  document.getElementById('reg-sesion-incidencias-label').textContent = cfg.labelIncidencias || 'Incidencias';
+  document.getElementById('reg-sesion-incidencias').placeholder = cfg.placeholderIncidencias || 'Cualquier incidencia durante la sesión (opcional)';
+  document.getElementById('reg-sesion-motivo-grupo').style.display = modo === 'correccion' ? '' : 'none';
+  sv('reg-sesion-motivo', '');
+  const notas = {
+    inicio: 'Apúntalo al arrancar el ciclo. Al terminar, antes de abrir, lo completas: hora de fin, temperatura y presión máximas e indicadores.',
+    cierre: cfg.arranqueConDatos ? 'Antes de abrir, lee en el panel la temperatura y la presión máximas alcanzadas. Al abrir, comprueba la cinta y el integrador.' : '',
+    completo: cfg.arranqueConDatos ? 'Para el ciclo que no se apuntó al arrancar: con sus horas reales.' : '',
+    correccion: 'Queda constancia de quién lo corrige, cuándo, por qué y qué ponía antes.',
+  };
+  const nota = document.getElementById('reg-sesion-nota');
+  nota.textContent = notas[modo] || '';
+  nota.style.display = notas[modo] ? '' : 'none';
 }
 
 function _actualizarLabelHoraFin(cfg) {
   const label = document.getElementById('reg-sesion-hora-fin-label');
-  if (label) label.textContent = cfg.permiteSesionAbierta ? 'Hora fin *' : 'Hora fin (si la conoces)';
+  if (label) label.textContent = 'Hora fin *';
 }
 
 function openModalCerrarSesion(tipo, idx) {
   const cfg = _regConfig[tipo];
   const r = DATA[cfg.key][idx];
   if (!r) return;
-  _regCtx = { tipo, idx };
+  _regCtx = { tipo, idx, modo: 'cierre' };
 
   const sel = document.getElementById('reg-sesion-equipo');
   sel.innerHTML = `<option value="${r.ID_Equipo}">${_nombreEquipoReg(r.ID_Equipo)}</option>`;
@@ -453,57 +594,186 @@ function openModalCerrarSesion(tipo, idx) {
   sv('reg-sesion-hora-inicio', r.Hora_Inicio);
   sv('reg-sesion-hora-fin', new Date().toTimeString().slice(0, 5));
   sv('reg-sesion-incidencias', r.Incidencias || '');
-  _renderCamposSesion(tipo, r);
-  _actualizarLabelHoraFin(cfg);
+  _renderCamposSesion(tipo, r, 'cierre');
+  _prepararModalReg(cfg, 'cierre');
 
-  document.getElementById('modal-reg-sesion-title').textContent = `Cerrar sesión — ${cfg.label}`;
-  document.getElementById('reg-sesion-btn-guardar').textContent = 'Guardar y cerrar sesión';
+  document.getElementById('modal-reg-sesion-title').textContent = cfg.arranqueConDatos ? `Completar ciclo — ${cfg.label}` : `Cerrar sesión — ${cfg.label}`;
+  document.getElementById('reg-sesion-btn-guardar').textContent = cfg.arranqueConDatos ? 'Guardar y completar el ciclo' : 'Guardar y cerrar sesión';
+  openModal('modal-reg-sesion');
+}
+
+/** Gestión corrige un registro cerrado: queda constancia de quién, cuándo, por qué y qué ponía antes. */
+function openModalCorregirRegistro(tipo, idRegistro) {
+  if (!_puedeGestionarRegistros()) return;
+  const cfg = _regConfig[tipo];
+  const idx = DATA[cfg.key].findIndex(r => r.ID_Registro === idRegistro);
+  const r = DATA[cfg.key][idx];
+  if (!r) return;
+  _regCtx = { tipo, idx, modo: 'correccion' };
+
+  const sel = document.getElementById('reg-sesion-equipo');
+  sel.innerHTML = `<option value="${r.ID_Equipo}">${_nombreEquipoReg(r.ID_Equipo)}</option>`;
+  sel.value = r.ID_Equipo;
+  sel.disabled = true;
+  sv('reg-sesion-fecha', r.Fecha);
+  sv('reg-sesion-hora-inicio', r.Hora_Inicio);
+  sv('reg-sesion-hora-fin', r.Hora_Fin || '');
+  sv('reg-sesion-incidencias', r.Incidencias || '');
+  _renderCamposSesion(tipo, r, 'correccion');
+  _prepararModalReg(cfg, 'correccion');
+  document.getElementById('modal-reg-sesion-title').textContent = `Corregir registro — ${cfg.label}`;
+  document.getElementById('reg-sesion-btn-guardar').textContent = 'Guardar corrección';
   openModal('modal-reg-sesion');
 }
 
 async function guardarSesionRegistro() {
   if (!_regCtx) return;
   const { tipo, idx } = _regCtx;
+  const modo = _regCtx.modo || 'completo';
   const cfg = _regConfig[tipo];
 
   const idEquipo = v('reg-sesion-equipo');
   const fecha    = v('reg-sesion-fecha');
   const horaIni  = v('reg-sesion-hora-inicio');
-  const horaFin  = v('reg-sesion-hora-fin');
+  const horaFin  = modo === 'inicio' ? '' : v('reg-sesion-hora-fin');
   if (!idEquipo || !fecha || !horaIni) { showToast('Completa fecha y hora de inicio', 'error'); return; }
-  if (cfg.permiteSesionAbierta && !horaFin) { showToast('Indica la hora de fin', 'error'); return; }
+  if (modo !== 'inicio' && modo !== 'correccion' && cfg.permiteSesionAbierta && !horaFin) { showToast('Indica la hora de fin', 'error'); return; }
   if (horaFin && horaFin <= horaIni) { showToast('La hora de fin debe ser posterior a la de inicio', 'error'); return; }
 
-  const campos = _leerCamposSesion(tipo);
-  const faltan = cfg.campos.filter(c => c.requerido && !String(campos[c.campo] || '').trim());
-  if (faltan.length) {
-    showToast(`Completa: ${faltan.map(c => (c.labelForm || c.label).toLowerCase()).join(', ')}`, 'error');
-    return;
+  const campos = _leerCamposSesion(tipo, modo);
+  if (modo !== 'correccion') {
+    const faltan = _camposFormReg(tipo, modo).filter(c => c.requerido && !String(campos[c.campo] || '').trim());
+    if (faltan.length) {
+      showToast(`Completa: ${faltan.map(c => (c.labelForm || c.label).toLowerCase()).join(', ')}`, 'error');
+      return;
+    }
   }
+  const motivo = v('reg-sesion-motivo').trim();
+  if (modo === 'correccion' && !motivo) { showToast('Escribe el motivo de la corrección', 'error'); return; }
   const incidencias = v('reg-sesion-incidencias');
   const idRegistro = idx != null ? DATA[cfg.key][idx].ID_Registro : null;
-  const camposApi = Object.fromEntries(cfg.campos.map(c => [c.api, campos[c.campo]]));
+  const camposApi = Object.fromEntries(_camposFormReg(tipo, modo).map(c => [c.api, campos[c.campo]]));
 
   showLoading('Guardando…');
   try {
-    const { registro } = await callEdgeFunction('gestionar-registro-uso', {
-      accion: 'guardar_sesion', tipo, id_registro: idRegistro, id_equipo: idEquipo,
-      fecha, hora_inicio: horaIni, hora_fin: horaFin, incidencias, campos: camposApi,
-    });
+    const cuerpo = modo === 'correccion'
+      ? { accion: 'corregir_registro', tipo, id_registro: idRegistro, fecha, hora_inicio: horaIni, hora_fin: horaFin,
+          incidencias, campos: camposApi, motivo,
+          resultado_biologico: document.getElementById('reg-campo-resultado_biologico')?.value,
+          fecha_lectura_biologico: document.getElementById('reg-campo-fecha_lectura_biologico')?.value }
+      : { accion: 'guardar_sesion', tipo, id_registro: idRegistro, id_equipo: idEquipo, abrir: modo === 'inicio',
+          fecha, hora_inicio: horaIni, hora_fin: horaFin, incidencias, campos: camposApi };
+    const { registro } = await callEdgeFunction('gestionar-registro-uso', cuerpo);
     const objLocal = _regSbToObj(tipo, registro);
-    if (idx != null) {
-      DATA[cfg.key][idx] = objLocal;
-      showToast('Sesión cerrada ✓', 'success');
-    } else {
-      DATA[cfg.key].push(objLocal);
-      showToast(cfg.permiteSesionAbierta ? 'Sesión registrada ✓' : 'Ciclo registrado ✓', 'success');
-    }
+    if (idx != null) DATA[cfg.key][idx] = objLocal;
+    else DATA[cfg.key].push(objLocal);
     closeModal('modal-reg-sesion');
     renderRegistrosUso();
     _updateBadgeRegistrosUso();
+    const fallo = cfg.arranqueConDatos && modo !== 'inicio' &&
+      [objLocal.Cinta_Indicadora, objLocal.Integrador_Quimico].includes('No viró');
+    if (fallo && modo !== 'correccion') {
+      showToast('Un indicador no ha virado: la carga no se da por tratada. El material no se usa y los residuos no se sacan como tratados. Sigue el apartado 10 del protocolo y avisa al profesorado.', 'error', 12000);
+    } else {
+      showToast({
+        inicio: 'Ciclo arrancado ✓ — al terminar, antes de abrir, complétalo',
+        cierre: cfg.arranqueConDatos ? 'Ciclo completado ✓' : 'Sesión cerrada ✓',
+        completo: cfg.arranqueConDatos ? 'Ciclo registrado ✓' : 'Sesión registrada ✓',
+        correccion: 'Corrección guardada ✓ (queda constancia del cambio)',
+      }[modo], 'success');
+    }
   } catch (e) {
-    showToast(e.message || 'Error al guardar la sesión', 'error'); console.error(e);
+    showToast(e.message || 'Error al guardar el registro', 'error'); console.error(e);
   } finally { hideLoading(); }
+}
+
+// ── Correcciones de Gestión: qué se cambió, quién y cuándo ───
+
+function _nombreColumnaReg(tipo, col) {
+  const cfg = _regConfig[tipo];
+  const c = cfg.campos.find(x => x.api === col);
+  if (c) return c.labelForm || c.label;
+  return {
+    fecha: 'Fecha', hora_inicio: 'Hora inicio', hora_fin: 'Hora fin',
+    incidencias: cfg.labelIncidencias || 'Incidencias',
+    resultado_biologico: 'Resultado del indicador biológico', fecha_lectura_biologico: 'Fecha de lectura del biológico',
+  }[col] || col;
+}
+
+function _textoCorreccionReg(tipo, corr) {
+  const val = x => (x === null || x === undefined || x === '') ? '(vacío)' : String(x);
+  return Object.entries(corr.cambios || {})
+    .map(([col, { antes, despues }]) => `${_nombreColumnaReg(tipo, col)}: «${val(antes)}» → «${val(despues)}»`).join(' · ');
+}
+
+function verCorreccionesReg(tipo, idRegistro) {
+  const cfg = _regConfig[tipo];
+  const r = DATA[cfg.key].find(x => x.ID_Registro === idRegistro);
+  if (!r) return;
+  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  document.getElementById('reg-corr-titulo').textContent = `${_nombreEquipoReg(r.ID_Equipo)} · ${_fmtFechaReg(r.Fecha)} ${r.Hora_Inicio}`;
+  document.getElementById('reg-corr-cuerpo').innerHTML = (r.Correcciones || []).map(c => {
+    const cuando = new Date(c.fecha_hora).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return `<div style="padding:10px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.55">
+      <div style="font-weight:600">${esc(cuando)} · ${esc(c.corregido_por)}</div>
+      <div style="color:var(--text-muted)">Motivo: ${esc(c.motivo)}</div>
+      <div>${esc(_textoCorreccionReg(tipo, c))}</div>
+    </div>`;
+  }).join('');
+  openModal('modal-reg-correcciones');
+}
+
+// ── Indicador biológico: el resultado se apunta al leerlo, 24–48 h después ───
+
+let _regBioId = null;
+
+function openModalBiologico(idRegistro) {
+  const r = DATA.registrosAutoclave.find(x => x.ID_Registro === idRegistro);
+  if (!r) return;
+  _regBioId = idRegistro;
+  document.getElementById('reg-bio-info').textContent =
+    `${_nombreEquipoReg(r.ID_Equipo)} · ciclo del ${_fmtFechaReg(r.Fecha)} a las ${r.Hora_Inicio}${[r.Programa_Ciclo, r.Tipo_Carga].filter(Boolean).map(x => ' · ' + x).join('')}`;
+  sv('reg-bio-resultado', '');
+  openModal('modal-reg-biologico');
+}
+
+async function guardarResultadoBiologico() {
+  const resultado = v('reg-bio-resultado');
+  if (!resultado) { showToast('Elige el resultado', 'error'); return; }
+  showLoading('Guardando…');
+  try {
+    const { registro } = await callEdgeFunction('gestionar-registro-uso', {
+      accion: 'resultado_biologico', tipo: 'autoclave', id_registro: _regBioId, resultado,
+    });
+    const obj = _registroAutoclaveSbToObj(registro);
+    const i = DATA.registrosAutoclave.findIndex(x => x.ID_Registro === obj.ID_Registro);
+    if (i >= 0) DATA.registrosAutoclave[i] = obj;
+    closeModal('modal-reg-biologico');
+    renderRegistrosUso();
+    if (resultado === 'Positivo') _avisoBiologicoPositivo(obj);
+    else showToast('Resultado apuntado ✓', 'success');
+  } catch (e) {
+    showToast(e.message || 'No se pudo guardar el resultado', 'error'); console.error(e);
+  } finally { hideLoading(); }
+}
+
+// Biológico positivo = fallo de esterilización: el autoclave pasa a «NO USAR» y se abre el aviso
+// de avería ya escrito (si el equipo tiene uno abierto, se añade a ese), como en un mantenimiento.
+function _avisoBiologicoPositivo(r) {
+  const texto = `Indicador biológico POSITIVO en el ciclo del ${_fmtFechaReg(r.Fecha)} a las ${r.Hora_Inicio}`
+    + `${[r.Programa_Ciclo, r.Tipo_Carga].filter(Boolean).map(x => ', ' + x).join('')}: fallo de esterilización. `
+    + `Autoclave en «NO USAR».`;
+  showToast('Indicador biológico positivo: el autoclave pasa a «NO USAR». Avisa al profesorado y envía el aviso de avería.', 'error', 12000);
+  setTimeout(() => {
+    if (getUserRole() === 'Alumno') {
+      abrirAvisoAlumno(r.ID_Equipo);
+      document.querySelector('input[name="aviso-uso"][value="Equipo fuera de servicio"]').checked = true;
+      sv('aviso-descripcion', texto);
+    } else if (puedeHacer('crearIncidencias')) {
+      openModalIncidenciaEquipo(r.ID_Equipo);
+      setTimeout(() => sv('inc-descripcion', texto), 120);
+    }
+  }, 400);
 }
 
 async function descartarSesionAbierta(tipo, idx) {
@@ -532,9 +802,11 @@ function _abrirRegistroPorNfc(tipo, idEquipo) {
   showPage('registros-uso');
   renderRegistrosUso();
 
-  if (!cfg.permiteSesionAbierta) {
-    // El autoclave no tiene concepto de sesión abierta: la etiqueta abre directamente el registro del ciclo.
-    openModalSesionRegistro(tipo, idEquipo);
+  if (cfg.arranqueConDatos) {
+    // Autoclave: si tiene un ciclo en marcha, completarlo; si no, arrancar uno.
+    const idxMarcha = DATA[cfg.key].findIndex(r => r.Estado === 'Abierta' && r.ID_Equipo === idEquipo);
+    if (idxMarcha >= 0) openModalCerrarSesion(tipo, idxMarcha);
+    else openModalSesionRegistro(tipo, idEquipo, true);
     return;
   }
 
@@ -583,9 +855,9 @@ function openModalNfcRegistro(tipo, idEquipo) {
   const url = urlEtiqueta({ action: 'registro-uso', tipo: tipo, equipo: idEquipo });
   document.getElementById('reg-nfc-label').textContent = `${cfg.label} · ${_nombreEquipoReg(idEquipo)}`;
   document.getElementById('reg-nfc-url-text').textContent = url;
-  document.getElementById('reg-nfc-desc').textContent = cfg.permiteSesionAbierta
+  document.getElementById('reg-nfc-desc').textContent = !cfg.arranqueConDatos
     ? 'La misma etiqueta sirve para empezar y para terminar la sesión: la app detecta automáticamente si ya tienes una abierta en este equipo. También se puede escanear con la cámara del móvil (código QR), sin necesidad de activar el NFC.'
-    : 'Al escanear (o fotografiar el QR con la cámara) se abre directamente el formulario para registrar el ciclo — no hace falta cerrar nada después.';
+    : 'Al escanear (o fotografiar el QR con la cámara) se abre «Arrancar ciclo»; si el autoclave tiene un ciclo en marcha, se abre «Completar ciclo».';
   const qrImg = document.getElementById('reg-nfc-qr');
   qrImg.src = '';
   qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(url)}`;
@@ -622,13 +894,18 @@ function generarInformeRegistro(tipo) {
   const hoy = new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const nombreEquipo = equipos.length <= 1 ? _nombreEquipoReg(equipos[0].ID_Activo) : _nombreEquipoReg(idEquipoSel);
 
+  const campos = _camposHistorialReg(tipo, cerradas);
+  const hayCorrecciones = cerradas.some(r => (r.Correcciones || []).length);
+  const correcciones = r => (r.Correcciones || []).map(c =>
+    `${new Date(c.fecha_hora).toLocaleDateString('es-ES')} · ${c.corregido_por} (${c.motivo}): ${_textoCorreccionReg(tipo, c)}`).join('<br>') || '—';
   const filas = cerradas.map(r => `<tr>
     <td>${_fmtFechaReg(r.Fecha)}</td>
     <td>${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
     <td>${(r.Usuario || '').split('@')[0]}</td>
     ${cfg.mostrarCicloModulo ? `<td>${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
-    ${cfg.campos.map(c => `<td>${r[c.campo] || '—'}</td>`).join('')}
+    ${campos.map(c => `<td>${_valorReg(c, r)}</td>`).join('')}
     <td>${r.Incidencias || '—'}</td>
+    ${hayCorrecciones ? `<td>${correcciones(r)}</td>` : ''}
   </tr>`).join('');
 
   const html = `<!DOCTYPE html>
@@ -651,7 +928,7 @@ function generarInformeRegistro(tipo) {
   <h1>Registro de uso — ${cfg.label}</h1>
   <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${nombreEquipo} &nbsp;·&nbsp; Generado el ${hoy} &nbsp;·&nbsp; ${cerradas.length} sesión${cerradas.length > 1 ? 'es' : ''}</div>
   <table>
-    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${cfg.campos.map(c => `<th>${c.label}</th>`).join('')}<th>Incidencias</th></tr></thead>
+    <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${campos.map(c => `<th>${c.label}</th>`).join('')}<th>${cfg.labelIncidencias || 'Incidencias'}</th>${hayCorrecciones ? '<th>Correcciones</th>' : ''}</tr></thead>
     <tbody>${filas}</tbody>
   </table>
 </body>

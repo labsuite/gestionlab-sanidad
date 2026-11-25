@@ -26,20 +26,66 @@
           <label>Hora inicio *</label>
           <input type="time" id="reg-sesion-hora-inicio" step="60">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="reg-sesion-hora-fin-grupo">
           <label id="reg-sesion-hora-fin-label">Hora fin *</label>
           <input type="time" id="reg-sesion-hora-fin" step="60">
         </div>
       </div>
+      <div id="reg-sesion-nota" style="display:none;font-size:12px;color:var(--text-muted);line-height:1.5;margin-top:10px"></div>
       <div id="reg-sesion-campos"></div>
       <div class="form-group" style="margin-top:12px">
-        <label>Incidencias</label>
+        <label id="reg-sesion-incidencias-label">Incidencias</label>
         <textarea id="reg-sesion-incidencias" rows="2" placeholder="Cualquier incidencia durante la sesión (opcional)"></textarea>
+      </div>
+      <!-- Solo al corregir (Gestión): queda en `correcciones` del registro -->
+      <div class="form-group" id="reg-sesion-motivo-grupo" style="display:none;margin-top:12px">
+        <label>Motivo de la corrección *</label>
+        <textarea id="reg-sesion-motivo" rows="2" placeholder="Qué estaba mal y quién lo ha avisado"></textarea>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('modal-reg-sesion')">Cancelar</button>
       <button class="btn btn-primary" id="reg-sesion-btn-guardar" onclick="guardarSesionRegistro()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULTADO DEL INDICADOR BIOLÓGICO (autoclave, 24–48 h después del ciclo) -->
+<div class="modal-overlay" id="modal-reg-biologico">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Resultado del indicador biológico</div>
+      <button class="modal-close" onclick="closeModal('modal-reg-biologico')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reg-bio-info" style="font-size:13px;font-weight:500;padding:8px 12px;background:var(--bg-soft,#f5f5f3);border-radius:var(--radius-sm);margin-bottom:12px"></div>
+      <div style="font-size:12px;color:var(--text-muted);line-height:1.5;margin-bottom:12px">Tras incubar 24–48 h a 56 °C, junto con su control positivo sin autoclavar.</div>
+      <div class="form-group">
+        <label>Resultado *</label>
+        <select id="reg-bio-resultado">
+          <option value="">— Elige —</option>
+          <option value="Negativo">Negativo (no ha crecido: esterilización correcta)</option>
+          <option value="Positivo">Positivo (ha crecido: fallo de esterilización)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-reg-biologico')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarResultadoBiologico()">Guardar resultado</button>
+    </div>
+  </div>
+</div>
+
+<!-- CORRECCIONES DE UN REGISTRO (quién, cuándo, por qué y qué ponía antes) -->
+<div class="modal-overlay" id="modal-reg-correcciones">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Correcciones del registro</div>
+      <button class="modal-close" onclick="closeModal('modal-reg-correcciones')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reg-corr-titulo" style="font-size:13px;font-weight:600;margin-bottom:6px"></div>
+      <div id="reg-corr-cuerpo"></div>
     </div>
   </div>
 </div>
