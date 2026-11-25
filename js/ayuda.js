@@ -24,15 +24,16 @@ const AYUDA_MANUALES = {
     secciones: [
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
       { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-2', 'STO-3'] },
-      { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-2'] },
-      { titulo: 'Si algo falla', tareas: ['EMP-2'] },
+      { titulo: 'Al recoger', tareas: ['RES-1', 'RES-2'] },
+      { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-1', 'MAN-2'] },
+      { titulo: 'Si algo falla', tareas: ['INC-1', 'EMP-2', 'USO-3'] },
     ],
   },
-  // EMP-6, EMP-2, STO-1 y STO-3 son comunes a todos los roles (misma versión en todos los
-  // manuales). STO-2 de momento solo tiene la versión del alumnado.
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  // EMP-6, EMP-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión en todos
+  // los manuales). STO-2, RES-2, MAN-1/2, INC-1 y USO-3 de momento solo tienen la del alumnado.
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -355,6 +356,260 @@ const AYUDA_TAREAS = {
     pantallas: ['material'],
     versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
   },
+
+  // ── RES-1 · común (guion «RES-1_a-que-contenedor.md», 25/11/2026) ──
+  // Los vídeos de residuos no están enlazados en GestionLab: no se enlazan desde aquí.
+  'RES-1': {
+    pantallas: ['residuos-guia'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+
+  // ── RES-2 · versión alumnado (guion «RES-2_echar-residuo.md», 25/11/2026) ──
+  // Sin «La IA se equivoca — registrar igualmente» ni «Registrar sin comprobar» para el
+  // grupo (decisiones de Paloma del 23 y el 25/11/2026; lo impone también gestionar-residuo).
+  'RES-2': {
+    pantallas: ['residuos-contenedores'],
+    versiones: {
+      Alumno: {
+        titulo: 'Echar un residuo en un contenedor y apuntarlo',
+        quien: ['Tu grupo, con la cuenta del grupo. Lo apuntado queda a nombre del grupo.'],
+        cuando: [
+          'Cada vez que se echa algo en un contenedor de residuos del laboratorio (bidones, garrafas, contenedores de punzantes, de biológicos, bolsas…).',
+          'Lo que según la guía va a la basura normal o al fregadero no tiene contenedor y no se apunta.',
+        ],
+        antes: [
+          '**Saber a qué contenedor va**, por la guía (→ [[RES-1|Saber a qué contenedor va un residuo]]).',
+          'El residuo preparado como diga la guía para ese contenedor (cerrado, en bolsa, etc.).',
+          'Los guantes y gafas que pida el residuo.',
+        ],
+        pasos: [
+          {
+            texto: '**Ir al contenedor y comprobar que es el que dice la guía**: su categoría en la etiqueta del contenedor y en la app. En «Residuos › Contenedores» (en el móvil, menú «☰»), cada tarjeta dice la categoría, el laboratorio, el sitio y el formato.',
+          },
+          {
+            texto: '**Mirar su nivel**, en el contenedor y en su tarjeta («Vacío», «25%», «50%», «75%», «Lleno»). Si está lleno, o se llenaría por encima de su marca, no se echa: ni apretar ni empujar. Avisar al profesorado, que es quien lo cierra y pone otro.',
+            img: 'RES-2/01-contenedor.png',
+            alt: 'Tarjeta de un contenedor de residuos con su categoría, laboratorio, sitio y nivel',
+          },
+          {
+            texto: '**Apuntarlo antes de echarlo**: leer la etiqueta NFC/QR del contenedor (→ [[EMP-6|Usar GestionLab en el móvil: etiquetas]]) o pulsar «+ Añadir residuo» en su tarjeta. Se abre «Añadir residuo»:',
+            lista: [
+              '«Residuo que vas a echar»: escribirlo y elegirlo de la lista. Si no está en la lista, describirlo en «…o descríbelo (si no está en la lista)» con todos sus datos (qué lleva, de qué práctica sale).',
+              '«Nivel en que quedará el contenedor al echarlo»: mirándolo de verdad.',
+              '«Observaciones»: la práctica y la cantidad. Sin nombres de personas.',
+            ],
+            nota: 'Por qué **antes** de echarlo: la comprobación de la app sirve para no echar algo que no va ahí. Si se echa primero, ya no tiene arreglo.',
+            img: 'RES-2/02-anadir-residuo.png',
+            alt: 'Ventana Añadir residuo con un residuo de la lista elegido, el nivel en que quedará y las observaciones',
+          },
+          {
+            texto: '**Pulsar «Registrar».** La app comprueba si se puede echar ahí: si es de otro contenedor, si reacciona con lo que ya hay dentro, y lo revisa con IA. Si lo admite, sale «Registrado: ya puedes echarlo en el contenedor».',
+          },
+          {
+            texto: '**Si la app lo admite, echarlo. Si lo bloquea o la IA no lo recomienda, no se echa**: pulsar «Entendido, no lo tiro» si sale, dejar el residuo cerrado y rotulado, y preguntar al profesorado. La app dice a qué contenedor debería ir: comprobarlo en la guía.',
+            imgs: [
+              { img: 'RES-2/03-bloqueo.png', alt: 'Mensaje rojo No se puede añadir: el contenedor tiene algo ácido y la lejía con un ácido desprende cloro', pie: 'Bloqueo: «No se puede añadir…». No se salta nunca.' },
+              { img: 'RES-2/04-ia-no-lo-recomienda.png', alt: 'Recuadro La IA no recomienda tirarlo en este contenedor, con el contenedor adecuado y el botón Entendido, no lo tiro', pie: '«⛔ La IA no recomienda tirarlo en este contenedor»: «Entendido, no lo tiro».' },
+            ],
+          },
+          {
+            texto: '**Cerrar el contenedor** como diga su aviso de seguridad (el recuadro amarillo de su tarjeta: tapa, cierre de la bolsa, tapón de la garrafa).',
+          },
+        ],
+        comprobacion: [
+          'El residuo está en el contenedor, el contenedor cerrado, y en su tarjeta aparece la adición a nombre del grupo («Historial de adiciones») con el nivel actualizado.',
+        ],
+        comprobacionImg: { img: 'RES-2/05-adicion-registrada.png', alt: 'Tarjeta del contenedor con el nivel actualizado, el historial de adiciones y el mensaje Registrado: ya puedes echarlo' },
+        problemas: [
+          ['La app lo bloquea porque va a otro contenedor, o porque reacciona con lo que ya hay dentro («No se puede añadir…»)', 'no echarlo. Estos bloqueos no se saltan nunca. Volver a la guía (→ [[RES-1|Saber a qué contenedor va un residuo]]).'],
+          ['«⛔ La IA no recomienda tirarlo en este contenedor»', 'no echarlo. Preguntar al profesorado: si la IA se equivoca, es el profesorado quien lo registra.'],
+          ['«No se ha podido comprobar con la IA en este momento» (con un residuo descrito con palabras propias)', 'el grupo no puede registrarlo sin comprobar. No echarlo: volver a intentarlo más tarde o preguntar al profesorado. Si el residuo está en la lista, elegirlo de la lista: así la app lo comprueba con sus reglas aunque la IA no responda.'],
+          ['«No se encontró un contenedor activo…» al leer la etiqueta', 'el contenedor se ha cerrado y no se ha puesto el de recambio. No dejar el residuo encima: guardarlo cerrado y rotulado y avisar al profesorado.'],
+          ['Se ha echado algo donde no iba', 'no intentar sacarlo. Avisar al profesorado en ese momento, diciendo qué y cuánto.'],
+          ['El contenedor está lleno', 'avisar al profesorado. No dejar residuos en el suelo ni al lado.'],
+        ],
+        relacionado: [
+          ['Antes', [['RES-1', 'Saber a qué contenedor va un residuo'], ['EMP-6', 'Usar GestionLab en el móvil: etiquetas de contenedor']]],
+        ],
+      },
+    },
+  },
+
+  // ── MAN-1 · versión alumnado (guion «MAN-1_que-mantenimientos-tocan.md», 25/11/2026) ──
+  'MAN-1': {
+    pantallas: ['dashboard', 'mantenimiento'],
+    versiones: {
+      Alumno: {
+        titulo: 'Ver qué mantenimientos tocan en tu laboratorio',
+        quien: [
+          'Tu grupo, con la cuenta del grupo. Solo salen los mantenimientos que puede hacer el grupo: los internos que no están reservados al profesorado, de los equipos de vuestros laboratorios y de la zona común.',
+        ],
+        cuando: [
+          '**Al inicio de cada evaluación**: es cuando salen los mantenimientos nuevos (las revisiones anuales de arranque de los equipos que se usan en esa evaluación y las lecturas de temperatura de estufas, incubadoras y baños).',
+          '**Al final de la última evaluación en que se usa un equipo**: salen sus revisiones de cierre.',
+          'Cuando el profesorado reparte los mantenimientos entre los grupos.',
+        ],
+        antes: ['Nada: entrar con la cuenta del grupo.'],
+        pasos: [
+          {
+            texto: '**El «Panel principal» dice cuántos mantenimientos pendientes tiene el grupo**: la cifra «Preventivos pendientes» y, más abajo, la tarjeta «Mantenimientos pendientes» con el equipo, la operación y el periodo.',
+            img: 'MAN-1/01-panel-principal.png',
+            alt: 'Panel principal con la cifra Preventivos pendientes señalada y la tarjeta Mantenimientos pendientes',
+          },
+          {
+            texto: '**La lista de pendientes enseña cuáles son**: «Equipos › Mantenimiento» (en el móvil, menú «☰»), pestaña «Pendientes». Cada fila es un mantenimiento: equipo, tipo, periodicidad, periodo y operación. Se puede filtrar por laboratorio («Todos los labs») y por periodo («Todos los períodos»), o buscar un equipo por su código.',
+            img: 'MAN-1/02-lista-de-pendientes.png',
+            alt: 'Mantenimientos pendientes con el buscador y los filtros de laboratorio y periodo señalados',
+          },
+          {
+            texto: '**Leer qué lleva cada uno antes de que os lo encarguen**: «▸ Cómo» despliega sus pasos debajo de la fila. Así se sabe qué material y cuánto tiempo hace falta.',
+          },
+          {
+            texto: '**Fijarse en las marcas de cada fila**:',
+            lista: [
+              '«▶ En curso n/m»: alguien lo empezó y lo dejó a medias (lleva n pasos de m). Se continúa («Continuar n/m»), no se empieza otro igual.',
+              '«📅 Aplazado (previsto …)»: el profesorado lo ha movido a otra fecha.',
+            ],
+            img: 'MAN-1/03-en-curso-y-como.png',
+            alt: 'Fila de un mantenimiento con la marca En curso 1/3 señalada y sus pasos desplegados con Cómo',
+          },
+          {
+            texto: '**El grupo hace los que le encarga el profesorado**, no los que elija por su cuenta: el profesorado reparte para que no coincidan dos grupos en el mismo equipo y para que cada uno tenga el material y el tiempo.',
+          },
+          {
+            texto: 'Para hacerlo, «Registrar» (o «Continuar») en su fila: → [[MAN-2|Hacer un mantenimiento y registrarlo paso a paso]].',
+          },
+        ],
+        comprobacion: ['Se sabe qué mantenimientos tiene el grupo, cuáles están empezados y qué necesita cada uno.'],
+        problemas: [
+          ['Un mantenimiento que esperabais no sale', 'puede que todavía no toque (solo salen los que ya han vencido), que lo haya finalizado otro grupo (espera el visto bueno), que el profesorado lo haya marcado «no aplica» o lo haya aplazado, que sea solo del profesorado o de una empresa, o que el equipo no esté en vuestros laboratorios ni en la zona común.'],
+          ['En el móvil, la tabla no cabe', 'desplazarla de lado para llegar a «▸ Cómo» y «Registrar», o entrar por la tarjeta del equipo (→ [[MAN-2|Hacer un mantenimiento y registrarlo]]).'],
+        ],
+        relacionado: [
+          ['Después', [['MAN-2', 'Hacer un mantenimiento y registrarlo']]],
+          ['Antes', [['EQU-1', 'Encontrar un equipo']]],
+        ],
+      },
+    },
+  },
+
+  // ── INC-1 · versión alumnado (guion «INC-1_avisar-averia.md», 25/11/2026) ──
+  // El 🚨 sobre un equipo con un aviso abierto añade a ese aviso (abrirAvisoAlumno, 25/11/2026).
+  'INC-1': {
+    pantallas: ['equipos', 'dashboard'],
+    versiones: {
+      Alumno: {
+        titulo: 'Avisar de una avería',
+        quien: ['Tu grupo, con la cuenta del grupo. El aviso sale a nombre del grupo.'],
+        cuando: [
+          'Cuando un equipo falla, da un mensaje de error, hace algo raro (ruido, olor, calentamiento, fuga), mide mal o le falta o se ha roto una pieza.',
+          'Cuando una comprobación de un mantenimiento no cumple: entonces el aviso se abre solo al finalizar (→ [[MAN-2|Hacer un mantenimiento y registrarlo]]).',
+        ],
+        antes: [
+          '**Primero, la seguridad. Si hay peligro** (humo, olor a quemado, chispas, calor anormal, fuga de líquido o de gas, cristal roto, una pieza que gira descontrolada): parar el equipo, apagarlo y desenchufarlo si se puede hacer sin riesgo, apartarse y **avisar en ese momento, en persona, al profesorado presente**. La app va después.',
+          '**Mirar el apartado 10, «Resolución de problemas», del protocolo del equipo** (→ [[EQU-2|Consultar cómo se usa un equipo]]). Si el fallo es de uso (una tapa mal cerrada, un ajuste mal puesto) y el protocolo dice cómo resolverlo sin herramientas, resolverlo. Nunca abrir el equipo, cambiar fusibles ni tocar la parte eléctrica: eso es del profesorado o del servicio técnico.',
+          '**Si el protocolo lo indica, poner la etiqueta «NO USAR»** en el equipo.',
+        ],
+        pasos: [
+          {
+            texto: '**Buscar el equipo** en «Equipos › Inventario» (→ [[EQU-1|Encontrar un equipo]]) **y pulsar 🚨 («Notificar aviso») en su fila.**',
+            img: 'INC-1/01-boton-aviso.png',
+            alt: 'Inventario de equipos con el botón de aviso de la fila del equipo señalado',
+          },
+          {
+            texto: '**Si el equipo ya tiene un aviso abierto, la ventana se abre como «Añadir al aviso abierto»** y enseña ese aviso. Si es por lo mismo, lo que se escriba se añade a ese aviso («Añadir al aviso»): no se abre otro. Si es un problema distinto, pulsar «Es otro problema: abrir un aviso nuevo». Al añadir se puede marcar que el equipo está peor de lo que decía el aviso, pero no mejor.',
+            img: 'INC-1/03-anadir-al-aviso-abierto.png',
+            alt: 'Ventana Añadir al aviso abierto con el aviso que ya tenía el equipo y el botón Es otro problema: abrir un aviso nuevo',
+          },
+          {
+            texto: '**En «¿Se puede seguir usando el equipo?», elegir con criterio**:',
+            lista: [
+              '«No funciona / No se puede usar»: no enciende, no hace lo que tiene que hacer, es peligroso, **o sus resultados ya no son fiables** (una balanza que pesa mal, una estufa fuera de temperatura). Un equipo que mide mal no sirve aunque encienda.',
+              '«Funciona, pero con limitaciones»: se puede usar para algunas cosas y no para otras. Decir para cuáles no.',
+              '«Sí, funciona (pero hay algo que revisar)»: se puede usar con normalidad, pero hay algo que mirar.',
+            ],
+            img: 'INC-1/02-ventana-del-aviso.png',
+            alt: 'Ventana Notificar aviso con No funciona elegido y una descripción con el error, desde cuándo y qué se ha hecho',
+          },
+          {
+            texto: '**Describir el problema con datos** en «Descripción del problema»: qué se estaba haciendo, qué ha pasado, el mensaje de error tal como sale en la pantalla, desde cuándo, y qué se ha hecho ya (por ejemplo, «apagado y desenchufado; etiqueta NO USAR puesta»). Sin nombres de personas.',
+          },
+          {
+            texto: '**Pulsar «Enviar aviso»** («Añadir al aviso» si se añade a uno abierto). Sale: «Aviso enviado. Le aparece en GestionLab al profesorado responsable del equipo (o, si no tiene, a la gestión del laboratorio), y quien abra el equipo verá el aviso. No se manda ningún correo: díselo también en persona.»',
+          },
+          {
+            texto: '**Decírselo además en persona al profesorado**, sobre todo si es «No funciona».',
+          },
+        ],
+        comprobacion: [
+          'En la tarjeta del equipo aparece el aviso abierto con lo que se ha elegido, y el equipo sale en el «Panel principal» de los grupos que lo usan («Equipos de tus laboratorios con aviso o sin poder usarse»).',
+        ],
+        comprobacionImg: { img: 'INC-1/04-aviso-enviado.png', alt: 'Tarjeta del equipo con el recuadro Aviso abierto: No funciona y el mensaje Aviso enviado' },
+        problemas: [
+          ['No se sabe qué elegir en «¿Se puede seguir usando?»', 'elegir la opción más prudente y explicarlo en la descripción.'],
+          ['El equipo no aparece (no está en la app o no tiene etiqueta)', 'avisar al profesorado en persona.'],
+          ['Se ha enviado con un error', 'decírselo al profesorado.'],
+        ],
+        relacionado: [
+          ['Antes', [['EQU-1', 'Encontrar un equipo'], ['EQU-2', 'Consultar cómo se usa: apartado 10 del protocolo'], ['EQU-3', 'Saber si se puede usar']]],
+          ['Desde un mantenimiento', [['MAN-2', 'Hacer un mantenimiento y registrarlo']]],
+        ],
+      },
+    },
+  },
+
+  // ── USO-3 · versión alumnado (guion «USO-3_sesiones-abiertas.md», 25/11/2026) ──
+  // Una sesión ya cerrada no se puede corregir desde la app (gestionar-registro-uso no tiene
+  // acción de editar): por eso «Se ha cerrado con un dato mal» no dice «Gestión lo corrige».
+  'USO-3': {
+    pantallas: ['registros-uso', 'dashboard'],
+    versiones: {
+      Alumno: {
+        titulo: 'Cerrar las sesiones de cabina o vitrina que se quedaron abiertas',
+        quien: ['Tu grupo, con la cuenta del grupo: solo las sesiones del grupo.'],
+        cuando: [
+          'Al entrar en la app sale «Tienes N sesiones de uso sin cerrar de días anteriores».',
+          'En el menú, «Registros de uso» lleva un número: las sesiones del grupo que siguen abiertas.',
+          'Cuando alguien del grupo se ha ido sin terminar su sesión.',
+        ],
+        antes: ['Saber quién del grupo usó el equipo y qué hizo. Es quien tiene que cerrarla o, al menos, quien tiene que dar los datos.'],
+        pasos: [
+          {
+            texto: '**Ir a «Uso del laboratorio › Registros de uso»** (en el móvil, menú «☰») y elegir la pestaña del equipo: «🧫 Cabina de bioseguridad» o «🌫️ Vitrina de gases».',
+            imgs: [
+              { img: 'USO-3/01-aviso-sesiones-sin-cerrar.png', alt: 'Panel principal con el aviso Tienes 1 sesión de uso sin cerrar de días anteriores', pie: 'El aviso al entrar.' },
+              { img: 'USO-3/02-menu-registros-de-uso.png', alt: 'Menú con el número de sesiones abiertas junto a Registros de uso señalado', pie: 'El número junto a «Registros de uso».' },
+            ],
+          },
+          {
+            texto: '**En «Sesiones abiertas» están las del grupo**, con el equipo, el día y la hora de inicio. Pulsar «■ Cerrar sesión» en la que se va a cerrar.',
+            img: 'USO-3/03-sesiones-abiertas.png',
+            alt: 'Registros de uso de la cabina con una sesión abierta de otro día y su botón Cerrar sesión señalados',
+          },
+          {
+            texto: '**Cerrarla con lo que se hizo de verdad ese día**, como al terminar una sesión normal (→ [[USO-1|Apuntar un uso de la cabina o de la vitrina]]). **«Hora fin» trae la hora de ahora: cambiarla por la hora real en que se terminó.**',
+            img: 'USO-3/04-cerrar-con-la-hora-real.png',
+            alt: 'Ventana Cerrar sesión con la hora de fin cambiada señalada y la nota cerrada después; hora de fin aproximada en Incidencias',
+          },
+          {
+            texto: '**Lo que no se sepa no se inventa.** Si no se sabe con seguridad la hora de fin o algún dato, poner lo más aproximado y escribir en «Incidencias» «cerrada después; hora de fin aproximada» (o qué dato falta). Después, «Guardar y cerrar sesión».',
+          },
+          {
+            texto: '**Si la sesión se abrió por error y no hubo uso**, no se cierra como si lo hubiera habido: avisar al profesorado, que pide a Gestión que la descarte.',
+          },
+        ],
+        comprobacion: ['La sesión sale cerrada en el «Historial» del equipo, y el número de «Registros de uso» ha bajado.'],
+        problemas: [
+          ['Nadie del grupo sabe qué se hizo en esa sesión', 'no cerrarla con datos inventados. Avisar al profesorado.'],
+          ['La sesión no es del grupo', 'el grupo solo ve las suyas; las de otros las cierra Gestión.'],
+          ['Se ha cerrado con un dato mal', 'avisar al profesorado.'],
+        ],
+        relacionado: [
+          ['Antes', [['USO-1', 'Apuntar un uso de la cabina o de la vitrina']]],
+        ],
+      },
+    },
+  },
 };
 
 (() => {
@@ -448,6 +703,85 @@ const AYUDA_TAREAS = {
     AYUDA_TAREAS['STO-1'].versiones[r] = sto1;
     AYUDA_TAREAS['STO-3'].versiones[r] = sto3;
   });
+})();
+
+// ── RES-1 · común a todos los roles (guion «RES-1_a-que-contenedor.md», 25/11/2026) ──
+// Qué va a cada contenedor lo dice la Guía de residuos (catálogo y normas del gestor): aquí
+// solo se enseña a encontrarlo y qué hacer si no se encuentra, sin copiar las normas.
+(() => {
+  const res1 = {
+    titulo: 'Saber a qué contenedor va un residuo, y qué hacer si no está en la guía',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      '**Antes de tirar cualquier cosa que no sea basura normal**, aunque se crea saber dónde va. En el laboratorio, la mayoría de los errores con los residuos son de quien estaba seguro.',
+      'Antes de empezar una práctica que va a generar un residuo nuevo: así el contenedor se localiza antes de necesitarlo.',
+    ],
+    antes: [
+      'Qué es el residuo: qué lleva (reactivos, muestra biológica, formol, disolventes…), de qué práctica sale y en qué estado está (sólido, líquido, punzante).',
+      'Si es un reactivo o lleva reactivos: su etiqueta y, si hace falta, su ficha de datos de seguridad.',
+    ],
+    extrasTrasAntes: [
+      {
+        titulo: 'Normas que no cambian',
+        items: [
+          '**No mezclar residuos** salvo que la guía lo diga. Mezclar lo que no debe juntarse puede reaccionar (por ejemplo, lejía con un ácido desprende cloro).',
+          '**Los frascos de reactivos que se desechan no se vacían**: van cerrados, tal cual, a donde diga la guía.',
+          '**Al fregadero, nada**, salvo lo que la guía diga expresamente que puede ir.',
+          '**El bidón «Reactivos de laboratorio» no es el contenedor de las dudas.** Es para lo que la guía manda allí (lo que tiene dos naturalezas, lo que tiene que ir solo o lo que no se puede clasificar), no para lo que no se sabe dónde va.',
+          '**Si hay un derrame, olor o alguien se ha expuesto**: no consultar la app; avisar en ese momento al profesorado presente.',
+        ],
+      },
+    ],
+    pasos: [
+      {
+        texto: '**Buscarlo en la Guía de residuos**: «Residuos › Guía de residuos» (en el móvil, menú «☰»). En «Buscar residuo, descripción o contenedor…» escribir el nombre, una palabra de lo que es («tinción», «formol») o el peligro («Inflamable»). Los resultados salen agrupados por contenedor: el título de cada grupo es el contenedor al que van.',
+        img: 'RES-1/01-buscar-en-la-guia.png',
+        alt: 'Guía de residuos con «tinción» escrito en el buscador y los residuos encontrados bajo su contenedor',
+      },
+      {
+        texto: '**Si no aparece, o no se está seguro: el asistente «🧭 ¿Dónde lo tiro?»**, en la misma página. Hace una pregunta cada vez: pulsar la respuesta que corresponde a lo que el residuo es de verdad, no a lo que se supone. «← Atrás» deshace la última respuesta y «Empezar de nuevo» vuelve al principio.',
+        img: 'RES-1/02-asistente.png',
+        alt: 'Asistente ¿Dónde lo tiro? a mitad de camino, con la pregunta ¿De dónde sale el líquido? y sus respuestas',
+      },
+      {
+        texto: '**Al final, el asistente dice el contenedor** y por qué, con los contenedores de ese tipo que hay en el centro: laboratorio, sitio y nivel. «Qué residuos del catálogo van aquí» enseña los de la guía que van en él.',
+        img: 'RES-1/03-asistente-resultado.png',
+        alt: 'Resultado del asistente: Bolsa de autoclave, el porqué y el contenedor del laboratorio 205 con su nivel',
+      },
+      {
+        texto: '**Leer también las «📋 Normas generales del gestor de residuos»** (pulsar para desplegarlas): son las reglas acordadas con la empresa de residuos y mandan sobre todo lo demás.',
+        img: 'RES-1/04-normas-del-gestor.png',
+        alt: 'Normas generales del gestor de residuos desplegadas',
+      },
+      {
+        texto: '**Si sigue sin estar claro: el consultorio de residuos**, con «💬 Abrir consultorio de residuos» (arriba de la página). Elegir en «¿En qué laboratorio estás ahora mismo?» el laboratorio en el que se está y describir el residuo con todos los datos de «Antes de empezar». Si su respuesta no coincide con la guía, manda la guía.',
+        img: 'RES-1/05-consultorio.png',
+        alt: 'Consultorio de residuos con el laboratorio elegido y la caja Describe el residuo',
+      },
+      {
+        texto: '**Si un reactivo no aparece en la guía**: mirar en su ficha de datos de seguridad el apartado 13, «Consideraciones relativas a la eliminación», y con eso volver a la guía o preguntar.',
+      },
+      {
+        texto: '**Si después de todo sigue la duda, no tirarlo.** Dejarlo en su envase, cerrado y rotulado con lo que es, y preguntar al profesorado o avisar a la gestora desde la guía: el botón «Avisar a la gestora» sale cuando el buscador no encuentra el residuo y cuando el asistente no llega a un contenedor. En «¿Qué quieres tirar?», qué es; en «¿Dónde lo has dejado?», dónde se ha dejado; y «Enviar aviso». La consulta queda en GestionLab para la gestión del laboratorio: no se manda ningún correo.',
+        img: 'RES-1/06-avisar-a-la-gestora.png',
+        alt: 'Ventana Avisar a la gestora con qué se quiere tirar y dónde se ha dejado',
+      },
+      {
+        texto: '**Con el contenedor claro, ir a echarlo y apuntarlo** (→ [[RES-2|Echar un residuo y apuntarlo]]). Si el contenedor está en otro laboratorio, se lleva allí.',
+      },
+    ],
+    comprobacion: [
+      'Se sabe a qué contenedor va y en qué laboratorio está, y lo dice la guía (no una suposición). O el residuo está cerrado, rotulado y avisado.',
+    ],
+    problemas: [
+      ['«No hemos encontrado ese residuo»', 'no tirarlo todavía. Seguir con el asistente y el consultorio, o avisar a la gestora.'],
+      ['El asistente dice que no hay ningún contenedor activo de ese tipo', 'dejarlo en su envase, cerrado y rotulado, y avisar a la gestora.'],
+      ['El consultorio no responde («La IA de Google está saturada ahora mismo y no ha contestado»)', 'volver a intentarlo más tarde o preguntar al profesorado. Mientras, el residuo no se tira.'],
+      ['La guía y el contenedor físico no coinciden (el contenedor que dice la guía no está donde dice, o tiene otra etiqueta)', 'no tirarlo y avisar al profesorado.'],
+    ],
+    relacionado: [['Después', [['RES-2', 'Echar un residuo y apuntarlo']]]],
+  };
+  AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS['RES-1'].versiones[r] = res1; });
 })();
 
 (() => {
@@ -683,7 +1017,8 @@ function _ayudaHtmlTarea(cod) {
   // con una nota opcional debajo.
   const tabla = t => `<div class="ayuda-tabla-wrap"><table class="ayuda-tabla"><thead><tr>${t.cabeceras.map(c => `<th>${_ayudaEsc(c)}</th>`).join('')}</tr></thead>
     <tbody>${t.filas.map(f => `<tr>${f.map(c => `<td>${_ayudaTxt(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-  // `extrasAntes` va después de «Cuándo» (p. ej. «Qué se apunta» de STO-2); `extras`, tras los pasos.
+  // `extrasAntes` va después de «Cuándo» (p. ej. «Qué se apunta» de STO-2); `extrasTrasAntes`,
+  // después de «Antes de empezar» («Normas que no cambian» de RES-1); `extras`, tras los pasos.
   const extrasDe = lista => (lista || []).map(x => bloque(_ayudaEsc(x.titulo),
     (x.intro ? `<p class="ayuda-p">${_ayudaTxt(x.intro)}</p>` : '') +
     (x.tabla ? tabla(x.tabla) : _ayudaLista(x.items, x.numerada)) +
@@ -703,6 +1038,7 @@ function _ayudaHtmlTarea(cod) {
       ${bloque('Cuándo', _ayudaLista(v.cuando))}
       ${extrasDe(v.extrasAntes)}
       ${bloque('Antes de empezar', _ayudaLista(v.antes))}
+      ${extrasDe(v.extrasTrasAntes)}
       ${bloque('Pasos', pasos)}
       ${extras}
       ${bloque('Comprobación', _ayudaLista(v.comprobacion) + (v.comprobacionImg ? _ayudaImg(v.comprobacionImg.img, v.comprobacionImg.alt) : ''))}
