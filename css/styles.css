@@ -494,6 +494,16 @@
       vertical-align: middle;
     }
 
+    /* Historial de registros de uso (cabina / autoclave / vitrina): muchas columnas
+       cortas → celdas más apretadas, valores cortos en una línea y las cabeceras pueden
+       partirse («Integrador / químico») en vez de ensanchar la tabla.
+       Con `.card > table.…` para ganar a la regla de móvil `.card > table th/td { nowrap }`. */
+    .card > table.tabla-registros-uso th { padding: 8px 10px; white-space: normal; vertical-align: bottom; min-width: 56px; }
+    .card > table.tabla-registros-uso td { padding: 8px 10px; font-size: 12px; }
+    .card > table.tabla-registros-uso td.reg-corto { white-space: nowrap; }
+    .card > table.tabla-registros-uso td.reg-largo { white-space: normal; min-width: 140px; max-width: 260px; }
+    .tabla-registros-uso td[title] { cursor: help; }
+
     /* BADGES */
     .badge {
       display: inline-flex;

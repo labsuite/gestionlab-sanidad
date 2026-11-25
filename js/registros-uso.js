@@ -201,6 +201,17 @@ function _duracionHorasReg(r) {
   return h > 0 ? h : 0;
 }
 
+/** Cómo figura quien hizo el registro: el nombre del grupo (cuentas de grupo) o nombre y
+ *  primer apellido (profesorado), sacado del catálogo de usuarios. El registro guarda el
+ *  email de la sesión; solo si no está en el catálogo se enseña la parte antes de la «@». */
+function _nombreUsuarioReg(email) {
+  const e = (email || '').toLowerCase().trim();
+  if (!e) return '—';
+  const u = DATA.usuarios.find(x => (x.Email || '').toLowerCase().trim() === e);
+  if (!u?.Nombre) return e.split('@')[0];
+  return _esCuentaDeGrupo(e) ? u.Nombre : _nombreCorto(u.Nombre);
+}
+
 function _cicloModuloUsuario(email) {
   const u = DATA.usuarios.find(u => (u.Email || '').toLowerCase().trim() === (email || '').toLowerCase().trim());
   if (!u) return '—';
@@ -357,7 +368,7 @@ function _renderSesionesAbiertasReg(tipo) {
     return `<div class="card" style="padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
         <div style="font-size:13px;font-weight:600">${_nombreEquipoReg(r.ID_Equipo)}</div>
-        <div style="font-size:12px;color:var(--text-muted)">${_fmtFechaReg(r.Fecha)} · desde las ${r.Hora_Inicio}${datosCiclo}${!esPropia ? ` · 👤 ${(r.Usuario || '').split('@')[0]}` : ''}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${_fmtFechaReg(r.Fecha)} · desde las ${r.Hora_Inicio}${datosCiclo}${!esPropia ? ` · 👤 ${_nombreUsuarioReg(r.Usuario)}` : ''}</div>
       </div>
       <div style="display:flex;gap:6px">
         ${(esPropia || esGestor || cfg.cierraCualquiera) ? `<button class="btn btn-sm btn-primary" onclick="openModalCerrarSesion('${tipo}', ${idx})">${txt.cerrar}</button>` : ''}
@@ -400,26 +411,35 @@ function _renderHistorialReg(tipo) {
 
   const campos = _camposHistorialReg(tipo, cerradas);
   const gestion = _puedeGestionarRegistros();
+  // Valores cortos (selects, números, casillas) en una línea; los textos libres
+  // (práctica, productos, incidencias) y el biológico, con su ancho acotado.
+  const claseCampo = c => (c.tipo === 'text' || c.mostrar) ? 'reg-largo' : 'reg-corto';
+  // El ciclo / módulo NO va en columna: es el perfil actual de la cuenta (no un dato del
+  // registro) y con la lista entera de módulos hacía cada fila de 5–7 líneas. Sale al pasar
+  // por encima del nombre, y entero en el 🖨️ Informe.
+  const titleUsuario = r => {
+    if (!cfg.mostrarCicloModulo) return '';
+    const cm = _cicloModuloUsuario(r.Usuario);
+    return cm === '—' ? '' : ` title="${_attrCampoSesion(cm)}"`;
+  };
   // Sin overflow:hidden en línea: pisaba la regla .card:has(table) { overflow-x: auto }
   // de css/styles.css y la tabla se recortaba por la derecha (se perdía Incidencias).
   return `<div class="card" style="padding:0">
-    <table><thead><tr>
+    <table class="tabla-registros-uso"><thead><tr>
       <th>Fecha</th><th>Horario</th><th>Usuario</th>
-      ${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}
       ${campos.map(c => `<th>${c.label}</th>`).join('')}
       <th>${cfg.labelIncidencias || 'Incidencias'}</th>
       ${gestion ? '<th></th>' : ''}
     </tr></thead>
     <tbody>
       ${cerradas.map(r => `<tr>
-        <td style="white-space:nowrap">${_fmtFechaReg(r.Fecha)}${(r.Correcciones || []).length
+        <td class="reg-corto">${_fmtFechaReg(r.Fecha)}${(r.Correcciones || []).length
           ? `<br><button class="badge badge-orange" style="border:none;cursor:pointer;font-size:10px;margin-top:3px" onclick="verCorreccionesReg('${tipo}','${r.ID_Registro}')" title="Ver qué se corrigió, quién y cuándo">✏️ Corregido</button>` : ''}</td>
-        <td style="white-space:nowrap">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
-        <td style="font-size:12px">${(r.Usuario || '').split('@')[0]}</td>
-        ${cfg.mostrarCicloModulo ? `<td style="font-size:12px;min-width:180px;max-width:240px">${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
-        ${campos.map(c => `<td style="font-size:12px">${_valorReg(c, r)}</td>`).join('')}
-        <td style="font-size:12px">${r.Incidencias || '—'}</td>
-        ${gestion ? `<td><button class="btn btn-sm btn-secondary" style="white-space:nowrap" onclick="openModalCorregirRegistro('${tipo}','${r.ID_Registro}')" title="Corregir este registro (queda constancia del cambio)">✏️ Corregir</button></td>` : ''}
+        <td class="reg-corto">${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
+        <td class="reg-corto"${titleUsuario(r)}>${_nombreUsuarioReg(r.Usuario)}</td>
+        ${campos.map(c => `<td class="${claseCampo(c)}">${_valorReg(c, r)}</td>`).join('')}
+        <td class="reg-largo">${r.Incidencias || '—'}</td>
+        ${gestion ? `<td class="reg-corto"><button class="btn btn-sm btn-secondary" onclick="openModalCorregirRegistro('${tipo}','${r.ID_Registro}')" title="Corregir este registro (queda constancia del cambio)">✏️ Corregir</button></td>` : ''}
       </tr>`).join('')}
     </tbody></table>
   </div>`;
@@ -901,7 +921,7 @@ function generarInformeRegistro(tipo) {
   const filas = cerradas.map(r => `<tr>
     <td>${_fmtFechaReg(r.Fecha)}</td>
     <td>${r.Hora_Fin ? `${r.Hora_Inicio}–${r.Hora_Fin}` : r.Hora_Inicio}</td>
-    <td>${(r.Usuario || '').split('@')[0]}</td>
+    <td>${_nombreUsuarioReg(r.Usuario)}</td>
     ${cfg.mostrarCicloModulo ? `<td>${_cicloModuloUsuario(r.Usuario)}</td>` : ''}
     ${campos.map(c => `<td>${_valorReg(c, r)}</td>`).join('')}
     <td>${r.Incidencias || '—'}</td>
