@@ -580,14 +580,15 @@ function _normConcepto(s) {
 // 716 € facturada como cámaras Neubauer, guantes y disolventes). Se guardan en
 // el pedido (pedidos.hoja_factura): en la hoja salen en lugar de todas las
 // líneas; las líneas, el inventario y la contabilidad no cambian.
-function _bloqueSinMatchEnHoja(sinMatch, pedidoId) {
+function _bloqueSinMatchEnHoja(sinMatch, pedidoId, excluir) {
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
-  if (!lineas.length || !(sinMatch || []).length) return '';
+  // Los ya sumados a una línea no cuentan: no sustituyen al pedido.
+  if (!lineas.length || !(sinMatch || []).some((_, idx) => !excluir?.has(idx))) return '';
   const importeLineas = lineas.reduce((s, l) => s + (parseFloat(l.Precio_Unitario) || 0) * (parseFloat(l.Cantidad_Pedida) || 0), 0);
   return `<div style="margin-top:12px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px">
     <div style="font-weight:600;margin-bottom:6px">🧾 ¿La factura sustituye a todo el pedido?</div>
     <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
-      ${sinMatch.map((i, idx) => `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="revext-sm-check" data-idx="${idx}" checked onchange="_sumaSinMatchHoja()" style="width:14px;height:14px;margin-top:2px;flex:none"><span>${_escAttr(i.material)}${i.cantidad != null ? ` — ${i.cantidad}` : ''}${i.precio_unitario != null ? ` × ${Number(i.precio_unitario).toFixed(2)} €` : ''}</span></label>`).join('')}
+      ${sinMatch.map((i, idx) => excluir?.has(idx) ? '' : `<label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" class="revext-sm-check" data-idx="${idx}" checked onchange="_sumaSinMatchHoja()" style="width:14px;height:14px;margin-top:2px;flex:none"><span>${_escAttr(i.material)}${i.cantidad != null ? ` — ${i.cantidad}` : ''}${i.precio_unitario != null ? ` × ${Number(i.precio_unitario).toFixed(2)} €` : ''}</span></label>`).join('')}
     </div>
     <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap">
       <span id="revext-sm-suma" data-lineas="${importeLineas}" style="font-size:12px"></span>
@@ -623,6 +624,33 @@ function _celdaConceptoFactura(m) {
       🧾 En la hoja como en la factura
     </label>
     <input type="text" class="revext-concepto" data-id-linea="${m.id_linea}" value="${_escAttr(valor)}" style="display:none;width:100%;font-size:12px;margin-top:2px">`;
+}
+
+// Un artículo de la factura sin pareja que ya se sumó a mano a una línea
+// (desplegable «¿asignar a una línea?» o 🧾 de la línea). La asignación en sí
+// no se guarda —solo el precio y, si se quiso, el texto para la hoja—, así que
+// se deduce: el artículo figura entre los textos de factura de la línea, o el
+// precio guardado de la línea es el leído por la IA más el de este artículo.
+// Sin esto la fila volvía a salir en rojo «Sin línea» cada vez y se reasignaba
+// una y otra vez (2026-11-25, PEDLG75G9: sonda PT100 ya sumada al termómetro).
+function _lineaQueYaIncluye(item, pedidoId, r) {
+  const tokens = s => new Set(_normConcepto(s).split(' ').filter(Boolean));
+  const parecido = (a, b) => {
+    const A = tokens(a), B = tokens(b);
+    if (!A.size || !B.size) return false;
+    let comunes = 0; A.forEach(t => { if (B.has(t)) comunes++; });
+    return comunes / (A.size + B.size - comunes) >= 0.8;
+  };
+  const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId);
+  const porTexto = lineas.find(l => (l.Conceptos_Factura || []).some(c => parecido(c.concepto, item.material)));
+  if (porTexto) return porTexto;
+  const precioItem = Number(item.precio_unitario);
+  if (!(precioItem > 0)) return null;
+  return lineas.find(l => {
+    const guardado = parseFloat(l.Precio_Unitario);
+    const leido = (r.matches || []).find(m => m.id_linea === l.ID_Linea)?.item_detectado?.precio_unitario;
+    return !isNaN(guardado) && leido != null && Math.abs(guardado - (Number(leido) + precioItem)) < 0.01;
+  }) || null;
 }
 
 function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
@@ -667,14 +695,20 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
       // artículo en una línea, sumando cantidades y PROMEDIANDO precios
       // (PEDLG75G9: dos patrones McFarland 50,90 y 129,70 → 90,30).
       const sumadoAOtra = !(r.sin_match || []).some(s => s.material === itemFactura.material);
-      const notaInicial = sumadoAOtra ? '⚠ La IA lo ha juntado con otro artículo en una línea, promediando el precio. Revisa esa fila o asígnalo aquí a su línea.' : '';
-      return `<tr style="border-bottom:1px solid var(--border);background:var(--danger-light,#fdf0f0)">
+      // Ya sumado antes a una línea: sale con esa línea elegida y sin rojo; la
+      // casilla sigue bloqueada (su precio suelto pisaría la suma guardada)
+      // hasta que se vuelva a elegir línea en el desplegable.
+      const yaEn = _lineaQueYaIncluye(itemFactura, pedidoId, r);
+      const notaInicial = yaEn
+        ? `✓ Ya va con esta línea${yaEn.Precio_Unitario ? ` (guardado: ${Number(yaEn.Precio_Unitario).toFixed(2)} €)` : ''}. No hace falta volver a asignarlo.`
+        : sumadoAOtra ? '⚠ La IA lo ha juntado con otro artículo en una línea, promediando el precio. Revisa esa fila o asígnalo aquí a su línea.' : '';
+      return `<tr style="border-bottom:1px solid var(--border)${yaEn ? '' : ';background:var(--danger-light,#fdf0f0)'}">
         <td style="padding:6px 8px;text-align:center;vertical-align:top"><div style="font-size:11px;color:var(--text-muted)">${n + 1}</div><input type="checkbox" class="revext-asig-check" data-n="${n}" disabled style="width:16px;height:16px"></td>
         <td style="padding:6px 8px;vertical-align:top">${factura}</td>
         <td style="padding:6px 8px;vertical-align:top">
           <select class="revext-asig-linea" data-n="${n}" onchange="_revextAsignarLinea(${n})" style="width:100%;font-size:12px">
             <option value="">Sin línea — ¿asignar a una línea?</option>
-            ${lineasPed.map(l => `<option value="${l.ID_Linea}">${_escAttr(String(l.Material || '').slice(0, 60))}${l.Precio_Unitario ? ` · ${Number(l.Precio_Unitario).toFixed(2)} €` : ' · sin precio'}</option>`).join('')}
+            ${lineasPed.map(l => `<option value="${l.ID_Linea}"${yaEn?.ID_Linea === l.ID_Linea ? ' selected' : ''}>${_escAttr(String(l.Material || '').slice(0, 60))}${l.Precio_Unitario ? ` · ${Number(l.Precio_Unitario).toFixed(2)} €` : ' · sin precio'}</option>`).join('')}
           </select>
           <div class="revext-asig-nota" data-n="${n}" style="font-size:11px;color:var(--text-muted);margin-top:3px">${notaInicial}</div></td>
         <td style="padding:6px 8px;text-align:right;vertical-align:top"><input type="number" class="revext-asig-precio" data-n="${n}" data-precio-item="${precioItem ?? ''}" min="0" step="0.01" value="${precioItem ?? ''}" style="width:90px;text-align:right"></td>
@@ -718,16 +752,18 @@ function abrirModalRevisionExtraccion(idDocumento, pedidoId) {
 
   const pedido = DATA.pedidos.find(x => x.ID_Pedido === pedidoId);
   const puedeAnadirDesdeFactura = true; // la línea nueva se añade como material; el tipo es de cada línea
-  const sinMatch = (r.sin_match || []).length ? `<div style="margin-top:16px;padding:10px 14px;background:var(--danger-light,#fdf0f0);border-radius:var(--radius-sm);font-size:13px">
+  // Los ya sumados a mano a una línea dejan de contar como "sin línea".
+  const yaIncluidos = new Set((r.sin_match || []).map((i, idx) => _lineaQueYaIncluye(i, pedidoId, r) ? idx : -1).filter(idx => idx !== -1));
+  const sinMatch = (r.sin_match || []).length > yaIncluidos.size ? `<div style="margin-top:16px;padding:10px 14px;background:var(--danger-light,#fdf0f0);border-radius:var(--radius-sm);font-size:13px">
     <div style="font-weight:600;margin-bottom:6px">⚠️ Detectado en el documento pero sin línea de pedido coincidente:</div>
     <div style="display:flex;flex-direction:column;gap:6px">
-      ${r.sin_match.map((i, idx) => `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      ${r.sin_match.map((i, idx) => yaIncluidos.has(idx) ? '' : `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
         <span>${i.material}${i.cantidad != null ? ` — ${i.cantidad}${i.unidad ? ' ' + i.unidad : ''}` : ''}</span>
         ${puedeAnadirDesdeFactura ? `<button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;white-space:nowrap" onclick="anadirLineaDesdeSinMatch(${idx})">+ Añadir línea nueva</button>` : ''}
       </div>`).join('')}
     </div>
     <div style="font-size:11px;color:var(--text-muted);margin-top:8px">Si en realidad es una de tus líneas y la IA no la ha reconocido, asígnala arriba en su fila («¿asignar a una línea?») y su precio se guardará con los demás. Usa "+ Añadir línea nueva" solo si de verdad llegó algo que no estaba en el pedido (p.ej. un reactivo no contemplado en el presupuesto). Esto funciona aunque el pedido ya no admita añadir líneas a mano.</div>
-  </div>${_bloqueSinMatchEnHoja(r.sin_match, pedidoId)}` : '';
+  </div>${_bloqueSinMatchEnHoja(r.sin_match, pedidoId, yaIncluidos)}` : '';
 
   const cargoExtra = r.cargo_extra ? `<div style="margin-top:16px;padding:10px 14px;background:var(--accent-light);border-radius:var(--radius-sm);font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:12px">
     <div>🚚 Cargo extra detectado: <strong>${r.cargo_extra.concepto}</strong> — ${Number(r.cargo_extra.importe).toFixed(2)} €</div>
