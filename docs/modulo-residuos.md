@@ -278,7 +278,8 @@ los .srt a .vtt.
   `inicio` de cada clip. Si se cambia el montaje, recalcular esos `inicio`.
 - **Subtítulos**: los clips ya los llevan grabados en la imagen; la pista .vtt va apagada por
   defecto (si no, salen dos veces) y se enciende en el menú del reproductor.
-- **Contenedor negro** (biosanitarios, autoclave externo): sin enlazar, falta saber a qué
-  `Contenedor_Tipo` del catálogo corresponde.
+- **Contenedor negro** (biosanitarios, al autoclave del gestor) = «Residuo Biológico GII»
+  (confirmado por Paloma, 2026-11-25): lleva el clip «Contenedores azul y negro», que va también
+  en «Bolsa de autoclave» (explica la alternativa de autoclavar en el laboratorio).
 - El modal del vídeo se cierra con `cerrarVideoResiduo()`, no con `closeModal()`: este borra
   `editingRow`, que «Añadir residuo» necesita si el vídeo se abrió encima.

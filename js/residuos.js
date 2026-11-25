@@ -307,15 +307,16 @@ function arbolReiniciar() { _arbolCamino = []; _repintarArbol(); }
 // (límite de 50 MB por archivo del plan), así que «Vídeo completo» reproduce los clips
 // seguidos y el índice salta al clip y al segundo. `categorias`: los Contenedor_Tipo que trata
 // cada clip (se enlaza en la Guía, en el asistente y en «Añadir residuo» de ese contenedor).
-// El contenedor negro (biosanitarios, autoclave externo) no se enlaza: falta saber a qué
-// categoría del catálogo corresponde.
+// El contenedor negro (biosanitarios, al autoclave del gestor) es «Residuo Biológico GII», y el
+// mismo clip va en «Bolsa de autoclave» porque explica la alternativa de autoclavar en el
+// laboratorio (confirmado por Paloma, 2026-11-25).
 const VIDEOS_RESIDUOS = [
   { id: 'donde-esta-cada-punto', titulo: 'Dónde está cada punto', inicio: 7.02,
     categorias: ['Aguas Laboratorio - Tinciones', 'Aguas Laboratorio - Equipos'] },
   { id: 'bidones-207', titulo: 'Los bidones del 207', inicio: 58.26,
     categorias: ['Reactivos de laboratorio', 'Contenedor Inertes', 'Contenedor Ácidos', 'Contenedor Halogenados'] },
   { id: 'azul-y-negro', titulo: 'Contenedores azul y negro', inicio: 127.88,
-    categorias: ['Muestras en formol', 'Citotóxicos'] },
+    categorias: ['Muestras en formol', 'Citotóxicos', 'Residuo Biológico GII', 'Bolsa de autoclave'] },
   { id: 'etanol-y-xfree', titulo: 'Etanol y X-Free', inicio: 234.33,
     categorias: ['Contenedor Inertes'] },
   { id: 'bolsa-207', titulo: 'La bolsa del 207', inicio: 301.26,
