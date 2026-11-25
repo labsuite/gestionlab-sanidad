@@ -261,3 +261,24 @@ Dinámicas: emergen de los valores únicos de `Contenedor_Tipo` en Tipos_Residuo
 ## Pendiente (datos)
 - Revisar que todos los tipos tengan `Contenedor_Tipo` relleno.
 - Contenedores físicos: introducir en Contenedores_Residuo con nivel inicial (requiere acceso al instituto).
+
+## Vídeos de residuos (2026-11-25)
+Clips de «B. Laboratorio/Residuos/Clips montados» (sin el piloto) en el bucket **privado** `videos`
+de Storage (`residuos/<id>.mp4` y `.vtt`), con política de lectura `to authenticated`: solo con
+sesión. El navegador pide URLs firmadas de 1 h (`_urlsVideoResiduo`). Lista, títulos y contenedores
+de cada clip en `VIDEOS_RESIDUOS` (`js/residuos.js`); se suben con un script puntual que convierte
+los .srt a .vtt.
+- **Dónde salen**: cabecera de la Guía («🎬 ¿Dónde tiro esto? En vídeo» → vídeo completo con su
+  índice); y cada clip, como «▶ Vídeo: …», en la lista de la Guía (cabecera de su contenedor), en el
+  resultado del asistente y en «Añadir residuo» de ese contenedor (también al llegar por su etiqueta).
+- **El vídeo completo no está subido**: ocupa 94 MB y el plan de Supabase admite 50 MB por archivo.
+  Son 7 s de entrada + los siete clips seguidos (comprobado con sus duraciones), así que «vídeo
+  completo» reproduce los clips uno tras otro y el índice (`_INDICE_VIDEO_RESIDUOS`, copiado de
+  «Residuos - Índice.html», en segundos del vídeo completo) salta al clip y al segundo con el
+  `inicio` de cada clip. Si se cambia el montaje, recalcular esos `inicio`.
+- **Subtítulos**: los clips ya los llevan grabados en la imagen; la pista .vtt va apagada por
+  defecto (si no, salen dos veces) y se enciende en el menú del reproductor.
+- **Contenedor negro** (biosanitarios, autoclave externo): sin enlazar, falta saber a qué
+  `Contenedor_Tipo` del catálogo corresponde.
+- El modal del vídeo se cierra con `cerrarVideoResiduo()`, no con `closeModal()`: este borra
+  `editingRow`, que «Añadir residuo» necesita si el vídeo se abrió encima.

@@ -78,6 +78,7 @@
       <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--bg-soft,#f9f9f9);border-radius:6px">
         Contenedor: <strong id="adic-contenedor-titulo"></strong>
       </div>
+      <div id="adic-videos" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
       <div style="font-size:12px;color:var(--text-soft);margin-bottom:12px;line-height:1.5">
         <strong>Apúntalo antes de echarlo.</strong> La app comprueba si va en este contenedor; si no lo admite, no lo eches.
       </div>
@@ -223,6 +224,21 @@
         <input id="chat-res-texto" placeholder="Describe el residuo…" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();_chatResEnviar();}">
         <button class="btn btn-primary" onclick="_chatResEnviar()">Enviar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- VÍDEO DE RESIDUOS: un clip suelto o el completo con su índice (js/residuos.js, VIDEOS_RESIDUOS) -->
+<div class="modal-overlay" id="modal-video-residuo">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title" id="vid-res-titulo" style="font-size:17px">Vídeo</div>
+      <button class="modal-close" onclick="cerrarVideoResiduo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <video id="vid-res" controls playsinline crossorigin="anonymous" preload="metadata"
+        style="display:block;width:100%;max-height:60vh;background:#000;border-radius:10px;aspect-ratio:9/16;object-fit:contain"></video>
+      <div id="vid-res-indice" style="display:none;margin-top:12px"></div>
     </div>
   </div>
 </div>

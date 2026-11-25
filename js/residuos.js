@@ -279,6 +279,7 @@ function _pintarHojaArbol(cat) {
   }
   return `<div style="font-size:18px;font-weight:700;margin-bottom:6px">${h.icon} ${cat}</div>
     <div style="font-size:13px;line-height:1.6;color:var(--text-soft);margin-bottom:10px">${h.porque}</div>
+    ${videosDeCategoria(cat).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${htmlBotonesVideoResiduo(cat)}</div>` : ''}
     ${contenedores}
     ${tipos.length ? `<details style="margin-top:10px"><summary style="cursor:pointer;font-size:13px">Qué residuos del catálogo van aquí (${tipos.length})</summary>
       <div style="font-size:13px;color:var(--text-soft);line-height:1.7;margin-top:6px">${tipos.join(' · ')}</div></details>` : ''}`;
@@ -298,6 +299,265 @@ function arbolResponder(id, i) {
 function arbolAtras() { _arbolCamino.pop(); _repintarArbol(); }
 function arbolReiniciar() { _arbolCamino = []; _repintarArbol(); }
 
+// ── Vídeos de residuos (bucket privado `videos`: solo con sesión) ─────────────
+// Clips de «B. Laboratorio/Residuos/Clips montados» (sin el piloto). Llevan los subtítulos
+// grabados en la imagen; sus .srt van además como pista .vtt, apagada por defecto (si no, salen
+// dos veces): quien la necesite la enciende en el menú del reproductor («⋮ › Subtítulos»). El vídeo completo son 7 s de entrada + estos clips seguidos, en
+// este orden (`inicio` = segundo del completo en que empieza cada uno); no cabe en Storage
+// (límite de 50 MB por archivo del plan), así que «Vídeo completo» reproduce los clips
+// seguidos y el índice salta al clip y al segundo. `categorias`: los Contenedor_Tipo que trata
+// cada clip (se enlaza en la Guía, en el asistente y en «Añadir residuo» de ese contenedor).
+// El contenedor negro (biosanitarios, autoclave externo) no se enlaza: falta saber a qué
+// categoría del catálogo corresponde.
+const VIDEOS_RESIDUOS = [
+  { id: 'donde-esta-cada-punto', titulo: 'Dónde está cada punto', inicio: 7.02,
+    categorias: ['Aguas Laboratorio - Tinciones', 'Aguas Laboratorio - Equipos'] },
+  { id: 'bidones-207', titulo: 'Los bidones del 207', inicio: 58.26,
+    categorias: ['Reactivos de laboratorio', 'Contenedor Inertes', 'Contenedor Ácidos', 'Contenedor Halogenados'] },
+  { id: 'azul-y-negro', titulo: 'Contenedores azul y negro', inicio: 127.88,
+    categorias: ['Muestras en formol', 'Citotóxicos'] },
+  { id: 'etanol-y-xfree', titulo: 'Etanol y X-Free', inicio: 234.33,
+    categorias: ['Contenedor Inertes'] },
+  { id: 'bolsa-207', titulo: 'La bolsa del 207', inicio: 301.26,
+    categorias: ['Bolsa plástica (químicos)'] },
+  { id: 'punzantes', titulo: 'Contenedor amarillo de punzantes', inicio: 377.09,
+    categorias: ['Residuo Cortante'] },
+  { id: 'en-caso-de-duda', titulo: 'En caso de duda, la guía de GestionLab', inicio: 444.94,
+    categorias: [] },
+];
+
+// Índice del vídeo completo («Residuos - Índice.html»): `t` = segundo del vídeo completo.
+const _INDICE_VIDEO_RESIDUOS = [
+  {
+    "grupo": "Líquidos",
+    "items": [
+      {
+        "que": "Aguas de laboratorio (líquidos diluidos)",
+        "donde": "Garrafa de aguas de laboratorio, en cada laboratorio",
+        "t": 17.65
+      },
+      {
+        "que": "Colorantes",
+        "donde": "Garrafa de colorantes del laboratorio",
+        "t": 30.2
+      },
+      {
+        "que": "Lejía y residuos líquidos de equipos",
+        "donde": "Garrafa aparte (lab. 203). No mezclar con colorantes",
+        "t": 30.2
+      },
+      {
+        "que": "Etanol y X-Free",
+        "donde": "Garrafa de 5 L, cerrada con parafilm",
+        "t": 240.4
+      },
+      {
+        "que": "Disolvente no halogenado",
+        "donde": "Bidón de no halogenados (207)",
+        "t": 106.95
+      },
+      {
+        "que": "Ácidos",
+        "donde": "Bidón de ácidos (207)",
+        "t": 110.7
+      },
+      {
+        "que": "Disolvente halogenado (con cloro)",
+        "donde": "Bidón de halogenados (207)",
+        "t": 115.6
+      }
+    ]
+  },
+  {
+    "grupo": "Guantes, papel y envases",
+    "items": [
+      {
+        "que": "Guantes, papel y absorbentes contaminados",
+        "donde": "Bolsa del 207, dentro de una bolsita zip",
+        "t": 319.95
+      },
+      {
+        "que": "Envases con restos de sustancias peligrosas",
+        "donde": "Bolsa del 207, marcando su casilla",
+        "t": 309.55
+      },
+      {
+        "que": "Envase de vidrio vacío de un producto químico",
+        "donde": "Bidón de vidrio vacío (207)",
+        "t": 61.3
+      },
+      {
+        "que": "Garrafa vacía: ¿sirve para residuos?",
+        "donde": "Solo si lleva el símbolo UN (la de etanol sí, la de X-Free no)",
+        "t": 262.5
+      }
+    ]
+  },
+  {
+    "grupo": "Corta o pincha",
+    "items": [
+      {
+        "que": "Portas y vidrio, cuchillas, agujas",
+        "donde": "Contenedor amarillo de punzantes",
+        "t": 380.1
+      },
+      {
+        "que": "Cuchilla de microtomo",
+        "donde": "Contenedor amarillo de punzantes",
+        "t": 406.75
+      },
+      {
+        "que": "Jeringuilla",
+        "donde": "Contenedor amarillo de punzantes",
+        "t": 417.85
+      },
+      {
+        "que": "Porta con material ya fijado",
+        "donde": "Basura normal",
+        "t": 401.25
+      }
+    ]
+  },
+  {
+    "grupo": "Muestras y material biológico",
+    "items": [
+      {
+        "que": "Muestra fijada en formol o etanol",
+        "donde": "Contenedor azul (va a incineradora)",
+        "t": 210.65
+      },
+      {
+        "que": "Residuos biosanitarios",
+        "donde": "Contenedor negro (va a autoclave)",
+        "t": 181.35
+      },
+      {
+        "que": "Citotóxicos",
+        "donde": "Contenedor azul",
+        "t": 164.95
+      }
+    ]
+  },
+  {
+    "grupo": "No lo tengo claro",
+    "items": [
+      {
+        "que": "Reactivo que, tras buscar, no encaja en ningún bidón o debe ir solo",
+        "donde": "Bidón de reactivos de laboratorio (207), bien cerrado",
+        "t": 65.55
+      },
+      {
+        "que": "No sé qué es ni dónde va",
+        "donde": "Guía de residuos de GestionLab",
+        "t": 444.95
+      }
+    ]
+  }
+];
+
+let _vidRes = { orden: null, i: 0, urls: {} };
+
+function videosDeCategoria(cat) { return VIDEOS_RESIDUOS.filter(v => v.categorias.includes(cat)); }
+
+/** Botones «▶» de los vídeos de una categoría (vacío si no tiene). */
+function htmlBotonesVideoResiduo(cat, estilo = '') {
+  return videosDeCategoria(cat).map(v =>
+    `<button type="button" class="btn btn-secondary btn-sm" style="${estilo}" onclick="event.stopPropagation();abrirVideoResiduo('${v.id}')">▶ Vídeo: ${v.titulo}</button>`).join(' ');
+}
+
+// URLs firmadas (1 h) del vídeo y sus subtítulos; se piden con la sesión de quien mira.
+async function _urlsVideoResiduo(id) {
+  const c = _vidRes.urls[id];
+  if (c && c.caduca > Date.now()) return c;
+  const { data, error } = await _sbMigracion.storage.from('videos')
+    .createSignedUrls([`residuos/${id}.mp4`, `residuos/${id}.vtt`], 3600);
+  if (error || !data?.[0]?.signedUrl) throw new Error('No se ha podido abrir el vídeo. Si tu sesión ha caducado, vuelve a entrar.');
+  const u = { mp4: data[0].signedUrl, vtt: data[1]?.signedUrl || '', caduca: Date.now() + 50 * 60 * 1000 };
+  _vidRes.urls[id] = u;
+  return u;
+}
+
+async function _cargarClipResiduo(i, segundo = 0, reproducir = false) {
+  const v = VIDEOS_RESIDUOS[i];
+  _vidRes.i = i;
+  const video = document.getElementById('vid-res');
+  document.getElementById('vid-res-titulo').textContent = _vidRes.orden ? `Residuos del laboratorio · ${i + 1}/${VIDEOS_RESIDUOS.length}: ${v.titulo}` : v.titulo;
+  try {
+    const u = await _urlsVideoResiduo(v.id);
+    video.querySelectorAll('track').forEach(t => t.remove());
+    video.src = u.mp4;
+    if (u.vtt) {
+      const tr = document.createElement('track');
+      Object.assign(tr, { kind: 'subtitles', srclang: 'es', label: 'Español', src: u.vtt });
+      video.appendChild(tr);
+    }
+    video.onloadedmetadata = () => {
+      if (video.textTracks[0]) video.textTracks[0].mode = 'disabled';   // ya van grabados en la imagen
+      if (segundo) video.currentTime = segundo;
+      if (reproducir) video.play().catch(() => {});
+    };
+    video.load();
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+/** Un clip suelto. */
+function abrirVideoResiduo(id) {
+  const i = VIDEOS_RESIDUOS.findIndex(v => v.id === id);
+  if (i < 0) return;
+  _vidRes.orden = null;
+  document.getElementById('vid-res-indice').style.display = 'none';
+  document.getElementById('vid-res').onended = null;
+  openModal('modal-video-residuo');
+  _cargarClipResiduo(i, 0, true);
+}
+
+/** El vídeo completo: los clips seguidos, con el índice para saltar a cada explicación. */
+function abrirVideoCompletoResiduos() {
+  _vidRes.orden = true;
+  const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const ind = document.getElementById('vid-res-indice');
+  ind.style.display = '';
+  ind.innerHTML = `<input type="search" class="form-input" placeholder="¿Qué quieres tirar?" oninput="_filtrarIndiceVideoResiduos(this.value)" style="width:100%;margin-bottom:8px">
+    ${_INDICE_VIDEO_RESIDUOS.map(g => `<div class="vid-res-grupo"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin:12px 0 6px">${esc(g.grupo)}</div>
+      ${g.items.map(it => `<button type="button" class="vid-res-item" data-buscar="${esc((it.que + ' ' + it.donde).toLowerCase())}" onclick="_saltarVideoResiduos(${it.t})"
+          style="display:block;width:100%;text-align:left;background:var(--bg-soft,#f5f5f3);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font:inherit">
+          <div style="font-weight:600;font-size:13px">${esc(it.que)}</div>
+          <div style="font-size:12px;color:var(--accent)">${esc(it.donde)}</div>
+        </button>`).join('')}</div>`).join('')}
+    <div id="vid-res-nada" style="display:none;font-size:13px;color:var(--text-muted);margin-top:8px">No está en el vídeo. Busca en la Guía de residuos.</div>`;
+  const video = document.getElementById('vid-res');
+  // Al acabar un clip, el siguiente: así se ve entero, como el vídeo completo.
+  video.onended = () => { if (_vidRes.orden && _vidRes.i < VIDEOS_RESIDUOS.length - 1) _cargarClipResiduo(_vidRes.i + 1, 0, true); };
+  openModal('modal-video-residuo');
+  _cargarClipResiduo(0, 0, false);
+}
+
+function _saltarVideoResiduos(t) {
+  let i = 0;
+  VIDEOS_RESIDUOS.forEach((v, k) => { if (v.inicio <= t + 0.05) i = k; });
+  _cargarClipResiduo(i, Math.max(0, t - VIDEOS_RESIDUOS[i].inicio), true);
+  document.getElementById('vid-res').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function _filtrarIndiceVideoResiduos(q) {
+  const f = (q || '').toLowerCase().trim();
+  let hay = 0;
+  document.querySelectorAll('#vid-res-indice .vid-res-grupo').forEach(g => {
+    let n = 0;
+    g.querySelectorAll('.vid-res-item').forEach(b => { const ok = !f || b.dataset.buscar.includes(f); b.style.display = ok ? '' : 'none'; n += ok; });
+    g.style.display = n ? '' : 'none'; hay += n;
+  });
+  document.getElementById('vid-res-nada').style.display = hay ? 'none' : '';
+}
+
+// Sin closeModal(): borraría `editingRow`, y el vídeo se abre también encima de «Añadir
+// residuo», que lo necesita para saber en qué contenedor se apunta.
+function cerrarVideoResiduo() {
+  const video = document.getElementById('vid-res');
+  video.pause();
+  document.getElementById('modal-video-residuo').classList.remove('open');
+}
+
 // ── Página: Guía de residuos ─────────────────────────────────
 function renderResiduosGuia() {
   const el = document.getElementById('page-residuos-guia');
@@ -305,6 +565,13 @@ function renderResiduosGuia() {
   const canEdit = ['Administrador', 'Gestor'].includes(getUserRole());
   el.innerHTML = `
     <div id="panel-consultas-residuo"></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header"><div class="card-title">🎬 ¿Dónde tiro esto? En vídeo</div></div>
+      <div style="padding:14px 18px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+        <button class="btn btn-primary" onclick="abrirVideoCompletoResiduos()">▶ Ver el vídeo completo, con su índice</button>
+        <span style="font-size:12px;color:var(--text-muted)">Los contenedores del centro explicados en el laboratorio. Cada contenedor tiene también su trozo, abajo.</span>
+      </div>
+    </div>
     <div class="card" style="margin-bottom:20px">
       <div class="card-header">
         <div class="card-title">🤖 ¿No sabes qué es o dónde tirarlo?</div>
@@ -383,6 +650,7 @@ function _renderGuia(tipos, filtro) {
             🗑️ ${contenedor}
             <span style="font-weight:400;font-size:13px;color:var(--text-muted)">${items.length} tipo${items.length !== 1 ? 's' : ''}</span>
           </div>
+          ${videosDeCategoria(contenedor).length ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${htmlBotonesVideoResiduo(contenedor)}</div>` : ''}
         </div>
         <table>
           <thead><tr><th>Nombre</th><th>Descripción</th><th>Peligrosidad</th><th></th></tr></thead>
@@ -611,6 +879,11 @@ function openModalAdicion(idx) {
   editingRow = idx;
   const c = DATA.contenedoresResiduo[idx];
   document.getElementById('adic-contenedor-titulo').textContent = `${c.Categoria || '—'} · Lab ${c.Lab}${c.Zona ? ' · ' + c.Zona : ''}`;
+  const vids = document.getElementById('adic-videos');
+  if (vids) {
+    vids.innerHTML = htmlBotonesVideoResiduo(c.Categoria);
+    vids.style.display = vids.innerHTML ? 'flex' : 'none';
+  }
   sv('adic-observaciones', '');
   sv('adic-nivel', c.Nivel || 'vacío');
 
