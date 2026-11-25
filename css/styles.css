@@ -196,6 +196,10 @@
     .nav-item:hover { background: var(--surface2); color: var(--text); }
     .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 500; }
     .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+    /* Subsección (Mantenimiento › Verificación de pipetas): sangrada, con una guía a la izquierda */
+    .nav-item.nav-subitem { margin-left: 18px; padding-left: 10px; font-size: 12.5px; border-left: 2px solid var(--border); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+    .nav-item.nav-subitem .nav-icon { font-size: 14px; }
+    .nav-item.nav-parent-active { color: var(--accent); font-weight: 500; }
 
     .nav-badge {
       margin-left: auto;
@@ -1369,6 +1373,7 @@
     position: relative;
   }
   .nav-item .nav-icon { font-size: 18px; }
+  .nav-item.nav-subitem { margin-left: 0; padding: 10px; border-left: none; border-radius: var(--radius-sm); }
   .nav-item span:not(.nav-icon):not(.nav-badge) { display: none; }
   .nav-badge { position: absolute; top: 4px; right: 4px; padding: 1px 4px; font-size: 9px; }
   .sidebar-footer { padding: 10px 6px; }

@@ -1635,6 +1635,11 @@ function renderMantenimiento() {
         style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted)">
         Planes configurados <span style="font-size:11px;background:var(--border);color:var(--text-muted);border-radius:99px;padding:1px 7px;margin-left:4px">${nPlanes}</span>
       </button>` : ''}
+      <!-- Subsección: la verificación de micropipetas tiene su propia página (js/verif-pipetas.js) -->
+      <button id="tab-btn-verifpipetas" onclick="showPage('verif-pipetas')"
+        style="padding:8px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--text-muted)">
+        🧪 Verificación de pipetas
+      </button>
     </div>
 
     <!-- Tab: Pendientes -->

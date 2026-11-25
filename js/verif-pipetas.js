@@ -158,6 +158,9 @@ function renderVerifPipetas() {
   };
 
   cont.innerHTML = `
+    <div style="margin-bottom:12px">
+      <button class="btn btn-secondary btn-sm" onclick="showPage('mantenimiento')">← Volver a Mantenimiento</button>
+    </div>
     <div class="card">
       <div class="card-header">
         <div class="card-title">Verificación anual de las micropipetas</div>

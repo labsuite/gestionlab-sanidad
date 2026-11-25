@@ -322,6 +322,8 @@ function showPage(page, opts) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
   document.querySelector(`[onclick="showPage('${page}')"]`)?.classList.add('active');
+  // Verificación de pipetas es una subsección de Mantenimiento: el padre queda marcado.
+  document.getElementById('nav-mantenimiento')?.classList.toggle('nav-parent-active', page === 'verif-pipetas');
   const titles = {
     dashboard: 'Panel principal', equipos: 'Inventario de equipos', 'equipo-detalle': 'Ficha de equipo',
     'ubicar-equipos': 'Ubicar equipos', 'inventariar-material': 'Inventariar material nuevo',
@@ -329,7 +331,7 @@ function showPage(page, opts) {
     incidencias: 'Incidencias', material: 'Material fungible', movimientos: 'Movimientos de material',
     solicitudes: 'Solicitudes de material', pedidos: 'Pedidos', 'pedido-detalle': 'Detalle del pedido',
     proveedores: 'Proveedores', 'proveedor-detalle': 'Ficha de proveedor', ubicaciones: 'Ubicaciones', usuarios: 'Usuarios',
-    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo', 'verif-pipetas': 'Verificación de micropipetas',
+    contabilidad: 'Contabilidad', mantenimiento: 'Mantenimiento preventivo', 'verif-pipetas': 'Mantenimiento › Verificación de micropipetas',
     'residuos-guia': 'Guía de residuos', 'residuos-contenedores': 'Contenedores de residuos',
     reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', congelados: 'Muestras congeladas', perfil: 'Mi perfil', ayuda: 'Ayuda'
   };
