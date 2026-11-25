@@ -304,6 +304,8 @@ const AYUDA_TAREAS = {
             titulo: 'Qué se apunta',
             items: [
               '**El envase que se abre, entero.** No se apuntan fracciones (mililitros, gramos, puntas sueltas): lo que se va usando de un envase abierto no se apunta. El siguiente gasto se apunta cuando se abra el siguiente envase.',
+              '**Si el material se cuenta por unidades** (por ejemplo, tubos o placas que vienen en caja), al abrir la caja se apuntan todas las unidades que traía: la app las pide como «Unidades del envase abierto».',
+              '**El material reutilizable no se gasta** (vidrio, gradillas, objetos: los que llevan «♻️ Reutilizable»). No se apunta gasto. Si se rompe o se pierde, avisar al profesorado.',
             ],
           },
         ],
@@ -313,7 +315,6 @@ const AYUDA_TAREAS = {
         pasos: [
           {
             texto: '**Al abrir el envase, abrir el registro de consumo.** En el «Panel principal», botón «📦 Registrar consumo de material» («¿Has abierto un envase? Apúntalo ahora»). O en «Material fungible › Inventario»: desplegar el material y pulsar «📦» en la línea del bote que se ha abierto; así el material y el bote ya van elegidos.',
-            nota: 'Los botes del almacén (zona común) no tienen «📦»: desde allí solo se trasladan. Tampoco el material marcado «♻️ Reutilizable» (vidrio, gradillas, pinzas…), que no se gasta.',
           },
           {
             texto: '**Elegir el material y el bote del que se ha cogido**, es decir, el sitio del laboratorio donde estaba: escribir el nombre en «Material» y elegirlo de la lista. Si el material está en más de un sitio de vuestros laboratorios, sale «¿De dónde has cogido el envase?»: elegir ese sitio. El stock se lleva por sitio: si se elige otro bote, un sitio queda con más de lo que hay y otro con menos. Si solo está en un sitio, la app lo elige sola.',
@@ -321,8 +322,7 @@ const AYUDA_TAREAS = {
             alt: 'Registrar consumo con el material elegido, el sitio de donde se ha cogido el envase y 1 envase abierto señalados',
           },
           {
-            texto: '**En «Envases abiertos», los envases que se han abierto**: normalmente, 1, que ya viene puesto.',
-            nota: 'Si el material se cuenta por unidades sueltas («unidad/es»), el campo se llama «Unidades del envase abierto» y viene vacío: poner todas las unidades que traía el envase.',
+            texto: '**La cantidad**: en «Envases abiertos», los envases que se han abierto (viene con 1 puesto). Si el material se cuenta por unidades, el campo se llama «Unidades del envase abierto»: todas las que traía.',
           },
           {
             texto: '**En «Motivo», la práctica.** Sin nombres de personas.',
@@ -379,7 +379,7 @@ const AYUDA_TAREAS = {
         alt: 'Tres materiales con la barra de stock señalada: verde, ámbar y roja',
       },
       {
-        texto: '**Pulsar el material para desplegarlo y ver cada bote**: una línea por sitio, con «📍», el código del sitio, dónde está (armario, balda, cajón…) y qué se guarda ahí, cuánto hay en cada uno y «☣️ ESTÉRIL» si es de uso estéril. Los botes del almacén llevan «Zona común» delante.',
+        texto: '**Pulsar el material para desplegarlo y ver cada bote**: una línea por sitio, con «📍», el código del sitio, dónde está (laboratorio, armario y balda, por ejemplo «Armario 1 · Balda 1») y qué se guarda en él («Puntas y guantes»), cuánto hay en cada uno y «☣️ ESTÉRIL» si es de uso estéril. Los botes del almacén llevan «Zona común» delante. El material reutilizable lleva «♻️ Reutilizable» junto a lo que hay en total.',
         img: 'STO-1/03-material-desplegado.png',
         alt: 'Material desplegado con una línea por bote y la línea de antigüedad señaladas',
       },
