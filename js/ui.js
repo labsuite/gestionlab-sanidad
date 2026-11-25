@@ -321,9 +321,10 @@ function showPage(page, opts) {
   document.querySelectorAll('.page').forEach(pg => pg.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + page).classList.add('active');
-  document.querySelector(`[onclick="showPage('${page}')"]`)?.classList.add('active');
-  // Verificación de pipetas es una subsección de Mantenimiento: el padre queda marcado.
-  document.getElementById('nav-mantenimiento')?.classList.toggle('nav-parent-active', page === 'verif-pipetas');
+  // Verificación de pipetas es una subsección de Mantenimiento sin entrada en el menú:
+  // queda marcado «Mantenimiento».
+  const navActivo = page === 'verif-pipetas' ? 'mantenimiento' : page;
+  document.querySelector(`.nav-item[onclick="showPage('${navActivo}')"]`)?.classList.add('active');
   const titles = {
     dashboard: 'Panel principal', equipos: 'Inventario de equipos', 'equipo-detalle': 'Ficha de equipo',
     'ubicar-equipos': 'Ubicar equipos', 'inventariar-material': 'Inventariar material nuevo',

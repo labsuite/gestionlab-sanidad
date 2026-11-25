@@ -66,9 +66,10 @@ y la respuesta sobre el tornillo), página «Verificación de pipetas» (prepara
 pipetas medidas en cada una, lista de pipetas con su última verificación) y Excel de calidad
 (columna de fechas de realización: «(verificación: OK / AJUSTADA / RETIRADA)»).
 
-La página es una **subsección de Mantenimiento** (desde 2026-11-25): en el menú cuelga sangrada
-bajo «Mantenimiento», que queda marcado mientras se está en ella; en Mantenimiento es la última
-pestaña («🧪 Verificación de pipetas», abre la página) y la página tiene «← Volver a Mantenimiento».
+La página es una **subsección de Mantenimiento** (desde 2026-11-25): **no tiene entrada en el menú
+lateral** (decisión de la usuaria); se entra por la última pestaña de Mantenimiento («🧪 Verificación
+de pipetas»), en el menú queda marcado «Mantenimiento» mientras se está en ella, y la página tiene
+«← Volver a Mantenimiento».
 Sigue siendo una página propia (`page-verif-pipetas`), no un panel dentro de `renderMantenimiento()`.
 
 **Sin rango** (17 pipetas): la verificación dice que no se puede hacer y remite a la tarea
