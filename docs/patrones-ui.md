@@ -110,9 +110,16 @@ el contenido antes que la localización, el fallo está en los datos (un apodo g
 
 | Columna | En pantalla | Ejemplo | Helper |
 |---|---|---|---|
-| `zona` | **Localización**, de lo general a lo concreto, separada por « · » | `Izquierda · 2º Cajón` | `zonaUbicacion(u)` = primer tramo (agrupa desplegables y el selector); `posicionUbicacion(u)` = el resto |
-| `subzona` | **Uso / contenido** | `Micropipetas` | `usoUbicacion(u)` |
+| `zona` | **Localización**: solo dónde está, de lo general a lo concreto, separada por « · » (lado o pared · mueble · balda, cajón o posición) | `Izquierda · 2º Cajón` | `zonaUbicacion(u)` = primer tramo (agrupa desplegables y el selector); `posicionUbicacion(u)` = el resto |
+| `subzona` | **Uso / contenido / apodo**: lo que se guarda o el nombre con el que se conoce el mueble (el apodo delante si hay los dos) | `Micropipetas`, `Reactivos` | `usoUbicacion(u)` |
 | `descripcion_completa` | **Observaciones** (no sale en las etiquetas) | — | — |
+
+**Criterio homogéneo** (Paloma, 2026-11-25, aplicado a las 182 con
+`scripts/homogeneizar_ubicaciones_2026_11.py`): un equipo puede ser referencia de la
+localización, pero escrito como posición («Debajo del procesador», «Al lado de los autoclaves»);
+un nombre suelto de mueble por lo que guarda («Reactivos», «Aguas», «Centrífugas») es su apodo y
+va en `subzona`. Cada tramo, con mayúscula inicial. La ayuda de la ventana de editar ubicación
+lo explica.
 
 `huecoUbicacion(u)` = posición + uso, para listas ya agrupadas por zona. Para agrupar no usar
 `u.Zona` entero (cada cajón sería un grupo): usar `zonaUbicacion(u)`.
