@@ -97,6 +97,14 @@ una ubicación tiene que salir también qué es. Usar `getNombreUbicacion(id)`
 la localización sola no identifica el sitio (siete «Izquierda · Encimera» en el 201). Para
 **elegir** una ubicación, el selector de `js/ubic-picker.js` (no un `<select>` con todas).
 
+⚠ **Orden, siempre** (Paloma, 2026-11-25): **código – zona · localización · contenido / uso / apodo**
+(«205-ZC-2.5 – Zona común · Inferior · Reactivos»; la «zona» es el apellido del laboratorio, como
+«Zona común»). No componer el texto a mano: `getNombreUbicacion(id)`, `descripcionUbicacion(u)`
+detrás de un código ya pintado, o `nombreHuecoUbicacion(u)` («205-1.5.2 – 2º Cajón ·
+Micropipetas») en un desplegable ya agrupado por laboratorio y zona. Había listas con el código
+al final o con el laboratorio delante (Ubicar equipos, Inventariar, traslados). Si aun así sale
+el contenido antes que la localización, el fallo está en los datos (un apodo guardado en `zona`).
+
 **Dos ideas, columnas con el nombre antiguo** (desde 2026-11-25, datos recolocados con
 `scripts/reorganizar_ubicaciones_2026_11.py`):
 
