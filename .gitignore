@@ -7,6 +7,9 @@ supabase/.temp/
 scripts/__pycache__/
 *.pyc
 exports/
+# Copias de tablas que dejan los scripts antes de cambiar datos: son datos de la base,
+# nunca al repositorio (se borran cuando ya no hacen falta)
+scripts/copias/
 .playwright-mcp/
 
 # Capturas de verificación (Playwright las deja en la raíz)
