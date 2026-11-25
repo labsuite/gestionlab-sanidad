@@ -535,7 +535,11 @@ function _invMatRenderFormulario() {
         </div>
 
         <!-- 4 · CUÁNTO ───────────────────────────────────────── -->
-        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:6px">4 · ¿Cuánto hay?</label>
+        <label style="font-size:12px;font-weight:600;display:block;margin-bottom:2px">4 · ¿Cuánto hay?</label>
+        <!-- Normas de material (Paloma, 25/11/2026): los abiertos ya se apuntaron como gasto al abrirlos -->
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;line-height:1.5">
+          <strong>Cuenta solo los envases cerrados</strong>; el material reutilizable (♻️), entero.
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:10px">
             <input type="number" min="0" step="0.01" value="${_escAttr(_invMat.cantidad)}" placeholder="Cantidad"
                    oninput="_invMat.cantidad=this.value">
