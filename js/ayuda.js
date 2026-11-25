@@ -1326,9 +1326,17 @@ const AYUDA_TAREAS = {
         texto: '**Escribir en «Observaciones de la verificación»** lo que haya pasado durante la serie (un tubo que se volcó, una lectura que hubo que repetir y por qué). La balanza y la sesión las guarda la app.',
       },
       {
-        texto: '**«Volver a la revisión»**: los pasos con 🧪 los ha marcado la app con el resultado (no se marcan a mano). Terminar los pasos que quedan (etiqueta, guardar) y **marcar el resultado del mantenimiento**.',
+        texto: '**«Volver a la revisión»**: los pasos con 🧪 los ha marcado la app con el resultado (no se marcan a mano). Terminar los pasos que quedan (etiqueta, guardar).',
         img: I + '07-pasos-marcados.png',
         alt: 'Pasos de la revisión marcados por la app: sesión, los dos volúmenes, Completar y Resultado',
+      },
+      {
+        texto: '**Marcar el resultado del mantenimiento** (la app lo sugiere):',
+        lista: [
+          '**Apto**: la verificación salió OK y no hubo que cambiar ninguna pieza en la revisión.',
+          '**Apto tras intervención**: salió OK, pero antes hubo que cambiar una pieza (por ejemplo, la junta tórica) o el profesorado ajustó la pipeta.',
+          '**No apto**: el resultado es «Retirar».',
+        ],
       },
       {
         texto: '**Finalizar.** Con algún volumen a medias («Completar» o faltan réplicas), la app no deja finalizar: «💾 Guardar progreso» y terminar en la misma sesión.',
@@ -1376,17 +1384,17 @@ const AYUDA_TAREAS = {
           '**Ajustar**: el docente ajusta la pipeta según el apartado 6.3 de su protocolo, pulsa «🔧 He ajustado la pipeta» y, **en la misma revisión**, repite los dos volúmenes con 10 réplicas (la app ya no hace cribado). El ajuste queda además como intervención «Calibración» de la pipeta. Si después del ajuste sigue sin cumplir, «Retirar».',
           '**Pipetas que no se ajustan en el laboratorio**: en las Gilson Pipetman Classic, la app convierte «Ajustar» en «Retirar y enviar al servicio técnico». En las Huawei, Lan Technics y Nahita pregunta si la pipeta tiene tornillo de ajuste bajo la tapa del émbolo: contestar mirándolo («Sí, tiene» / «No tiene»); si no lo tiene, se retira.',
           '**PIP-005**: elegir el volumen bajo (100 o 200 µl) según lo grabado en la pipeta.',
-          '**Retirar**: la pipeta queda fuera de servicio y con el aviso abierto. Tras repararla, vuelve a estar operativa solo con una **verificación extraordinaria** de 10 réplicas que salga OK (decisión del 25/11/2026): ver el bloque siguiente.',
+          '**Retirar**: la pipeta queda fuera de servicio y con el aviso abierto. Tras repararla, vuelve a estar operativa solo con una verificación extraordinaria que salga OK (bloque siguiente).',
         ],
       },
       {
-        titulo: 'Verificación extraordinaria tras una reparación',
-        numerada: true,
+        titulo: 'Verificación extraordinaria tras una reparación (solo profesorado)',
         items: [
-          '**Cuándo**: tras reparar una pipeta o cambiarle la junta (caída, avería, fallo de la verificación), con su incidencia abierta. Va fuera de calendario y enlazada a esa incidencia.',
-          '**Dónde**: en el hilo de la incidencia, recuadro «🧪 Verificación extraordinaria» → «Hacer la verificación extraordinaria»; o en «Verificación de pipetas» → «🔧 Verificaciones extraordinarias» → «+ Nueva», eligiendo la pipeta y su incidencia.',
-          '**Cómo**: el mismo formulario que la revisión anual, pero **sin cribado: 10 réplicas a cada volumen**, en una sesión válida del día. «💾 Guardar progreso» para seguir otro rato; «Finalizar la verificación» cuando haya resultado.',
-          '**Qué pasa al finalizar**: el resultado queda escrito en la incidencia. **Si es OK**, ya se puede cerrar la incidencia desde su hilo dejando la pipeta «Operativo». **Si no**, la pipeta sigue «Fuera de servicio» con la incidencia abierta: la app no deja cerrarla como operativa sin una verificación extraordinaria OK.',
+          '**Cuándo**: después de reparar una pipeta que tiene una incidencia abierta: junta o pistón cambiados, una caída, líquido o vapores corrosivos en el cilindro, o un «Retirar» de su revisión anual. Sin ella, la pipeta no puede volver a estar operativa (decisión de Paloma, 25/11/2026).',
+          '**Dónde**: desde el hilo de la incidencia de la pipeta, «🧪 Hacer la verificación extraordinaria»; o desde «Verificación de pipetas» → «🔧 Verificaciones extraordinarias» → «+ Nueva».',
+          '**Cómo**: el mismo formulario y los mismos cálculos que en la revisión anual, pero **sin cribado: 10 réplicas a cada volumen**, cambiando de punta tras la 5.ª. Si algún volumen es con colorante, hace falta una sesión válida ese día ([[MAN-12|Llevar una sesión de verificación de micropipetas]]). «💾 Guardar progreso» para seguir otro rato; «Finalizar la verificación» cuando haya resultado.',
+          '**Resultado**: queda añadido a la incidencia. **OK**: se puede cerrar la incidencia como resuelta y dejar la pipeta «Operativo»; etiqueta con la fecha y «OK». **No OK**: la pipeta sigue fuera de servicio y la incidencia, abierta: otra reparación, el servicio técnico o la baja.',
+          '**Al cerrar la incidencia**: la app no deja cerrarla como resuelta con la pipeta «Operativo» sin una verificación extraordinaria OK. Sí deja descartarla (si al final no había avería) o cerrarla dejando la pipeta fuera de servicio.',
         ],
       },
     ],
