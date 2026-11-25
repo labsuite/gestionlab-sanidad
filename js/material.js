@@ -1285,6 +1285,21 @@ async function guardarMaterial() {
 // ============================================================
 // GUARDAR CONSUMO / ENTRADA
 // ============================================================
+// Mete en DATA lo que devuelve `consumo` de gestionar-material (material, bote y movimiento).
+function _aplicarConsumoLocal(res) {
+  if (res?.material) {
+    const obj = _materialSbToObj(res.material);
+    const i = DATA.material.findIndex(m => m.ID_Material === obj.ID_Material);
+    if (i !== -1) DATA.material[i] = obj; else DATA.material.push(obj);
+  }
+  if (res?.lote) {
+    const obj = _materialUbicacionSbToObj(res.lote);
+    const i = DATA.materialUbicaciones.findIndex(l => l.ID === obj.ID);
+    if (i !== -1) DATA.materialUbicaciones[i] = obj; else DATA.materialUbicaciones.push(obj);
+  }
+  if (res?.movimiento) DATA.movimientos.push(_movimientoSbToObj(res.movimiento));
+}
+
 async function guardarConsumo() {
   const matId   = document.getElementById('consumo-material-id').value;
   const cantStr = v('consumo-cantidad');
@@ -1319,11 +1334,13 @@ async function guardarConsumo() {
 
   showLoading('Registrando...');
   try {
-    await callEdgeFunction('gestionar-material', {
+    const res = await callEdgeFunction('gestionar-material', {
       accion: 'consumo', id_material: matId, cantidad, lote_id: loteElegido?.ID || undefined,
       motivo: v('consumo-motivo') || 'Consumo', observaciones: v('consumo-obs'), usuario: currentUser?.name || 'Usuario',
     });
-    await loadAllData();
+    // Solo cambian el material, su bote y un movimiento: se actualizan esas filas en vez de
+    // recargar las ~40 tablas de la app con loadAllData(), que era casi toda la espera.
+    _aplicarConsumoLocal(res);
     const matFinal = DATA.material.find(m => m.ID_Material === matId);
     showToast(`Gasto apuntado. Stock: ${getStockTotal(matFinal)} ${matFinal?.Unidad || ''}`, 'success');
     closeModal('modal-consumo'); renderAll();

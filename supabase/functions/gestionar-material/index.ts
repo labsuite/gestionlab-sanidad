@@ -12,7 +12,7 @@
 // - revisión de inventario: cualquiera puede *proponerla* (revision_crear,
 //   gated client-side por Puede_Revisar_Inventario, un flag de datos no de
 //   rol); aplicarla/descartarla es Admin/Gestor/Profesor (requireStaff).
-import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight, identificarUsuario } from "../_shared/auth.ts";
+import { requireAdminOrGestor, requireAdmin, requireStaff, requireValidSession, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 import { unidadValida, MSG_UNIDAD_NUMERICA } from "../_shared/material.ts";
 
 function genId(prefix: string): string {
@@ -65,7 +65,9 @@ async function registrarMovimiento(supabaseAdmin: any, mat: any, tipo: string, c
     id_movimiento: genId("MOV"), material: mat?.nombre || "", id_material: mat?.id_material || null,
     tipo, cantidad, usuario, motivo, observaciones,
   };
-  await supabaseAdmin.from("movimientos").insert(datos);
+  // Devuelve la fila guardada: el consumo la manda al navegador para no tener que recargarlo todo
+  const { data } = await supabaseAdmin.from("movimientos").insert(datos).select().maybeSingle();
+  return data;
 }
 
 /**
@@ -130,12 +132,15 @@ Deno.serve(async (req) => {
     // Consumo, traslado y recuento de inventario los puede hacer el alumnado:
     // el servidor decide la firma según el rol y nunca guarda su nombre
     // (RGPD, ver docs/proteccion-datos.md).
-    const { autor: usuarioNombre } = await autorRegistro(supabaseAdmin, email, body.usuario);
-    const { rol: rolSesion } = await identificarUsuario(supabaseAdmin, email);
-    const esGrupo = rolSesion === "Alumno";
     const idMaterial = String(body.id_material || "").trim();
     if (!idMaterial) return jsonError("id_material es obligatorio", 400);
-    const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+    // Firma, rol y material a la vez: son independientes y cada consulta es un viaje a la base
+    // de datos. autorRegistro ya devuelve el rol (antes se volvía a preguntar con identificarUsuario).
+    const [{ autor: usuarioNombre, rol: rolSesion }, { data: mat }] = await Promise.all([
+      autorRegistro(supabaseAdmin, email, body.usuario),
+      supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle(),
+    ]);
+    const esGrupo = rolSesion === "Alumno";
     if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
 
     if (accion === "asegurar_lote_legacy") {
@@ -167,23 +172,36 @@ Deno.serve(async (req) => {
       // marcado como común del departamento (material_comun) sí se gasta desde allí, porque de
       // la zona común se lo llevan otros ciclos. Espejo: gastoBloqueadoEnAlmacen() en js/config.js.
       const ubicacionGasto = loteElegido ? loteElegido.id_ubicacion : mat.ubicacion;
-      if (mat.material_comun !== true && await esUbicacionZonaComun(supabaseAdmin, ubicacionGasto)) {
-        return jsonError(MSG_DESDE_ALMACEN, 400);
-      }
-      if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, ubicacionGasto))) {
-        return jsonError("Este material no está en los laboratorios de tu grupo", 403);
-      }
-      await registrarMovimiento(supabaseAdmin, mat, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || ""));
+      // Las dos comprobaciones de sitio a la vez (antes, una detrás de otra)
+      const [enAlmacen, alAlcance] = await Promise.all([
+        mat.material_comun === true ? false : esUbicacionZonaComun(supabaseAdmin, ubicacionGasto),
+        esGrupo ? ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, ubicacionGasto) : true,
+      ]);
+      if (enAlmacen) return jsonError(MSG_DESDE_ALMACEN, 400);
+      if (!alAlcance) return jsonError("Este material no está en los laboratorios de tu grupo", 403);
+
+      // Movimiento y stock a la vez. Con botes, el total del material es la suma de los botes
+      // ya leídos con el nuevo valor de este (lo mismo que sincronizarStockMaterial, sin volver
+      // a leerlos). Se devuelve todo lo que cambia para que el navegador no recargue la app entera.
+      let nuevoLocal = 0;
+      let nuevoStock: number;
       if (loteElegido) {
-        const nuevoLocal = Math.max(0, (Number(loteElegido.stock_local) || 0) - cantidad);
-        await supabaseAdmin.from("material_ubicaciones").update({ stock_local: nuevoLocal }).eq("id", loteElegido.id);
-        await sincronizarStockMaterial(supabaseAdmin, idMaterial);
+        nuevoLocal = Math.max(0, (Number(loteElegido.stock_local) || 0) - cantidad);
+        nuevoStock = lotes.reduce((s: number, l: any) => s + (l.id === loteElegido.id ? nuevoLocal : (Number(l.stock_local) || 0)), 0);
       } else {
-        const nuevoStock = Math.max(0, (Number(mat.stock_actual) || 0) - cantidad);
-        await supabaseAdmin.from("material").update({ stock_actual: nuevoStock }).eq("id_material", idMaterial);
+        nuevoStock = Math.max(0, (Number(mat.stock_actual) || 0) - cantidad);
       }
-      const { data: matFinal } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).single();
-      return jsonOk({ material: matFinal });
+      const [movimiento, loteRes, matRes] = await Promise.all([
+        registrarMovimiento(supabaseAdmin, mat, "Salida", cantidad, usuarioNombre, String(body.motivo || "Consumo"), String(body.observaciones || "")),
+        loteElegido
+          ? supabaseAdmin.from("material_ubicaciones").update({ stock_local: nuevoLocal }).eq("id", loteElegido.id).select().maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabaseAdmin.from("material").update({ stock_actual: nuevoStock }).eq("id_material", idMaterial).select().maybeSingle(),
+      ]);
+      if (loteRes.error || matRes.error) {
+        return jsonError(`No se pudo apuntar el gasto: ${(loteRes.error || matRes.error).message}`, 500);
+      }
+      return jsonOk({ material: matRes.data || { ...mat, stock_actual: nuevoStock }, lote: loteRes.data, movimiento });
     }
 
     if (accion === "traslado") {
