@@ -281,6 +281,17 @@ function esZonaComun(idUbicacion) {
 }
 
 /**
+ * ¿Se le niega el gasto a este material en esta ubicación por ser el almacén?
+ * La zona común es un almacén: de allí no se apunta gasto, se traslada al laboratorio.
+ * Excepción (Paloma, 2026-11-25): el material marcado «🤝 Material común del departamento»
+ * sí se gasta desde la zona común, porque de allí se lo llevan otros ciclos.
+ * Espejo en el servidor: `consumo` de gestionar-material.
+ */
+function gastoBloqueadoEnAlmacen(mat, idUbicacion) {
+  return esZonaComun(idUbicacion) && !(mat && mat.Material_Comun === true);
+}
+
+/**
  * True si el usuario actual (currentUser.name) figura como responsable del equipo.
  * El campo Responsable admite varios nombres separados por comas.
  */

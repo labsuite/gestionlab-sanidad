@@ -163,9 +163,13 @@ Deno.serve(async (req) => {
       if (lotes.length > 0 && !loteElegido) return jsonError("Selecciona una ubicación", 400);
       // Norma de Paloma (2026-11-23): la zona común es un almacén. Lo que hay allí se lleva al
       // laboratorio donde se trabaja y el gasto se apunta allí, al abrir el envase. Para todos
-      // los roles: desde la zona común solo se traslada.
+      // los roles: desde la zona común solo se traslada. Excepción (2026-11-25): el material
+      // marcado como común del departamento (material_comun) sí se gasta desde allí, porque de
+      // la zona común se lo llevan otros ciclos. Espejo: gastoBloqueadoEnAlmacen() en js/config.js.
       const ubicacionGasto = loteElegido ? loteElegido.id_ubicacion : mat.ubicacion;
-      if (await esUbicacionZonaComun(supabaseAdmin, ubicacionGasto)) return jsonError(MSG_DESDE_ALMACEN, 400);
+      if (mat.material_comun !== true && await esUbicacionZonaComun(supabaseAdmin, ubicacionGasto)) {
+        return jsonError(MSG_DESDE_ALMACEN, 400);
+      }
       if (esGrupo && !(await ubicacionAlAlcanceDeGrupo(supabaseAdmin, email, ubicacionGasto))) {
         return jsonError("Este material no está en los laboratorios de tu grupo", 403);
       }

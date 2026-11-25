@@ -323,7 +323,7 @@ function renderFilaMaterial(m) {
         </td>
         <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLocal || '—'} / ${opLocal || '—'}</td>
         <td onclick="event.stopPropagation()"><div class="row-actions">
-          ${esZonaComun(l.ID_Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Apuntar un envase abierto aquí">📦</button>`}
+          ${gastoBloqueadoEnAlmacen(m, l.ID_Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoLote('${l.ID}')" title="Apuntar un envase abierto aquí">📦</button>`}
           ${_puedeRevisarInventario() ? `<button class="icon-btn" onclick="openModalContarStock('${m.ID_Material}','lote:${l.ID}')" title="Contar stock en esta ubicación">🔢</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaLote('${l.ID}')" title="Entrada en esta ubicación">📥</button>` : ''}
           ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalSubdividirLote('${l.ID}')" title="Subdividir/alicuotar">✂️</button>` : ''}
@@ -350,7 +350,7 @@ function renderFilaMaterial(m) {
       </td>
       <td colspan="2" style="font-size:12px;color:var(--text-muted)">${mnLeg || '—'} / ${opLeg || '—'}</td>
       <td onclick="event.stopPropagation()"><div class="row-actions">
-        ${esZonaComun(m.Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Apuntar un envase abierto">📦</button>`}
+        ${gastoBloqueadoEnAlmacen(m, m.Ubicacion) || m.Reutilizable ? '' : `<button class="icon-btn" onclick="openModalConsumoMaterial('${m.ID_Material}')" title="Apuntar un envase abierto">📦</button>`}
         ${puedeHacer('editarMaterial') ? `<button class="icon-btn" onclick="openModalEntradaMaterial('${m.ID_Material}')" title="Entrada">📥</button>` : ''}
         ${puedeHacer('editarMaterial') && m.Ubicacion ? `<button class="icon-btn" onclick="subdividirDesdeLegacy('${m.ID_Material}')" title="Subdividir/alicuotar">✂️</button>` : ''}
         ${m.Ubicacion ? `<button class="icon-btn" onclick="trasladarDesdeLegacy('${m.ID_Material}')" title="Trasladar a otra ubicación">🔀</button>` : ''}
@@ -1034,8 +1034,9 @@ function _prepararCantidadConsumo(mat) {
 function openModalConsumoLote(loteId) {
   const lote = DATA.materialUbicaciones.find(l => l.ID === loteId);
   if (!lote) return;
-  if (esZonaComun(lote.ID_Ubicacion)) { showToast(MSG_GASTO_ALMACEN, 'error'); return; }
-  if (DATA.material.find(m => m.ID_Material === lote.ID_Material)?.Reutilizable) { showToast(MSG_GASTO_REUTILIZABLE, 'error'); return; }
+  const matLote = DATA.material.find(m => m.ID_Material === lote.ID_Material);
+  if (gastoBloqueadoEnAlmacen(matLote, lote.ID_Ubicacion)) { showToast(MSG_GASTO_ALMACEN, 'error'); return; }
+  if (matLote?.Reutilizable) { showToast(MSG_GASTO_REUTILIZABLE, 'error'); return; }
   openModalConsumoMaterial(lote.ID_Material);
   // Guardar el LOTE fijo en un input hidden dedicado (no la ubicación: puede
   // haber más de un bote en la misma ubicación, p.ej. madre + alícuotas)
@@ -1075,11 +1076,12 @@ function _mostrarSelectorUbicConsumo(matId) {
     ubiGrp.style.display = '';
   };
   // Material sin botes (stock en la propia ficha) guardado en la zona común
-  if (!todos.length && mat0 && esZonaComun(mat0.Ubicacion)) {
+  if (!todos.length && mat0 && gastoBloqueadoEnAlmacen(mat0, mat0.Ubicacion)) {
     noDisponible(MSG_GASTO_ALMACEN, 'Está en el almacén: trasládalo antes'); return;
   }
-  // La zona común es un almacén: de allí no se apunta gasto, para ningún rol.
-  let lotes = todos.filter(l => !esZonaComun(l.ID_Ubicacion));
+  // La zona común es un almacén: de allí no se apunta gasto, para ningún rol —
+  // salvo el material común del departamento, que otros ciclos gastan desde allí.
+  let lotes = todos.filter(l => !gastoBloqueadoEnAlmacen(mat0, l.ID_Ubicacion));
   // Alumno: además, solo los de sus laboratorios
   if (getUserRole() === 'Alumno') {
     const permitidas = getUbicacionesAlumno();
@@ -1298,8 +1300,8 @@ async function guardarConsumo() {
   const loteElegido = loteSel ? DATA.materialUbicaciones.find(l => l.ID === loteSel) : null;
 
   if (mat.Reutilizable) { showToast(MSG_GASTO_REUTILIZABLE, 'error'); return; }
-  // La zona común es un almacén: de allí no se apunta gasto (lo comprueba también el servidor)
-  if ((loteElegido && esZonaComun(loteElegido.ID_Ubicacion)) || (!lotes.length && esZonaComun(mat.Ubicacion))) {
+  // La zona común es un almacén: de allí no se apunta gasto, salvo material común (lo comprueba también el servidor)
+  if ((loteElegido && gastoBloqueadoEnAlmacen(mat, loteElegido.ID_Ubicacion)) || (!lotes.length && gastoBloqueadoEnAlmacen(mat, mat.Ubicacion))) {
     showToast(MSG_GASTO_ALMACEN, 'error'); return;
   }
   if (lotes.length > 0 && !loteElegido) { showToast('Elige de dónde has cogido el envase', 'error'); return; }

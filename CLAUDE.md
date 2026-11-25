@@ -482,6 +482,11 @@ de consumo no los ofrece y `consumo` de `gestionar-material` lo rechaza (`esUbic
 Desde la zona común solo se traslada, y **solo a un laboratorio** (lo exige también el servidor
 en `traslado` y `transferencia_masiva`; `corregir_ubicacion` no, porque arregla un error de
 inventario). Tareas STO-1/2/3 de la Ayuda.
+**Excepción (2026-11-25): el material marcado «🤝 Material común del departamento»**
+(`material.material_comun`) **sí** se gasta desde la zona común, porque de allí se lo llevan
+otros ciclos. Una sola regla en cliente, `gastoBloqueadoEnAlmacen(mat, idUbicacion)` en
+`js/config.js` (usarla, no `esZonaComun` a secas, en cualquier sitio nuevo que ofrezca 📦), y
+su espejo en `consumo` de `gestionar-material`.
 
 **Material reutilizable** (2026-11-24): vidrio, gradillas, pinzas, aspiradores… no se gastan
 (se rompen o se dan de baja). Columna `material.reutilizable` (casilla «♻️ Reutilizable» en la
