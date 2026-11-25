@@ -213,7 +213,7 @@ function _congNombreEquipo(idEquipo, conUbicacion = true) {
   const e = DATA.equipos.find(x => x.ID_Activo === idEquipo);
   if (!e) return idEquipo || '—';
   const nombre = [e.Tipo_Equipo, e.Marca, e.Modelo].filter(Boolean).join(' ');
-  return `${nombre} (${e.ID_Activo})${conUbicacion && e.Ubicacion ? ' · ' + e.Ubicacion : ''}`;
+  return `${nombre} (${e.ID_Activo})${conUbicacion && e.Ubicacion ? ' · ' + getNombreUbicacion(e.Ubicacion) : ''}`;
 }
 
 function _congEsc(s) {

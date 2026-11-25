@@ -200,8 +200,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   const dlUbi = document.getElementById('ubicaciones-datalist');
   if (dlUbi) {
     dlUbi.innerHTML = DATA.ubicaciones.filter(u => u.Activa !== 'FALSE').map(u => {
-      const label = [u.ID_Ubicacion, descripcionUbicacion(u)].filter(Boolean).join(' · ');
-      return `<option value="${u.ID_Ubicacion}">${label}</option>`;
+      return `<option value="${u.ID_Ubicacion}">${getNombreUbicacion(u.ID_Ubicacion)}</option>`;
     }).join('');
   }
 
@@ -645,7 +644,8 @@ function buscarUbicacionMat(query) {
    .slice(0, 15);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {
-    const label = [u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '', descripcionUbicacion(u)].filter(Boolean).join(' · ');
+    // Debajo del código: zona · localización · contenido (orden de getNombreUbicacion)
+    const label = descripcionUbicacion(u) || (u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '');
     return `<div class="autocomplete-item" onclick="seleccionarUbicacionMatLote('${u.ID_Ubicacion}','${label.replace(/'/g,"\\'")}')">
     <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${_esc(label)}</div></div>
   </div>`;
@@ -1473,10 +1473,6 @@ function _ubicsConMaterial(matIds, idOrigen) {
   return res;
 }
 
-function _nombreSitio(u) {
-  return huecoUbicacion(u) || zonaUbicacion(u) || u.ID_Ubicacion;
-}
-
 function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
   if (matIds !== undefined) _destinoMatIds[idSelect] = matIds;
   if (lab === undefined) _destinoManual[idSelect] = false;
@@ -1493,8 +1489,8 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
     labs.map(l => `<option value="${_escAttr(l)}" ${l === lab ? 'selected' : ''}>${_esc(l)}</option>`).join('');
 
   const yaHay  = _ubicsConMaterial(_destinoMatIds[idSelect], idOrigen);
-  // En "★ Ya hay de este material" no hay optgroup de zona: la zona va en el texto.
-  const opt    = (u, conZona) => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(conZona && zonaUbicacion(u) && zonaUbicacion(u) !== _nombreSitio(u) ? zonaUbicacion(u) + ' · ' + _nombreSitio(u) : _nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
+  // En "★ Ya hay de este material" no hay optgroup de zona: el texto va entero.
+  const opt    = (u, conZona) => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(conZona ? getNombreUbicacion(u.ID_Ubicacion) : nombreHuecoUbicacion(u))}</option>`;
   const porId  = (a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true });
   const ubics  = activas.filter(u => labDe(u) === lab);
   const conMat = ubics.filter(u => yaHay.has(u.ID_Ubicacion)).sort(porId);
@@ -1538,7 +1534,7 @@ function _pintarSugerencias(idSelect, idOrigen) {
               title="${_escAttr(nombres.join(', '))}"
               data-origen="${_escAttr(idOrigen)}" data-ubic="${_escAttr(u.ID_Ubicacion)}"
               onclick="_elegirDestinoSugerido('${idSelect}', this.dataset.origen, this.dataset.ubic)">
-        <span>${sel ? '✓ ' : ''}<strong>${_esc(labDe(u))}</strong> · ${_esc(_nombreSitio(u))}
+        <span>${sel ? '✓ ' : ''}<strong>${_esc(u.ID_Ubicacion)}</strong> – ${_esc(descripcionUbicacion(u) || labDe(u))}
         ${varios ? `<span style="display:block;font-size:11px;color:var(--text-muted);font-weight:400">${_esc(nombres.join(', '))}</span>` : ''}</span>
       </button>`; }).join('')}</div>
     ${verManual
@@ -1839,7 +1835,7 @@ function buscarDestinoSubdiv(i, query) {
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {
-    const label = [u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '', descripcionUbicacion(u)].filter(Boolean).join(' · ');
+    const label = descripcionUbicacion(u) || (u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '');
     return `<div class="autocomplete-item" onclick="seleccionarDestinoSubdiv(${i},'${u.ID_Ubicacion}')">
       <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${label}</div></div>
     </div>`;

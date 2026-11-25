@@ -391,7 +391,7 @@ function _renderEquiposAvisoGrupo(esAlumno) {
     }
     if (fuera) etiquetas.push(`<span class="badge badge-gray" style="font-size:10px">📦 Fuera del centro</span>`);
     return `<div class="equipo-aviso-fila" onclick="abrirEquipoEnInventario('${esc(e.ID_Activo)}')">
-      <div><strong>${esc(e.ID_Activo)}</strong> · ${esc(e.Tipo_Equipo || '')} <span style="color:var(--text-muted);font-size:12px">${esc(e.Ubicacion || '')}</span></div>
+      <div><strong>${esc(e.ID_Activo)}</strong> · ${esc(e.Tipo_Equipo || '')} <span style="color:var(--text-muted);font-size:12px">${esc(e.Ubicacion ? getNombreUbicacion(e.Ubicacion) : '')}</span></div>
       <div class="equipo-aviso-etiquetas">${etiquetas.join('')}</div>
     </div>`;
   }).join('');
@@ -484,7 +484,7 @@ function buildIntervencionesEquipo(equipoId) {
   const panelDetalles = htmlAvisoEquipo(equipoId) + avisoFuera + `
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px 16px;padding:10px 12px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:14px">
       <div class="detail-mobile-only">${detalle('Marca / Modelo', [equipo.Marca, equipo.Modelo].filter(Boolean).join(' · '))}</div>
-      <div class="detail-mobile-only">${detalle('Ubicación', equipo.Ubicacion)}</div>
+      <div class="detail-mobile-only">${detalle('Ubicación', equipo.Ubicacion ? getNombreUbicacion(equipo.Ubicacion) : '')}</div>
       <div class="detail-mobile-only">${detalle('Responsable', equipo.Responsable)}</div>
       ${detalle('Nº de serie', equipo.Numero_Serie)}
       ${detalle('Origen financiación', equipo.Origen_Financiacion)}

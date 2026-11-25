@@ -107,7 +107,7 @@ function _invMatLabsSitio() {
 function _invMatEtiquetaUbic(idUbicacion) {
   const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '';
-  return [u.Zona, usoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
+  return getNombreUbicacion(idUbicacion);
 }
 
 /** La tarjeta de arriba: el laboratorio y, dentro, la zona concreta. */
@@ -135,7 +135,7 @@ function _invMatRenderSitio() {
               ${zonas.map(z => `
                 <optgroup label="${_escAttr(z)}">
                   ${ubics.filter(u => (zonaUbicacion(u) || 'Sin zona') === z).map(u =>
-                    `<option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === sitio.idUbicacion ? 'selected' : ''}>${_esc(huecoUbicacion(u) || zonaUbicacion(u) || u.ID_Ubicacion)} · ${_esc(u.ID_Ubicacion)}</option>`
+                    `<option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === sitio.idUbicacion ? 'selected' : ''}>${_esc(nombreHuecoUbicacion(u))}</option>`
                   ).join('')}
                 </optgroup>`).join('')}
             </select>` : ''}

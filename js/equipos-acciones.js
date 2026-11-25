@@ -224,10 +224,8 @@ async function editEquipo(idx) {
   const selUbi = document.getElementById('eq-ubicacion-selected');
   const txtUbi = document.getElementById('eq-ubicacion-selected-text');
   if (e.Ubicacion) {
-    const uObj = DATA.ubicaciones.find(u => u.ID_Ubicacion === e.Ubicacion);
-    const label = uObj ? (uObj.Laboratorio_Aula || '') + (uObj.Zona ? ' · ' + uObj.Zona : '') : '';
     if (selUbi) selUbi.style.display = 'flex';
-    if (txtUbi) txtUbi.textContent = e.Ubicacion + (label ? ' – ' + label : '');
+    if (txtUbi) txtUbi.textContent = getNombreUbicacion(e.Ubicacion);
   } else {
     if (selUbi) selUbi.style.display = 'none';
   }
@@ -1787,7 +1785,8 @@ function buscarUbicacionEquipo(query) {
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(u => {
-    const label = ['Lab ' + (u.Laboratorio_Aula || ''), descripcionUbicacion(u)].filter(x => x && x !== 'Lab ').join(' · ');
+    // Debajo del código: zona · localización · contenido (orden de getNombreUbicacion)
+    const label = descripcionUbicacion(u) || (u.Laboratorio_Aula ? 'Lab ' + u.Laboratorio_Aula : '');
     return `<div class="autocomplete-item" onclick="seleccionarUbicacionEquipo('${u.ID_Ubicacion}','${label.replace(/'/g,"\\'")}')">
       <div><div class="autocomplete-item-name">${u.ID_Ubicacion}</div><div class="autocomplete-item-meta">${label}</div></div>
     </div>`;

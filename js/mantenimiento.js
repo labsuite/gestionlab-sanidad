@@ -2412,7 +2412,7 @@ async function exportarModeloCalidad(cursoAcademico) {
   function ubicacionTexto(idUbicacion) {
     const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
     if (!u) return idUbicacion || '';
-    return [u.Laboratorio_Aula, u.Zona, u.Subzona].filter(Boolean).join(', ');
+    return getNombreUbicacion(idUbicacion);
   }
 
   const VALID_PERIODICIDADES = new Set(['Diaria','Semanal','Quincenal','Mensual','Bimensual','Trimestral','Semestral','Anual','Bianual','Trianual','Quinquenal','Decenal']);

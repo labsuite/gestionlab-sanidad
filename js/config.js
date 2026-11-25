@@ -211,11 +211,24 @@ function getMinOptLabel(mat) {
 // solas no identifican el sitio: hay siete "Izquierda · Encimera" en el 201).
 // Si el laboratorio tiene apellido ("205 - Zona común", "207 - Residuos")
 // también sale. Detrás, el uso/contenido ("Puntas y tubos"); las observaciones no.
+//
+// ⚠ ORDEN, en toda la app (Paloma, 2026-11-25): código – zona · localización · contenido,
+// p. ej. «205-ZC-2.5 – Zona común · Inferior · Reactivos». Usar siempre getNombreUbicacion()
+// o, en un desplegable ya agrupado por laboratorio y zona, nombreHuecoUbicacion(); no
+// componer el texto a mano (había listas con el código al final o el contenido delante).
 function getNombreUbicacion(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion;
   const desc = descripcionUbicacion(u);
   return desc ? `${u.ID_Ubicacion} – ${desc}` : (u.Laboratorio_Aula ? `${u.ID_Ubicacion} – Lab ${u.Laboratorio_Aula}` : u.ID_Ubicacion);
+}
+
+/** «205-1.5.2 – 2º Cajón · Micropipetas»: para un desplegable que ya agrupa por laboratorio y
+ *  zona (el primer tramo de la localización), el código y lo que queda: posición y contenido. */
+function nombreHuecoUbicacion(u) {
+  if (!u) return '';
+  const resto = huecoUbicacion(u) || zonaUbicacion(u);
+  return resto ? `${u.ID_Ubicacion} – ${resto}` : u.ID_Ubicacion;
 }
 
 // Desde 2026-11-25 una ubicación se describe con DOS ideas (las columnas

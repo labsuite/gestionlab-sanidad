@@ -33,7 +33,8 @@ function _ubpEtiquetaLab(lab) {
 function ubicDescripcionLarga(idUbicacion) {
   const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '';
-  return [_ubpEtiquetaLab(u.Laboratorio_Aula), descripcionUbicacion(u)].filter(Boolean).join(' · ');
+  // Va detrás del código: zona · localización · contenido (orden de getNombreUbicacion)
+  return descripcionUbicacion(u) || _ubpEtiquetaLab(u.Laboratorio_Aula);
 }
 
 function _ubpActivas() {

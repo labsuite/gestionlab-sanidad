@@ -84,12 +84,12 @@ function _ubicLabsUsuario() {
 function _ubicEtiqueta(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '—';
-  return [u.Zona, usoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
+  return getNombreUbicacion(idUbicacion);
 }
 
-/** Etiqueta corta para el desplegable, ya agrupado por zona: "Encimera · 201-1.1" */
+/** Etiqueta corta para el desplegable, ya agrupado por zona: "201-1.1 – Encimera" */
 function _ubicEtiquetaCorta(u) {
-  return [huecoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
+  return nombreHuecoUbicacion(u);
 }
 
 function _ubicNombreEquipo(eq) {
