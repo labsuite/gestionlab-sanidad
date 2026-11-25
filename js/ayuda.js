@@ -23,21 +23,22 @@ const AYUDA_MANUALES = {
     intro: 'Lo que hace tu grupo en GestionLab, contado como tareas de laboratorio. Entras con la cuenta del grupo, y lo que registras sale a nombre del grupo.',
     secciones: [
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
-      { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-2', 'STO-3'] },
+      { titulo: 'Antes de usar un equipo', tareas: ['EQU-1', 'EQU-2', 'EQU-3', 'EQU-4'] },
+      { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'MUE-1', 'MUE-2', 'STO-1', 'STO-2', 'STO-3'] },
       { titulo: 'Al recoger', tareas: ['RES-1', 'RES-2'] },
       { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-1', 'MAN-2', 'MAN-10'] },
       { titulo: 'Si algo falla', tareas: ['INC-1', 'EMP-2', 'USO-3'] },
       { titulo: 'Cuando el profesorado os lo pida', tareas: ['INV-1', 'INV-2', 'INV-3'] },
     ],
   },
-  // EMP-6, EMP-2, USO-1, USO-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión
+  // EMP-6, EMP-2, EQU-1 a EQU-4, USO-1, USO-2, MUE-1, MUE-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión
   // en todos los manuales; STO-1 y STO-3 llevan además, solo en Gestor y Administrador, la
   // excepción del material común en la zona común). STO-2, RES-2, MAN-1/2, INC-1, USO-3 e
   // INV-1/2/3 de momento solo tienen la del alumnado. MAN-10 (Ⓥ), MAN-11 y MAN-12: verificación de
   // micropipetas (25/11/2026); MAN-11/12 solo en profesorado, gestión y administración.
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Antes de usar un equipo', tareas: ['EQU-1', 'EQU-2', 'EQU-3', 'EQU-4'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'MUE-1', 'MUE-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Antes de usar un equipo', tareas: ['EQU-1', 'EQU-2', 'EQU-3', 'EQU-4'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'MUE-1', 'MUE-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Antes de usar un equipo', tareas: ['EQU-1', 'EQU-2', 'EQU-3', 'EQU-4'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'MUE-1', 'MUE-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -426,11 +427,11 @@ const AYUDA_TAREAS = {
             ],
           },
           {
-            texto: '**Cerrar el contenedor** como diga su aviso de seguridad (el recuadro amarillo de su tarjeta: tapa, cierre de la bolsa, tapón de la garrafa).',
+            texto: '**Dejar el contenedor como diga su aviso de seguridad** (el recuadro amarillo de su tarjeta). Garrafas y bidones, con su tapón puesto. **Los contenedores con tapa de cierre definitivo (como el azul y el negro) no se cierran: la tapa se apoya, sin hacer presión.** Una vez cerrada, no se vuelve a abrir nunca (ni siquiera la empresa de residuos) y el contenedor queda inservible. El cierre definitivo lo hace el profesorado cuando está lleno.',
           },
         ],
         comprobacion: [
-          'El residuo está en el contenedor, el contenedor cerrado, y en su tarjeta aparece la adición a nombre del grupo («Historial de adiciones») con el nivel actualizado.',
+          'El residuo está en el contenedor, el contenedor queda como dice su aviso (tapón puesto, o tapa apoyada sin cerrar si es de cierre definitivo), y en su tarjeta aparece la adición a nombre del grupo («Historial de adiciones») con el nivel actualizado.',
         ],
         comprobacionImg: { img: 'RES-2/05-adicion-registrada.png', alt: 'Tarjeta del contenedor con el nivel actualizado, el historial de adiciones y el mensaje Registrado: ya puedes echarlo' },
         problemas: [
@@ -440,6 +441,7 @@ const AYUDA_TAREAS = {
           ['«No se encontró un contenedor activo…» al leer la etiqueta', 'el contenedor se ha cerrado y no se ha puesto el de recambio. No dejar el residuo encima: guardarlo cerrado y rotulado y avisar al profesorado.'],
           ['Se ha echado algo donde no iba', 'no intentar sacarlo. Avisar al profesorado en ese momento, diciendo qué y cuánto.'],
           ['El contenedor está lleno', 'avisar al profesorado. No dejar residuos en el suelo ni al lado.'],
+          ['Se ha cerrado del todo, sin querer, la tapa de un contenedor de cierre definitivo', 'no intentar abrirla. Avisar al profesorado: ese contenedor ya no admite más residuos.'],
         ],
         relacionado: [
           ['Antes', [['RES-1', 'Saber a qué contenedor va un residuo'], ['EMP-6', 'Usar GestionLab en el móvil: etiquetas de contenedor']]],
@@ -819,6 +821,32 @@ const AYUDA_TAREAS = {
       },
     },
   },
+
+  // ── EQU-1 a EQU-4, MUE-1 y MUE-2 · comunes (guiones del 23/11/2026) ──
+  'EQU-1': {
+    pantallas: ['equipos', 'ubicaciones'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'EQU-2': {
+    pantallas: ['equipos', 'mantenimiento'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'EQU-3': {
+    pantallas: ['equipos', 'dashboard'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'EQU-4': {
+    pantallas: ['reservas'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'MUE-1': {
+    pantallas: ['congelados'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'MUE-2': {
+    pantallas: ['congelados'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
 };
 
 (() => {
@@ -1083,7 +1111,7 @@ const AYUDA_TAREAS = {
       { texto: '**Al terminar, antes de abrir**: leer en el panel la temperatura y la presión máximas alcanzadas. Abrir solo como dice el protocolo (manómetro a 0 bar, cara apartada).' },
       {
         texto: '**Comprobar la cinta y el integrador, y completar el registro**: «■ Completar ciclo» (o leer otra vez la etiqueta). «Hora fin», «Temperatura máxima alcanzada (°C)», «Presión máxima alcanzada (bar)», «Cinta indicadora» e «Integrador químico» («Viró», «No viró» o «No se puso»), e incidencias. Pulsar «Guardar y completar el ciclo».',
-        nota: 'Mientras dura, el ciclo sale en «Ciclos en marcha». Lo puede completar cualquier cuenta: el ciclo es del autoclave, no de quien lo arrancó.',
+        nota: 'Mientras dura, el ciclo sale en «Ciclos en marcha». Un ciclo en marcha lo completa quien abre el autoclave, aunque lo haya arrancado otra persona o grupo: el ciclo es del autoclave.',
         imgs: [
           { img: 'USO-2/02-ciclo-en-marcha.png', alt: 'Pestaña del autoclave con el ciclo en marcha y el botón Completar ciclo señalado', pie: 'El ciclo en marcha: «■ Completar ciclo».' },
           { img: 'USO-2/03-completar-ciclo.png', alt: 'Ventana Completar ciclo con la temperatura y la presión máximas y los dos indicadores', pie: 'Temperatura, presión e indicadores.' },
@@ -1123,6 +1151,326 @@ const AYUDA_TAREAS = {
     AYUDA_TAREAS['USO-1'].versiones[r] = uso1;
     AYUDA_TAREAS['USO-2'].versiones[r] = uso2;
   });
+})();
+
+// ── EQU-1 a EQU-4, MUE-1 y MUE-2 · comunes a todos los roles (guiones del 23/11/2026) ──
+(() => {
+  const equ1 = {
+    titulo: 'Encontrar un equipo por su código, tipo o laboratorio, y saber dónde está',
+    quien: ['Cualquier cuenta. Todas ven el inventario completo de equipos.'],
+    cuando: [
+      'Antes de usar un equipo, de hacerle un mantenimiento o de avisar de una avería: todo empieza por encontrarlo en la app.',
+      'Cuando hace falta saber dónde se guarda un equipo (laboratorio y armario).',
+    ],
+    antes: ['El código de la etiqueta del equipo (por ejemplo, BAL-003, CEN-08 o MIC12). Si no tiene etiqueta o no se lee: su tipo, el laboratorio donde está y, si hace falta, marca, modelo o número de serie.'],
+    pasos: [
+      { texto: '**Ir a «Equipos › Inventario»** (en el móvil, menú «☰»).' },
+      {
+        texto: '**Escribir el código tal como aparece en la etiqueta**, en «Buscar equipo...». Los códigos no tienen todos el mismo formato: unos llevan guion y otros no, y unos tienen dos cifras y otros tres (BAL-003, CEN-08, MIC12). El buscador acepta también tipo, marca, modelo, número de serie, ubicación y responsable.',
+        img: 'EQU-1/01-buscar-codigo.png',
+        alt: 'Inventario de equipos con el código escrito en el buscador y el equipo encontrado',
+      },
+      {
+        texto: '**Si no se sabe el código**, escribir el laboratorio en «Filtrar por ubicación...» (por ejemplo, 203) y buscar por tipo en «Buscar equipo...» («centrífuga», «balanza»…).',
+        img: 'EQU-1/02-filtrar-por-laboratorio.png',
+        alt: 'Inventario de equipos filtrado por el laboratorio 203 y buscando centrífuga',
+      },
+      {
+        texto: '**Leer dónde está**: en la lista, debajo del nombre, y en «Ubicación» al desplegar su tarjeta: el código del sitio, la zona, el armario o la balda si consta, y lo que se guarda ahí. La **zona común (205-ZC) es un almacén**, una ubicación propia distinta del laboratorio 205. Allí se guardan, por ejemplo, las balanzas, los termómetros de referencia y el tacómetro.',
+        img: 'EQU-1/03-donde-esta.png',
+        alt: 'Tarjeta del equipo desplegada con su ubicación señalada',
+      },
+      {
+        texto: '**Para ver todo lo que hay en un sitio concreto** (un armario, un laboratorio): «Catálogo › Ubicaciones». Desplegar el laboratorio y pulsar, en la fila del sitio, lo que tiene («N ítems», «N equipos»).',
+        img: 'EQU-1/04-que-hay-en-un-sitio.png',
+        alt: 'Catálogo de ubicaciones con un sitio de la zona común desplegado y sus equipos',
+      },
+    ],
+    comprobacion: ['El código que se ve en la app es el mismo de la etiqueta del equipo que tienes delante. Con equipos iguales (micropipetas, microscopios), si hay duda, comprobar también el número de serie.'],
+    problemas: [
+      ['No aparece', 'revisar cómo está escrito el código (guion, ceros). Probar buscando por tipo y laboratorio.'],
+      ['El equipo no tiene etiqueta, o su etiqueta no coincide con la app', 'no adivinar cuál es. Avisar al profesorado: es un fallo del inventario.'],
+      ['La ubicación de la app no es donde está el equipo', 'no moverlo para que cuadre. Avisar al profesorado (o, cuando os lo pida, ubicarlo desde la app → [[INV-1|Ubicar los equipos de un laboratorio]]).'],
+      ['No aparecen los equipos dados de baja', 'es lo normal. El filtro de estados no los ofrece.'],
+    ],
+    relacionado: [
+      ['Después', [['EQU-2', 'Consultar cómo se usa'], ['EQU-3', 'Saber si se puede usar'], ['MAN-2', 'Hacer un mantenimiento'], ['INC-1', 'Avisar de una avería']]],
+      ['Cuando lo pide el profesorado', [['INV-1', 'Ubicar los equipos de un laboratorio']]],
+    ],
+  };
+
+  const equ2 = {
+    titulo: 'Consultar cómo se usa un equipo: su protocolo y el manual del fabricante',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      'Antes de usar un equipo por primera vez y cada vez que haya dudas.',
+      'Durante un mantenimiento, cuando un paso cita un apartado del protocolo, por ejemplo «(6.2)».',
+      'Cuando algo falla o la pantalla del equipo da un mensaje de error.',
+    ],
+    antes: ['El equipo encontrado en la app (→ [[EQU-1|Encontrar un equipo]]).'],
+    pasos: [
+      { texto: '**Desplegar la tarjeta del equipo** (pulsarlo en «Equipos › Inventario») **y abrir su protocolo de uso**: el recuadro «📖» con el nombre del protocolo y «12 apartados».' },
+      {
+        texto: '**Ir al apartado que hace falta** con el índice (los botones con el número y el título de cada apartado). Todos los protocolos tienen los mismos 12 apartados, con el mismo número, aunque el título cambie un poco según el equipo: ver «Qué apartado mirar», más abajo.',
+        img: 'EQU-2/01-protocolo-indice.png',
+        alt: 'Protocolo de uso desplegado con el índice de sus 12 apartados señalado',
+      },
+      {
+        texto: '**Buscar dentro del protocolo** cuando se busca algo concreto, en «🔍 Buscar en el protocolo…»: un mensaje de error de la pantalla tal como sale (por ejemplo, «E1»), «fusible», «aceite»… Debajo dice cuántas coincidencias hay y en qué apartados, y el índice deja solo esos.',
+        img: 'EQU-2/02-buscar-en-el-protocolo.png',
+        alt: 'Buscador del protocolo con una palabra escrita, el número de coincidencias y los apartados donde están',
+      },
+      {
+        texto: '«⤢ Ampliar» para leerlo a pantalla completa, sobre todo en el móvil («✕ Cerrar» para volver).',
+        img: 'EQU-2/03-ampliado.png',
+        alt: 'Protocolo ampliado a pantalla completa',
+      },
+      {
+        texto: '**Mirar la versión en la tabla del principio** («Versión del protocolo»). Si pone **0.9**, el protocolo es provisional: falta la documentación del fabricante. Seguir lo que dice y no hacer nada que no diga (ningún ajuste, ningún autoclavado).',
+        img: 'EQU-2/04-version-del-protocolo.png',
+        alt: 'Tabla del principio del protocolo con la fila de la versión señalada',
+      },
+      { texto: 'El manual del fabricante, si el equipo lo tiene, se abre desde la tarjeta: «📄 Ver manual», en «Manual / Ficha técnica». La tabla del principio del protocolo dice también cuál es y dónde está.' },
+    ],
+    extras: [
+      {
+        titulo: 'Qué apartado mirar',
+        tabla: {
+          cabeceras: ['Para…', 'Apartado'],
+          filas: [
+            ['Usarlo por primera vez', '2 Seguridad y riesgos · 3 Puesto de trabajo, o principio y elección · 4 Comprobaciones previas · 7 Procedimiento de uso'],
+            ['Usarlo cada vez', '4 Comprobaciones previas · 7 Procedimiento de uso'],
+            ['Elegir entre equipos parecidos', '3'],
+            ['Limpiarlo y dejarlo recogido', '9 Limpieza y mantenimiento'],
+            ['Un fallo o un mensaje en la pantalla del equipo', '10 Resolución de problemas'],
+            ['Un paso de mantenimiento que cita un apartado, p. ej. «(6.2)»', 'El que cita (el 6 es ajuste y verificación)'],
+          ],
+        },
+      },
+    ],
+    comprobacion: ['El protocolo abierto es el de ese equipo: la tabla del principio recoge su código o su familia, y su marca y modelo.'],
+    problemas: [
+      ['El equipo no tiene protocolo', 'avisar al profesorado y no usarlo sin sus indicaciones.'],
+      ['No sale el botón del manual («📄 Ver manual»)', 'no hay manual adjuntado en la app. La tabla del principio del protocolo y el apartado 12, «Fuentes», dicen cuál es.'],
+      ['El manual no se abre en el móvil', 'se abre en otra pestaña, y el navegador puede bloquearla. Permitir las ventanas emergentes de GestionLab.'],
+      ['El protocolo dice una cosa y el equipo o su manual otra', 'hacer caso a lo que sea más seguro y avisar al profesorado, que lo corrige.'],
+    ],
+    relacionado: [
+      ['Antes', [['EQU-1', 'Encontrar un equipo']]],
+      ['Después', [['EQU-3', 'Saber si se puede usar'], ['MAN-2', 'Hacer un mantenimiento']]],
+    ],
+  };
+
+  const equ3 = {
+    titulo: 'Saber si un equipo se puede usar: estado, avisos abiertos y si está fuera del centro',
+    quien: ['Cualquier cuenta.'],
+    cuando: ['Antes de usar un equipo, y siempre que su aspecto o su comportamiento haga dudar.'],
+    antes: ['El equipo encontrado en la app (→ [[EQU-1|Encontrar un equipo]]) y, a ser posible, delante.'],
+    extrasTrasAntes: [
+      {
+        titulo: 'Qué hacer según lo que se ve',
+        tabla: {
+          cabeceras: ['Lo que se ve', 'Qué hacer'],
+          filas: [
+            ['Verde, «Operativo», sin ⚠️', 'Se puede usar, después de hacer sus comprobaciones previas (apartado 4 del protocolo)'],
+            ['Aviso abierto «No funciona / No se puede usar»', 'No usar hasta que el profesorado lo revise'],
+            ['Aviso abierto «Funciona, pero con limitaciones»', 'Leer el aviso. Usarlo solo si la limitación no afecta a lo que se va a hacer; si hay duda, preguntar al profesorado'],
+            ['Aviso abierto «Sí, funciona (pero hay algo que revisar)»', 'Se puede usar. Leer el aviso por si afecta a lo que se va a hacer'],
+            ['Naranja, «Operativo con fallos» o «En revisión»', 'Solo con el permiso del profesorado'],
+            ['Azul, «Revisión planificada»', 'Se puede usar hasta la fecha de la revisión, salvo que el profesorado diga otra cosa'],
+            ['Rojo, «No operativo» o «Averiado»; gris, «Fuera de servicio»', 'No usar'],
+            ['«📦 Fuera del centro»', 'No está en el laboratorio: lo tiene el servicio técnico'],
+          ],
+        },
+      },
+    ],
+    pasos: [
+      {
+        texto: '**Mirar el estado del equipo en el inventario** («Equipos › Inventario»): la etiqueta de color junto a su código y, si las tiene, la del aviso abierto («No funciona (aviso)», «Uso limitado (aviso)» o «Aviso abierto»), la fecha de la revisión planificada o «📦 Fuera del centro». Decidir con la tabla de arriba. Al desplegar la tarjeta, el recuadro del aviso dice cuál es y qué hacer.',
+        imgs: [
+          { img: 'EQU-3/01-estados.png', alt: 'Inventario de equipos con un equipo en cada estado, con avisos y uno fuera del centro', pie: 'Los estados en el inventario.' },
+          { img: 'EQU-3/02-aviso-abierto.png', alt: 'Tarjeta del equipo con el recuadro de un aviso abierto y su consejo', pie: 'El recuadro del aviso, en la tarjeta.' },
+          { img: 'EQU-3/03-fuera-del-centro.png', alt: 'Equipo con la etiqueta Fuera del centro y el recuadro de quién lo retiró y cuándo', pie: '«📦 Fuera del centro».' },
+        ],
+      },
+      { texto: '**La etiqueta física manda sobre la app.** Si el equipo lleva puesta la etiqueta «NO USAR», no se usa aunque la app diga «Operativo»: puede que la app no esté al día.' },
+      { texto: '**El estado de la app no sustituye a las comprobaciones previas.** Si al hacerlas algo falla, no se usa y se avisa (→ [[INC-1|Avisar de una avería]]), aunque la app diga «Operativo».' },
+      { texto: 'La columna de mantenimiento («N pendiente(s)») dice si tiene mantenimientos por hacer. Por sí sola **no impide usarlo**.' },
+      {
+        texto: '**Con la cuenta de un grupo, mirar el Panel principal al empezar la práctica**: «Equipos de tus laboratorios con aviso o sin poder usarse» avisa de los equipos de vuestros laboratorios y de la zona común que no se pueden usar o tienen un aviso de avería abierto.',
+        img: 'EQU-3/04-panel-principal.png',
+        alt: 'Panel principal con la tarjeta Equipos de tus laboratorios con aviso o sin poder usarse',
+      },
+    ],
+    comprobacion: ['Se ha decidido si usarlo con la tabla, con la etiqueta física y con las comprobaciones previas, no solo con el color de la app.'],
+    problemas: [
+      ['La app y el equipo no coinciden (la app dice que funciona y no funciona, o al revés)', 'no usarlo y avisar.'],
+      ['No se entiende lo que dice el aviso, o no se sabe si la limitación afecta a la práctica', 'preguntar al profesorado antes de usarlo.'],
+    ],
+    relacionado: [
+      ['Antes', [['EQU-1', 'Encontrar un equipo'], ['EQU-2', 'Consultar cómo se usa']]],
+      ['Después', [['EQU-4', 'Reservar un equipo'], ['INC-1', 'Avisar de una avería']]],
+    ],
+  };
+
+  const equ4 = {
+    titulo: 'Reservar un equipo, ver si está libre, empezar y terminar su uso y anular la reserva',
+    quien: [
+      'Cualquier cuenta. Con la cuenta de un grupo, la reserva es **del grupo**: cualquier persona del grupo puede empezar el uso, terminarlo o anular la reserva.',
+      'Solo se reservan los equipos que Gestión ha preparado para reservar.',
+      'Si la reserva coincide con otra, queda pendiente hasta que la decide Gestión. Si no coincide, queda confirmada sin más.',
+    ],
+    cuando: [
+      'Cuando hace falta un equipo compartido en un tramo concreto (una incubación, un ciclo largo) y hay que asegurarse de que esté libre.',
+      'Al empezar y al terminar de usarlo.',
+      'En cuanto se sabe que ya no hace falta, para anularla.',
+    ],
+    antes: [
+      'Qué equipo, de qué hora a qué hora y para qué práctica.',
+      'En los equipos que se comparten por condiciones (por ejemplo, una incubadora con varias reservas a la vez), las condiciones que necesita la práctica: temperatura, CO₂…',
+    ],
+    pasos: [
+      {
+        texto: '**Ver si está libre**: «Uso del laboratorio › Reservas», pestaña «Disponibilidad», elegir el equipo. El calendario enseña los próximos 14 días, de 07:00 a 22:00, con cada reserva en el color de su estado («Pendiente», «Confirmada», «Activa», «En conflicto»); «Libre» si no hay ninguna.',
+        img: 'EQU-4/01-calendario.png',
+        alt: 'Calendario de reservas de una incubadora para los próximos 14 días',
+      },
+      { texto: '**Pedir la reserva**: «+ Nueva reserva». Fecha y hora de inicio y de fin, «Propósito / uso previsto» y, si el equipo las pide, las «Condiciones requeridas» (temperatura, CO₂…). En el propósito, la práctica y el módulo, sin nombres de personas.' },
+      {
+        texto: '**Leer el aviso de la ventana antes de guardar**: «✓ Disponible», «✗ Ocupado» o «✗ Incompatible». Si está ocupado, elegir otro tramo u otro equipo del mismo tipo (→ [[EQU-1|Encontrar un equipo]]). Después, «Solicitar reserva».',
+        img: 'EQU-4/02-nueva-reserva.png',
+        alt: 'Ventana Nueva reserva con las fechas, las horas, el propósito, las condiciones y el aviso Disponible',
+      },
+      { texto: '**Respetar la duración máxima y la antelación mínima** aunque la app solo avise («La duración supera el máximo configurado», «Se requieren … de antelación mínima»): son las normas del equipo.' },
+      {
+        texto: '**Al empezar a usarlo, «▶ Iniciar uso»; al terminar, «■ Finalizar»**, en la pestaña «Mis reservas». La reserva no cambia sola de estado, y así los demás saben cuándo queda libre de verdad.',
+        img: 'EQU-4/03-mis-reservas.png',
+        alt: 'Mis reservas: una en uso con Finalizar, una confirmada con Iniciar uso y Cancelar, y una pendiente',
+      },
+      {
+        texto: '**Si ya no hace falta, anularla en cuanto se sepa**, para dejar el tramo libre: «Cancelar», en «Mis reservas».',
+        nota: '«Cancelar» sale mientras no ha llegado la hora de inicio de la reserva.',
+      },
+    ],
+    extras: [
+      {
+        titulo: 'Normas del laboratorio',
+        items: [
+          '**En un equipo compartido por condiciones, no cambiar la temperatura ni el CO₂**, porque dentro hay muestras de otros. Si la práctica necesita otras condiciones, eso es otra reserva y hay que hablarlo con el profesorado.',
+          '**La reserva no es el registro de uso.** En la cabina, la vitrina y el autoclave hay que apuntar además el uso (→ [[USO-1|Apuntar un uso de la cabina o de la vitrina]], [[USO-2|Apuntar un ciclo de autoclave]]).',
+        ],
+      },
+    ],
+    comprobacion: [
+      'En «Mis reservas», la reserva sale **Confirmada**. Si sale **Pendiente**, todavía no está asegurada: espera a que decida Gestión.',
+      'Al terminar, la reserva pasa a **Completada** en el historial («Historial», al final de «Mis reservas»).',
+    ],
+    problemas: [
+      ['El equipo no aparece para reservar', 'no está preparado como reservable. Preguntar al profesorado.'],
+      ['Pendiente o En conflicto', 'hasta que Gestión decida, contar con que puede no estar libre.'],
+      ['Rechazada', 'la tarjeta lleva la nota de Gestión con el motivo.'],
+      ['En el móvil, el texto de cada bloque del calendario sale recortado', 'el resumen de reservas (y «Mis reservas») dice quién reservó y para qué.'],
+    ],
+    relacionado: [
+      ['Antes', [['EQU-1', 'Encontrar un equipo'], ['EQU-3', 'Saber si se puede usar']]],
+      ['Después', [['USO-1', 'Apuntar un uso de la cabina o de la vitrina'], ['USO-2', 'Apuntar un ciclo de autoclave']]],
+    ],
+  };
+
+  const mue1 = {
+    titulo: 'Encontrar una muestra congelada y ver de dónde procede',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      'Antes de una práctica que necesita una cepa, una alícuota o un reactivo congelado.',
+      'Para saber si queda bastante, o de qué pase es una cepa.',
+    ],
+    antes: ['El nombre o la abreviatura de la muestra (por ejemplo, «E. coli ATCC 25922»), o la etiqueta de su caja o de su congelador.'],
+    pasos: [
+      {
+        texto: '**Localizarla en la app antes de abrir el congelador**: en «Uso del laboratorio › Muestras congeladas», con «🔍 Buscar muestra…» (nombre, abreviatura, especie, código de colección, lote…), o leyendo la etiqueta del congelador o de la caja (→ [[EMP-6|Usar GestionLab en el móvil: etiquetas]]). Cada vez que se abre un congelador, sube la temperatura de todo lo que hay dentro: la puerta abierta, el menor tiempo posible, y sabiendo ya qué caja y qué casilla se buscan.',
+        img: 'MUE-1/01-buscador.png',
+        alt: 'Muestras congeladas con «coli» en el buscador y los tubos encontrados',
+      },
+      {
+        texto: '**Abrir la ficha del tubo** (pulsarlo en el resultado o en la caja) y leer lo que importa para usarlo:',
+        lista: [
+          '**Queda**: cuánto queda; con borde rojo en la caja, y «queda poco» en la ficha.',
+          '**Caducidad**: si pone «caducado», no usarlo y avisar al profesorado.',
+          '**Descongelaciones** (formato volumen): cuántas veces se ha descongelado.',
+          '**Pase y Procedencia** (cepas): de qué pase es, desde la cepa de referencia. Si avisa de «último pase permitido» o de que «supera el máximo», avisar al profesorado: con ese tubo no se hace otro stock (la norma ISO 11133 admite como máximo 5 pases desde la cepa de referencia).',
+        ],
+        imgs: [
+          { img: 'MUE-1/02-caja-abierta.png', alt: 'Caja del congelador abierta con un tubo elegido, marcado con borde rojo de queda poco', pie: 'La caja, con el tubo elegido.' },
+          { img: 'MUE-1/03-ficha-de-la-cepa.png', alt: 'Ficha de una cepa con lo que queda, el pase con último pase permitido y la procedencia', pie: 'La ficha: queda, pase y procedencia.' },
+        ],
+      },
+      { texto: 'Anotar la caja y la casilla (la letra y el número, por ejemplo A3), y ir a por ella.' },
+    ],
+    comprobacion: ['Se sabe la caja y la casilla. Al abrir la caja, la etiqueta del tubo de esa casilla coincide con la de la app.'],
+    problemas: [
+      ['No aparece en el buscador', 'probar con la abreviatura o con otro dato. Los tubos agotados o descartados no salen.'],
+      ['En la caja real no está donde dice la app (o hay otro tubo)', 'no usar otro «parecido». Avisar al profesorado: el registro de esa caja no cuadra.'],
+      ['En el móvil, la caja no cabe', 'desplazar la cuadrícula de lado. Para ver lo que hay en una casilla, pulsar el tubo: en una pantalla táctil no sale el texto que aparece al pasar el ratón.'],
+    ],
+    relacionado: [
+      ['Después', [['MUE-2', 'Usar una muestra']]],
+      ['Antes', [['EMP-6', 'Usar GestionLab en el móvil: etiquetas de caja y congelador']]],
+    ],
+  };
+
+  const mue2 = {
+    titulo: 'Usar una muestra congelada (sacar una bolita, gastar un tubo o tomar volumen) y deshacerlo si te equivocas',
+    quien: [
+      'Cualquier cuenta. Con la cuenta de un grupo, el uso queda a nombre del grupo.',
+      'Deshacer un uso: quien lo apuntó (el mismo grupo), en los 15 minutos siguientes y si es el último uso de ese tubo. Después, la cantidad la corrige el profesorado.',
+    ],
+    cuando: ['Cada vez que se saca algo de un tubo congelado: una bolita, un tubo entero o un volumen.'],
+    antes: [
+      '**El puesto preparado antes de abrir el congelador**: placa o caldo, bloque frío o hielo, y el mechero o la cabina, según lo que diga «📋 Cómo se usa» del tubo. Las cepas del grupo de riesgo 2 se trabajan en la cabina de bioseguridad.',
+      '**«📋 Cómo se usa» del tubo leído**: está en su ficha.',
+      'La caja y la casilla del tubo (→ [[MUE-1|Encontrar una muestra]]).',
+    ],
+    pasos: [
+      {
+        texto: 'Abrir la ficha del tubo, desde el buscador o desde la etiqueta de la caja. «📋 Cómo se usa» se despliega al pulsarlo.',
+        img: 'MUE-2/01-como-se-usa.png',
+        alt: 'Ficha del tubo con Cómo se usa desplegado',
+      },
+      { texto: 'Sacar el tubo y **comprobar que su etiqueta es la que dice la app** antes de abrirlo.' },
+      { texto: 'Hacer el uso como dice «📋 Cómo se usa». Con bolitas, el tubo no puede descongelarse: unos minutos fuera como máximo. Con volumen, todo en hielo, y lo que sobra nunca vuelve al tubo.' },
+      { texto: '**Devolver el tubo enseguida a su misma casilla.**' },
+      {
+        texto: '**Apuntar el uso en ese momento, no al final de la práctica**: primero el tubo vuelve al congelador y después se apunta. En la ficha, el botón «🧊 Usar…» (dice qué se apunta: «sacar 1 bolita», «Usar este tubo» o «apuntar lo gastado»). En «Apuntar uso», elegir «¿Para qué?» y, en el formato volumen, escribir en «¿Cuánto has gastado?» lo que de verdad se ha tomado. Pulsar «Apuntar uso».',
+        imgs: [
+          { img: 'MUE-2/02-apuntar-uso-bolitas.png', alt: 'Ventana Apuntar uso de un tubo de bolitas con Para qué elegido', pie: 'Bolitas: se saca una.' },
+          { img: 'MUE-2/03-apuntar-uso-volumen.png', alt: 'Ventana Apuntar uso de un tubo de volumen con la cantidad gastada señalada', pie: 'Volumen: lo que de verdad se ha tomado.' },
+        ],
+      },
+      {
+        texto: 'Si se ha apuntado mal: «↩︎ Deshacer», en el aviso que sale al momento o, durante 15 minutos, en la ficha del tubo («✓ Has apuntado un uso…»).',
+        img: 'MUE-2/04-deshacer.png',
+        alt: 'Ficha del tubo con el aviso Has apuntado un uso y el botón Deshacer, y el aviso de abajo con Deshacer',
+      },
+    ],
+    comprobacion: [
+      'En la ficha del tubo, «Queda» ha bajado: una bolita menos, el volumen descontado (con una descongelación más) o, si se ha gastado entero, el tubo ya no está y la casilla queda libre.',
+      'En el historial del stock aparece el uso a nombre de la cuenta (el grupo).',
+    ],
+    problemas: [
+      ['«Alguien acaba de usar este tubo; recarga y vuelve a intentarlo»', 'recargar, mirar cuánto queda ahora y apuntar el uso si sigue faltando.'],
+      ['No sale «Deshacer»', 'han pasado más de 15 minutos, ya hay un uso posterior o se está en otra pestaña del navegador. Pedir al profesorado que corrija la cantidad.'],
+      ['La etiqueta del tubo no coincide con la app', 'no usarlo. Devolverlo a su casilla y avisar al profesorado.'],
+      ['El tubo de bolitas se ha descongelado', 'devolverlo y avisar al profesorado. Puede que ese stock ya no sirva.'],
+      ['Queda poco (borde rojo)', 'avisar al profesorado para preparar más.'],
+    ],
+    relacionado: [
+      ['Antes', [['MUE-1', 'Encontrar una muestra'], ['EMP-6', 'Usar GestionLab en el móvil: etiquetas de caja']]],
+      ['Cepas del grupo de riesgo 2', [['USO-1', 'Apuntar un uso de la cabina']]],
+    ],
+  };
+
+  const comunes = { 'EQU-1': equ1, 'EQU-2': equ2, 'EQU-3': equ3, 'EQU-4': equ4, 'MUE-1': mue1, 'MUE-2': mue2 };
+  Object.entries(comunes).forEach(([cod, v]) => AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS[cod].versiones[r] = v; }));
 })();
 
 (() => {
@@ -1216,7 +1564,7 @@ const AYUDA_TAREAS = {
           cabeceras: ['Etiqueta', 'Qué abre', 'Tarea'],
           filas: [
             ['Cabina de bioseguridad, vitrina de gases', 'La primera lectura **empieza** la sesión de trabajo en ese equipo; la siguiente abre el formulario para **terminarla**', '[[USO-1|Apuntar un uso de la cabina o de la vitrina]]'],
-            ['Autoclave', '«Arrancar ciclo», con el autoclave ya elegido; si tiene un ciclo en marcha, «Completar ciclo»', '[[USO-2|Apuntar un ciclo de autoclave]]'],
+            ['Autoclave', '«Arrancar ciclo», o «Completar ciclo» si el autoclave tiene un ciclo en marcha', '[[USO-2|Apuntar un ciclo de autoclave]]'],
             ['Caja o congelador de muestras', 'La caja, lista para buscar el tubo y usarlo (con la del congelador, todas sus cajas)', '[[MUE-1|Encontrar una muestra]] · [[MUE-2|Usar una muestra]]'],
             ['Armario', '«¿Qué te llevas?»: el material de ese armario, para llevarlo a otro sitio', '[[STO-3|Llevar material de un sitio a otro]]'],
             ['Contenedor de residuos', '«Añadir residuo» del contenedor de esa categoría en ese laboratorio', '[[RES-2|Echar un residuo y apuntarlo]]'],
