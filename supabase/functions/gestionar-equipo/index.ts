@@ -65,7 +65,7 @@ Deno.serve(async (req) => {
     const numField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : Number(v);
     const strField = (v: unknown) => (v === "" || v === null || v === undefined) ? null : String(v);
 
-    const datos = {
+    const datos: Record<string, unknown> = {
       tipo_equipo: tipoEquipo,
       marca,
       modelo: strField(body.modelo),
@@ -86,6 +86,9 @@ Deno.serve(async (req) => {
       // desde el modal del plan (planes Pretemporada/Posttemporada). Aquí no se tocan
       // para no borrarlos en cada edición de la ficha del equipo.
     };
+    // La app ya no descarga los protocolos al cargar (pesan 12 MB): si la ficha se guarda sin
+    // haber podido leerlo, el campo no viene. Ausente ≠ vacío: al actualizar, no se toca.
+    if (accion === "actualizar" && body.protocolo_uso === undefined) delete datos.protocolo_uso;
 
     if (accion === "crear") {
       const { data, error } = await supabaseAdmin.from("equipos")

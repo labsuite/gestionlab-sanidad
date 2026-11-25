@@ -271,6 +271,13 @@ app) y `COLS` en `js/config.js` si el módulo también tiene columnas legacy de 
 olvida el mapeo en `_xSbToObj()`, el campo llega siempre `undefined` en el navegador aunque
 la columna exista en la base de datos.
 
+⚠ **Tabla `equipos`: además, añadirla a `_COLS_EQUIPOS_CARGA` en `js/sheets.js`.** Desde
+2026-11-25 `loadAllData()` lee `equipos` con una lista explícita de columnas que deja fuera
+`protocolo_uso` (12 MB de textos: eran ~10 s de cada carga, y la app recarga tras muchas
+acciones). El protocolo se pide al abrirlo con `cargarProtocoloEquipo(id)`;
+`Protocolo_Uso === undefined` significa "aún sin pedir" y `Tiene_Protocolo` dice si lo hay.
+`gestionar-equipo` no toca `protocolo_uso` al actualizar si el campo no viene (ausente ≠ vacío).
+
 (Ya no aplica el antiguo sistema de "rango A2:X" de Sheets — `loadAllData()` en `js/sheets.js`
 lee todas las tablas directo de Supabase con `select('*')`.)
 

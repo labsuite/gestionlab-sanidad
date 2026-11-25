@@ -172,6 +172,8 @@ function openModalEquipo() {
   _initModulosResponsables(''); // limpia tags módulos responsables
   sv('eq-estado','Operativo'); sv('eq-pdf-url','');
   sv('eq-protocolo-uso','');
+  const _taProtoN = document.getElementById('eq-protocolo-uso');
+  if (_taProtoN) { _taProtoN.disabled = false; _taProtoN.placeholder = _taProtoN.dataset.placeholderOriginal ?? _taProtoN.placeholder; }
   document.getElementById('eq-pdf-preview').style.display = 'none';
   document.getElementById('eq-pdf-name').textContent = '';
   if (document.getElementById('eq-pdf-input')) document.getElementById('eq-pdf-input').value = '';
@@ -180,8 +182,15 @@ function openModalEquipo() {
   poblarSelects(); openModal('modal-equipo');
 }
 
-function editEquipo(idx) {
+async function editEquipo(idx) {
   const e = DATA.equipos[idx];
+  // El protocolo de uso no llega en la carga general: se pide antes de abrir la ficha. Si
+  // falla, el campo queda bloqueado y guardarEquipo no lo manda (así no se borra).
+  if (e.Protocolo_Uso === undefined) {
+    showLoading('Abriendo la ficha...');
+    try { await cargarProtocoloEquipo(e.ID_Activo); } catch (err) { console.warn(err); }
+    hideLoading();
+  }
   editingRow = { sheet: 'Equipos', rowIndex: idx };
   pendingEqFileBase64 = null;
   document.getElementById('modal-equipo-title').textContent = 'Editar equipo';
@@ -202,6 +211,13 @@ function editEquipo(idx) {
   sv('eq-coste', e.Coste||'');
   sv('eq-pdf-url', e.Manual_Ficha_Tecnica||'');
   sv('eq-protocolo-uso', e.Protocolo_Uso||'');
+  const _taProto = document.getElementById('eq-protocolo-uso');
+  if (_taProto) {
+    if (_taProto.dataset.placeholderOriginal === undefined) _taProto.dataset.placeholderOriginal = _taProto.placeholder;
+    _taProto.disabled = e.Protocolo_Uso === undefined;
+    _taProto.placeholder = _taProto.dataset.placeholderOriginal;
+    if (_taProto.disabled) _taProto.placeholder = 'No se ha podido cargar el protocolo: se guardará sin tocarlo.';
+  }
   // Restaurar autocomplete de ubicación
   document.getElementById('eq-ubicacion').value = e.Ubicacion || '';
   document.getElementById('eq-ubicacion-search').value = '';
@@ -1506,7 +1522,9 @@ async function guardarEquipo() {
     origen_financiacion: v('eq-financiacion'), proveedor_compra: v('eq-proveedor-compra'),
     proveedor_servicio_tecnico: v('eq-proveedor-sat'), estado_operativo: v('eq-estado'),
     manual_ficha_tecnica: manualUrl, observaciones: v('eq-observaciones'),
-    coste: v('eq-coste'), protocolo_uso: v('eq-protocolo-uso'),
+    coste: v('eq-coste'),
+    // Campo bloqueado = el protocolo no se pudo cargar: no se manda y el servidor lo deja como está
+    protocolo_uso: document.getElementById('eq-protocolo-uso')?.disabled ? undefined : v('eq-protocolo-uso'),
   };
 
   const cambioId = editingRow && editingRow.sheet === 'Equipos' && idOriginal && id !== idOriginal;

@@ -370,7 +370,16 @@ function buildMantenimientoEquipo(equipoId) {
   const secciones = [];
 
   // Protocolo de uso (Markdown → visor plegable con índice y buscador, js/protocolo.js)
-  if (equipo.Protocolo_Uso) secciones.push(buildProtocoloUso(equipo.Protocolo_Uso));
+  // No llega en la carga general (pesa mucho): si aún no está, se pinta un hueco y se pide ahora.
+  if (equipo.Protocolo_Uso !== undefined) {
+    if (equipo.Protocolo_Uso) secciones.push(buildProtocoloUso(equipo.Protocolo_Uso));
+  } else if (equipo.Tiene_Protocolo) {
+    secciones.push(`<div class="proto-pendiente" data-proto-equipo="${encodeURIComponent(equipoId)}" style="font-size:12px;color:var(--text-muted);padding:8px 0">📖 Cargando el protocolo de uso…</div>`);
+    const huecos = () => [...document.querySelectorAll('.proto-pendiente')].filter(el => el.dataset.protoEquipo === encodeURIComponent(equipoId));
+    cargarProtocoloEquipo(equipoId)
+      .then(md => huecos().forEach(el => { el.outerHTML = buildProtocoloUso(md); }))
+      .catch(err => huecos().forEach(el => { el.textContent = '⚠️ ' + (err.message || 'No se pudo cargar el protocolo de uso'); }));
+  }
 
   // Micropipetas: fecha y resultado de la última verificación, con el error sistemático y el CV
   // de cada volumen (lo que dice la etiqueta de la pipeta).

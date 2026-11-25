@@ -140,7 +140,10 @@ function _equipoSbToObj(e) {
     Manual_Ficha_Tecnica: e.manual_ficha_tecnica || '',
     Observaciones: e.observaciones || '',
     Coste: e.coste != null ? String(e.coste) : '',
-    Protocolo_Uso: e.protocolo_uso || '',
+    // El protocolo NO llega en la carga general (pesa 12 MB entre todos los equipos y tardaba
+    // ~10 s): undefined = aún sin pedir → cargarProtocoloEquipo(). Tiene_Protocolo sí llega siempre.
+    Protocolo_Uso: e.protocolo_uso === undefined ? undefined : (e.protocolo_uso || ''),
+    Tiene_Protocolo: e.protocolo_uso === undefined ? !!e._tiene_protocolo : !!String(e.protocolo_uso || '').trim(),
     Tipo_Mantenimiento: e.tipo_mantenimiento || '',
     Mes_Inicio_Temporada: e.mes_inicio_temporada != null ? String(e.mes_inicio_temporada) : '',
     Mes_Fin_Temporada: e.mes_fin_temporada != null ? String(e.mes_fin_temporada) : '',
@@ -743,12 +746,32 @@ function _usuarioSbToObj(u) {
 // se vuelve a leer entera por páginas, ordenada por su clave primaria para que las
 // páginas no se solapen ni dejen huecos. Las tablas pequeñas se leen como siempre.
 const _SB_MAX_FILAS = 1000;
-async function _leerTablaCompleta(tabla, pk) {
-  const primera = await _sbMigracion.from(tabla).select('*');
+// Columnas de `equipos` que se leen al cargar la app: TODAS menos `protocolo_uso`, que son
+// textos de hasta 73 KB por equipo (12 MB en total: era ~10 s de los ~15 s de loadAllData).
+// ⚠ Al añadir una columna a `equipos`, añadirla también aquí o llegará undefined.
+const _COLS_EQUIPOS_CARGA = 'id_activo,tipo_equipo,marca,modelo,numero_serie,ubicacion,responsable,' +
+  'fecha_adquisicion,origen_financiacion,proveedor_compra,proveedor_servicio_tecnico,estado_operativo,' +
+  'manual_ficha_tecnica,observaciones,coste,tipo_mantenimiento,mes_inicio_temporada,mes_fin_temporada,' +
+  'modulos_responsables,evaluaciones_uso';
+
+// Protocolo de uso de un equipo, pedido solo cuando hace falta (tarjeta desplegada, editar
+// ficha). Se queda guardado en DATA.equipos hasta la próxima carga completa.
+async function cargarProtocoloEquipo(idActivo) {
+  const eq = DATA.equipos.find(e => e.ID_Activo === idActivo);
+  if (eq && eq.Protocolo_Uso !== undefined) return eq.Protocolo_Uso;
+  const { data, error } = await _sbMigracion.from('equipos').select('protocolo_uso').eq('id_activo', idActivo).maybeSingle();
+  if (error) throw new Error('No se pudo cargar el protocolo de uso: ' + error.message);
+  const md = data?.protocolo_uso || '';
+  if (eq) { eq.Protocolo_Uso = md; eq.Tiene_Protocolo = !!md.trim(); }
+  return md;
+}
+
+async function _leerTablaCompleta(tabla, pk, columnas = '*') {
+  const primera = await _sbMigracion.from(tabla).select(columnas);
   if (primera.error || (primera.data || []).length < _SB_MAX_FILAS) return primera;
   let data = [];
   for (let desde = 0; ; desde += _SB_MAX_FILAS) {
-    const pagina = await _sbMigracion.from(tabla).select('*').order(pk).range(desde, desde + _SB_MAX_FILAS - 1);
+    const pagina = await _sbMigracion.from(tabla).select(columnas).order(pk).range(desde, desde + _SB_MAX_FILAS - 1);
     if (pagina.error) {
       // Mejor las primeras 1000 filas que una tabla vacía.
       console.warn(`[loadAllData] ${tabla}: fallo al paginar, se usan solo las primeras ${_SB_MAX_FILAS} filas`, pagina.error);
@@ -782,7 +805,7 @@ async function loadAllData() {
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
            sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes, sbUsosMuestraRes,
-           sbVerifParamRes, sbVerifPrepRes, sbVerifSesRes] = await Promise.all([
+           sbVerifParamRes, sbVerifPrepRes, sbVerifSesRes, sbEquiposConProtocoloRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -796,7 +819,7 @@ async function loadAllData() {
       _sb.from('users').select('id,full_name,role,ciclo_principal,is_active,puede_revisar_inventario').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('proveedores', 'id_proveedor').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('ubicaciones', 'id_ubicacion').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('equipos', 'id_activo').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('equipos', 'id_activo', _COLS_EQUIPOS_CARGA).then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('intervenciones', 'id_intervencion').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('incidencias', 'id_incidencia').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('tareas_intervencion', 'id_tarea').then(r => r, () => ({ data: [] })),
@@ -834,7 +857,11 @@ async function loadAllData() {
       // los usa el módulo de cálculo compartido con el servidor (verif_pipetas.js).
       _leerTablaCompleta('verif_pipetas_parametros', 'id_activo').then(r => r, () => ({ data: [] })),
       _leerTablaCompleta('verif_preparaciones', 'id').then(r => r, () => ({ data: [] })),
-      _leerTablaCompleta('verif_sesiones', 'id').then(r => r, () => ({ data: [] }))
+      _leerTablaCompleta('verif_sesiones', 'id').then(r => r, () => ({ data: [] })),
+      // Solo QUÉ equipos tienen protocolo de uso (el texto se pide al abrirlo: cargarProtocoloEquipo)
+      // (hoy ~320 filas; el servidor corta en 1000, como en el resto de lecturas sin paginar)
+      _sbMigracion.from('equipos').select('id_activo')
+        .not('protocolo_uso', 'is', null).neq('protocolo_uso', '').then(r => r, () => ({ data: [] }))
     ]);
 
     // Sesión que el navegador cree válida pero el servidor rechaza (contraseña cambiada,
@@ -845,7 +872,8 @@ async function loadAllData() {
       return false;
     }
 
-    DATA.equipos                 = (sbEquiposRes?.data || []).map(_equipoSbToObj);
+    const _conProtocolo = new Set((sbEquiposConProtocoloRes?.data || []).map(r => r.id_activo));
+    DATA.equipos                 = (sbEquiposRes?.data || []).map(e => _equipoSbToObj({ ...e, _tiene_protocolo: _conProtocolo.has(e.id_activo) }));
     DATA.intervenciones          = (sbIntervencionesRes?.data || []).map(_intervencionSbToObj);
     DATA.incidencias             = (sbIncidenciasRes?.data || []).map(_incidenciaSbToObj);
     DATA.tareasIntervencion      = (sbTareasRes?.data || []).map(_tareaSbToObj);
