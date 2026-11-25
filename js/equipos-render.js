@@ -405,6 +405,7 @@ function abrirEquipoEnInventario(idEquipo) {
   filtrarEquipos(idEquipo);
   const fila = document.getElementById('eq-expand-' + idEquipo.replace(/[^a-zA-Z0-9]/g, '_'));
   if (fila && !fila.classList.contains('open')) fila.classList.add('open');
+  if (fila) cargarProtocolosPendientes(fila);
   window.scrollTo(0, 0);
 }
 
@@ -457,6 +458,7 @@ function toggleEquipoExpand(id) {
   const row = document.getElementById(id);
   if (!row) return;
   row.classList.toggle('open');
+  if (row.classList.contains('open')) cargarProtocolosPendientes(row);
 }
 
 function buildIntervencionesEquipo(equipoId) {
