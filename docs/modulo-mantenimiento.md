@@ -189,8 +189,12 @@ la fecha; en J, por qué no fue «apto»).
 
 **Periodicidad `Quinquenal`** (cada 5 años, `_CICLO_ANIOS`): para calibraciones externas como
 la de las micropipetas, que sustituye al antiguo bianual interno «Cambio de juntas y
-verificación». Ese cambio de los planes viene de los protocolos (encargo en `PENDIENTES.md` de
-la carpeta de protocolos, 2026-11-25), no se hace a mano en la base.
+verificación» (y al bianual externo de las Multipette). Hecho el 2026-11-25 en los protocolos
+(plantilla de micropipetas y `Eppendorf-Multipette-plus.md`, «Cada 5 años (externo)» →
+`build_mantenimientos.py` → «Quinquenal») y recargado: 109 planes «Calibración externa». Ese
+mismo día se reescribieron como comprobaciones los pasos «cambiar/engrasar … si procede» de
+los protocolos; en la base no queda ninguno. Estos cambios se hacen siempre en los
+protocolos y se recargan, nunca a mano en la base.
 
 ## Comprobaciones con criterio: «Cumple» / «No cumple» (2026-11-23)
 
