@@ -53,10 +53,13 @@ def año_inicio_curso(curso):
 
 def es_curso_debido_multianual(plan, registros_todos, curso_actual):
     """Igual que _esCursoDebidoMultianual() en mantenimiento.js: solo 'debido' si han
-    pasado N cursos desde el último registro real de este plan (cualquier curso)."""
+    pasado N cursos desde el último registro real de este plan (cualquier curso), y nunca
+    antes de su curso_inicio (primer curso en que se pide; tandas de calibración externa)."""
     n = CICLO_ANIOS.get(plan.get('periodicidad', ''))
     if not n:
         return True
+    if plan.get('curso_inicio') and año_inicio_curso(curso_actual) < año_inicio_curso(plan['curso_inicio']):
+        return False
     cursos_realizados = [
         año_inicio_curso(r['curso_academico'])
         for r in registros_todos

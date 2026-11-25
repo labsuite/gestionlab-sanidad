@@ -246,7 +246,12 @@ create table planes_mantenimiento (
   -- Los mantenimientos internos los realiza el alumnado (el profesorado firma el visto
   -- bueno); marcar esta columna reserva ESE plan al profesorado. Los externos quedan
   -- fuera del alumnado por su tipo_intervencion, sin necesidad de marcarlos.
-  solo_profesorado    boolean not null default false
+  solo_profesorado    boolean not null default false,
+  -- Planes multianuales (Bianual, Trianual, Quinquenal): curso de la PRIMERA vez
+  -- ('2027-2028'). Antes de ese curso no se pide; desde él, hasta que se haga, y luego
+  -- cada N cursos desde el último registro. Nulo = se pide ya (comportamiento anterior).
+  -- Añadido 2026-11-25 para repartir la calibración externa de las pipetas en tandas.
+  curso_inicio        text check (curso_inicio is null or curso_inicio ~ '^[0-9]{4}-[0-9]{4}$')
 );
 
 create table registro_mantenimientos (

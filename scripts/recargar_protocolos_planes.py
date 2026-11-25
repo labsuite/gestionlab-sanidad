@@ -151,8 +151,15 @@ if EN_SITIO:
 nuevos = [m for m in mant if m['id_equipo'] not in bajas]
 omitidos = [(m['id_equipo'], m['periodicidad']) for m in mant if m['id_equipo'] in bajas]
 eqs = sorted({m['id_equipo'] for m in mant})
-activos = q("select id_plan, id_equipo, periodicidad from planes_mantenimiento where activo and id_equipo = any(%s)", (eqs,))
+activos = q("select id_plan, id_equipo, periodicidad, curso_inicio from planes_mantenimiento where activo and id_equipo = any(%s)", (eqs,))
+# Primer curso de los multianuales (tandas de calibración externa): el plan nuevo hereda el del
+# plan activo del mismo equipo y periodicidad, salvo que el JSONL traiga otro.
+curso_inicio_previo = {(p['id_equipo'], p['periodicidad']): p['curso_inicio'] for p in activos if p['curso_inicio']}
+def curso_inicio_de(m):
+    return m.get('curso_inicio') or curso_inicio_previo.get((m['id_equipo'], m['periodicidad']))
 print(f"\n2. Planes: se desactivan {len(activos)}:", dict(collections.Counter(p['periodicidad'] for p in activos)))
+print(f"   conservan su primer curso (tandas): {sum(1 for m in mant if m['id_equipo'] not in bajas and curso_inicio_de(m))}"
+      f" de {len(curso_inicio_previo)} que lo tenían")
 print(f"   se crean {len(nuevos)}:", dict(collections.Counter(m['periodicidad'] for m in nuevos)))
 print(f"   omitidos por equipo dado de baja: {omitidos}")
 print("   operaciones de arranque/cierre:", dict(collections.Counter(
@@ -198,10 +205,11 @@ for p in prot:
     q("update equipos set protocolo_uso=%s where id_activo=%s", (p['protocolo_uso'], p['id_activo']))
 for m in nuevos:
     q("""insert into planes_mantenimiento (id_plan, id_equipo, tipo_intervencion, periodicidad, operacion,
-                                           instrucciones, solo_profesorado, activo)
-         values (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                                           instrucciones, solo_profesorado, activo, curso_inicio)
+         values (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
       (nuevo_id[(m['id_equipo'], m['periodicidad'])], m['id_equipo'], m['tipo_intervencion'], m['periodicidad'],
-       m['operacion'], m['instrucciones'], bool(m['solo_profesorado']), bool(m.get('activo', True))))
+       m['operacion'], m['instrucciones'], bool(m['solo_profesorado']), bool(m.get('activo', True)),
+       curso_inicio_de(m)))
 for r in regs:
     q("update registro_mantenimientos set id_plan=%s, actualizado_en=now() where id_registro=%s",
       (nuevo_id[(r['id_equipo'], r['periodicidad'])], r['id_registro']))

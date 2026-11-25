@@ -249,6 +249,11 @@ def generar_plan_mantenimiento(conn, dry_run=True):
 
             periodicidad  = plan.get('periodicidad', '')
             fecha_prevista = fecha_str(FECHAS_CURSO.get(periodicidad))
+            # Plan multianual cuya primera vez es un curso posterior (tandas de calibración
+            # externa): no toca este curso, y el Excel de la app tampoco lo pone.
+            ci = plan.get('curso_inicio') or ''
+            if ci and int(ci[:4]) > int(CURSO_ACADEMICO[:4]):
+                continue
 
             escribir_fila(ws, fila, [
                 f"{equipo.get('tipo_equipo', '')} ({equipo.get('id_activo', '')})",  # A — Denominación

@@ -230,6 +230,7 @@ function _planMantenimientoSbToObj(p) {
     Activo: p.activo ? 'TRUE' : 'FALSE',
     Instrucciones: p.instrucciones || '',
     Solo_Profesorado: p.solo_profesorado ? 'Sí' : 'No',
+    Curso_Inicio: p.curso_inicio || '',
   };
 }
 

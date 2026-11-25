@@ -14,7 +14,9 @@
   `_esCursoDebidoMultianual()` mira el último `Curso_Academico` con un registro real en
   `registro_mantenimientos` para ese `ID_Plan` y solo lo da por "debido" si han pasado 2
   (Bianual) o 3 (Trianual) cursos desde entonces. Si el plan nunca se ha registrado como
-  realizado, se sigue pidiendo todos los cursos (para no perder el aviso). Aplica tanto a
+  realizado, se sigue pidiendo todos los cursos (para no perder el aviso) **desde su
+  `Curso_Inicio`** (columna `planes_mantenimiento.curso_inicio`, 2026-11-25): antes de ese
+  curso no se pide nunca (ver «Tandas» más abajo). Aplica tanto a
   `getPeriodosEsperados` (dashboard) como a `getPeriodosCursoCompleto` dentro de
   `exportarModeloCalidad` (el Excel del plan de mantenimiento).
 - Pretemporada: "pretemporada-YYYY-YYYY" (si hoy ≥ Mes_Inicio_Temporada)
@@ -195,6 +197,26 @@ verificación» (y al bianual externo de las Multipette). Hecho el 2026-11-25 en
 mismo día se reescribieron como comprobaciones los pasos «cambiar/engrasar … si procede» de
 los protocolos; en la base no queda ninguno. Estos cambios se hacen siempre en los
 protocolos y se recargan, nunca a mano en la base.
+
+**Tandas de la calibración externa (decisión de Paloma, 2026-11-25).** Las 109 pipetas y
+Multipette no se calibran fuera el mismo año: van en tandas, una por curso, **por modelos
+enteros**. Cada plan lleva el curso de su primera calibración en `curso_inicio`
+(`Curso_Inicio` en el cliente; campo «Primer curso» del plan, solo en Bianual/Trianual/
+Quinquenal). Antes de ese curso el plan no se pide (en la ficha del equipo sale «Desde
+2027-2028» y en el Excel de calidad no aparece); desde ese curso se pide hasta que se registre,
+y luego a los 5 cursos del último registro. Reparto: 2027-28 Socorex (26) · 2028-29 Huawei y
+Nichiryo (25) · 2029-30 Eppendorf Research, Lan Technics, HTL, Nahita, Multipette, AHN y
+Brand (35, incluidas PIPR-009 y PIPR-010, que no estaban en la lista y van con su modelo) ·
+2030-31 Gilson (23) · 2031-32 ninguna; después se repite cada 5 años. Fuente:
+`calibracion_externa_tandas.csv` de la carpeta de protocolos, cargado con
+`scripts/asignar_tandas_calibracion.py` (simulación por defecto, `--aplicar`). La recarga
+completa de `recargar_protocolos_planes.py` hace heredar `curso_inicio` al plan nuevo del
+mismo equipo y periodicidad, para no perder las tandas.
+
+⚠ **Una pipeta que no pasa su verificación anual antes de su tanda** (necesita calibración o
+reparación externa) se registra como **intervención del equipo** (incidencia → actuación), no
+adelantando el plan: el plan solo cuenta sus propios registros, así que su tanda y su ciclo de
+5 años no se mueven.
 
 ## Comprobaciones con criterio: «Cumple» / «No cumple» (2026-11-23)
 

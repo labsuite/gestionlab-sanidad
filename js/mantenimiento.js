@@ -127,12 +127,17 @@ function _añoInicioCurso(cursoAcademico) {
 // Quinquenal (2026-11-25): calibraciones externas cada 5 años (p. ej. las micropipetas).
 const _CICLO_ANIOS = { 'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3, 'Quinquenal': 5 };
 
-// Para Bianual/Trianual: solo "debido" cuando han pasado N cursos desde el último
-// registro real de este plan. Si nunca se ha realizado, se sigue pidiendo cada curso
-// (para no perder el aviso a la espera de que alguien lo confirme la primera vez).
+// Para Bianual/Trianual/Quinquenal: solo "debido" cuando han pasado N cursos desde el
+// último registro real de este plan. Si nunca se ha realizado, se pide cada curso desde
+// su Curso_Inicio (para no perder el aviso a la espera de que alguien lo confirme la
+// primera vez); antes de ese curso, no. Curso_Inicio reparte en tandas lo que no se puede
+// hacer todo el mismo año (calibración externa de pipetas, 2026-11-25).
+// Lo que haya que hacer antes de su turno (una pipeta que no pasa la verificación) es una
+// INTERVENCIÓN del equipo: no cuenta como registro del plan ni adelanta su ciclo.
 function _esCursoDebidoMultianual(plan, cursoAcademico) {
   const n = _CICLO_ANIOS[plan.Periodicidad];
   if (!n) return true; // Anual u otra: sin restricción de ciclo
+  if (plan.Curso_Inicio && _añoInicioCurso(cursoAcademico) < _añoInicioCurso(plan.Curso_Inicio)) return false;
   const cursosRealizados = DATA.registroMantenimientos
     .filter(r => r.ID_Plan === plan.ID_Plan && r.Estado === 'finalizado')
     .map(r => _añoInicioCurso(r.Curso_Academico));
@@ -510,7 +515,7 @@ function buildMantenimientoEquipo(equipoId) {
                 <span class="badge badge-gray" style="font-size:10px;min-width:80px">${plan.Tipo_Intervencion||'—'}</span>
                 <span style="font-size:11px;font-weight:500;flex:1;min-width:0">${plan.Periodicidad}</span>
                 <span style="font-size:11px;color:var(--text-muted);flex:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</span>
-                <span class="badge badge-gray" style="font-size:10px">No aplica aún</span>
+                <span class="badge badge-gray" style="font-size:10px">${plan.Curso_Inicio && _añoInicioCurso(plan.Curso_Inicio) > _añoInicioCurso(curso) ? `Desde ${plan.Curso_Inicio}` : 'No aplica aún'}</span>
               </div>`;
             }
             return periodos.map(periodo => {
@@ -1574,6 +1579,21 @@ function _togglePlanTemporada() {
   const porEval = _PERIODICIDADES_POR_EVALUACION.includes(period);
   if (wrap) wrap.style.display = porEval ? '' : 'none';
   if (porEval) _pintarVencimientoPlan(period);
+  const wrapCi = document.getElementById('plan-curso-inicio-wrap');
+  if (wrapCi) wrapCi.style.display = _CICLO_ANIOS[period] ? '' : 'none';
+}
+
+// Opciones del «Primer curso» de un plan multianual: el curso actual y los siguientes
+// (y el guardado, aunque ya haya pasado, para no perderlo al editar).
+function _pintarOpcionesCursoInicio(valor) {
+  const sel = document.getElementById('plan-curso-inicio');
+  if (!sel) return;
+  const a0 = _añoInicioCurso(getCursoAcademico());
+  const cursos = Array.from({ length: 8 }, (_, i) => `${a0 + i}-${a0 + i + 1}`);
+  if (valor && !cursos.includes(valor)) cursos.unshift(valor);
+  sel.innerHTML = `<option value="">Desde ya (este curso)</option>` +
+    cursos.map(c => `<option value="${c}">${c}</option>`).join('');
+  sel.value = valor || '';
 }
 
 function _equipoActualPlan() {
@@ -1654,7 +1674,9 @@ function openModalPlan(equipoId = null, idPlan = null) {
     document.getElementById('plan-operacion').value     = plan.Operacion;
     document.getElementById('plan-instrucciones').value = plan.Instrucciones || '';
     document.getElementById('plan-solo-profesorado').checked = _esSoloProfesorado(plan);
+    _pintarOpcionesCursoInicio(plan.Curso_Inicio);
   } else {
+    _pintarOpcionesCursoInicio('');
     document.getElementById('plan-tipo-int').value      = 'Interno';
     document.getElementById('plan-periodicidad').value  = 'Anual';
     document.getElementById('plan-operacion').value     = '';
@@ -1684,6 +1706,8 @@ async function guardarPlan() {
   const payload = {
     id_equipo: idEquipo,
     tipo_intervencion: tipo, periodicidad: period, operacion, instrucciones, solo_profesorado: soloProf,
+    // Solo cuenta en los multianuales; en el resto se guarda vacío.
+    curso_inicio: _CICLO_ANIOS[period] ? (document.getElementById('plan-curso-inicio')?.value || '') : '',
   };
 
   showLoading('Guardando...');
@@ -2068,7 +2092,7 @@ function _renderFilasPlanesTabla(filtro = '') {
     return `<tr style="${rowStyle}">
       <td><strong style="${idStyle}">${label}</strong></td>
       <td><span class="badge ${tipoBadge}" style="font-size:10px">${plan.Tipo_Intervencion}</span></td>
-      <td>${plan.Periodicidad}</td>
+      <td>${plan.Periodicidad}${plan.Curso_Inicio && _CICLO_ANIOS[plan.Periodicidad] ? `<div style="font-size:11px;color:var(--text-muted)">1.ª vez: ${plan.Curso_Inicio}</div>` : ''}</td>
       <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${plan.Operacion}">${plan.Operacion}</td>
       <td style="white-space:nowrap">
         ${puedeEditar ? `<button class="icon-btn" onclick="openModalPlan(null,'${plan.ID_Plan}')" title="Editar">✏️</button>

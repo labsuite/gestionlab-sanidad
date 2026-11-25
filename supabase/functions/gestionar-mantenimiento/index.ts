@@ -567,7 +567,13 @@ Deno.serve(async (req) => {
       operacion,
       instrucciones: body.instrucciones ? String(body.instrucciones) : null,
       solo_profesorado: body.solo_profesorado === true || body.solo_profesorado === "Sí",
-    };
+    } as Record<string, unknown>;
+    // Primer curso de un plan multianual. Solo se toca si viene (ausente ≠ vacío).
+    if ("curso_inicio" in body) {
+      const ci = String(body.curso_inicio || "").trim();
+      if (ci && !/^\d{4}-\d{4}$/.test(ci)) return jsonError("El primer curso debe ser como 2027-2028", 400);
+      datos.curso_inicio = ci || null;
+    }
 
     if (accion === "crear_plan") {
       const idEquipo = String(body.id_equipo || "").trim();
