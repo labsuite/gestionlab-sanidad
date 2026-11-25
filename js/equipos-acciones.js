@@ -475,6 +475,8 @@ function abrirHiloIncidencia(incId) {
         </div>`
       : '';
     cont.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🗓</div><div class="empty-state-title">Aún sin actuaciones</div><div class="empty-state-text">Regístrala si ya se ha hecho algo, o planíficala si toca más adelante.</div>${botones}</div>`;
+    // Micropipeta: estado de su verificación extraordinaria tras la reparación.
+    if (pieCierre && botones && typeof vpHtmlExtraordinariaHilo === 'function') pieCierre.innerHTML = vpHtmlExtraordinariaHilo(inc);
     openModal('modal-hilo-incidencia');
     return;
   }
@@ -616,7 +618,7 @@ function _renderCierreHilo(inc) {
     cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px;font-size:12px;color:var(--text-soft)">
       Para poder cerrar la incidencia ${sinCerrar.length === 1 ? 'queda' : 'quedan'}
       ${sinCerrar.length === 1 ? 'una actuación' : sinCerrar.length + ' actuaciones'} sin cerrar: <strong>${detalle}</strong>.
-    </div>`;
+    </div>${typeof vpHtmlExtraordinariaHilo === 'function' ? vpHtmlExtraordinariaHilo(inc) : ''}`;
     return;
   }
 
@@ -624,7 +626,10 @@ function _renderCierreHilo(inc) {
   // tarea del hilo dejara constancia de que el equipo NO quedó operativo.
   const tareas    = chain.flatMap(c => getTareasIntervencion(c.ID_Intervencion));
   const algunaNo  = tareas.some(t => t.Operativo === 'No');
-  const propuesto = (!algunaNo || estadoEq === '—') ? 'Operativo' : estadoEq;
+  // Micropipeta fuera de servicio: solo vuelve a «Operativo» con una verificación extraordinaria
+  // OK de esta incidencia (lo exige también gestionar-incidencia). Mientras, se propone su estado.
+  const faltaExtra = typeof vpFaltaExtraordinariaOK === 'function' && vpFaltaExtraordinariaOK(inc);
+  const propuesto = faltaExtra ? estadoEq : (!algunaNo || estadoEq === '—') ? 'Operativo' : estadoEq;
   const ESTADOS   = ['Operativo', 'Operativo con fallos', 'En revisión', 'Revisión planificada', 'No operativo', 'Averiado', 'Fuera de servicio'];
 
   cont.innerHTML = `<div style="padding:12px 0 2px;border-top:1px solid var(--border);margin-top:6px">
@@ -639,6 +644,7 @@ function _renderCierreHilo(inc) {
       <button class="btn btn-primary" style="font-size:12px;padding:5px 10px" onclick="cerrarIncidenciaDesdeHilo('Resuelta')">✅ Marcar resuelta</button>
       <button class="btn btn-secondary" style="font-size:12px;padding:5px 10px" onclick="cerrarIncidenciaDesdeHilo('Descartada')">🚫 Descartar</button>
     </div>
+    ${typeof vpHtmlExtraordinariaHilo === 'function' ? vpHtmlExtraordinariaHilo(inc) : ''}
   </div>`;
 }
 
@@ -665,7 +671,7 @@ async function cerrarIncidenciaDesdeHilo(estado) {
     _hiloIncidenciaActiva = null;
     showToast(`Incidencia ${estado.toLowerCase()}. Equipo → ${estadoEquipo}`, 'success');
     renderAll();
-  } catch(e) { showToast('Error cerrando la incidencia', 'error'); console.error(e); }
+  } catch(e) { showToast(e.message || 'Error cerrando la incidencia', 'error'); console.error(e); }
   hideLoading();
 }
 

@@ -204,6 +204,8 @@ function renderVerifPipetas() {
       : '<div style="padding:0 16px 16px;color:var(--text-muted);font-size:13px">Todavía no hay sesiones este curso.</div>'}
     </div>
 
+    ${_vpHtmlExtraordinarias(staff)}
+
     <div class="card">
       <div class="card-header">
         <div class="card-title">Micropipetas (${(DATA.verifParametros || []).length})</div>
@@ -218,7 +220,8 @@ function renderVerifPipetas() {
 /** Pipetas medidas en cada sesión (por los registros que la citan). */
 function _vpPipetasPorSesion() {
   const m = {};
-  for (const r of DATA.registroMantenimientos || []) {
+  const extras = (DATA.verifExtraordinarias || []).map(x => ({ ID_Equipo: x.id_equipo, Verificacion: x.verificacion }));
+  for (const r of (DATA.registroMantenimientos || []).concat(extras)) {
     for (const f of r.Verificacion?.fases || []) {
       for (const v of Object.values(f.volumenes || {})) {
         if (!v?.id_sesion) continue;
@@ -230,10 +233,15 @@ function _vpPipetasPorSesion() {
   return m;
 }
 
-/** Última verificación con resultado de una pipeta (finalizada o a la espera de visto bueno). */
+/** Última verificación con resultado de una pipeta (finalizada o a la espera de visto bueno),
+ *  de su revisión anual o extraordinaria tras una reparación (`extra: true`). */
 function ultimaVerificacionPipeta(idEquipo) {
+  const extras = (DATA.verifExtraordinarias || [])
+    .filter(x => x.id_equipo === idEquipo && x.estado === 'finalizada' && x.verificacion?.calculo?.final)
+    .map(x => ({ ID_Equipo: x.id_equipo, Fecha_Realizacion: x.fecha, Estado: 'finalizado', Verificacion: x.verificacion, extra: true, id: x.id }));
   return (DATA.registroMantenimientos || [])
     .filter(r => r.ID_Equipo === idEquipo && r.Verificacion?.calculo?.final && (r.Estado === 'finalizado' || r.Estado === 'pendiente_vb'))
+    .concat(extras)
     .sort((a, b) => String(b.Fecha_Realizacion).localeCompare(String(a.Fecha_Realizacion)))[0] || null;
 }
 
@@ -269,7 +277,7 @@ function _vpPintarPipetas() {
           ${staff ? ` <button class="btn-link vp-link" onclick="responderAjustePipeta('${p.id_activo}','si')">Tiene</button> · <button class="btn-link vp-link" onclick="responderAjustePipeta('${p.id_activo}','no')">No tiene</button>` : ''}</div>` : ''}
         ${p.v_bajo_elegido ? `<div style="font-size:11px;margin-top:3px">Volumen bajo elegido: <strong>${VP.fmt(+p.v_bajo_elegido, 0)} µl</strong> (${_vpEsc(p.v_bajo_elegido_por || '')})</div>` : ''}</td>
       <td style="font-size:12px">${vols}</td>
-      <td style="font-size:12px">${calc ? `<strong>${formatDate(ult.Fecha_Realizacion)}</strong> · ${_vpBadgeResultado(calc.resultado)}${ult.Estado === 'pendiente_vb' ? ' <span class="badge badge-orange">⏳ visto bueno</span>' : ''}
+      <td style="font-size:12px">${calc ? `<strong>${formatDate(ult.Fecha_Realizacion)}</strong> · ${_vpBadgeResultado(calc.resultado)}${ult.extra ? ' <span class="badge badge-blue">extraordinaria</span>' : ''}${ult.Estado === 'pendiente_vb' ? ' <span class="badge badge-orange">⏳ visto bueno</span>' : ''}
         <div style="color:var(--text-muted)">${_vpEsc(resumenVerificacion(calc))}</div>` : '<span style="color:var(--text-muted)">—</span>'}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
@@ -625,7 +633,7 @@ function _vpCalcVer() {
 
 /** Marca los pasos de verificación del checklist de la revisión con el cálculo. */
 function vpMarcarPasosRevision() {
-  if (!_vpRev || typeof _leerChecklist !== 'function') return;
+  if (!_vpRev || _vpRev.extra || typeof _leerChecklist !== 'function') return;
   const calc = _vpCalcVer();
   _renderMantChecklist(VP.marcarPasosVerificacion(_leerChecklist(), calc));
 }
@@ -669,6 +677,7 @@ function openModalVerifPipeta() {
 
 function cerrarVerifPipeta() {
   closeModal('modal-verif-pipeta');
+  if (_vpRev?.extra) { _vpRev = null; _vpEstado.ver = null; _vpModoPieVerif(false); return; }
   vpMarcarPasosRevision();
   _vpPintarResumenRevision();
 }
@@ -692,6 +701,7 @@ function _vpPintarVerif() {
     <div><strong>${_vpEsc(_vpRev.idEquipo)}</strong> · ${_vpEsc(par.marca_modelo || eq?.Marca || '')} · rango ${_vpEsc(par.rango || '—')}${par.multicanal ? ' · <strong>8 canales</strong> (cada canal se verifica como una pipeta)' : ''}</div>
     <div class="vp-guia">Límites: ${_vpEsc(par.fuente_limites || '—')}${par.notas ? ' · ' + _vpEsc(par.notas) : ''} · Ajuste en el laboratorio: ${_vpEsc(par.ajuste_usuario || '—')}${par.ajuste_respuesta ? ` (tornillo: ${par.ajuste_respuesta === 'si' ? 'sí' : 'no'})` : ''}</div>
     ${par.confirmar ? `<div class="vp-aviso-caja">⚠ ${_vpEsc(par.confirmar)}</div>` : ''}
+    ${_vpRev.extra ? `<div class="vp-aviso-caja"><strong>Verificación extraordinaria</strong> tras la reparación de la incidencia <strong>${_vpEsc(_vpRev.extra.id_incidencia)}</strong>${_vpRev.extra.finalizada ? ' · finalizada: solo lectura' : ''}. La pipeta solo vuelve a estar operativa si sale OK.</div>` : ''}
     ${_vpRev.sinCribado ? '<div class="vp-aviso-caja">Tras un cambio de junta o una reparación no hay cribado: 10 réplicas a cada volumen; con menos no se da OK.</div>' : ''}
   </div>`;
   if (!par.v_nominal) {
@@ -805,7 +815,11 @@ function _vpPintarResultadosVer() {
   res.innerHTML = `<div><strong>Resultado de la pipeta:</strong> ${_vpBadgeResultado(calc.resultado)}</div>
     <div class="vp-guia">${_vpEsc(VP.RESULTADO[calc.resultado] || '')}${calc.final ? '' : ' · ' + _vpEsc(VP.resumenPendiente(calc))}</div>
     ${(calc.avisos || []).length ? `<div class="vp-aviso">${calc.avisos.map(_vpEsc).join(' · ')}</div>` : ''}
-    ${/^RETIRAR/.test(calc.resultado) ? '<div class="vp-aviso-caja vp-grave">Al finalizar la revisión, GestionLab abre la incidencia de la pipeta con lo que ha fallado y la deja fuera de servicio. Ponle la etiqueta «NO USAR».</div>' : ''}
+    ${_vpRev.extra
+      ? (calc.final ? `<div class="vp-aviso-caja${/^OK/.test(calc.resultado) ? '' : ' vp-grave'}">${/^OK/.test(calc.resultado)
+          ? 'Al finalizar, el resultado queda en la incidencia y ya se podrá cerrar desde su hilo dejando la pipeta operativa.'
+          : 'Al finalizar, el resultado queda en la incidencia y la pipeta sigue fuera de servicio, con la incidencia abierta. Mantén la etiqueta «NO USAR».'}</div>` : '')
+      : (/^RETIRAR/.test(calc.resultado) ? '<div class="vp-aviso-caja vp-grave">Al finalizar la revisión, GestionLab abre la incidencia de la pipeta con lo que ha fallado y la deja fuera de servicio. Ponle la etiqueta «NO USAR».</div>' : '')}
     ${acciones}`;
 }
 
@@ -931,4 +945,186 @@ function _vpAvisoImportado(idCuerpo, extra) {
   const nErr = document.querySelectorAll(`#${idCuerpo} .vp-mal`).length;
   const nAv = document.querySelectorAll(`#${idCuerpo} .vp-dudoso`).length;
   showToast(`Datos importados: revísalos antes de guardar.${nErr ? ` ${nErr} ${nErr === 1 ? 'no cumple' : 'no cumplen'} (en rojo) y hay que corregir${nErr === 1 ? 'lo' : 'los'}.` : ''}${nAv ? ` ${nAv} con aviso.` : ''}${extra ? ' ' + extra : ''}`, nErr ? 'error' : 'success');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// VERIFICACIÓN EXTRAORDINARIA TRAS UNA REPARACIÓN (2026-11-25)
+// ═══════════════════════════════════════════════════════════════════════════════
+// Fuera de calendario, enlazada a la incidencia de la pipeta, sin cribado (10 réplicas a cada
+// volumen) y con el mismo formulario y cálculo que la revisión anual. La guarda
+// gestionar-verif-pipetas (_shared/verif_extra.ts). La pipeta solo vuelve a «Operativo» si sale
+// OK: lo comprueba el servidor al cerrar la incidencia desde su hilo. Solo profesorado.
+
+const _vpIncAbierta = i => i.Estado === 'Abierta' || i.Estado === 'En gestión';
+const _vpEquipoDeInc = i => i.ID_Equipo || String(i.Equipo || '').split(' – ')[0].trim();
+
+/** Última verificación extraordinaria de una incidencia (en curso o finalizada), o null. */
+function vpExtraordinariaDeIncidencia(idIncidencia) {
+  return (DATA.verifExtraordinarias || []).filter(x => x.id_incidencia === idIncidencia)
+    .sort((a, b) => String(b.actualizado).localeCompare(String(a.actualizado)))[0] || null;
+}
+
+function _vpModoPieVerif(extra, finalizada) {
+  const ver = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  ver('vp-ver-volver', !extra);
+  ver('vp-ver-importar', !extra || !finalizada);
+  ver('vp-ver-x-cerrar', extra);
+  ver('vp-ver-x-progreso', extra && !finalizada);
+  ver('vp-ver-x-finalizar', extra && !finalizada);
+}
+
+/** Abre la verificación extraordinaria de una incidencia (la que está en curso, una concreta, o una nueva). */
+function vpAbrirExtraordinaria(idEquipo, idIncidencia, idExtra) {
+  if (!_vpListo()) return;
+  if (!_vpEsStaff()) { showToast('La verificación extraordinaria la hace el profesorado', 'error'); return; }
+  const par = _vpParDe(idEquipo);
+  if (!par) { showToast(`${idEquipo} no tiene datos de verificación (tabla 6.4)`, 'error'); return; }
+  const x = idExtra ? (DATA.verifExtraordinarias || []).find(e => e.id === idExtra)
+    : (DATA.verifExtraordinarias || []).find(e => e.id_incidencia === idIncidencia && e.estado === 'en_curso');
+  const g = x?.verificacion;
+  _vpEstado.ver = JSON.parse(JSON.stringify(g ? { fases: g.fases, v_bajo_elegido: g.v_bajo_elegido || null, puntas: g.puntas || '', observaciones: g.observaciones || '' }
+    : { fases: [{ tipo: 'inicial', volumenes: {} }], v_bajo_elegido: null, puntas: '', observaciones: '' }));
+  const plan = DATA.planesMantenimiento.find(p => p.ID_Equipo === idEquipo && p.Activo !== 'FALSE' && p.Periodicidad === 'Pretemporada');
+  _vpRev = { idEquipo, curso: x?.curso_academico || getCursoAcademico(), sinCribado: true,
+    opcionesBajo: VP.opcionesVolumenBajo(plan?.Instrucciones),
+    extra: { id: x?.id || null, id_incidencia: x?.id_incidencia || idIncidencia, finalizada: x?.estado === 'finalizada' } };
+  _vpModoPieVerif(true, _vpRev.extra.finalizada);
+  _vpPintarVerif();
+  openModal('modal-verif-pipeta');
+}
+
+async function guardarVerifExtraordinaria(finalizar) {
+  if (!_vpRev?.extra) return;
+  if (finalizar) {
+    const calc = _vpCalcVer();
+    if (!calc?.final) { showToast('La verificación no tiene resultado todavía: ' + VP.resumenPendiente(calc), 'error'); return; }
+    const ok = /^OK/.test(calc.resultado);
+    if (!confirm(`Resultado: ${VP.RESULTADO[calc.resultado] || calc.resultado}.\n\n` + (ok
+      ? 'Queda anotado en la incidencia. Después podrás cerrarla desde su hilo dejando la pipeta operativa.'
+      : 'Queda anotado en la incidencia y la pipeta sigue fuera de servicio.') + '\n\n¿Finalizar la verificación?')) return;
+  }
+  showLoading(finalizar ? 'Finalizando…' : 'Guardando…');
+  try {
+    const r = await callEdgeFunction('gestionar-verif-pipetas', {
+      accion: 'extraordinaria_guardar', id: _vpRev.extra.id, id_equipo: _vpRev.idEquipo,
+      id_incidencia: _vpRev.extra.id_incidencia, curso_academico: _vpRev.curso,
+      verificacion: JSON.parse(JSON.stringify(_vpEstado.ver)), finalizar,
+      fecha: new Date().toISOString().slice(0, 10),
+    });
+    DATA.verifExtraordinarias = DATA.verifExtraordinarias || [];
+    const i = DATA.verifExtraordinarias.findIndex(x => x.id === r.extra.id);
+    if (i >= 0) DATA.verifExtraordinarias[i] = r.extra; else DATA.verifExtraordinarias.push(r.extra);
+    _vpRev.extra.id = r.extra.id;
+    const idEq = _vpRev.idEquipo;
+    if (r.incidencia) {
+      const inc = _incidenciaSbToObj(r.incidencia);
+      const k = DATA.incidencias.findIndex(x => x.ID_Incidencia === inc.ID_Incidencia);
+      if (k >= 0) DATA.incidencias[k] = inc;
+    }
+    if (r.equipo_estado) { const eq = DATA.equipos.find(e => e.ID_Activo === idEq); if (eq) eq.Estado_Operativo = r.equipo_estado; }
+    if (finalizar) {
+      const ok = /^OK/.test(r.extra.resultado);
+      cerrarVerifPipeta();
+      showToast(ok ? 'Verificación extraordinaria OK. Ya puedes cerrar la incidencia desde su hilo, con la pipeta operativa.'
+        : 'Verificación extraordinaria finalizada: la pipeta sigue fuera de servicio.', ok ? 'success' : 'error');
+    } else showToast('Progreso guardado', 'success');
+    if (document.getElementById('page-verif-pipetas')?.classList.contains('active')) renderVerifPipetas();
+  } catch (e) { showToast(e.message || 'No se pudo guardar', 'error'); console.error(e); }
+  hideLoading();
+}
+
+async function eliminarVerifExtraordinaria(id) {
+  if (!confirm('¿Borrar esta verificación extraordinaria sin finalizar? Se pierden los datos metidos.')) return;
+  showLoading('Borrando…');
+  try {
+    await callEdgeFunction('gestionar-verif-pipetas', { accion: 'extraordinaria_eliminar', id });
+    DATA.verifExtraordinarias = (DATA.verifExtraordinarias || []).filter(x => x.id !== id);
+    showToast('Borrada', 'success');
+    renderVerifPipetas();
+  } catch (e) { showToast(e.message || 'No se pudo borrar', 'error'); }
+  hideLoading();
+}
+
+/** Incidencias abiertas de pipetas con datos de verificación: las que pueden necesitar una extraordinaria. */
+function _vpIncidenciasDePipetas() {
+  const conDatos = new Set((DATA.verifParametros || []).map(p => p.id_activo));
+  return (DATA.incidencias || []).filter(i => _vpIncAbierta(i) && conDatos.has(_vpEquipoDeInc(i)))
+    .sort((a, b) => _vpEquipoDeInc(a).localeCompare(_vpEquipoDeInc(b), 'es', { numeric: true }));
+}
+
+function openModalVerifExtraNueva() {
+  const lista = _vpIncidenciasDePipetas();
+  document.getElementById('vp-extra-nueva-cuerpo').innerHTML = lista.length ? `
+    <div class="form-group"><label>Pipeta e incidencia *</label>
+      <select id="vp-extra-inc">${lista.map(i => `<option value="${_vpEsc(i.ID_Incidencia)}">${_vpEsc(_vpEquipoDeInc(i))} · ${_vpEsc(i.ID_Incidencia)} — ${_vpEsc(String(i.Descripcion_Problema || '').slice(0, 70))}</option>`).join('')}</select>
+      <div class="vp-guia">Solo salen las pipetas con una incidencia abierta: la verificación extraordinaria es la que se hace tras repararlas o cambiarles la junta.</div></div>`
+    : '<div class="vp-guia">Ninguna micropipeta tiene una incidencia abierta. La verificación extraordinaria se hace tras una reparación: primero tiene que estar abierta su incidencia.</div>';
+  openModal('modal-verif-extra-nueva');
+}
+
+function vpEmpezarExtraordinariaElegida() {
+  const idInc = document.getElementById('vp-extra-inc')?.value;
+  closeModal('modal-verif-extra-nueva');
+  if (!idInc) return;
+  const inc = DATA.incidencias.find(i => i.ID_Incidencia === idInc);
+  vpAbrirExtraordinaria(_vpEquipoDeInc(inc), idInc);
+}
+
+function _vpHtmlExtraordinarias(staff) {
+  const lista = (DATA.verifExtraordinarias || []).slice()
+    .sort((a, b) => (a.estado === b.estado ? 0 : a.estado === 'en_curso' ? -1 : 1) || String(b.actualizado).localeCompare(String(a.actualizado)));
+  const fila = x => {
+    const inc = DATA.incidencias.find(i => i.ID_Incidencia === x.id_incidencia);
+    const calc = x.verificacion?.calculo;
+    return `<tr>
+      <td><strong>${_vpEsc(x.id_equipo)}</strong></td>
+      <td style="font-size:12px">${_vpEsc(x.id_incidencia)}${inc ? ` <span class="badge badge-gray">${_vpEsc(inc.Estado)}</span>` : ''}</td>
+      <td style="font-size:12px">${x.estado === 'finalizada' ? `${formatDate(x.fecha)} · ${_vpBadgeResultado(x.resultado)}` : `<span class="badge badge-orange">▶ En curso</span>${calc ? ' ' + _vpBadgeResultado(calc.resultado) : ''}`}</td>
+      <td><div class="row-actions">
+        ${staff ? `<button class="icon-btn" title="${x.estado === 'finalizada' ? 'Ver' : 'Continuar'}" onclick="vpAbrirExtraordinaria('${x.id_equipo}','${x.id_incidencia}','${x.id}')">${x.estado === 'finalizada' ? '👁' : '✏️'}</button>` : ''}
+        ${staff && x.estado === 'en_curso' ? `<button class="icon-btn" title="Borrar" onclick="eliminarVerifExtraordinaria('${x.id}')">🗑️</button>` : ''}
+      </div></td></tr>`;
+  };
+  return `<div class="card">
+      <div class="card-header">
+        <div class="card-title">🔧 Verificaciones extraordinarias (tras una reparación)</div>
+        <div class="card-actions">${staff ? '<button class="btn btn-primary" onclick="openModalVerifExtraNueva()">+ Nueva</button>' : ''}</div>
+      </div>
+      <div style="padding:0 16px 10px;font-size:13px;color:var(--text-soft);line-height:1.55">
+        Tras reparar una pipeta o cambiarle la junta, fuera de calendario: se enlaza a su incidencia y se hacen <strong>10 réplicas
+        a cada volumen</strong>, sin cribado, con los mismos cálculos. La pipeta solo vuelve a estar operativa si sale <strong>OK</strong>.
+      </div>
+      ${lista.length ? `<table><thead><tr><th>Pipeta</th><th>Incidencia</th><th>Resultado</th><th></th></tr></thead><tbody>${lista.map(fila).join('')}</tbody></table>`
+        : '<div style="padding:0 16px 16px;color:var(--text-muted);font-size:13px">Todavía no hay ninguna.</div>'}
+    </div>`;
+}
+
+/** Bloque del hilo de la incidencia de una pipeta: estado de su verificación extraordinaria. */
+function vpHtmlExtraordinariaHilo(inc) {
+  if (!window.VP || !inc) return '';
+  const idEq = _vpEquipoDeInc(inc);
+  if (!_vpParDe(idEq) || !_vpIncAbierta(inc)) return '';
+  const x = vpExtraordinariaDeIncidencia(inc.ID_Incidencia);
+  const fin = x?.estado === 'finalizada';
+  const ok = fin && /^OK/.test(x.resultado || '');
+  const btn = _vpEsStaff() ? `<div><button class="btn btn-primary" style="font-size:12px;padding:5px 10px;margin-top:6px"
+      onclick="closeModal('modal-hilo-incidencia');vpAbrirExtraordinaria('${idEq}','${inc.ID_Incidencia}'${x && !fin ? `,'${x.id}'` : ''})">🧪 ${x && !fin ? 'Continuar la' : fin ? 'Hacer otra' : 'Hacer la'} verificación extraordinaria</button></div>` : '';
+  return `<div style="padding:10px 12px;margin-top:8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;background:var(--bg)">
+    <strong>🧪 Verificación extraordinaria</strong> (tras la reparación, 10 réplicas):
+    ${!x ? 'sin hacer. La pipeta solo vuelve a estar operativa si sale OK.'
+      : !fin ? 'empezada, sin finalizar.'
+      : `${formatDate(x.fecha)} · ${_vpBadgeResultado(x.resultado)} ${ok ? '— ya se puede cerrar la incidencia dejando la pipeta operativa.' : '— la pipeta sigue fuera de servicio.'}`}
+    ${!ok ? btn : ''}
+  </div>`;
+}
+
+/** ¿La pipeta de esta incidencia necesita aún una extraordinaria OK para volver a «Operativo»? */
+function vpFaltaExtraordinariaOK(inc) {
+  if (!window.VP || !inc) return false;
+  const idEq = _vpEquipoDeInc(inc);
+  if (!_vpParDe(idEq)) return false;
+  const eq = DATA.equipos.find(e => e.ID_Activo === idEq);
+  if (/^Operativo/i.test(eq?.Estado_Operativo || '')) return false;
+  const x = vpExtraordinariaDeIncidencia(inc.ID_Incidencia);
+  return !(x?.estado === 'finalizada' && /^OK/.test(x.resultado || ''));
 }

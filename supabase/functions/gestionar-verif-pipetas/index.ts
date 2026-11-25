@@ -8,6 +8,7 @@
 // La respuesta sobre el tornillo de ajuste es solo del profesorado (encargo, apartado 9).
 import { requireStaff, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 import { recalcularSesionesCurso } from "../_shared/verif_pipetas_srv.ts";
+import { guardarExtraordinaria } from "../_shared/verif_extra.ts";
 
 const CURSO = /^\d{4}-\d{4}$/;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
@@ -93,7 +94,10 @@ Deno.serve(async (req) => {
     // Si alguna pipeta se ha medido en ella, no se borra: sus resultados dependen de ella.
     const { data: conVer } = await db.from("registro_mantenimientos").select("id_registro, id_equipo, verificacion")
       .not("verificacion", "is", null);
-    const usos = (conVer || []).filter((r: { verificacion: unknown }) => JSON.stringify(r.verificacion).includes(`"${id}"`));
+    // También las verificaciones extraordinarias tras una reparación.
+    const { data: extras } = await db.from("verif_extraordinarias").select("id_equipo, verificacion");
+    const usos = [...(conVer || []), ...(extras || [])]
+      .filter((r: { verificacion: unknown }) => JSON.stringify(r.verificacion).includes(`"${id}"`));
     if (usos.length) {
       return jsonError(`No se puede borrar: hay pipetas medidas en esta sesión (${usos.map((u: { id_equipo: string }) => u.id_equipo).join(", ")})`, 400);
     }
@@ -113,6 +117,20 @@ Deno.serve(async (req) => {
       .eq("id_activo", idActivo).select().single();
     if (error || !data) return jsonError(`No se pudo guardar: ${error?.message || "la pipeta no tiene datos de verificación"}`, 400);
     return jsonOk({ parametros: data });
+  }
+
+  // Verificación extraordinaria tras una reparación (2026-11-25): _shared/verif_extra.ts.
+  if (accion === "extraordinaria_guardar") {
+    const r = await guardarExtraordinaria(db, body, firma);
+    if (r.error) return jsonError(r.error, r.status || 400);
+    return jsonOk(r);
+  }
+  if (accion === "extraordinaria_eliminar") {
+    const id = String(body.id || "");
+    const { data, error } = await db.from("verif_extraordinarias").delete().eq("id", id).eq("estado", "en_curso").select("id");
+    if (error) return jsonError(`No se pudo borrar: ${error.message}`, 400);
+    if (!data?.length) return jsonError("Solo se puede borrar una verificación extraordinaria sin finalizar", 400);
+    return jsonOk({ eliminada: id });
   }
 
   return jsonError(`Acción desconocida: ${accion}`, 400);

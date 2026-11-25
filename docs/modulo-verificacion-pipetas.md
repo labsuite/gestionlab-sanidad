@@ -90,6 +90,35 @@ la pipeta (rellena sus réplicas; «la sesión de este archivo» se casa con la 
 la misma fecha, así que **primero se importa la sesión**). Nada se guarda sin revisarlo; si el
 archivo es de otro formato, se rechaza.
 
+## Verificación extraordinaria tras una reparación (2026-11-25)
+
+Decisión de Paloma (plantilla de micropipetas, 6.2 punto 4): tras reparar una pipeta o cambiarle
+la junta, **fuera de calendario**, enlazada a la **incidencia** de la pipeta, con **10 réplicas a
+cada volumen sin cribado** y los mismos cálculos. La pipeta **solo vuelve a estar operativa si sale
+OK**; si no, sigue fuera de servicio con la incidencia abierta.
+
+- Tabla **`verif_extraordinarias`** (`id` VX…, `id_equipo`, `id_incidencia`, `curso_academico`,
+  `estado` en_curso/finalizada, `verificacion` con la misma forma que la de la revisión anual,
+  `resultado`, `fecha`, `realizado_por`). Se carga en `DATA.verifExtraordinarias`.
+- Se hace desde la tarjeta **«🔧 Verificaciones extraordinarias»** de la página (+ Nueva: elige
+  entre las pipetas con incidencia abierta) o desde el **hilo de la incidencia** (recuadro «🧪
+  Verificación extraordinaria»). Mismo formulario que la revisión (`_vpPintarVerif`, con
+  `_vpRev.extra` y `sinCribado: true`); el pie cambia a «Guardar progreso» / «Finalizar». Solo
+  profesorado. Admite el ajuste (AJUSTAR → «He ajustado» → repetición), igual que la revisión.
+- Servidor: `_shared/verif_extra.ts` (`guardarExtraordinaria`), acciones `extraordinaria_guardar`
+  y `extraordinaria_eliminar` (solo sin finalizar) de `gestionar-verif-pipetas`. Al finalizar, el
+  resultado se **añade a la descripción de la incidencia**; si no es OK, la pipeta queda «Fuera de
+  servicio».
+- **Volver a «Operativo»** sigue siendo a propósito (cerrar la incidencia desde su hilo), pero
+  `gestionar-incidencia` (`cierreOperativoPermitido`) rechaza cerrar como «Resuelta» dejando «Operativo…»
+  una pipeta con datos de verificación que no está operativa, salvo que esa incidencia tenga una
+  extraordinaria finalizada OK. Descartar la incidencia o cerrarla dejándola fuera de servicio sí
+  se puede. El hilo propone el estado actual mientras falte la OK.
+- «Última verificación» de la lista y las pipetas de cada sesión cuentan también las
+  extraordinarias; una sesión usada por una extraordinaria no se puede borrar.
+- Pruebas contra la base (datos ficticios, se borran solos):
+  `SUPABASE_JS=…/supabase-js/dist/index.mjs node tools/verif-pipetas/extraordinaria.test.mjs`.
+
 ## Quién puede
 
 - Preparación, sesiones y respuesta sobre el tornillo: Profesor, Gestor y Administrador
@@ -100,8 +129,6 @@ archivo es de otro formato, se rechaza.
 
 ## Pendiente / limitaciones conocidas
 
-- La verificación «que cierra una incidencia de la pipeta» (10 réplicas sin cribado tras una
-  reparación) no tiene formulario propio: las incidencias e intervenciones no llevan verificación.
 - Editar una revisión ya finalizada (Mantenimiento → Realizados) no recalcula la verificación.
 - PIP-005 con 200 µl elegido usa los límites del volumen bajo del CSV (los de 100 µl) hasta que se
   corrija el CSV.

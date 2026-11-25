@@ -45,8 +45,29 @@
     <div class="modal-body">
       <div id="vp-ver-cuerpo"></div>
       <div class="form-footer">
-        <button class="btn btn-secondary" onclick="vpElegirArchivo('pipeta')">📥 Importar de la página de recogida</button>
-        <button class="btn btn-primary" onclick="cerrarVerifPipeta()">Volver a la revisión</button>
+        <button class="btn btn-secondary" id="vp-ver-importar" onclick="vpElegirArchivo('pipeta')">📥 Importar de la página de recogida</button>
+        <button class="btn btn-primary" id="vp-ver-volver" onclick="cerrarVerifPipeta()">Volver a la revisión</button>
+        <!-- Verificación extraordinaria tras una reparación (js/verif-pipetas.js, vpAbrirExtraordinaria) -->
+        <button class="btn btn-secondary" id="vp-ver-x-cerrar" style="display:none" onclick="cerrarVerifPipeta()">Cerrar</button>
+        <button class="btn btn-secondary" id="vp-ver-x-progreso" style="display:none" onclick="guardarVerifExtraordinaria(false)">💾 Guardar progreso</button>
+        <button class="btn btn-primary" id="vp-ver-x-finalizar" style="display:none" onclick="guardarVerifExtraordinaria(true)">Finalizar la verificación</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Nueva verificación extraordinaria: qué pipeta y qué incidencia -->
+<div class="modal-overlay" id="modal-verif-extra-nueva">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">Verificación extraordinaria</div>
+      <button class="modal-close" onclick="closeModal('modal-verif-extra-nueva')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="vp-extra-nueva-cuerpo"></div>
+      <div class="form-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-verif-extra-nueva')">Cancelar</button>
+        <button class="btn btn-primary" onclick="vpEmpezarExtraordinariaElegida()">Empezar</button>
       </div>
     </div>
   </div>

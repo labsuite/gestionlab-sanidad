@@ -3,6 +3,7 @@
 // (aviso de problema con un equipo, openModalAvisoAlumno — ver equipos-render.js
 // getUserRole()==='Alumno'). "eliminar" queda restringido a Admin/Gestor.
 import { requireValidSession, requireAdminOrGestor, requireStaff, requiereResponsableEquipo, autorRegistro, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { cierreOperativoPermitido } from "../_shared/verif_extra.ts";
 
 function generarIdIncidencia(): string {
   return "INC-" + Date.now().toString(36).toUpperCase().slice(-6);
@@ -96,6 +97,12 @@ Deno.serve(async (req) => {
     const ESTADOS = ["Resuelta", "Descartada", "En gestión", "Abierta"];
     if (!idIncidencia) return jsonError("id_incidencia es obligatorio", 400);
     if (!ESTADOS.includes(estado)) return jsonError(`estado debe ser uno de: ${ESTADOS.join(", ")}`, 400);
+    // Una micropipeta fuera de servicio solo vuelve a «Operativo» con una verificación
+    // extraordinaria OK de esta incidencia (decisión de Paloma, 2026-11-25).
+    {
+      const motivo = await cierreOperativoPermitido(supabaseAdmin, idIncidencia, estado, String(body.estado_equipo || ""));
+      if (motivo) return jsonError(motivo, 400);
+    }
 
     const { data: incidencia, error } = await supabaseAdmin.from("incidencias")
       .update({ estado }).eq("id_incidencia", idIncidencia).select().single();

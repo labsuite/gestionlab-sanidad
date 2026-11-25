@@ -1141,3 +1141,26 @@ alter table registro_mantenimientos add column if not exists verificacion jsonb;
 -- paso (pieza cambiada, ajuste) van a `intervenciones` con origen «Mantenimiento
 -- preventivo RM…» y su id se guarda dentro del paso (pasos[i].id_intervencion).
 alter table registro_mantenimientos add column if not exists resultado text;
+
+-- Verificación EXTRAORDINARIA de una pipeta tras una reparación o un cambio de junta
+-- (decisión de Paloma, 2026-11-25; plantilla de micropipetas 6.2 punto 4): fuera de
+-- calendario, enlazada a la incidencia de la pipeta, sin cribado (10 réplicas a cada
+-- volumen) y con los mismos cálculos. La pipeta solo vuelve a «Operativo» con resultado OK:
+-- lo comprueba gestionar-incidencia al cerrar la incidencia. `verificacion` tiene la misma
+-- forma que registro_mantenimientos.verificacion.
+create table if not exists verif_extraordinarias (
+  id               text primary key,
+  id_equipo        text not null references equipos(id_activo),
+  id_incidencia    text not null,
+  curso_academico  text not null,
+  estado           text not null default 'en_curso',   -- 'en_curso' | 'finalizada'
+  verificacion     jsonb,
+  resultado        text,                                -- clave de VP.RESULTADO (OK, RETIRAR…)
+  fecha            date,
+  realizado_por    text,
+  creado           timestamptz not null default now(),
+  actualizado      timestamptz not null default now()
+);
+create index if not exists idx_verif_extra_incidencia on verif_extraordinarias (id_incidencia);
+alter table verif_extraordinarias enable row level security;
+create policy "verif_extraordinarias_select" on verif_extraordinarias for select to authenticated using (true);

@@ -821,7 +821,7 @@ async function loadAllData() {
            sbExcepcionesResiduoIaRes,
            sbPropuestasUbicacionRes, sbPropuestasMaterialRes, sbFichasAtributosRes,
            sbTareasPersonalesRes, sbEvaluacionesCursoRes, sbCajasCongeladoRes, sbMuestrasCongeladasRes, sbUsosMuestraRes,
-           sbVerifParamRes, sbVerifPrepRes, sbVerifSesRes, sbEquiposConProtocoloRes] = await Promise.all([
+           sbVerifParamRes, sbVerifPrepRes, sbVerifSesRes, sbEquiposConProtocoloRes, sbVerifExtraRes] = await Promise.all([
       // .then(r=>r, fallback) porque el builder de Supabase no tiene .catch()
       _sb.from('ciclos').select('id,nombre').then(r => r, () => ({ data: [] })),
       _sb.from('modulos').select('id,nombre,lab_teoria,lab_practicas').then(r => r, () => ({ data: [] })),
@@ -877,7 +877,8 @@ async function loadAllData() {
       // Solo QUÉ equipos tienen protocolo de uso (el texto se pide al abrirlo: cargarProtocoloEquipo)
       // (hoy ~320 filas; el servidor corta en 1000, como en el resto de lecturas sin paginar)
       _sbMigracion.from('equipos').select('id_activo')
-        .not('protocolo_uso', 'is', null).neq('protocolo_uso', '').then(r => r, () => ({ data: [] }))
+        .not('protocolo_uso', 'is', null).neq('protocolo_uso', '').then(r => r, () => ({ data: [] })),
+      _leerTablaCompleta('verif_extraordinarias', 'id').then(r => r, () => ({ data: [] })),
     ]);
 
     // Sesión que el navegador cree válida pero el servidor rechaza (contraseña cambiada,
@@ -911,6 +912,8 @@ async function loadAllData() {
     DATA.verifParametros         = sbVerifParamRes?.data || [];
     DATA.verifPreparaciones      = sbVerifPrepRes?.data || [];
     DATA.verifSesiones           = sbVerifSesRes?.data || [];
+    // Verificaciones extraordinarias de pipetas tras una reparación (2026-11-25)
+    DATA.verifExtraordinarias    = sbVerifExtraRes?.data || [];
     DATA.registroMantenimientos  = (sbRegistroMantRes?.data || []).map(_registroMantSbToObj);
     DATA.tiposResiduo            = (sbTiposResiduoRes?.data || []).map(_tipoResiduoSbToObj);
     DATA.contenedoresResiduo     = (sbContenedoresResiduoRes?.data || []).map(_contenedorResiduoSbToObj);
