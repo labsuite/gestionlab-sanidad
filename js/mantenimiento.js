@@ -737,7 +737,7 @@ function _renderMantChecklist(pasos) {
         ${p.criterio ? '<div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>' : ''}
         <div class="mant-check-pieza" style="${p.hecho ? '' : 'display:none'}">
           <select class="mant-check-tipoint" onchange="_mantCampoPaso(${i}, 'tipo_intervencion', this.value)">${opcionesTipo(p.tipo_intervencion, ['Sustitución de pieza', 'Cambio de consumibles'])}</select>
-          <input type="text" data-campo="actuacion" placeholder="Pieza puesta: referencia, lote… (opcional)" oninput="_mantCampoPaso(${i}, 'actuacion', this.value)">
+          <input type="text" data-campo="actuacion" placeholder="Pieza puesta (ref., lote…)" oninput="_mantCampoPaso(${i}, 'actuacion', this.value)">
           <div class="mant-check-nota-ayuda">${p.id_intervencion
             ? `🔩 Registrada como intervención ${p.id_intervencion} del equipo.`
             : `🔩 Quedará también como intervención en el historial del equipo${esAlumno ? ' cuando el profesorado firme el visto bueno' : ''}.`}</div>
@@ -928,8 +928,8 @@ function _mantPintarAccion(i) {
     if (sel) sel.style.display = p.accion === 'intervencion' ? '' : 'none';
     const inp = act.querySelector('input');
     if (inp) inp.placeholder = p.accion === 'intervencion'
-      ? '¿Qué has cambiado o ajustado? (p. ej. junta tórica nueva) *'
-      : '¿Qué has hecho? (p. ej. engrasado el pistón) *';
+      ? 'Qué has cambiado o ajustado *'
+      : 'Qué has hecho (p. ej. engrasar) *';
   }
   const ayuda = el.querySelector('.mant-check-nota-ayuda');
   if (ayuda) {

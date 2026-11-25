@@ -132,19 +132,33 @@ async (page, { app: APP, salida: SALIDA }) => {
   await pausa(300);
   await page.locator('#mant-checklist [data-idx="0"]').screenshot({ path: SALIDA + '04-comprobacion-con-calculadora.png' });
 
-  // 5 · Paso normal marcado y comprobación que no cumple, con lo que se ha visto
+  // 5 · Paso normal marcado y comprobación que no cumple: lo que se ha visto y qué se ha hecho
+  //     (aquí, «Necesita reparación»: es lo que abre el aviso de avería del paso 7).
   await page.evaluate(() => {
     document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
     const cb = document.querySelector('#mant-checklist [data-idx="1"] input'); cb.checked = true; _mantPasoHecho(1, true);
     _mantMarcarCriterio(2, 'no_cumple');
     const ta = document.querySelector('#mant-checklist [data-idx="2"] textarea');
     ta.value = 'Lectura: restos blancos de cal en el calefactor después de descalcificar; criterio: calefactor sin cal; condiciones: baño vacío y frío.';
-    _mantNotaCriterio(2, ta.value); ta.blur();
+    _mantCampoPaso(2, 'nota', ta.value); ta.blur();
     ta.style.height = ta.scrollHeight + 4 + 'px';
+    _mantAccionPaso(2, 'reparacion');
+    document.activeElement?.blur();
     document.querySelector('#mant-checklist [data-idx="2"] .mant-btn-nocumple').classList.add('ayuda-senal');
+    document.querySelector('#mant-checklist [data-idx="2"] .mant-check-acciones').classList.add('ayuda-senal');
   });
   await pausa(300);
   await page.locator('#mant-checklist [data-idx="2"]').screenshot({ path: SALIDA + '05-no-cumple.png' });
+
+  // 5b · Resultado del mantenimiento: la app resalta el que sale de los pasos; lo marca el grupo.
+  await page.evaluate(() => {
+    document.querySelectorAll('.ayuda-senal').forEach(e => e.classList.remove('ayuda-senal'));
+    _mantElegirResultado('no_apto');
+    const b = document.getElementById('mant-resultado-bloque');
+    b.classList.add('ayuda-senal');
+  });
+  await pausa(300);
+  await page.locator('#mant-resultado-bloque').screenshot({ path: SALIDA + '05b-resultado.png' });
 
   // 6 · Observaciones y «Finalizar»
   await page.evaluate(() => {
@@ -163,7 +177,7 @@ async (page, { app: APP, salida: SALIDA }) => {
     const periodo = getPeriodosEsperados(DATA.planesMantenimiento[0], DATA.equipos[0], window._demo.curso)[0];
     window._demo.periodo = periodo;
     closeModal('modal-registrar-mant');
-    _ofrecerAvisoNoCumple('BAT-06', window._demo.PLAN, periodo, pasos.filter(p => p.resultado === 'no_cumple'));
+    _ofrecerAvisoNoCumple('BAT-06', window._demo.PLAN, periodo, pasos.filter(p => p.resultado === 'no_cumple' && p.accion === 'reparacion'));
   });
   await pausa(900);
   await page.evaluate(() => {
@@ -182,7 +196,7 @@ async (page, { app: APP, salida: SALIDA }) => {
     const hoy = new Date().toISOString().slice(0, 10);
     DATA.registroMantenimientos = [_registroMantSbToObj({
       id_registro: 'RMDEMO1', id_plan: window._demo.PLAN, id_equipo: 'BAT-06', curso_academico: window._demo.curso,
-      periodo: window._demo.periodo, fecha_realizacion: hoy, realizado_por: '1º CS LCB', estado: 'pendiente_vb', pasos: _leerChecklist(),
+      periodo: window._demo.periodo, fecha_realizacion: hoy, realizado_por: '1º CS LCB', estado: 'pendiente_vb', pasos: _leerChecklist(), resultado: 'no_apto',
     })];
     renderEquipos('BAT-06');
     toggleEquipoExpand('eq-expand-BAT_06');

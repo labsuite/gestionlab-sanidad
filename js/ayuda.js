@@ -90,17 +90,25 @@ const AYUDA_TAREAS = {
             alt: 'Ventana Ejecutar mantenimiento con el recuadro rojo de un aviso abierto No funciona señalado',
           },
           {
-            texto: '**Hacer cada paso en el equipo y marcar su casilla al terminarlo**, no antes ni todos al final: el registro tiene que decir lo que se hizo, y marcar de memoria al final acaba marcando pasos que no se hicieron. Arriba a la derecha, el contador dice cuántos pasos van.',
+            texto: '**Hacer cada paso en el equipo y marcarlo al terminarlo**, no antes ni todos al final: el registro tiene que decir lo que se hizo, y marcar de memoria al final acaba marcando pasos que no se hicieron. Los pasos que solo hay que hacer (limpiar, etiquetar, guardar) llevan casilla. Arriba a la derecha, el contador dice cuántos pasos van.',
           },
           {
-            texto: '**En las comprobaciones** (los pasos que llevan «Criterio:» debajo): medir, comparar con el criterio y pulsar «✓ Cumple» o «✗ No cumple». Si el criterio lleva números, el paso trae 🧮 y pide lo que marca el equipo y lo que mide el instrumento de referencia: **anotar las dos lecturas completas, tal como salen (todos los decimales, sin redondear)**. En «Pantalla del equipo» va lo que marca la pantalla en ese momento (lo programado, solo si no tiene pantalla), y las dos lecturas se toman a la vez, con el equipo estable (el tiempo que diga el protocolo). La app hace la cuenta y decide sola si cumple; si no cumple, marca ella «✗ No cumple» y escribe las cifras en «¿Qué has visto?». Lo que no se mide con números aparece como «Comprueba tú: …»: mirarlo y pulsar «✓ Cumple» o «✗ No cumple». Si se pulsa el botón equivocado, pulsarlo otra vez lo desmarca.',
+            texto: '**En las comprobaciones** (revisar, comprobar, verificar, y los pasos que llevan «Criterio:» debajo), contestar lo que se ha encontrado: «✓ Correcto» o «⚠ Hay que actuar»; si llevan criterio, medir, comparar con el criterio y pulsar «✓ Cumple» o «✗ No cumple». Los pasos escritos como «Cambio de … si procede» o «Engrasar si procede» no mandan cambiar nada: piden mirar si hace falta («✓ No hacía falta» o «⚠ Hacía falta»). «No aplica», si ese paso no tiene sentido en este equipo (y explicarlo en Observaciones). Si el criterio lleva números, el paso trae 🧮 y pide lo que marca el equipo y lo que mide el instrumento de referencia: **anotar las dos lecturas completas, tal como salen (todos los decimales, sin redondear)**. En «Pantalla del equipo» va lo que marca la pantalla en ese momento (lo programado, solo si no tiene pantalla), y las dos lecturas se toman a la vez, con el equipo estable (el tiempo que diga el protocolo). La app hace la cuenta y decide sola si cumple; si no cumple, marca ella «✗ No cumple» y escribe las cifras en «¿Qué has visto?». Lo que no se mide con números aparece como «Comprueba tú: …»: mirarlo y pulsar «✓ Cumple» o «✗ No cumple». Si se pulsa el botón equivocado, pulsarlo otra vez lo desmarca.',
             img: 'MAN-2/04-comprobacion-con-calculadora.png',
             alt: 'Comprobación con calculadora: lectura del equipo y del termómetro de referencia, la app dice que cumple y se pulsa Cumple',
           },
           {
-            texto: '**Si una comprobación no cumple**, «¿Qué has visto? *» es obligatorio: ver el bloque «Si una comprobación no cumple», más abajo.',
+            texto: '**Si algo no está bien** («⚠» o «✗»), escribir «¿Qué has visto? *» y elegir en «¿Qué has hecho? *»: «🔧 Lo he corregido en el momento» (engrasar, limpiar, apretar: escribir qué), «🔩 He cambiado una pieza o ajustado el equipo» (elegir el tipo y escribir qué pieza; cuando el profesorado firme, queda también en el historial del equipo) o «🚨 Necesita reparación» (al finalizar se abre el aviso de avería). Ver también el bloque «Si una comprobación no cumple», más abajo.',
             img: 'MAN-2/05-no-cumple.png',
-            alt: 'Comprobación marcada como No cumple con lo que se ha visto escrito',
+            alt: 'Comprobación marcada como No cumple, con lo que se ha visto escrito y «Necesita reparación» elegido en «¿Qué has hecho?»',
+          },
+          {
+            texto: '**En las sustituciones programadas** (por ejemplo, «Sustitución de la tapa del rotor»): marcar la casilla al cambiar la pieza y escribir la pieza puesta (referencia o lote, si lo tiene). Cuando el profesorado firme, queda también en el historial del equipo.',
+          },
+          {
+            texto: '**Marcar el resultado del mantenimiento**: «✓ Apto», «🔩 Apto tras intervención» (se ha cambiado una pieza o ajustado el equipo) o «✗ No apto» (necesita reparación). La app resalta con un borde discontinuo el que sale de los pasos, pero lo marca el grupo; si se marca otro, explicar por qué en Observaciones.',
+            img: 'MAN-2/05b-resultado.png',
+            alt: 'Bloque Resultado del mantenimiento con las opciones Apto, Apto tras intervención y No apto, esta última marcada',
           },
           {
             texto: '**Si hay que parar**: «💾 Guardar progreso». Otro día, en la tarjeta del equipo saldrá «Continuar n/m» con lo que ya estaba marcado. Lo puede continuar cualquier grupo: el progreso es del equipo, no del grupo.',
@@ -111,10 +119,10 @@ const AYUDA_TAREAS = {
             alt: 'Parte de abajo de la ventana: fecha, realizado por, observaciones, aviso de visto bueno y botón Finalizar señalado',
           },
           {
-            texto: '**Pulsar «Finalizar».** Si queda un paso sin marcar, la app pide confirmación («Quedan … paso(s) sin marcar»): confirmar solo si ese paso no aplica a este equipo y está explicado en Observaciones. Al terminar sale «Registrado. Queda a la espera del visto bueno del profesorado.»',
+            texto: '**Pulsar «Finalizar».** Sin el resultado marcado no deja finalizar. Si queda un paso sin marcar, la app pide confirmación («Quedan … paso(s) sin marcar»): confirmar solo si ese paso no aplica a este equipo y está explicado en Observaciones. Al terminar sale «Registrado. Queda a la espera del visto bueno del profesorado.»',
           },
           {
-            texto: '**Si alguna comprobación no cumplía, se abre «Notificar aviso»** con la descripción ya rellenada. Elegir en «¿Se puede seguir usando el equipo?» si se puede seguir usando y pulsar «Enviar aviso». El aviso aparece en GestionLab al profesorado responsable del equipo y a quien abra el equipo; no se manda ningún correo.',
+            texto: '**Si en algún paso se eligió «🚨 Necesita reparación», se abre «Notificar aviso»** con la descripción ya rellenada. Elegir en «¿Se puede seguir usando el equipo?» si se puede seguir usando y pulsar «Enviar aviso». El aviso aparece en GestionLab al profesorado responsable del equipo y a quien abra el equipo; no se manda ningún correo.',
             nota: 'Si el equipo ya tenía un aviso abierto, se abre en cambio «Añadir al aviso abierto»: lo visto se añade a ese aviso («Añadir al aviso») y no se abre otro. Ahí se puede marcar que el equipo está peor que lo que decía el aviso, pero no mejor.',
             img: 'MAN-2/07-aviso-de-averia.png',
             alt: 'Ventana Notificar aviso con la descripción ya escrita y las opciones de si se puede seguir usando el equipo',
@@ -145,7 +153,7 @@ const AYUDA_TAREAS = {
           ['El mantenimiento no está en la lista, o la tarjeta del equipo no enseña su plan de mantenimiento', 'puede que todavía no toque (solo salen los que ya han vencido), que otro grupo ya lo haya finalizado (está esperando el visto bueno), que el profesorado lo haya marcado como «no aplica» o lo haya aplazado, o que el equipo no esté en uno de vuestros laboratorios ni en la zona común, el almacén (sus mantenimientos los hace otro grupo o el profesorado).'],
           ['Estaba empezado', '«Continuar n/m» y seguir desde donde se dejó.'],
           ['Se ha marcado un paso por error', 'desmarcarlo antes de finalizar. Si ya está finalizado, decírselo al profesorado, que puede devolverlo para corregirlo.'],
-          ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'no marcarlo, explicarlo en Observaciones y avisar al profesorado. Si falta material, guardar el progreso y terminar otro día.'],
+          ['Un paso no se puede hacer (falta material, el equipo no tiene esa pieza)', 'si el equipo no tiene esa pieza, «No aplica» (en las comprobaciones) y explicarlo en Observaciones. Si falta material, no marcarlo, guardar el progreso, avisar al profesorado y terminar otro día.'],
           ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar con la misma cuenta del grupo. La ventana reaparece con lo marcado: pulsar otra vez el botón (→ [[EMP-2|La app te pide volver a entrar (sesión caducada)]]).'],
           ['En el móvil, «Registrar» queda fuera de la pantalla en «Pendientes»', 'desplazar la tabla hacia la izquierda, o entrar por la tarjeta del equipo.'],
         ],
