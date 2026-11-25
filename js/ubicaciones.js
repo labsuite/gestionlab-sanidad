@@ -397,7 +397,8 @@ function renderUbicaciones() {
         : puedeEditar
           ? `<button type="button" class="ubi-itbtn ubi-itbtn-vacio${itemsAbiertos ? ' abierto' : ''}" id="ubi-itbtn-${_escAttr(u.ID_Ubicacion)}" onclick="toggleUbiItems('${idJs}')" title="Apuntar lo que hay aquí">＋ Añadir</button>`
           : `<span style="font-size:12px;color:var(--text-muted)">—</span>`;
-      const sub = u.Subzona || '';
+      // Localización | Uso / contenido (+ observaciones en pequeño). Ver config.js.
+      const sub = usoUbicacion(u);
       const desc = u.Descripcion_Completa && u.Descripcion_Completa !== sub ? u.Descripcion_Completa : '';
       return `<div class="ubi-row${u.ID_Ubicacion === _ubiResaltar ? ' ubi-row-resaltada' : ''}" id="ubi-row-${_escAttr(u.ID_Ubicacion)}">
         <strong style="font-size:12px">${_escAttr(u.ID_Ubicacion)}</strong>
@@ -421,7 +422,7 @@ function renderUbicaciones() {
       </div>
       <div class="ubi-grupo-rows${abierto ? ' open' : ''}" id="${grupoId}">
         <div class="ubi-table-header">
-          <span>ID</span><span>Zona</span><span>Subzona / Descripción</span><span>Material</span><span>Estado</span><span></span>
+          <span>ID</span><span>Localización</span><span>Uso / contenido</span><span>Material</span><span>Estado</span><span></span>
         </div>
         ${rows}
       </div>

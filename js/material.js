@@ -1450,7 +1450,7 @@ function _ubicsConMaterial(matIds, idOrigen) {
 }
 
 function _nombreSitio(u) {
-  return huecoUbicacion(u) || u.Zona || u.ID_Ubicacion;
+  return huecoUbicacion(u) || zonaUbicacion(u) || u.ID_Ubicacion;
 }
 
 function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
@@ -1470,17 +1470,17 @@ function _rellenarDestinoUbic(idSelect, idOrigen, lab, matIds) {
 
   const yaHay  = _ubicsConMaterial(_destinoMatIds[idSelect], idOrigen);
   // En "★ Ya hay de este material" no hay optgroup de zona: la zona va en el texto.
-  const opt    = (u, conZona) => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(conZona && u.Zona && u.Zona !== _nombreSitio(u) ? u.Zona + ' · ' + _nombreSitio(u) : _nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
+  const opt    = (u, conZona) => `<option value="${_escAttr(u.ID_Ubicacion)}">${_esc(conZona && zonaUbicacion(u) && zonaUbicacion(u) !== _nombreSitio(u) ? zonaUbicacion(u) + ' · ' + _nombreSitio(u) : _nombreSitio(u))} · ${_esc(u.ID_Ubicacion)}</option>`;
   const porId  = (a, b) => a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true });
   const ubics  = activas.filter(u => labDe(u) === lab);
   const conMat = ubics.filter(u => yaHay.has(u.ID_Ubicacion)).sort(porId);
   const resto  = ubics.filter(u => !yaHay.has(u.ID_Ubicacion));
-  const zonas  = [...new Set(resto.map(u => u.Zona || 'Sin zona'))].sort();
+  const zonas  = [...new Set(resto.map(u => zonaUbicacion(u) || 'Sin zona'))].sort();
   selDest.disabled = !lab;
   selDest.innerHTML = `<option value="">${lab ? 'Sitio…' : '← Elige laboratorio'}</option>` +
     (conMat.length ? `<optgroup label="★ Ya hay de este material">${conMat.map(u => opt(u, true)).join('')}</optgroup>` : '') +
     zonas.map(z => `<optgroup label="${_escAttr(z)}">` +
-      resto.filter(u => (u.Zona || 'Sin zona') === z).sort(porId).map(u => opt(u)).join('') + '</optgroup>').join('');
+      resto.filter(u => (zonaUbicacion(u) || 'Sin zona') === z).sort(porId).map(u => opt(u)).join('') + '</optgroup>').join('');
 
   _pintarSugerencias(idSelect, idOrigen);
 }

@@ -210,7 +210,7 @@ function getMinOptLabel(mat) {
 // orienta es "Reactivos · Inferior". El código va primero (zona y subzona
 // solas no identifican el sitio: hay siete "Izquierda · Encimera" en el 201).
 // Si el laboratorio tiene apellido ("205 - Zona común", "207 - Residuos")
-// también sale. Sin subzona se usa la descripción.
+// también sale. Detrás, el uso/contenido ("Puntas y tubos"); las observaciones no.
 function getNombreUbicacion(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion;
@@ -218,16 +218,15 @@ function getNombreUbicacion(idUbicacion) {
   return desc ? `${u.ID_Ubicacion} – ${desc}` : (u.Laboratorio_Aula ? `${u.ID_Ubicacion} – Lab ${u.Laboratorio_Aula}` : u.ID_Ubicacion);
 }
 
-// La descripción es donde se apunta qué guarda el armario ("Puntas y tubos",
-// "Medios de cultivo…"): desde 2026-11-24 sale SIEMPRE junto a la subzona,
-// no solo cuando falta la subzona. Una descripción muy larga se acorta a su
-// primera frase para que quepa en un desplegable (la entera, en Ubicaciones).
-function _textoDescUbicacion(d, max = 80) {
-  d = (d || '').trim().replace(/\s+/g, ' ');
-  if (d.length > max) d = d.split(/\.\s/)[0];
-  if (d.length > max) d = d.slice(0, max).replace(/[\s,;]+\S*$/, '') + '…';
-  return d.replace(/\.$/, '');
-}
+// Desde 2026-11-25 una ubicación se describe con DOS ideas (las columnas
+// conservan su nombre antiguo; scripts/reorganizar_ubicaciones_2026_11.py
+// recolocó los datos):
+//   Zona                 → LOCALIZACIÓN, de lo general a lo concreto:
+//                          "Izquierda · 2º cajón". El primer tramo ("Izquierda")
+//                          es el que agrupa en los desplegables (zonaUbicacion).
+//   Subzona              → USO / CONTENIDO: "Micropipetas", "Puntas y tubos".
+//   Descripcion_Completa → OBSERVACIONES: notas; no sale en las etiquetas.
+const SEP_LOCALIZACION = ' · ';
 
 function _juntarPartesUbicacion(lista) {
   const partes = [];
@@ -239,17 +238,32 @@ function _juntarPartesUbicacion(lista) {
   return partes;
 }
 
-/** "1º Cajón · Micropipetas" — el hueco dentro de su zona: subzona y descripción. */
-function huecoUbicacion(u) {
-  if (!u) return '';
-  return _juntarPartesUbicacion([u.Subzona, _textoDescUbicacion(u.Descripcion_Completa)]).join(' · ');
+/** "Izquierda" — primer tramo de la localización: agrupa los desplegables. */
+function zonaUbicacion(u) {
+  return ((u && u.Zona) || '').split(SEP_LOCALIZACION)[0].trim();
 }
 
-/** "Zona común · Reactivos · Inferior" — zona, subzona y descripción (y apellido del laboratorio) sin el código. */
+/** "2º cajón" — la localización sin su primer tramo. */
+function posicionUbicacion(u) {
+  return ((u && u.Zona) || '').split(SEP_LOCALIZACION).slice(1).join(SEP_LOCALIZACION).trim();
+}
+
+/** "Micropipetas" — qué se guarda ahí. */
+function usoUbicacion(u) {
+  return ((u && u.Subzona) || '').trim().replace(/\.$/, '');
+}
+
+/** "2º cajón · Micropipetas" — el hueco dentro de su zona: posición y uso. */
+function huecoUbicacion(u) {
+  if (!u) return '';
+  return _juntarPartesUbicacion([posicionUbicacion(u), usoUbicacion(u)]).join(' · ');
+}
+
+/** "Zona común · Reactivos · Inferior" — localización y uso (y apellido del laboratorio) sin el código. */
 function descripcionUbicacion(u) {
   if (!u) return '';
   const apellidoLab = ((u.Laboratorio_Aula || '').match(/^\d{3}\s*-\s*(.+)$/) || [])[1] || '';
-  return _juntarPartesUbicacion([apellidoLab, u.Zona, u.Subzona, _textoDescUbicacion(u.Descripcion_Completa)]).join(' · ');
+  return _juntarPartesUbicacion([apellidoLab, u.Zona, usoUbicacion(u)]).join(' · ');
 }
 
 // ============================================================

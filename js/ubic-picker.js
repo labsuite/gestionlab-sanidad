@@ -18,15 +18,8 @@ const _UBP_SIN_ZONA = '__sin_zona__';
 function _ubpTxt(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function _ubpNorm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 
-// "Encimera · 1º cajón debajo de AUT-02" — lo que describe el hueco dentro de su zona.
-function _ubpDescHueco(u) {
-  const partes = [];
-  [u.Subzona, u.Descripcion_Completa].forEach(p => {
-    p = (p || '').trim();
-    if (p && !partes.some(x => _ubpNorm(x) === _ubpNorm(p))) partes.push(p);
-  });
-  return partes.join(' · ');
-}
+// "1º cajón debajo de AUT-02 · Micropipetas" — el hueco dentro de su zona: posición y uso.
+function _ubpDescHueco(u) { return huecoUbicacion(u); }
 
 // "205 - Zona común" → "Lab 205 · Zona común"
 function _ubpEtiquetaLab(lab) {
@@ -40,7 +33,7 @@ function _ubpEtiquetaLab(lab) {
 function ubicDescripcionLarga(idUbicacion) {
   const u = DATA.ubicaciones.find(x => x.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '';
-  return [_ubpEtiquetaLab(u.Laboratorio_Aula), u.Zona, _ubpDescHueco(u)].filter(Boolean).join(' · ');
+  return [_ubpEtiquetaLab(u.Laboratorio_Aula), descripcionUbicacion(u)].filter(Boolean).join(' · ');
 }
 
 function _ubpActivas() {
@@ -150,19 +143,19 @@ function _ubpResultados(id) {
   if (st.lab === null) return html;
 
   const delLab = activas.filter(u => (u.Laboratorio_Aula || '') === st.lab);
-  const zonas = [...new Set(delLab.map(u => u.Zona || _UBP_SIN_ZONA))];
+  const zonas = [...new Set(delLab.map(u => zonaUbicacion(u) || _UBP_SIN_ZONA))];
   // Si el lab tiene una sola zona, se salta ese paso.
   const zonaActiva = zonas.length === 1 ? zonas[0] : st.zona;
   if (zonas.length > 1) {
     html += `<div class="ubp-titulo">Zona</div><div class="ubp-chips">`
       + zonas.sort((a, b) => a === _UBP_SIN_ZONA ? 1 : b === _UBP_SIN_ZONA ? -1 : a.localeCompare(b, 'es'))
         .map(z => {
-          const n = delLab.filter(u => (u.Zona || _UBP_SIN_ZONA) === z).length;
+          const n = delLab.filter(u => (zonaUbicacion(u) || _UBP_SIN_ZONA) === z).length;
           return `<button type="button" class="ubp-chip${zonaActiva === z ? ' activo' : ''}" onclick="_ubpZona('${id}', ${_ubpArg(z)})">${_ubpTxt(z === _UBP_SIN_ZONA ? 'Sin zona' : z)} <span class="ubp-n">${n}</span></button>`;
         }).join('') + `</div>`;
   }
   if (zonaActiva === null || zonaActiva === undefined) return html;
-  const huecos = delLab.filter(u => (u.Zona || _UBP_SIN_ZONA) === zonaActiva).sort(_ubpOrden);
+  const huecos = delLab.filter(u => (zonaUbicacion(u) || _UBP_SIN_ZONA) === zonaActiva).sort(_ubpOrden);
   html += `<div class="ubp-titulo">Sitio</div><div class="ubp-lista">${huecos.map(u => _ubpBotonHueco(id, u)).join('')}</div>`;
   return html;
 }

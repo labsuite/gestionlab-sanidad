@@ -84,7 +84,7 @@ function _ubicLabsUsuario() {
 function _ubicEtiqueta(idUbicacion) {
   const u = DATA.ubicaciones.find(u => u.ID_Ubicacion === idUbicacion);
   if (!u) return idUbicacion || '—';
-  return [u.Zona, huecoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
+  return [u.Zona, usoUbicacion(u), u.ID_Ubicacion].filter(Boolean).join(' · ');
 }
 
 /** Etiqueta corta para el desplegable, ya agrupado por zona: "Encimera · 201-1.1" */
@@ -176,12 +176,12 @@ function _ubicEquiposDelLab() {
 function _ubicRenderHerramienta(labs) {
   const ubicacionesLab = DATA.ubicaciones
     .filter(u => _ubicNumLab(u.Laboratorio_Aula) === _ubicLabActivo && u.Activa !== 'FALSE')
-    .sort((a, b) => (a.Zona || '').localeCompare(b.Zona || '') || (a.Subzona || '').localeCompare(b.Subzona || ''));
+    .sort((a, b) => (a.Zona || '').localeCompare(b.Zona || '', 'es', { numeric: true }) || a.ID_Ubicacion.localeCompare(b.ID_Ubicacion, 'es', { numeric: true }));
 
-  const zonas = [...new Set(ubicacionesLab.map(u => u.Zona || 'Sin zona'))];
+  const zonas = [...new Set(ubicacionesLab.map(u => zonaUbicacion(u) || 'Sin zona'))];
   const opciones = zonas.map(z => `
     <optgroup label="${_escAttr(z)}">
-      ${ubicacionesLab.filter(u => (u.Zona || 'Sin zona') === z).map(u => `
+      ${ubicacionesLab.filter(u => (zonaUbicacion(u) || 'Sin zona') === z).map(u => `
         <option value="${_escAttr(u.ID_Ubicacion)}" ${u.ID_Ubicacion === _ubicUbicacionActual ? 'selected' : ''}>
           ${_esc(_ubicEtiquetaCorta(u))}
         </option>`).join('')}

@@ -89,17 +89,28 @@ equipo (lo llama `buildMantenimientoEquipo` en `js/mantenimiento.js`):
   protocolo nuevo usa algo más (imágenes, bloques de código ```), hay que añadirlo en `_mdRender`.
 - `position: sticky` no funciona dentro del `<details>` en Chrome: por eso la barra de búsqueda no se queda fija al hacer scroll.
 
-## Ubicaciones: siempre con zona y subzona (2026-11-21)
+## Ubicaciones: siempre con su localización y su uso (2026-11-21, revisado 2026-11-25)
 Nadie se sabe los códigos (`205-ZC-2.3`) de memoria: en cualquier sitio donde se muestre
-una ubicación tiene que salir también su zona y subzona. Usar `getNombreUbicacion(id)`
-(`js/config.js`) → `205-ZC-2.3 – Zona común · Reactivos · Inferior`, o
-`descripcionUbicacion(u)` si el código ya se pinta aparte. Sin subzona se usa
-`Descripcion_Completa`. El código va siempre delante: zona y subzona solas no
-identifican el sitio (siete «Izquierda · Encimera» en el 201). Para **elegir** una
-ubicación, el selector de `js/ubic-picker.js` (no un `<select>` con todas).
+una ubicación tiene que salir también qué es. Usar `getNombreUbicacion(id)`
+(`js/config.js`) → `205-1.5.2 – Izquierda · 2º Cajón · Micropipetas`, o
+`descripcionUbicacion(u)` si el código ya se pinta aparte. El código va siempre delante:
+la localización sola no identifica el sitio (siete «Izquierda · Encimera» en el 201). Para
+**elegir** una ubicación, el selector de `js/ubic-picker.js` (no un `<select>` con todas).
+
+**Dos ideas, columnas con el nombre antiguo** (desde 2026-11-25, datos recolocados con
+`scripts/reorganizar_ubicaciones_2026_11.py`):
+
+| Columna | En pantalla | Ejemplo | Helper |
+|---|---|---|---|
+| `zona` | **Localización**, de lo general a lo concreto, separada por « · » | `Izquierda · 2º Cajón` | `zonaUbicacion(u)` = primer tramo (agrupa desplegables y el selector); `posicionUbicacion(u)` = el resto |
+| `subzona` | **Uso / contenido** | `Micropipetas` | `usoUbicacion(u)` |
+| `descripcion_completa` | **Observaciones** (no sale en las etiquetas) | — | — |
+
+`huecoUbicacion(u)` = posición + uso, para listas ya agrupadas por zona. Para agrupar no usar
+`u.Zona` entero (cada cajón sería un grupo): usar `zonaUbicacion(u)`.
 
 **Sección Ubicaciones** (`renderUbicaciones`, `js/ubicaciones.js`): buscador por código /
-laboratorio / zona / subzona / descripción; los laboratorios desplegados se recuerdan por
+laboratorio / localización / uso / observaciones; los laboratorios desplegados se recuerdan por
 nombre en `_ubiAbiertos`, así que siguen abiertos tras guardar (antes `renderAll()` los
 cerraba todos); la fila recién guardada se centra en pantalla y se marca un momento
 (`_ubiResaltar`). El recuento de material cuenta los botes (`material_ubicaciones`), no solo
