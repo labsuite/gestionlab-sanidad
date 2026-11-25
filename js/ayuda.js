@@ -379,7 +379,7 @@ const AYUDA_TAREAS = {
         alt: 'Tres materiales con la barra de stock señalada: verde, ámbar y roja',
       },
       {
-        texto: '**Pulsar el material para desplegarlo y ver cada bote**: una línea por sitio, con «📍», el código y el nombre del sitio (laboratorio, armario, balda), cuánto hay en cada uno y «☣️ ESTÉRIL» si es de uso estéril. Los botes del almacén llevan «Zona común» en el nombre del sitio.',
+        texto: '**Pulsar el material para desplegarlo y ver cada bote**: una línea por sitio, con «📍», el código del sitio, dónde está (armario, balda, cajón…) y qué se guarda ahí, cuánto hay en cada uno y «☣️ ESTÉRIL» si es de uso estéril. Los botes del almacén llevan «Zona común» delante.',
         img: 'STO-1/03-material-desplegado.png',
         alt: 'Material desplegado con una línea por bote y la línea de antigüedad señaladas',
       },

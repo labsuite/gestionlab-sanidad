@@ -36,11 +36,12 @@ async (page, APP) => {
     ];
     // Ubicaciones, material y residuos de ejemplo
     DATA.ubicaciones = [
-      _ubicacionSbToObj({ id_ubicacion: '205-ZC-1.1', laboratorio_aula: '205 - Zona común', zona: 'Armario 1', subzona: 'Balda 1', descripcion_completa: 'Zona común · Armario 1 · Balda 1', activa: true }),
-      _ubicacionSbToObj({ id_ubicacion: '205-ZC-2.1', laboratorio_aula: '205 - Zona común', zona: 'Reactivos', subzona: 'Inferior', descripcion_completa: 'Zona común · Reactivos · Inferior', activa: true }),
-      _ubicacionSbToObj({ id_ubicacion: '205-1.7', laboratorio_aula: '205', zona: 'Poyata 1', subzona: 'Cajón 7', descripcion_completa: 'Lab 205 · Poyata 1 · Cajón 7', activa: true }),
-      _ubicacionSbToObj({ id_ubicacion: '205-2.3', laboratorio_aula: '205', zona: 'Armario 2', subzona: 'Balda 3', descripcion_completa: 'Lab 205 · Armario 2 · Balda 3', activa: true }),
-      _ubicacionSbToObj({ id_ubicacion: '203-1.2', laboratorio_aula: '203', zona: 'Armario 1', subzona: 'Balda 2', descripcion_completa: 'Lab 203 · Armario 1 · Balda 2', activa: true }),
+      // Convención del 2026-11-25: zona = localización («Armario 1 · Balda 1»), subzona = uso / contenido.
+      _ubicacionSbToObj({ id_ubicacion: '205-ZC-1.1', laboratorio_aula: '205 - Zona común', zona: 'Armario 1 · Balda 1', subzona: 'Puntas y guantes', descripcion_completa: '', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '205-ZC-2.1', laboratorio_aula: '205 - Zona común', zona: 'Armario 2 · Inferior', subzona: 'Reactivos', descripcion_completa: '', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '205-1.7', laboratorio_aula: '205', zona: 'Poyata 1 · Cajón 7', subzona: 'Puntas', descripcion_completa: '', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '205-2.3', laboratorio_aula: '205', zona: 'Armario 2 · Balda 3', subzona: 'Vidrio', descripcion_completa: '', activa: true }),
+      _ubicacionSbToObj({ id_ubicacion: '203-1.2', laboratorio_aula: '203', zona: 'Armario 1 · Balda 2', subzona: 'Puntas', descripcion_completa: '', activa: true }),
     ];
     DATA.material = [
       _materialSbToObj({ id_material: 'MATEJ1', nombre: 'Puntas de pipeta 200 µL', categoria: 'Material fungible — puntas, tubos, placas, Eppendorf...', unidad: 'caja/s', stock_actual: 7, stock_minimo: 2, stock_optimo: 8 }),
