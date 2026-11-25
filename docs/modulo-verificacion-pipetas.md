@@ -51,7 +51,10 @@ escrituras, solo por las Edge Functions.
    «🧪 Verificación de la pipeta» abre el formulario. Por volumen: la sesión en que se mide, el lote
    de S-C si hay dos, y las réplicas (por canal en las multicanal). La app calcula y decide al
    escribir. Los pasos de verificación del plan (sesión, cada volumen, «Completar», «Resultado»;
-   en el bianual, «Verificación con 10 réplicas») salen con 🧪 y **los marca la app**.
+   en el antiguo bianual, «Verificación con 10 réplicas») salen con 🧪 y **los marca la app**.
+   Desde el 2026-11-25 ya no hay bianual interno: lo sustituye una calibración **externa cada 5
+   años** («Quinquenal», sin formulario de verificación); el código del bianual (`sin_cribado`)
+   se conserva por los registros antiguos.
 4. **Finalizar** solo con resultado OK o RETIRAR (lo exige también el servidor). AJUSTAR: el
    docente ajusta y pulsa «He ajustado la pipeta», y se repiten los volúmenes con 10 réplicas en la
    misma revisión; si sigue sin cumplir, RETIRAR. «Por comprobar» el tornillo: lo contesta el
