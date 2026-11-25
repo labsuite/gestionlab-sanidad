@@ -1190,6 +1190,9 @@ function _mostrarSelectorUbicEntrada(matId) {
 // ============================================================
 function autoIdMaterial(nombre) {
   const idField = document.getElementById('mat-id'); if (!idField) return;
+  // Al editar, el ID no cambia aunque se cambie el nombre: si se regenerase
+  // (PIP-01 → PIP-02), "actualizar" buscaría un material que no existe.
+  if (idField.readOnly || (editingRow && editingRow.sheet === 'Material')) return;
   const currentVal = idField.value;
   const autoPattern = /^[A-Z]{2,3}-\d{2,}$/;
   if (currentVal && !autoPattern.test(currentVal)) return;
@@ -1215,7 +1218,9 @@ async function guardarMaterial() {
   if (!unidadValida(unidad) || _lotesTemp.some(l => (l.Unidad_Lote || '').trim() && !unidadValida(l.Unidad_Lote))) {
     showToast(MSG_UNIDAD_NUMERICA, 'error'); return;
   }
-  const id = (editingRow && editingRow.sheet === 'Material') ? v('mat-id') : generarIdMaterial(nombre);
+  const id = (editingRow && editingRow.sheet === 'Material')
+    ? (DATA.material[editingRow.rowIndex]?.ID_Material || v('mat-id'))
+    : generarIdMaterial(nombre);
   const gestionAuto = document.getElementById('mat-gestion-auto') ? document.getElementById('mat-gestion-auto').checked : true;
 
   const stockGlobal = _lotesTemp.length
