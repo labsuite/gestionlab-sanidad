@@ -30,7 +30,8 @@ const AYUDA_MANUALES = {
     ],
   },
   // EMP-6, EMP-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión en todos
-  // los manuales). STO-2, RES-2, MAN-1/2, INC-1 y USO-3 de momento solo tienen la del alumnado.
+  // los manuales; STO-1 y STO-3 llevan además, solo en Gestor y Administrador, la excepción
+  // del material común en la zona común). STO-2, RES-2, MAN-1/2, INC-1 y USO-3 de momento solo tienen la del alumnado.
   Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
   Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
   Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
@@ -699,9 +700,17 @@ const AYUDA_TAREAS = {
       ['Después', [['STO-2', 'Apuntar el gasto al abrir un envase nuevo']]],
     ],
   };
+  // Solo en los manuales de Gestor y Administrador (decisión de Paloma, 25/11/2026): el
+  // material común del departamento sí se apunta como gasto desde la zona común. Al alumnado
+  // y al profesorado no se les cuenta. Guiones: apartado «Solo en los manuales de Gestor y
+  // Administrador» de STO-1 y STO-3. Regla de la app: gastoBloqueadoEnAlmacen() (js/config.js).
+  const excepcionComun = '**Solo para gestión: el material común del departamento.** El que tiene marcada en su ficha la casilla «🤝 Material común del departamento» (guantes, papel…) **sí** se puede apuntar como gasto desde la zona común, porque de allí se lo llevan otros ciclos: sus botes del almacén tienen «📦». Los manuales del alumnado y del profesorado no lo cuentan.';
+  const sto1Gestion = { ...sto1, pasos: sto1.pasos.map((p, i) => i === 0 ? { ...p, nota: p.nota + ' ' + excepcionComun } : p) };
+  const sto3Gestion = { ...sto3, cuando: [sto3.cuando[0], excepcionComun, ...sto3.cuando.slice(1)] };
   AYUDA_ORDEN_MANUALES.forEach(r => {
-    AYUDA_TAREAS['STO-1'].versiones[r] = sto1;
-    AYUDA_TAREAS['STO-3'].versiones[r] = sto3;
+    const gestion = r === 'Gestor' || r === 'Administrador';
+    AYUDA_TAREAS['STO-1'].versiones[r] = gestion ? sto1Gestion : sto1;
+    AYUDA_TAREAS['STO-3'].versiones[r] = gestion ? sto3Gestion : sto3;
   });
 })();
 
