@@ -15,9 +15,9 @@ async (page, { app: APP, salida: SALIDA }) => {
     const hace = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
     DATA.registrosCabina = [
       _registroCabinaSbToObj({ id_registro: 'RCEJ1', id_equipo: 'CAB-03', usuario: _demo.EMAIL, fecha: hace(2), hora_inicio: '10:15',
-        practica_tecnica: 'Siembra en agar sangre', nivel_riesgo: 'BSL-2', verificacion_previa: 'Sí', estado: 'Abierta' }),
+        practica_tecnica: 'Siembra en agar sangre', grupo_riesgo: '2', verificacion_previa: 'Sí', desinfeccion_inicial: 'Sí', estado: 'Abierta' }),
       _registroCabinaSbToObj({ id_registro: 'RCEJ0', id_equipo: 'CAB-03', usuario: _demo.EMAIL, fecha: hace(9), hora_inicio: '09:00', hora_fin: '10:30',
-        practica_tecnica: 'Tinción de Gram', nivel_riesgo: 'BSL-2', verificacion_previa: 'Sí', descontaminacion_posterior: 'Sí', estado: 'Cerrada' }),
+        practica_tecnica: 'Tinción de Gram', grupo_riesgo: '2', verificacion_previa: 'Sí', desinfeccion_inicial: 'Sí', descontaminacion_posterior: 'Sí', estado: 'Cerrada' }),
     ];
     DATA.incidencias = [];
     renderAll();

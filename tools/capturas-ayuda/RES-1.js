@@ -11,6 +11,15 @@ async (page, { app: APP, salida: SALIDA }) => {
   await eval(fs.readFileSync(path.join(__dirname, '_demo-alumno.js'), 'utf8'))(page, APP);
   await eval(fs.readFileSync(path.join(__dirname, '_demo-residuos.js'), 'utf8'))(page);
 
+  // 0 · Los vídeos, arriba de la Guía
+  await page.evaluate(() => {
+    showPage('residuos-guia'); renderResiduosGuia(); window.scrollTo(0, 0);
+    document.querySelector('button[onclick="abrirVideoCompletoResiduos()"]').closest('.card').classList.add('ayuda-senal');
+  });
+  await pausa(300);
+  await foto('00-videos.png');
+  await limpiar();
+
   // 1 · Buscador de la guía con un resultado
   await page.evaluate(() => {
     showPage('residuos-guia'); renderResiduosGuia();

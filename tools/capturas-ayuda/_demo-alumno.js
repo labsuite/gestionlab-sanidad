@@ -14,6 +14,7 @@ async (page, APP) => {
     const eq = (id, tipo, marca, modelo, ubic) => _equipoSbToObj({ id_activo: id, tipo_equipo: tipo, marca, modelo, ubicacion: ubic, estado_operativo: 'Operativo', responsable: 'Docente de ejemplo' });
     DATA.equipos = [
       eq('CAB-03', 'Cabina de seguridad biológica', 'Telstar', 'BioVanguard Green Line', 'Lab 205'),
+      eq('CAB-01', 'Vitrina de extracción de gases', 'Indelab', 'Flow lan sv', 'Lab 205'),
       eq('AUTC-001', 'Autoclave', 'J.P. Selecta', 'Presoclave', 'Lab 205'),
       eq('BAT-06', 'Baño termostático', 'J.P. Selecta', 'Precisterm', 'Lab 205'),
       eq('BAL-003', 'Balanza', 'Phoenix Instrument', 'BTC-223', '205-ZC'),

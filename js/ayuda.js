@@ -23,18 +23,20 @@ const AYUDA_MANUALES = {
     intro: 'Lo que hace tu grupo en GestionLab, contado como tareas de laboratorio. Entras con la cuenta del grupo, y lo que registras sale a nombre del grupo.',
     secciones: [
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
-      { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-2', 'STO-3'] },
+      { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-2', 'STO-3'] },
       { titulo: 'Al recoger', tareas: ['RES-1', 'RES-2'] },
       { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-1', 'MAN-2'] },
       { titulo: 'Si algo falla', tareas: ['INC-1', 'EMP-2', 'USO-3'] },
+      { titulo: 'Cuando el profesorado os lo pida', tareas: ['INV-1', 'INV-2', 'INV-3'] },
     ],
   },
-  // EMP-6, EMP-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión en todos
-  // los manuales; STO-1 y STO-3 llevan además, solo en Gestor y Administrador, la excepción
-  // del material común en la zona común). STO-2, RES-2, MAN-1/2, INC-1 y USO-3 de momento solo tienen la del alumnado.
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  // EMP-6, EMP-2, USO-1, USO-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión
+  // en todos los manuales; STO-1 y STO-3 llevan además, solo en Gestor y Administrador, la
+  // excepción del material común en la zona común). STO-2, RES-2, MAN-1/2, INC-1, USO-3 e
+  // INV-1/2/3 de momento solo tienen la del alumnado.
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -367,7 +369,7 @@ const AYUDA_TAREAS = {
   },
 
   // ── RES-1 · común (guion «RES-1_a-que-contenedor.md», 25/11/2026) ──
-  // Los vídeos de residuos no están enlazados en GestionLab: no se enlazan desde aquí.
+  // Los vídeos de residuos (VIDEOS_RESIDUOS en js/residuos.js) se enlazan desde el paso 1.
   'RES-1': {
     pantallas: ['residuos-guia'],
     versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
@@ -568,8 +570,7 @@ const AYUDA_TAREAS = {
   },
 
   // ── USO-3 · versión alumnado (guion «USO-3_sesiones-abiertas.md», 25/11/2026) ──
-  // Una sesión ya cerrada no se puede corregir desde la app (gestionar-registro-uso no tiene
-  // acción de editar): por eso «Se ha cerrado con un dato mal» no dice «Gestión lo corrige».
+  // Gestión (Gestor/Administrador) corrige una sesión cerrada dejando constancia (desde el 25/11/2026).
   'USO-3': {
     pantallas: ['registros-uso', 'dashboard'],
     versiones: {
@@ -611,10 +612,207 @@ const AYUDA_TAREAS = {
         problemas: [
           ['Nadie del grupo sabe qué se hizo en esa sesión', 'no cerrarla con datos inventados. Avisar al profesorado.'],
           ['La sesión no es del grupo', 'el grupo solo ve las suyas; las de otros las cierra Gestión.'],
-          ['Se ha cerrado con un dato mal', 'avisar al profesorado.'],
+          ['Se ha cerrado con un dato mal', 'avisar al profesorado. Gestión lo corrige, y queda constancia del cambio.'],
         ],
         relacionado: [
           ['Antes', [['USO-1', 'Apuntar un uso de la cabina o de la vitrina']]],
+        ],
+      },
+    },
+  },
+  // ── USO-1 y USO-2 · comunes (guiones «USO-1_cabina-y-vitrina.md» y «USO-2_ciclo-autoclave.md»,
+  // 23/11/2026), con los registros que sustituyen a las hojas en papel (en la app desde el 25/11/2026)
+  'USO-1': {
+    pantallas: ['registros-uso'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+  'USO-2': {
+    pantallas: ['registros-uso'],
+    versiones: {},   // la misma versión en los cuatro manuales: se rellena más abajo
+  },
+
+  // ── INV-1 · versión alumnado (guion «INV-1_ubicar-equipos.md», 25/11/2026) ──
+  'INV-1': {
+    pantallas: ['equipos', 'ubicar-equipos'],
+    versiones: {
+      Alumno: {
+        titulo: 'Ubicar los equipos de un laboratorio, o avisar de que falta uno',
+        quien: ['Tu grupo, con la cuenta del grupo, en los laboratorios del grupo.'],
+        cuando: ['Cuando el profesorado os pide revisar dónde está cada equipo de un laboratorio (inventario).'],
+        antes: [
+          'El móvil con la sesión del grupo abierta: esta tarea se hace recorriendo el laboratorio.',
+          'Tiempo para hacerlo armario a armario, sin prisa. Un equipo mal ubicado se busca después donde no está.',
+        ],
+        pasos: [
+          {
+            texto: '**Abrir «📍 Ubicar equipos»**, en «Equipos › Inventario» (en el móvil, menú «☰»). Si el grupo tiene más de un laboratorio, elegirlo arriba, en «🔎 Ubicar equipos».',
+          },
+          {
+            texto: '**Ponerse delante de un sitio** (un armario, una balda, una mesa) y elegirlo en «1 · ¿Dónde estás ahora?». El sitio se elige por su localización («Poyata 1 · Encima»), que es lo que se ve en el laboratorio. Debajo sale «✓ Estás en …».',
+            img: 'INV-1/01-elegir-sitio.png',
+            alt: 'Ubicar equipos con el sitio elegido en ¿Dónde estás ahora? señalado',
+          },
+          {
+            texto: '**Marcar solo los equipos que se ven en ese sitio, comprobando el código de su etiqueta** (con equipos iguales, como micropipetas o microscopios, es el error más fácil). Lo que se recuerde o se suponga, no se marca. «Buscar por tipo, marca o ID…» ayuda a encontrarlos en la lista.',
+          },
+          {
+            texto: '**Pulsar «📍 Están aquí (n)»**, abajo, y pasar al sitio siguiente.',
+            img: 'INV-1/02-marcar-y-estan-aqui.png',
+            alt: 'Lista de equipos con uno marcado y el botón Están aquí señalado',
+          },
+          {
+            texto: '**No mover equipos para que cuadren con la app**: se apunta dónde están, no dónde deberían estar.',
+          },
+          {
+            texto: '**Si un equipo de la lista no aparece en el laboratorio**: pulsar ❓ («No lo encuentro») en su fila y escribir en la nota dónde se ha buscado. No adivinar dónde está.',
+            img: 'INV-1/03-no-lo-encuentro.png',
+            alt: 'Fila de un equipo con el botón No lo encuentro señalado',
+          },
+          {
+            texto: '**Si hay un equipo sin etiqueta o con una etiqueta que no está en la app**: no marcarlo como otro. Avisar al profesorado.',
+          },
+        ],
+        comprobacion: [
+          'En «📨 Lo que has propuesto», cada propuesta sale «Pendiente de validar» (o «Aceptada», si otra cuenta propuso el mismo sitio). La barra de progreso sube cuando el profesorado las acepta.',
+        ],
+        comprobacionImg: { img: 'INV-1/04-lo-que-has-propuesto.png', alt: 'Lo que has propuesto con propuestas pendientes, aceptadas y no aceptadas' },
+        problemas: [
+          ['El sitio no está en la lista', 'elegir el más cercano que exista y decirlo en la nota, o avisar al profesorado, que crea las ubicaciones.'],
+          ['Una propuesta sale «No aceptada»', 'leer el motivo que ha escrito el profesorado, debajo.'],
+          ['Se ha marcado un equipo en el sitio equivocado', 'volver a ese sitio, marcar «Mostrar también los que ya tienen ubicación concreta (para corregirla)» y marcarlo en el correcto.'],
+        ],
+        relacionado: [
+          ['Antes', [['EQU-1', 'Encontrar un equipo'], ['EMP-6', 'Usar GestionLab en el móvil']]],
+        ],
+      },
+    },
+  },
+
+  // ── INV-2 · versión alumnado (guion «INV-2_contar-stock.md», 25/11/2026) ──
+  'INV-2': {
+    pantallas: ['material'],
+    versiones: {
+      Alumno: {
+        titulo: 'Contar el stock de un sitio',
+        quien: ['Tu grupo, si el profesorado le ha dado permiso para contar stock. Solo en sitios de vuestros laboratorios y del almacén (zona común, 205-ZC).'],
+        cuando: ['Cuando el profesorado os pide contar un armario o una balda.'],
+        antes: [
+          'El permiso del grupo (sin él, no sale el botón de contar).',
+          'Guantes si hay reactivos.',
+        ],
+        extrasTrasAntes: [
+          {
+            titulo: 'Qué se cuenta',
+            items: [
+              '**Solo los envases cerrados**, en la misma unidad que usa la app para ese material (envases, cajas o unidades). Los envases abiertos no se cuentan: se apuntaron como gastados al abrirlos.',
+              '**El material reutilizable** (♻️: vidrio, gradillas, objetos) se cuenta entero, porque no se gasta.',
+              '**Solo lo que hay en ese sitio**, no lo de otros armarios.',
+            ],
+          },
+        ],
+        pasos: [
+          {
+            texto: '**Ponerse delante del sitio y buscar el material** en «Material fungible › Inventario» (→ [[STO-1|Encontrar un material]]). Pulsarlo para desplegar sus botes.',
+          },
+          {
+            texto: '**Pulsar 🔢 en la línea del bote de ese sitio.** Si la app no lo tiene ahí pero lo hay, pulsar 🔢 en la línea del material y elegir el sitio en «¿Dónde lo has contado?»: está entre «Ahí no consta todavía» (los que ya tienen ese material, en «Donde ya consta»).',
+            img: 'INV-2/01-boton-contar.png',
+            alt: 'Material desplegado con el botón de contar de la línea de un bote señalado',
+          },
+          {
+            texto: '**Contar lo que se ve, no lo que dice la app.** «En la app, ahí hay» enseña cuánto cree la app que hay; en «Cantidad real que ves», lo que hay de verdad, aunque no coincida. La ventana lo recuerda: «Cuenta solo los envases cerrados».',
+            img: 'INV-2/02-ventana-de-recuento.png',
+            alt: 'Ventana Contar stock con lo que dice la app, la cantidad real y el recordatorio de contar solo los envases cerrados',
+          },
+          {
+            texto: '**En «Observaciones», lo que ayude a entender la diferencia**, con hechos: «2 cajas caducadas», «1 frasco roto». Sin nombres de personas.',
+          },
+          {
+            texto: '**Pulsar «Enviar revisión».** Sale «Revisión enviada. El profesor la revisará pronto.» **No mover material mientras se cuenta**: si algo está fuera de sitio, se dice en observaciones.',
+            img: 'INV-2/03-enviado.png',
+            alt: 'Aviso Revisión enviada. El profesor la revisará pronto',
+          },
+          {
+            texto: 'Si hay material que no está en la app, eso no se cuenta aquí: se inventaría (→ [[INV-3|Inventariar material que no está en la app]]).',
+          },
+        ],
+        comprobacion: ['El recuento queda enviado y pendiente de que lo aplique un docente. Cuando lo aplica, el stock de ese sitio pasa a ser lo contado.'],
+        problemas: [
+          ['No sale el botón 🔢', 'el grupo no tiene permiso para contar, o ese sitio no es de vuestros laboratorios ni del almacén.'],
+          ['Se ha enviado un número mal', 'avisar al profesorado antes de que lo aplique.'],
+          ['Hay envases caducados o deteriorados', 'contarlos, decirlo en observaciones y avisar al profesorado. No tirarlos por vuestra cuenta (→ [[RES-1|Saber a qué contenedor va un residuo]]).'],
+        ],
+        relacionado: [
+          ['Antes', [['STO-1', 'Encontrar un material']]],
+          ['Junto a esta', [['INV-3', 'Inventariar material que no está en la app']]],
+        ],
+      },
+    },
+  },
+
+  // ── INV-3 · versión alumnado (guion «INV-3_inventariar-material-nuevo.md», 25/11/2026) ──
+  'INV-3': {
+    pantallas: ['material', 'inventariar-material'],
+    versiones: {
+      Alumno: {
+        titulo: 'Inventariar material que no está en la app',
+        quien: ['Tu grupo, con la cuenta del grupo.'],
+        cuando: ['Cuando el profesorado os pide inventariar un armario y aparece material que no está en la app.'],
+        antes: [
+          'El móvil con la sesión del grupo abierta y la cámara permitida. Si la app se abre dentro de otra aplicación (Classroom, Instagram…), abrirla en el navegador: dentro de esas aplicaciones la cámara suele estar bloqueada.',
+          'Guantes si hay reactivos.',
+        ],
+        extrasTrasAntes: [
+          {
+            titulo: 'Normas que no cambian',
+            items: [
+              '**Un producto sin etiqueta o con la etiqueta ilegible no se inventaría ni se abre para ver qué es.** Apartarlo y avisar al profesorado: un producto desconocido es un problema de seguridad y de residuos, no de inventario.',
+              '**Nada se abre para inventariarlo.** Se trabaja con lo que pone el envase por fuera.',
+            ],
+          },
+        ],
+        pasos: [
+          {
+            texto: '**Abrir «🧴 Inventariar material nuevo»**, en «Material fungible › Inventario», y **elegir el sitio donde se está** en «📍 ¿Dónde estás inventariando?»: el laboratorio y el armario o la balda. Todo lo que se envíe se guarda en ese sitio (lo dice debajo: «✓ Todo lo que envíes se guardará en …»): cambiarlo al pasar a otro armario.',
+            img: 'INV-3/01-elegir-sitio.png',
+            alt: 'Tarjeta ¿Dónde estás inventariando? con el laboratorio y el armario elegidos',
+          },
+          {
+            texto: '**Comprobar antes que no está ya en la app** (→ [[STO-1|Encontrar un material]]). Si está, no se inventaría: se cuenta (→ [[INV-2|Contar el stock de un sitio]]).',
+          },
+          {
+            texto: '**Fotografiar la etiqueta** entera y legible: «📷 Hacer una foto» (o «🖼️ Elegir una foto ya hecha»). Es obligatoria: es lo que mira el profesorado para validar.',
+          },
+          {
+            texto: '**Elegir la categoría y el tipo de producto**, en «2 · ¿Qué es?». «✨ Leer la etiqueta» rellena los datos con IA: **comprobar cada dato con la etiqueta** y corregir lo que esté mal. Lo que no se ve en la foto se deja en blanco: la app lo marca con «no se ve en la foto».',
+            imgs: [
+              { img: 'INV-3/02-foto-de-la-etiqueta.png', alt: 'Foto de la etiqueta subida, con la categoría y el tipo elegidos y el botón Leer la etiqueta', pie: 'La foto, la categoría y el tipo; después, «✨ Leer la etiqueta».' },
+              { img: 'INV-3/03-datos-leidos.png', alt: 'Datos leídos de la etiqueta con un dato marcado como no se ve en la foto, y la cantidad', pie: 'Lo leído, con lo que «no se ve en la foto» en blanco.' },
+            ],
+          },
+          {
+            texto: '**El nombre no se escribe: la app lo compone.** Lo que pone la etiqueta (marca, referencia) va en «Lo que pone en la etiqueta».',
+          },
+          {
+            texto: '**Cantidad, en «4 · ¿Cuánto hay?»: los envases cerrados**, en su unidad. Si hay alguno abierto, decirlo en observaciones.',
+          },
+          {
+            texto: '**En observaciones, la caducidad si ya ha pasado o el estado del envase si está deteriorado.**',
+          },
+          {
+            texto: '**Pulsar «📨 Enviar propuesta».** Si la app avisa de que se parece a algo que ya existe («⚠️ Se parece a …»), mirar si es lo mismo; si hay duda, enviarlo igual con su foto.',
+          },
+        ],
+        comprobacion: ['En «📨 Lo que has propuesto» sale «Pendiente de validar». Cuando el profesorado lo valida, pasa a «Aceptada» o «Ya existía»; si no, «No aceptada» con el motivo.'],
+        comprobacionImg: { img: 'INV-3/05-lo-que-has-propuesto.png', alt: 'Lo que has propuesto con una propuesta pendiente, una que ya existía y una aceptada' },
+        problemas: [
+          ['No se puede enviar', 'falta la foto, la categoría o el tipo.'],
+          ['El tipo de producto no está en la lista', 'elegir «No está en la lista» y escribir el nombre común (no el comercial).'],
+          ['La cámara no se abre', 'dar permiso a la cámara, o abrir la app en el navegador en vez de dentro de otra aplicación. También vale elegir una foto ya hecha.'],
+        ],
+        relacionado: [
+          ['Antes', [['STO-1', 'Encontrar un material']]],
+          ['Junto a esta', [['INV-2', 'Contar el stock de un sitio'], ['INV-1', 'Ubicar los equipos de un laboratorio']]],
         ],
       },
     },
@@ -638,7 +836,7 @@ const AYUDA_TAREAS = {
         alt: 'Inventario de material fungible con «puntas» escrito en el buscador y el material encontrado señalado',
       },
       {
-        texto: '**Leer la barra de stock**: verde, hay bastante; ámbar, está en el mínimo o por debajo; rojo, no queda. Al lado de la barra, lo que hay en total; a la derecha, el mínimo y el óptimo.',
+        texto: '**Leer la barra de stock**: verde, hay bastante; ámbar, está en el mínimo o por debajo; rojo, no queda. Al lado de la barra, lo que hay en total; a la derecha, el mínimo y el óptimo. **El stock son los envases cerrados**: los abiertos ya se apuntaron como gastados al abrirlos. El material reutilizable (♻️) cuenta entero.',
         img: 'STO-1/02-barra-de-stock.png',
         alt: 'Tres materiales con la barra de stock señalada: verde, ámbar y roja',
       },
@@ -752,8 +950,11 @@ const AYUDA_TAREAS = {
     pasos: [
       {
         texto: '**Buscarlo en la Guía de residuos**: «Residuos › Guía de residuos» (en el móvil, menú «☰»). En «Buscar residuo, descripción o contenedor…» escribir el nombre, una palabra de lo que es («tinción», «formol») o el peligro («Inflamable»). Los resultados salen agrupados por contenedor: el título de cada grupo es el contenedor al que van.',
-        img: 'RES-1/01-buscar-en-la-guia.png',
-        alt: 'Guía de residuos con «tinción» escrito en el buscador y los residuos encontrados bajo su contenedor',
+        nota: '**Los vídeos de residuos**: arriba de la Guía, «▶ Ver el vídeo completo, con su índice» recorre los contenedores del centro explicados en el laboratorio; en el índice se pulsa lo que se quiere tirar y el vídeo salta a esa explicación. Cada contenedor que sale en el vídeo tiene además su trozo («▶ Vídeo: …») en la lista de la Guía, en el asistente y en «Añadir residuo». Todos llevan subtítulos.',
+        imgs: [
+          { img: 'RES-1/01-buscar-en-la-guia.png', alt: 'Guía de residuos con «tinción» escrito en el buscador y los residuos encontrados bajo su contenedor', pie: 'El buscador de la Guía.' },
+          { img: 'RES-1/00-videos.png', alt: 'Cabecera de la Guía de residuos con el botón Ver el vídeo completo, con su índice', pie: 'Los vídeos, arriba de la Guía.' },
+        ],
       },
       {
         texto: '**Si no aparece, o no se está seguro: el asistente «🧭 ¿Dónde lo tiro?»**, en la misma página. Hace una pregunta cada vez: pulsar la respuesta que corresponde a lo que el residuo es de verdad, no a lo que se supone. «← Atrás» deshace la última respuesta y «Empezar de nuevo» vuelve al principio.',
@@ -799,6 +1000,127 @@ const AYUDA_TAREAS = {
     relacionado: [['Después', [['RES-2', 'Echar un residuo y apuntarlo']]]],
   };
   AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS['RES-1'].versiones[r] = res1; });
+})();
+
+// ── USO-1 y USO-2 · comunes a todos los roles (guiones del 23/11/2026) ──
+(() => {
+  const uso1 = {
+    titulo: 'Apuntar un uso de la cabina de seguridad biológica o de la vitrina de gases',
+    quien: ['Cualquier cuenta. Con la cuenta de un grupo, la sesión es del grupo: que la empiece y la termine la misma persona, que es quien sabe lo que se ha hecho.'],
+    cuando: ['Cada vez que se trabaja en la cabina de seguridad biológica (CAB-03) o en una vitrina de gases (CAB-01, CAB-02, CAB-04). Este registro sustituye a la hoja en papel.'],
+    antes: [
+      '**El equipo adecuado**: la cabina es para trabajo biológico (cultivos, muestras humanas), y solo con agentes de los grupos de riesgo 1 y 2, porque los laboratorios son de nivel de contención 2. La vitrina es para productos químicos que desprenden vapores, y en ella nada de cultivos abiertos.',
+      '**En la vitrina de carbón activo (CAB-02)**: que los productos estén entre los admitidos de su etiqueta y que el filtro esté en fecha.',
+      '**El protocolo del equipo**: apartado 2 (seguridad), 4 (comprobaciones previas) y 7 (procedimiento de uso) (→ [[EQU-2|Consultar cómo se usa un equipo]]).',
+      'La práctica que se va a hacer y, en la cabina, el grupo de riesgo del agente; en la vitrina, los productos.',
+    ],
+    pasos: [
+      { texto: '**Encender el equipo y hacer las comprobaciones previas del apartado 4** de su protocolo, antes de abrir nada.' },
+      {
+        texto: '**Empezar la sesión**: leer la etiqueta del equipo con el móvil (→ [[EMP-6|Usar GestionLab en el móvil: etiquetas]]) o, en «Uso del laboratorio › Registros de uso», elegir la pestaña («🧫 Cabina de bioseguridad» o «🌫️ Vitrina de gases») y el equipo, y pulsar «▶ Empezar sesión». Si se ha empezado por error, «Deshacer» durante unos segundos.',
+        imgs: [
+          { img: 'USO-1/01-empezar-sesion.png', alt: 'Registros de uso de la cabina con el botón Empezar sesión señalado', pie: '«▶ Empezar sesión».' },
+          { img: 'USO-1/02-sesion-empezada.png', alt: 'Sesión empezada con el aviso y su botón Deshacer, y el botón Terminar mi sesión señalado', pie: 'La sesión empezada: el botón pasa a «■ Terminar mi sesión».' },
+        ],
+      },
+      { texto: 'Trabajar según el apartado 7 del protocolo.' },
+      { texto: 'Al terminar, recoger y desinfectar como dice el protocolo. En la cabina, la UV solo con el frontal cerrado y sin nadie delante; nunca sustituye a la desinfección.' },
+      {
+        texto: '**Terminar la sesión** (leer otra vez la etiqueta, o «■ Terminar mi sesión») y rellenar con lo que se ha hecho de verdad. «Hora fin» trae la hora de ahora.',
+        lista: [
+          '**Cabina**: «Práctica / técnica» · «Grupo de riesgo del agente» · «Minutos de UV (si se ha usado)» · las casillas «Comprobaciones previas hechas (apartado 4 del protocolo)», «Desinfección inicial hecha» y «Desinfección final hecha» · en «Alarmas e incidencias», las alarmas que hayan saltado y los derrames.',
+          '**Vitrina**: «Práctica / técnica» · «Productos / reactivos manipulados» · las casillas «Comprobaciones previas hechas (apartado 4 del protocolo)» y «Limpieza y retirada de material al terminar» · «Incidencias».',
+        ],
+        nota: 'Después, «Guardar y cerrar sesión».',
+        imgs: [
+          { img: 'USO-1/03-terminar-cabina.png', alt: 'Ventana Cerrar sesión de la cabina con la práctica, el grupo de riesgo, los minutos de UV y las tres casillas', pie: 'Cabina.' },
+          { img: 'USO-1/04-terminar-vitrina.png', alt: 'Ventana Cerrar sesión de la vitrina con la práctica, los productos y las dos casillas', pie: 'Vitrina.' },
+        ],
+      },
+      { texto: '**Si se olvidó empezar la sesión**: «📝 Registrar sesión completa» ese mismo día, con las horas reales.' },
+    ],
+    comprobacion: [
+      'La sesión sale cerrada en el «Historial» del equipo, con los datos rellenados.',
+      'La cuenta no tiene ninguna sesión abierta en ese equipo.',
+    ],
+    comprobacionImg: { img: 'USO-1/05-historial.png', alt: 'Historial de la cabina con la sesión cerrada y sus datos' },
+    problemas: [
+      ['Salta una alarma mientras se trabaja', 'parar y seguir el apartado 10 del protocolo; apuntarla en «Alarmas e incidencias». Si el equipo falla, avisar (→ [[INC-1|Avisar de una avería]]).'],
+      ['Derrame', 'actuar según el apartado 2 del protocolo, apuntarlo en incidencias y avisar al profesorado.'],
+      ['Se olvidó terminar la sesión', 'la app avisa al entrar. Cerrarla con los datos de ese día (→ [[USO-3|Cerrar las sesiones que se quedaron abiertas]]).'],
+      ['Se ha apuntado algo mal en una sesión ya cerrada', 'avisar al profesorado. Gestión lo corrige, y queda constancia del cambio.'],
+      ['Hay una reserva del equipo', 'la reserva no es el registro. Hay que apuntar el uso igualmente.'],
+    ],
+    relacionado: [
+      ['Antes', [['EQU-2', 'Consultar cómo se usa'], ['EMP-6', 'Usar GestionLab en el móvil: etiquetas'], ['EQU-4', 'Reservar un equipo']]],
+      ['Después', [['USO-3', 'Cerrar las sesiones que se quedaron abiertas'], ['INC-1', 'Avisar de una avería']]],
+      ['Cepas del grupo 2', [['MUE-2', 'Usar una muestra congelada']]],
+    ],
+  };
+
+  const uso2 = {
+    titulo: 'Apuntar un ciclo de autoclave',
+    quien: ['Cualquier cuenta.'],
+    cuando: [
+      'En cada ciclo de cualquiera de los dos autoclaves del 205 (AUTC-001 y AUTC-002, el grande de 75 l): al arrancarlo y al terminar.',
+      'Si el ciclo llevaba indicador biológico, también al leerlo, 24–48 h después.',
+      'Este registro sustituye a la hoja del autoclave.',
+    ],
+    antes: [
+      '**El protocolo del autoclave**: apartados 2 (seguridad), 4 (comprobaciones previas) y 7 (procedimiento de uso, con los programas por tipo de carga) (→ [[EQU-2|Consultar cómo se usa un equipo]]).',
+      '**La carga preparada como dice el apartado 7**: cinta indicadora en cada paquete o bolsa, e integrador químico en el centro de la carga.',
+      'El programa (temperatura y minutos) y el tipo de carga: material, medios o residuos.',
+    ],
+    pasos: [
+      { texto: 'Hacer las comprobaciones previas del apartado 4 y cargar.' },
+      {
+        texto: '**Arrancar el ciclo y apuntarlo en ese momento**: con la etiqueta del autoclave (→ [[EMP-6|Usar GestionLab en el móvil: etiquetas]]) o en «Uso del laboratorio › Registros de uso», pestaña «♨️ Autoclave», «▶ Arrancar ciclo». En «Arrancar ciclo»: la hora de inicio, el «Programa (temperatura y minutos)», el «Tipo de carga» y, si la carga lleva indicador biológico, la casilla «Lleva indicador biológico». Pulsar «Arrancar ciclo».',
+        img: 'USO-2/01-arrancar-ciclo.png',
+        alt: 'Ventana Arrancar ciclo con el programa, el tipo de carga y la casilla del indicador biológico',
+      },
+      { texto: '**Al terminar, antes de abrir**: leer en el panel la temperatura y la presión máximas alcanzadas. Abrir solo como dice el protocolo (manómetro a 0 bar, cara apartada).' },
+      {
+        texto: '**Comprobar la cinta y el integrador, y completar el registro**: «■ Completar ciclo» (o leer otra vez la etiqueta). «Hora fin», «Temperatura máxima alcanzada (°C)», «Presión máxima alcanzada (bar)», «Cinta indicadora» e «Integrador químico» («Viró», «No viró» o «No se puso»), e incidencias. Pulsar «Guardar y completar el ciclo».',
+        nota: 'Mientras dura, el ciclo sale en «Ciclos en marcha». Lo puede completar cualquier cuenta: el ciclo es del autoclave, no de quien lo arrancó.',
+        imgs: [
+          { img: 'USO-2/02-ciclo-en-marcha.png', alt: 'Pestaña del autoclave con el ciclo en marcha y el botón Completar ciclo señalado', pie: 'El ciclo en marcha: «■ Completar ciclo».' },
+          { img: 'USO-2/03-completar-ciclo.png', alt: 'Ventana Completar ciclo con la temperatura y la presión máximas y los dos indicadores', pie: 'Temperatura, presión e indicadores.' },
+        ],
+      },
+      {
+        texto: '**Si la carga llevaba indicador biológico**: el ciclo queda en «Indicadores biológicos por leer». Cuando se lea tras incubar (24–48 h a 56 °C, junto con su control positivo sin autoclavar), «🧫 Apuntar resultado» y elegir «Negativo» o «Positivo».',
+        nota: 'Si es positivo, la app abre el aviso de avería del autoclave ya escrito (→ [[INC-1|Avisar de una avería]]).',
+        imgs: [
+          { img: 'USO-2/04-biologico-por-leer.png', alt: 'Indicadores biológicos por leer con el ciclo y el botón Apuntar resultado', pie: '«Indicadores biológicos por leer».' },
+          { img: 'USO-2/05-resultado-biologico.png', alt: 'Ventana Resultado del indicador biológico con Negativo elegido', pie: 'El resultado, en ese mismo ciclo.' },
+        ],
+      },
+    ],
+    extras: [
+      {
+        titulo: 'Si el ciclo no sale bien',
+        items: [
+          '**Integrador sin virar, o temperatura o presión por debajo de lo previsto**: la carga no se da por tratada. El material no se usa y los residuos no se sacan como tratados. Seguir el apartado 10 del protocolo (recargar bien y repetir) y avisar al profesorado.',
+          '**Indicador biológico positivo**: el autoclave pasa a «NO USAR». Avisar al profesorado y abrir un aviso de avería (→ [[INC-1|Avisar de una avería]]).',
+          '**Mensaje de error en el panel**: apuntar el código tal como sale en incidencias y buscarlo en el apartado 10 del protocolo.',
+        ],
+      },
+    ],
+    comprobacion: ['El ciclo sale en el «Historial» del autoclave con todos sus datos: programa, carga, temperatura y presión máximas, indicadores y, cuando toque, el resultado del biológico.'],
+    comprobacionImg: { img: 'USO-2/06-historial.png', alt: 'Historial del autoclave con la temperatura, la presión y la cinta del ciclo' },
+    problemas: [
+      ['Se ha apuntado algo mal', 'avisar al profesorado. Gestión lo corrige, y queda constancia del cambio.'],
+      ['No se apuntó al arrancar', 'apuntarlo en cuanto se pueda, con la hora real de inicio: «📝 Registrar ciclo completo».'],
+    ],
+    relacionado: [
+      ['Antes', [['EQU-2', 'Consultar cómo se usa'], ['EMP-6', 'Usar GestionLab en el móvil: etiquetas'], ['EQU-4', 'Reservar un equipo']]],
+      ['Después', [['INC-1', 'Avisar de una avería'], ['RES-2', 'Echar un residuo y apuntarlo']]],
+    ],
+  };
+  AYUDA_ORDEN_MANUALES.forEach(r => {
+    AYUDA_TAREAS['USO-1'].versiones[r] = uso1;
+    AYUDA_TAREAS['USO-2'].versiones[r] = uso2;
+  });
 })();
 
 (() => {
@@ -878,7 +1200,7 @@ const AYUDA_TAREAS = {
         texto: '**Comprobar en la pantalla que se ha abierto lo que esperabas** (el equipo, la caja o el contenedor correctos) antes de seguir. Lo que abre cada etiqueta está en la tabla de abajo.',
         imgs: [
           { img: 'EMP-6/01-cabina-sesion-empezada.png', alt: 'Registros de uso de la cabina con la sesión recién empezada y el aviso con el botón Deshacer', pie: 'Cabina o vitrina: la sesión empezada, con «Deshacer» durante unos segundos.' },
-          { img: 'EMP-6/02-autoclave-registro.png', alt: 'Ventana Registrar ciclo del autoclave con el equipo ya elegido', pie: 'Autoclave: «Registrar ciclo», con el autoclave ya elegido.' },
+          { img: 'EMP-6/02-autoclave-registro.png', alt: 'Ventana Arrancar ciclo del autoclave con el equipo ya elegido', pie: 'Autoclave: «Arrancar ciclo», con el autoclave ya elegido (si tiene un ciclo en marcha, «Completar ciclo»).' },
           { img: 'EMP-6/03-caja-de-muestras.png', alt: 'Caja del congelador abierta con sus tubos', pie: 'Caja de muestras: la caja abierta, para buscar y usar el tubo.' },
           { img: 'EMP-6/04-armario-que-te-llevas.png', alt: 'Ventana ¿Qué te llevas? con el material del armario', pie: 'Armario: «¿Qué te llevas?», con el material de ese armario.' },
           { img: 'EMP-6/05-contenedor-anadir-residuo.png', alt: 'Ventana Añadir residuo del contenedor biosanitario del laboratorio 205', pie: 'Contenedor: «Añadir residuo» del contenedor de esa categoría en ese laboratorio.' },
@@ -892,7 +1214,7 @@ const AYUDA_TAREAS = {
           cabeceras: ['Etiqueta', 'Qué abre', 'Tarea'],
           filas: [
             ['Cabina de bioseguridad, vitrina de gases', 'La primera lectura **empieza** la sesión de trabajo en ese equipo; la siguiente abre el formulario para **terminarla**', '[[USO-1|Apuntar un uso de la cabina o de la vitrina]]'],
-            ['Autoclave', 'El registro del ciclo, con el autoclave ya elegido', '[[USO-2|Apuntar un ciclo de autoclave]]'],
+            ['Autoclave', '«Arrancar ciclo», con el autoclave ya elegido; si tiene un ciclo en marcha, «Completar ciclo»', '[[USO-2|Apuntar un ciclo de autoclave]]'],
             ['Caja o congelador de muestras', 'La caja, lista para buscar el tubo y usarlo (con la del congelador, todas sus cajas)', '[[MUE-1|Encontrar una muestra]] · [[MUE-2|Usar una muestra]]'],
             ['Armario', '«¿Qué te llevas?»: el material de ese armario, para llevarlo a otro sitio', '[[STO-3|Llevar material de un sitio a otro]]'],
             ['Contenedor de residuos', '«Añadir residuo» del contenedor de esa categoría en ese laboratorio', '[[RES-2|Echar un residuo y apuntarlo]]'],
