@@ -48,7 +48,9 @@ export function parsePasos(v: unknown): Paso[] | null {
     const o = (p ?? {}) as Record<string, unknown>;
     const texto = String(o.texto ?? "");
     const criterio = o.criterio ? String(o.criterio).trim() : "";
-    const tipo = TIPOS_PASO.includes(String(o.tipo)) ? String(o.tipo) : (criterio ? "comprobar" : "hacer");
+    let tipo = TIPOS_PASO.includes(String(o.tipo)) ? String(o.tipo) : (criterio ? "comprobar" : "hacer");
+    // Los pasos de la verificación de una pipeta sin criterio los marca el servidor como hechos.
+    if (!criterio && VP.pasoVerificacion(texto)) tipo = "hacer";
     // Una vez creada la intervención de un paso, su id viaja con él: no se vuelve a crear.
     const idInt = txt(o.id_intervencion, 40);
     const conId = idInt ? { id_intervencion: idInt } : {};

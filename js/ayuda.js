@@ -25,7 +25,7 @@ const AYUDA_MANUALES = {
       { titulo: 'Al llegar', tareas: ['EMP-1', 'EMP-6'] },
       { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-2', 'STO-3'] },
       { titulo: 'Al recoger', tareas: ['RES-1', 'RES-2'] },
-      { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-1', 'MAN-2'] },
+      { titulo: 'Cuando toca mantenimiento', tareas: ['MAN-1', 'MAN-2', 'MAN-10'] },
       { titulo: 'Si algo falla', tareas: ['INC-1', 'EMP-2', 'USO-3'] },
       { titulo: 'Cuando el profesorado os lo pida', tareas: ['INV-1', 'INV-2', 'INV-3'] },
     ],
@@ -33,10 +33,11 @@ const AYUDA_MANUALES = {
   // EMP-6, EMP-2, USO-1, USO-2, STO-1, STO-3 y RES-1 son comunes a todos los roles (misma versión
   // en todos los manuales; STO-1 y STO-3 llevan además, solo en Gestor y Administrador, la
   // excepción del material común en la zona común). STO-2, RES-2, MAN-1/2, INC-1, USO-3 e
-  // INV-1/2/3 de momento solo tienen la del alumnado.
-  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
-  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  // INV-1/2/3 de momento solo tienen la del alumnado. MAN-10 (Ⓥ), MAN-11 y MAN-12: verificación de
+  // micropipetas (25/11/2026); MAN-11/12 solo en profesorado, gestión y administración.
+  Profesor: { titulo: 'Manual del profesorado', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Gestor: { titulo: 'Manual de gestión', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
+  Administrador: { titulo: 'Manual de administración', intro: '', secciones: [{ titulo: 'Al llegar', tareas: ['EMP-6'] }, { titulo: 'Durante la práctica', tareas: ['USO-1', 'USO-2', 'STO-1', 'STO-3'] }, { titulo: 'Al recoger', tareas: ['RES-1'] }, { titulo: 'Verificación de micropipetas', tareas: ['MAN-11', 'MAN-12', 'MAN-10'] }, { titulo: 'Si algo falla', tareas: ['EMP-2'] }] },
 };
 
 const AYUDA_ORDEN_MANUALES = ['Alumno', 'Profesor', 'Gestor', 'Administrador'];
@@ -1243,6 +1244,324 @@ const AYUDA_TAREAS = {
     ],
   };
   AYUDA_ORDEN_MANUALES.forEach(r => { AYUDA_TAREAS['EMP-6'].versiones[r] = emp6; });
+})();
+
+// ── MAN-10 Ⓥ, MAN-11 y MAN-12 · verificación de micropipetas (guiones del 25/11/2026) ──
+// MAN-10: cuerpo del alumnado en todos los manuales; Profesor, Gestor y Administrador llevan además
+// «Solo en el manual del profesorado» (con la verificación extraordinaria tras una reparación).
+// MAN-11 y MAN-12: solo profesorado, Gestor y Administrador. Capturas con los datos de ejemplo del
+// apartado 11 del encargo (tools/capturas-ayuda/_demo-pipetas.js).
+(() => {
+  const I = 'MAN-10/';
+  const man10 = {
+    titulo: 'Verificar una micropipeta en su revisión anual',
+    quien: [
+      'Tu grupo, con la cuenta del grupo, o el profesorado.',
+      'Se hace siempre en una **sesión de verificación** que lleva el profesorado: la abre, deja preparada la recta del día y comprueba las disoluciones (→ [[MAN-12|Llevar una sesión de verificación de micropipetas]]). Sin sesión válida, la app no deja guardar la verificación.',
+      'Lo que finaliza el grupo queda «⏳ Espera visto bueno» hasta que lo firma un docente.',
+      'Ajustar una pipeta, o decidir qué se hace con una que no cumple, es del profesorado.',
+    ],
+    cuando: [
+      'En la revisión anual de arranque de la pipeta: al inicio de la primera evaluación en que se usa. La verificación es parte de esa revisión, después del desmontaje, la revisión de juntas y la prueba de estanqueidad.',
+      'Lo habitual es verificar varias pipetas en la misma sesión, cada grupo las suyas.',
+    ],
+    antes: [
+      '**La pipeta y el código de su etiqueta** (PIP-…). Hay muchas pipetas iguales: es fácil apuntar en la que no es.',
+      '**Los pasos anteriores de la revisión hechos**, y la prueba de estanqueidad superada. Si la pipeta gotea, no se verifica ([[MAN-2|Hacer un mantenimiento y registrarlo paso a paso]] y apartado 10 de su protocolo).',
+      '**Qué volúmenes se prueban y cómo**: los dice la app al abrir la verificación, y la tabla 6.4 de su protocolo. Hasta 300 µl, con colorante amarillo (tartrazina) y el espectrofotómetro FOT-06; de 500 µl en adelante, pesando el agua en la balanza BTC-223 (BAL-003).',
+      '**Material**: puntas nuevas de la marca validada para esa pipeta; para el método con colorante, microtubos de 1,5 ml con tapa (de 2 ml para 300 µl), rotulador, gradilla, la disolución de colorante que indique la app (S-A, S-B o S-C) a la temperatura de la sala, agua destilada y la balanza de 1 mg que os asigne el profesorado; para el método de pesada, un vaso de pesada y el agua de ensayo en la sala desde 2 h antes.',
+    ],
+    pasos: [
+      {
+        texto: '**Entrar por la pipeta** y abrir su revisión anual, como en [[MAN-2|Hacer un mantenimiento y registrarlo paso a paso]] («Registrar» o «Continuar»). **Comprobar que es la pipeta correcta**: código, operación y periodo.',
+      },
+      {
+        texto: '**Hacer los pasos del mantenimiento anteriores a la verificación** como en [[MAN-2|Hacer un mantenimiento]]: limpieza, desmontaje, juntas, estanqueidad, puntas.',
+      },
+      {
+        texto: '**Abrir la verificación**: en el recuadro «🧪 Verificación de la pipeta», pulsar «Abrir la verificación».',
+        img: I + '01-abrir-verificacion.png',
+        alt: 'Ventana Ejecutar mantenimiento de PIP-035 con el recuadro Verificación de la pipeta y el botón Abrir la verificación señalado',
+      },
+      {
+        texto: '**Por cada volumen, la app enseña su método, la disolución, la masa de agua de cada tubo y los límites. Eso no se cambia.** Elegir en «Sesión en que se mide *» la sesión de hoy: si sale «✗ (no vale para este volumen)», o no hay ninguna, parar y avisar al profesorado.',
+        img: I + '02-volumen-y-sesion.png',
+        alt: 'Volumen de 200 µl con su método, disolución, masa de agua y límites, y el desplegable Sesión en que se mide señalado',
+      },
+      {
+        texto: '**Con colorante (volúmenes hasta 300 µl), por cada volumen:**',
+        lista: [
+          '**Preparar 4 tubos**: rotularlos del 1 al 4; en la balanza de 1 mg, tarar con el tubo abierto, echar agua hasta la masa que indica la app (no hace falta clavarla: basta con ± 0,05 g) y **anotar en «Agua del tubo (g)» la masa exacta de cada tubo, con sus tres decimales**. Tapar. Todos los tubos de una pipeta, en la misma balanza.',
+          '**Preparar la pipeta**: ajustar el volumen girando hacia abajo desde un valor superior; punta nueva; prehumedecer 3 veces con la disolución de colorante.',
+          '**Echar el colorante en cada tubo**, con la técnica directa del apartado 7 del protocolo: aspirar despacio y en vertical, expulsar siempre igual en toda la serie, golpe final y retirar la punta deslizándola por la pared. Cerrar el tubo y mezclar: **10 inversiones o 3 s de vórtex**. Sin mezclar bien, el colorante se queda abajo y parece que la pipeta entrega menos.',
+          '**Leer los 4 tubos en el FOT-06**: enjuagar la cubeta dos veces con cada tubo, sin burbujas, siempre en la misma orientación. **Anotar cada absorbancia en «A del tubo»**, con sus tres decimales.',
+          '**Mirar lo que dice la app** debajo de las réplicas: el volumen de cada una, el error sistemático, los CV y la decisión. «OK»: pasar al siguiente volumen.',
+        ],
+        img: I + '03-colorante-ok.png',
+        alt: 'Volumen de 200 µl con las cuatro masas de agua y absorbancias y el resultado OK señalado',
+      },
+      {
+        texto: '**«Completar»**: preparar los tubos 5 a 10 («+ Hasta 10 réplicas») y repetir con **punta nueva** prehumedecida, en la misma sesión; la app decide con los 10.',
+        img: I + '04-completar.png',
+        alt: 'Volumen de 20 µl con cuatro réplicas, la decisión COMPLETAR hasta 10 réplicas y el enlace Hasta 10 réplicas señalado',
+      },
+      {
+        texto: '**Pesando el agua (volúmenes de 500 µl o más), por cada volumen**: tarar el vaso de pesada en la BTC-223; punta nueva y prehumedecer 3 veces; hacer 4 entregas contra la pared del vaso, anotando en «Masa entregada (g)» cada masa con sus tres decimales (tarar entre entrega y entrega, o restar la lectura anterior). Si la app dice «Completar», punta nueva y entregas 5 a 10.',
+        img: I + '05-pesada.png',
+        alt: 'Volumen de 1 000 µl por balanza con las cuatro masas entregadas y el resultado OK',
+      },
+      {
+        texto: '**Multicanal (PIPR-009, PIPR-010)**: cada canal es una pipeta. Los ocho tubos de una réplica se ponen en fila en la gradilla y cada canal echa en el suyo; la app pide los datos canal por canal (botones 1 a 8 encima de las réplicas).',
+      },
+      {
+        texto: '**Según el «Resultado de la pipeta»** (al final de la verificación):',
+        lista: [
+          '**OK**: etiqueta en la pipeta con la fecha y «OK», y guardarla vertical en su soporte.',
+          '**Ajustar** o **Retirar**: llamar al profesorado. El grupo no ajusta la pipeta. Si es «Retirar», poner la etiqueta «NO USAR»: la app ya ha abierto el aviso de avería.',
+        ],
+        img: I + '06-resultado.png',
+        alt: 'Resultado de la pipeta: OK',
+      },
+      {
+        texto: '**Escribir en «Observaciones de la verificación»** lo que haya pasado durante la serie (un tubo que se volcó, una lectura que hubo que repetir y por qué). La balanza y la sesión las guarda la app.',
+      },
+      {
+        texto: '**«Volver a la revisión»**: los pasos con 🧪 los ha marcado la app con el resultado (no se marcan a mano). Terminar los pasos que quedan (etiqueta, guardar) y **marcar el resultado del mantenimiento**.',
+        img: I + '07-pasos-marcados.png',
+        alt: 'Pasos de la revisión marcados por la app: sesión, los dos volúmenes, Completar y Resultado',
+      },
+      {
+        texto: '**Finalizar.** Con algún volumen a medias («Completar» o faltan réplicas), la app no deja finalizar: «💾 Guardar progreso» y terminar en la misma sesión.',
+      },
+    ],
+    extras: [
+      {
+        titulo: 'Si un resultado no es OK',
+        numerada: true,
+        items: [
+          '**Antes de completar, repasar la técnica**: punta bien puesta y de la marca validada, prehumedecido, inmersión de 2–3 mm, tubos bien mezclados, cubeta enjuagada y sin burbujas. Son las causas más habituales de un «Completar» que no es culpa de la pipeta.',
+          '**No repetir hasta que salga OK ni cambiar un dato**: un resultado que no cumple es un dato. Si en un tubo hubo un fallo claro (se derramó, se expulsó fuera del agua), no se borra: se explica en Observaciones y se avisa al profesorado, que decide si se repite el volumen entero.',
+          '**Si la app no acepta una absorbancia** (fuera de 0,10–1,20): casi siempre es la disolución equivocada (S-B en lugar de S-C, o al revés) o una masa de agua que no es la de la tabla. Comprobarlo y repetir la serie de ese volumen con lo correcto.',
+          '**«CV orientativo» y «Resultado orientativo (menos de 5 µl)» no son fallos**: avisan de que en ese volumen el método no puede afinar más. El resultado de la pipeta es el que da la app.',
+        ],
+      },
+    ],
+    comprobacion: [
+      'Cada volumen tiene su resultado en la app, y los pasos de verificación están marcados por la app (no se marcan a mano).',
+      'La revisión sale «⏳ Espera visto bueno» (grupo) o finalizada (profesorado). Cuando está firmada, la ficha de la pipeta muestra la fecha y el resultado de la última verificación, que coinciden con su etiqueta.',
+    ],
+    problemas: [
+      ['La app dice que no hay sesión válida', 'el profesorado tiene que abrir la sesión del día y dejar bien la recta y las comprobaciones ([[MAN-12|Llevar una sesión de verificación de micropipetas]]).'],
+      ['La app dice que falta el rango de la pipeta', 'no se puede verificar todavía. Avisar al profesorado (está en la página de pendientes del laboratorio).'],
+      ['No deja finalizar', 'falta algún volumen, o hay uno en «Completar». Terminar las réplicas en la misma sesión; si no da tiempo, guardar y avisar al profesorado: en otra sesión se repite el volumen entero.'],
+      ['Sin conexión en el laboratorio', 'si el profesorado os ha dado la página de recogida (se descarga desde la app), apuntar allí los datos y entregarle el archivo; se importa después («📥 Importar de la página de recogida») y se revisa antes de guardar.'],
+      ['Al guardar sale «Tu sesión ha caducado»', 'volver a entrar con la misma cuenta (→ [[EMP-2|La app te pide volver a entrar (sesión caducada)]]).'],
+    ],
+    relacionado: [
+      ['Antes', [['MAN-1', 'Ver qué mantenimientos tocan'], ['MAN-2', 'Hacer un mantenimiento paso a paso'], ['EQU-2', 'Consultar cómo se usa un equipo']]],
+      ['Lo hace antes el profesorado', [['MAN-12', 'Llevar una sesión de verificación de micropipetas']]],
+      ['Si no es OK', [['INC-1', 'Avisar de una avería']]],
+    ],
+  };
+  // Profesorado, Gestor y Administrador: «Solo en el manual del profesorado» del guion, y la
+  // verificación extraordinaria tras una reparación (hecha en la app el 25/11/2026).
+  const man10Prof = {
+    ...man10,
+    extras: [
+      ...man10.extras,
+      {
+        titulo: 'Solo para el profesorado',
+        items: [
+          '**Lo que finaliza el profesorado no espera visto bueno.** Al firmar lo de un grupo se ven los datos, los cálculos y el resultado de cada volumen.',
+          '**Ajustar**: el docente ajusta la pipeta según el apartado 6.3 de su protocolo, pulsa «🔧 He ajustado la pipeta» y, **en la misma revisión**, repite los dos volúmenes con 10 réplicas (la app ya no hace cribado). El ajuste queda además como intervención «Calibración» de la pipeta. Si después del ajuste sigue sin cumplir, «Retirar».',
+          '**Pipetas que no se ajustan en el laboratorio**: en las Gilson Pipetman Classic, la app convierte «Ajustar» en «Retirar y enviar al servicio técnico». En las Huawei, Lan Technics y Nahita pregunta si la pipeta tiene tornillo de ajuste bajo la tapa del émbolo: contestar mirándolo («Sí, tiene» / «No tiene»); si no lo tiene, se retira.',
+          '**PIP-005**: elegir el volumen bajo (100 o 200 µl) según lo grabado en la pipeta.',
+          '**Retirar**: la pipeta queda fuera de servicio y con el aviso abierto. Tras repararla, vuelve a estar operativa solo con una **verificación extraordinaria** de 10 réplicas que salga OK (decisión del 25/11/2026): ver el bloque siguiente.',
+        ],
+      },
+      {
+        titulo: 'Verificación extraordinaria tras una reparación',
+        numerada: true,
+        items: [
+          '**Cuándo**: tras reparar una pipeta o cambiarle la junta (caída, avería, fallo de la verificación), con su incidencia abierta. Va fuera de calendario y enlazada a esa incidencia.',
+          '**Dónde**: en el hilo de la incidencia, recuadro «🧪 Verificación extraordinaria» → «Hacer la verificación extraordinaria»; o en «Verificación de pipetas» → «🔧 Verificaciones extraordinarias» → «+ Nueva», eligiendo la pipeta y su incidencia.',
+          '**Cómo**: el mismo formulario que la revisión anual, pero **sin cribado: 10 réplicas a cada volumen**, en una sesión válida del día. «💾 Guardar progreso» para seguir otro rato; «Finalizar la verificación» cuando haya resultado.',
+          '**Qué pasa al finalizar**: el resultado queda escrito en la incidencia. **Si es OK**, ya se puede cerrar la incidencia desde su hilo dejando la pipeta «Operativo». **Si no**, la pipeta sigue «Fuera de servicio» con la incidencia abierta: la app no deja cerrarla como operativa sin una verificación extraordinaria OK.',
+        ],
+      },
+    ],
+  };
+  // Las capturas del bloque del profesorado van como pasos finales de su versión.
+  man10Prof.pasos = [
+    ...man10.pasos,
+    {
+      texto: '**Solo profesorado — tornillo de ajuste.** Si la app pregunta «¿Tiene tornillo de ajuste bajo la tapa del émbolo?», mirarlo y contestar.',
+      img: I + '08-tornillo.png',
+      alt: 'Resultado de la pipeta AJUSTAR con la pregunta del tornillo de ajuste y los botones Sí, tiene y No tiene',
+    },
+    {
+      texto: '**Solo profesorado — tras una reparación.** En el hilo de la incidencia de la pipeta, «🧪 Hacer la verificación extraordinaria». Mientras no haya una que salga OK, el cierre propone dejar la pipeta como está.',
+      img: I + '09-extra-hilo.png',
+      alt: 'Hilo de la incidencia de PIP-035 con el recuadro Verificación extraordinaria y su botón señalados',
+    },
+    {
+      texto: '**La verificación extraordinaria** se rellena como la anual, con 10 réplicas a cada volumen; arriba dice a qué incidencia va.',
+      img: I + '10-extra-formulario.png',
+      alt: 'Verificación extraordinaria de PIP-035 con el aviso de la incidencia INC-EJ5 y las diez filas de réplicas',
+    },
+  ];
+  man10Prof.relacionado = [
+    ...man10.relacionado.slice(0, 2),
+    ['Si no es OK', [['INC-1', 'Avisar de una avería']]],
+    ['Antes de la primera sesión', [['MAN-11', 'Preparar las disoluciones de verificación del curso']]],
+  ];
+
+  const man11 = {
+    titulo: 'Preparar las disoluciones de verificación de micropipetas del curso',
+    quien: ['Profesorado, Gestor y Administrador. El alumnado puede hacer las pesadas como práctica, con el docente presente; lo registra el docente.'],
+    cuando: [
+      '**Una vez por curso**, antes de la primera sesión de verificación: antes del inicio de la primera evaluación en que arrancan micropipetas.',
+      'Además, si a mitad de curso se acaba la disolución S-C o una disolución no pasa su comprobación (se prepara otro lote de esa).',
+    ],
+    antes: [
+      '**Cuántos bloques de verificación tendrá el curso**: uno por cada evaluación en cuyo inicio arrancan micropipetas (sus evaluaciones de uso). Cada bloque necesita su propio juego de tubos.',
+      '**Tartrazina** en polvo, agua destilada, la balanza BTC-223 (BAL-003) encendida 30 min antes y el espectrofotómetro FOT-06 encendido 20 min antes (para comprobar S-A).',
+      '**Frascos para preparar** (dos de 50–100 ml, uno de 250 ml de plástico para S-C, siete de 25–50 ml) y, **para congelar**, por cada bloque, 3 tubos de 50 ml y 5 de 15 ml de polipropileno con tapón de rosca, más una caja para el congelador. Nada de vidrio en el congelador.',
+      '**Rotulador** y etiquetas: cada tubo lleva disolución, bloque y fecha.',
+      'Una hora y media.',
+      'El procedimiento completo (cantidades, cálculos, criterios) está en el anexo A de los protocolos de micropipetas, apartados 2.2, 4.2 y 5.1.',
+    ],
+    pasos: [
+      { texto: '**Preparar S-A** (disolución de colorante concentrada): unos 0,1 g de tartrazina y agua hasta unos 50 g, en frasco tarado, anotando las dos masas con sus tres decimales. Disolver dándole la vuelta al frasco: se disuelve enseguida.' },
+      { texto: '**Preparar D1 y D2** (diluciones de S-A) y **comprobar S-A** leyendo D2 en el FOT-06: tiene que dar una absorbancia de 1,0 ± 0,2. Si no, añadir agua o colorante a S-A, volver a pesar y repetir.' },
+      { texto: '**Preparar S-B, S-C y los cinco puntos de la recta (P1–P5)** con las masas de las tablas 2.2 y 4.2 del anexo A, anotando cada masa real con sus tres decimales. No hace falta clavar las masas: lo que importa es anotar las que han salido.' },
+      {
+        texto: '**Abrir la preparación en GestionLab**: «Equipos › Mantenimiento», última pestaña, «🧪 Verificación de pipetas».',
+        img: 'MAN-11/01-entrar.png',
+        alt: 'Pestañas de Mantenimiento con Verificación de pipetas señalada',
+      },
+      {
+        texto: 'En «Preparación del curso», pulsar «+ Registrar la preparación» (si ya está, «✏️ Editar la preparación»).',
+        img: 'MAN-11/02-registrar.png',
+        alt: 'Página Verificación de micropipetas con el botón Registrar la preparación señalado',
+      },
+      {
+        texto: '**Meter todas las masas.** La app calcula los factores de S-B y S-C y la fracción de cada punto de la recta. S-B debe salir cerca de 5 y S-C cerca de 20: si sale muy distinto, hay una masa mal anotada.',
+        imgs: [
+          { img: 'MAN-11/03-disoluciones-y-factores.png', alt: 'Tabla de disoluciones con las masas y los factores calculados F_B 4,99900 y F_C 19,99800', pie: 'Disoluciones y factores.' },
+          { img: 'MAN-11/04-puntos-de-la-recta.png', alt: 'Tabla de los puntos de la recta P1 a P5 con sus masas y la f calculada', pie: 'Puntos de la recta.' },
+        ],
+      },
+      { texto: '**Repartir en tubos, un juego por bloque**: S-A, S-B y S-C en tubos de 50 ml; P1 a P5 en tubos de 15 ml. Dejar aire en cada tubo: el agua se expande al congelarse.' },
+      {
+        texto: '**Pesar cada tubo vacío y después lleno y cerrado**, y anotar las dos masas en «Tubos congelados» («+ Tubos de un bloque» añade el juego de 8). Con ellas se sabrá si un tubo ha perdido agua antes de usarlo. Después, «Guardar la preparación».',
+        img: 'MAN-11/05-tubos.png',
+        alt: 'Tubos congelados del bloque 1 con la masa del tubo vacío y lleno y cerrado',
+      },
+      { texto: '**Etiquetar cada tubo** (disolución, bloque, fecha) y **congelarlos juntos en la caja**, que además los tiene a oscuras.' },
+      { texto: 'D1 y D2 solo hacían falta para preparar: se desechan (la tartrazina diluida va al desagüe con agua abundante).' },
+    ],
+    comprobacion: [
+      'En «Verificación de pipetas», la preparación del curso aparece con su fecha, los factores de S-B y S-C y los tubos de cada bloque.',
+      'En el congelador hay un juego completo de 8 tubos etiquetados por cada bloque.',
+    ],
+    problemas: [
+      ['D2 no da 1,0 ± 0,2', 'S-A está demasiado concentrada o diluida. Corregirla (añadir agua o colorante) y volver a pesar antes de preparar las demás.'],
+      ['La balanza no admite el frasco de S-C', 'frasco y contenido no deben pasar de 220 g, el máximo de la BTC-223. Usar un frasco de plástico ligero.'],
+      ['Se acaba S-C a mitad de curso', 'preparar un 2.º lote igual y meterlo en la app como 2.º lote («S-C, 2.º lote»); tiene su propio factor y cada verificación guarda qué lote usó.'],
+      ['Se ha anotado una masa mal', 'corregirla en la app antes de la primera sesión. Si ya se ha usado, avisar a Gestión: las verificaciones de esas sesiones pueden estar mal calculadas.'],
+    ],
+    relacionado: [
+      ['Después', [['MAN-12', 'Llevar una sesión de verificación de micropipetas'], ['MAN-10', 'Verificar una micropipeta']]],
+    ],
+  };
+
+  const man12 = {
+    titulo: 'Llevar una sesión de verificación de micropipetas',
+    quien: ['Profesorado, Gestor y Administrador. La sesión la abre y la cierra un docente; las pipetas las verifican los grupos o el propio docente (→ [[MAN-10|Verificar una micropipeta en su revisión anual]]).'],
+    cuando: [
+      'Cada día que se verifican micropipetas por el método del colorante. Si ese día solo se verifican volúmenes de 500 µl o más (por pesada), basta con la temperatura del agua y la balanza.',
+      '**Primer día de cada bloque**: sacar del congelador el juego de tubos de ese bloque al menos 2 h antes y dejarlo descongelar **cerrado**.',
+      '**Primera sesión del curso**: además, la validación del método (anexo A, apartado 8). Se repite si se repara el FOT-06, se le cambia la lámpara o se estrenan cubetas.',
+    ],
+    antes: [
+      'El espectrofotómetro FOT-06 encendido 20 min antes, a 427 nm; las balanzas de 1 mg encendidas 30 min antes: la BTC-223 (BAL-003) y, si ya tienen comprobada su repetibilidad, BAL-001 y BAL-005.',
+      'Las dos cubetas (blanco y muestras), papel óptico, agua destilada a la temperatura de la sala y un termómetro en ella.',
+      'Los tubos de disoluciones del bloque, ya a la temperatura de la sala.',
+      'Qué pipetas se verifican hoy y qué disoluciones van a hacer falta (S-A, S-B o S-C, según los volúmenes: los dice la app en cada pipeta).',
+      'El procedimiento completo está en el anexo A de los protocolos de micropipetas, apartados 4.3, 5.1 y 8.',
+    ],
+    pasos: [
+      {
+        texto: '**Abrir la sesión**: «Equipos › Mantenimiento» → «🧪 Verificación de pipetas» → «+ Nueva sesión».',
+        img: 'MAN-12/01-nueva-sesion.png',
+        alt: 'Página Verificación de micropipetas con el botón Nueva sesión señalado',
+      },
+      {
+        texto: '**Fecha, bloque, quién la dirige, temperatura del agua (en grados enteros) y balanzas** que se usan para los tubos. Arriba, la app va diciendo si la parte fotométrica y la gravimétrica son válidas y qué disoluciones se pueden pipetear hoy.',
+        img: 'MAN-12/02-datos-y-validez.png',
+        alt: 'Datos de la sesión: fecha, bloque, temperatura con su Z, balanzas y la validez de la sesión',
+      },
+      {
+        texto: '**Pesar cada tubo de disolución cerrado antes de abrirlo** y anotarlo en «Masa ahora»: la app dice si ha perdido agua (más de un 0,1 % de su contenido) y hay que desecharlo. Después, darle la vuelta 10 veces (20 si se acaba de descongelar: el colorante se concentra al congelarse).',
+        img: 'MAN-12/03-tubos.png',
+        alt: 'Tubos de disoluciones del bloque con la masa ahora y la pérdida OK de cada uno',
+      },
+      { texto: '**Blanco**: cero con la cubeta de blanco llena de agua; leer la cubeta de muestras llena de agua y anotarlo en «Blanco al empezar» (tiene que dar 0,000 ± 0,003).' },
+      {
+        texto: '**Recta del día**: leer P1 a P5, de menor a mayor, enjuagando la cubeta dos veces con cada uno, y anotar las absorbancias. La app calcula la recta y dice si es válida.',
+        img: 'MAN-12/04-recta.png',
+        alt: 'Blanco y recta del día con las absorbancias de P1 a P5 y la recta Válida señalada',
+      },
+      {
+        texto: '**Diluciones de comprobación**: de cada disolución que se vaya a usar hoy, una dilución recién pesada (anexo A, 4.3); leerla y anotar masas y absorbancia. La app dice si la disolución sigue bien (± 0,5 %). **CV de lectura**: leer diez veces la dilución de comprobación de S-C (o la de S-B, si hoy no se usa S-C), vaciando y rellenando la cubeta, y anotar las lecturas.',
+        img: 'MAN-12/05-comprobaciones-y-cv.png',
+        alt: 'Diluciones de comprobación de S-A, S-B y S-C en OK y CV de lectura OK',
+      },
+      { texto: '**Primera sesión del curso: validación del método** (las cinco pruebas del anexo A, apartado 8), en el bloque «Validación del método» del final. Si alguna no cumple, ese día no se verifica ninguna pipeta por colorante.' },
+      { texto: '**Guardar la sesión** y **repartir el trabajo**: cuando la app da la sesión por válida, los grupos verifican sus pipetas ([[MAN-10|Verificar una micropipeta en su revisión anual]]). Asignar a cada grupo una balanza y que no la cambie con la misma pipeta.' },
+      { texto: '**Al terminar**: volver a leer el blanco y anotarlo en «Blanco al final»; pesar cada tubo de disolución cerrado y anotarlo en «Al cerrarlo al final» (será la masa de partida de la próxima sesión); guardar los tubos en el armario a oscuras, **sin volver a congelarlos**; guardar la sesión.' },
+      { texto: '**Al acabar el bloque**: desechar lo que sobre de ese juego. El bloque siguiente usa su propio juego congelado.' },
+    ],
+    comprobacion: [
+      'La sesión sale válida en «Verificación de pipetas», con la recta, las comprobaciones y el CV de lectura dentro de criterio, y con la lista de pipetas verificadas en ella.',
+      'Los tubos de disolución tienen anotada su masa al cerrar.',
+    ],
+    problemas: [
+      ['La recta no es válida', 'revisar cubetas (limpias, secas por fuera, misma orientación), burbujas, mezcla y lecturas, y volver a leer los puntos. Si sigue sin valer, rehacer P1–P5 ([[MAN-11|Preparar las disoluciones de verificación del curso]]) antes de verificar.'],
+      ['Falla la comprobación de una disolución', 'esa no se usa hoy («✗ No vale hoy»); preparar otra de esa disolución (con su nuevo factor) o usar un tubo de reserva. **Si fallan todas en el mismo sentido**, lo que ha cambiado probablemente es la recta: rehacer P1–P5.'],
+      ['Un tubo ha perdido agua', 'desecharlo y usar uno de reserva, o preparar otro.'],
+      ['El CV de lectura pasa de 0,3 %', 'cubetas sucias o rayadas, burbujas, cubeta girada, lámpara del FOT-06 sin estabilizar. Corregirlo y repetir las diez lecturas.'],
+      ['El blanco del final se ha movido más de 0,003', 'las verificaciones por colorante de esa sesión quedan marcadas «a repetir».'],
+      ['Sin conexión', 'la página de recogida se descarga antes desde la app («⬇️ Página para recoger datos sin conexión»); los datos de la sesión se apuntan en ella y se importan después («📥 Importar de la página de recogida»), revisándolos antes de guardar.'],
+    ],
+    extras: [
+      {
+        titulo: 'Si una comprobación no cumple',
+        items: ['La app lo marca «✗ No vale hoy» y esa disolución no se puede pipetear en la sesión.'],
+        nota: '',
+      },
+    ],
+    relacionado: [
+      ['Antes', [['MAN-11', 'Preparar las disoluciones de verificación del curso']]],
+      ['Durante', [['MAN-10', 'Verificar una micropipeta en su revisión anual']]],
+    ],
+  };
+  // La captura de la comprobación que no cumple va en «Si una comprobación no cumple».
+  man12.pasos.splice(6, 0, {
+    texto: 'Si una comprobación no cumple, la app la marca «✗ No vale hoy»: esa disolución no se pipetea hoy (ver «Si algo no sale»).',
+    img: 'MAN-12/06-comprobacion-no-cumple.png',
+    alt: 'Comprobación de S-B con −3,74 % marcada No vale hoy',
+  });
+  delete man12.extras;
+
+  AYUDA_TAREAS['MAN-10'] = { pantallas: ['mantenimiento', 'equipos', 'verif-pipetas'], versiones: {} };
+  AYUDA_TAREAS['MAN-11'] = { pantallas: ['verif-pipetas'], versiones: {} };
+  AYUDA_TAREAS['MAN-12'] = { pantallas: ['verif-pipetas'], versiones: {} };
+  AYUDA_ORDEN_MANUALES.forEach(r => {
+    AYUDA_TAREAS['MAN-10'].versiones[r] = r === 'Alumno' ? man10 : man10Prof;
+    if (r !== 'Alumno') { AYUDA_TAREAS['MAN-11'].versiones[r] = man11; AYUDA_TAREAS['MAN-12'].versiones[r] = man12; }
+  });
 })();
 
 // ── Estado de la página ────────────────────────────────────────────

@@ -278,8 +278,9 @@ const _RE_PASO_COMPROBAR = /^(?:revis|comprob|verific|inspecc|control|observ|exa
 
 function _tipoPasoDesdeTexto(texto, criterio) {
   const t = String(texto || '').trim();
-  // Los pasos de la verificación de una pipeta los marca la app (js/verif-pipetas.js).
-  if (typeof vpPasoAuto === 'function' && vpPasoAuto(t)) return criterio ? 'comprobar' : 'hacer';
+  // Los pasos de la verificación de una pipeta los marca la app (js/verif-pipetas.js). Se
+  // reconocen por el texto: al construir el checklist la verificación aún no está preparada.
+  if (window.VP && VP.pasoVerificacion(t)) return criterio ? 'comprobar' : 'hacer';
   if (_RE_PASO_CONDICIONAL.test(t) && _RE_PASO_ACCION_COND.test(t)) return 'comprobar';
   if (_RE_PASO_SUSTITUIR.test(t) && !_RE_PASO_FLUIDO.test(t)) return 'sustituir';
   if (criterio) return 'comprobar';
@@ -305,9 +306,11 @@ function _normPasoMant(p, delPlan) {
     const m = texto.match(_RE_CRITERIO);
     if (m) { criterio = m[1].trim(); texto = texto.replace(_RE_CRITERIO, '').trim(); }
   }
-  const tipo = ['comprobar', 'hacer', 'sustituir'].includes(p?.tipo) ? p.tipo
+  let tipo = ['comprobar', 'hacer', 'sustituir'].includes(p?.tipo) ? p.tipo
     : delPlan ? _tipoPasoDesdeTexto(texto, criterio)
     : (criterio ? 'comprobar' : 'hacer');
+  // Un paso de la verificación sin criterio solo se marca como hecho (marcarPasosVerificacion).
+  if (!criterio && window.VP && VP.pasoVerificacion(texto)) tipo = 'hacer';
   const base = { texto, tipo, criterio: criterio || null, id_intervencion: p?.id_intervencion || null, auto: !!p?.auto };
   if (tipo === 'hacer') return { ...base, hecho: p?.hecho === true, resultado: null, nota: '', medidas: [] };
   if (tipo === 'sustituir') {

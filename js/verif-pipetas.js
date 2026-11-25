@@ -813,7 +813,10 @@ function _vpPintarResultadosVer() {
       : '<div class="vp-guia" style="margin-top:6px">El ajuste lo hace el profesorado (apartado 6.3 del protocolo). Guarda el progreso y avísale.</div>';
   }
   res.innerHTML = `<div><strong>Resultado de la pipeta:</strong> ${_vpBadgeResultado(calc.resultado)}</div>
-    <div class="vp-guia">${_vpEsc(VP.RESULTADO[calc.resultado] || '')}${calc.final ? '' : ' · ' + _vpEsc(VP.resumenPendiente(calc))}</div>
+    <div class="vp-guia">${_vpEsc(VP.RESULTADO[calc.resultado] || '')}${(() => {
+      const pend = calc.final ? '' : VP.resumenPendiente(calc);
+      return pend && pend !== VP.RESULTADO[calc.resultado] ? ' · ' + _vpEsc(pend) : '';
+    })()}</div>
     ${(calc.avisos || []).length ? `<div class="vp-aviso">${calc.avisos.map(_vpEsc).join(' · ')}</div>` : ''}
     ${_vpRev.extra
       ? (calc.final ? `<div class="vp-aviso-caja${/^OK/.test(calc.resultado) ? '' : ' vp-grave'}">${/^OK/.test(calc.resultado)

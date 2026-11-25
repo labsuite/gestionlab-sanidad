@@ -25,3 +25,7 @@ Reglas (del plan del manual, «B. Laboratorio/Manual GestionLab/CLAUDE.md»):
 
 Al cambiar una pantalla: buscar en `js/ayuda.js` las tareas cuyo `pantallas` la incluyen,
 volver a ejecutar su guion y revisar que los pasos siguen diciendo lo que se ve.
+
+Datos de ejemplo compartidos: `_demo-alumno.js` (manual del alumnado) y `_demo-pipetas.js`
+(verificación de micropipetas, MAN-10/11/12: tres pipetas reales del 203 y la preparación y la sesión
+del apartado 11.1 del encargo, calculadas por la propia app).
