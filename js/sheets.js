@@ -252,6 +252,8 @@ function _registroMantSbToObj(r) {
     Actualizado_En: r.actualizado_en || '',
     // Verificación de una micropipeta (réplicas, cálculo y resultado), solo en sus revisiones
     Verificacion: r.verificacion && typeof r.verificacion === 'object' ? r.verificacion : null,
+    // Apto / apto tras intervención / no apto (desde 2026-11-25; antes, vacío)
+    Resultado: r.resultado || '',
   };
 }
 

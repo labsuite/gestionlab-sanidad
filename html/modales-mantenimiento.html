@@ -21,12 +21,27 @@
         </label>
         <div id="mant-checklist" class="mant-checklist"></div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:6px" id="mant-checklist-ayuda">
-          Marca los pasos según los completes. En las <strong>comprobaciones</strong> (las que tienen criterio)
-          pulsa <strong>✓ Cumple</strong> o <strong>✗ No cumple</strong>; si no cumple, anota qué has visto y al
-          finalizar se abrirá el aviso de avería del equipo. Si la comprobación trae <strong>🧮</strong>, escribe
-          lo que marca el equipo y lo que mide el instrumento de referencia: la app dice si cumple. Puedes <strong>guardar el progreso</strong> y
-          retomarlo en otra sesión; cuando esté todo hecho, pulsa <strong>Finalizar</strong>.
+          El mantenimiento <strong>comprueba</strong>. En cada comprobación contesta <strong>✓</strong> (está bien),
+          <strong>⚠</strong> (hay que actuar) o <strong>No aplica</strong>. Si hay que actuar, anota qué has visto
+          y qué has hecho: <strong>🔧 corregirlo en el momento</strong> (engrasar, limpiar…), <strong>🔩 cambiar una
+          pieza o ajustar el equipo</strong> (queda además como intervención del equipo) o <strong>🚨 avisar de que
+          necesita reparación</strong> (al finalizar se abre el aviso de avería). Si la comprobación trae
+          <strong>🧮</strong>, escribe lo que marca el equipo y lo que mide el instrumento de referencia: la app dice
+          si cumple. Los demás pasos se marcan con su casilla. Puedes <strong>guardar el progreso</strong> y
+          retomarlo en otra sesión; al terminar, marca el resultado y pulsa <strong>Finalizar</strong>.
         </div>
+      </div>
+
+      <!-- Resultado del mantenimiento (registro_mantenimientos.resultado): lo marca quien lo
+           realiza; la app resalta el que sale de los pasos (js/mantenimiento.js, _mantPintarResultado) -->
+      <div class="form-group full" id="mant-resultado-bloque" style="margin-bottom:14px">
+        <label>Resultado del mantenimiento *</label>
+        <div class="mant-resultado-botones">
+          <button type="button" data-res="apto" onclick="_mantElegirResultado('apto')">✓ Apto</button>
+          <button type="button" data-res="apto_tras_intervencion" onclick="_mantElegirResultado('apto_tras_intervencion')">🔩 Apto tras intervención</button>
+          <button type="button" data-res="no_apto" onclick="_mantElegirResultado('no_apto')">✗ No apto</button>
+        </div>
+        <div id="mant-resultado-hint" class="mant-resultado-hint"></div>
       </div>
 
       <div class="form-grid form-grid-2">
@@ -160,6 +175,7 @@
             <option>Anual</option>
             <option>Bianual</option>
             <option>Trianual</option>
+            <option value="Quinquenal">Quinquenal (cada 5 años)</option>
             <option value="Pretemporada">Revisión anual de arranque</option>
             <option value="Posttemporada">Revisión anual de cierre</option>
           </select>

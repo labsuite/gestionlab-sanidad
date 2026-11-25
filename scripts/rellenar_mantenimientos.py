@@ -44,7 +44,7 @@ def es_momento_fin(operacion):
 
 
 # Nº de cursos que debe esperar cada periodicidad multianual antes de volver a pedirse
-CICLO_ANIOS = {'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3}
+CICLO_ANIOS = {'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3, 'Quinquenal': 5}
 
 
 def año_inicio_curso(curso):
@@ -85,7 +85,7 @@ def get_periodos_curso(plan, equipo):
         idx = [4, 9] if es_fin else [0, 5]
         return [mes_str(meses[i][0], meses[i][1]) for i in idx if i < len(meses)]
 
-    if p in ('Anual', 'Bianual', 'Trianual', 'Cada 2 años'):
+    if p in ('Anual', 'Bianual', 'Trianual', 'Quinquenal', 'Cada 2 años'):
         m = meses[-1] if es_fin else meses[0]
         return [mes_str(m[0], m[1])]
 

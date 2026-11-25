@@ -419,11 +419,17 @@ create table registros_cabina (
   hora_inicio                     time,
   hora_fin                        time,
   practica_tecnica                text,
-  nivel_riesgo                    text,
-  verificacion_previa             text,
-  descontaminacion_posterior      text,
-  incidencias                     text,
-  estado                          text not null default 'Abierta'
+  nivel_riesgo                    text,      -- antiguo (nivel BSL): ya no se escribe; ver grupo_riesgo
+  grupo_riesgo                    text,      -- 'No aplica' | '1' | '2' (grupo de riesgo del agente)
+  verificacion_previa             text,      -- comprobaciones previas (apartado 4 del protocolo)
+  desinfeccion_inicial            text,
+  descontaminacion_posterior      text,      -- desinfección final
+  minutos_uv                      integer,
+  incidencias                     text,      -- alarmas e incidencias
+  estado                          text not null default 'Abierta',
+  -- Correcciones de Gestión a un registro cerrado: [{fecha_hora, corregido_por, motivo,
+  -- cambios: {columna: {antes, despues}}}] (gestionar-registro-uso, corregir_registro)
+  correcciones                    jsonb not null default '[]'::jsonb
 );
 
 create table registros_autoclave (
@@ -435,9 +441,19 @@ create table registros_autoclave (
   hora_fin                 time,
   programa_ciclo           text,
   tipo_carga               text,
-  resultado_control        text,
+  resultado_control        text,       -- antiguo (indicadores juntos): ya no se escribe
+  -- El ciclo se apunta al arrancar (estado 'Abierta' = en marcha) y se completa al terminar
+  temperatura_max          numeric,    -- °C
+  presion_max              numeric,    -- bar
+  cinta_indicadora         text,       -- 'Viró' | 'No viró' | 'No se puso'
+  integrador_quimico       text,       -- 'Viró' | 'No viró' | 'No se puso'
+  indicador_biologico      text,       -- 'Sí' | 'No'
+  resultado_biologico      text,       -- 'Negativo' | 'Positivo' (se añade al leerlo, 24–48 h después)
+  fecha_lectura_biologico  date,
+  biologico_leido_por      text,       -- email de la sesión que lo apuntó
   incidencias              text,
-  estado                   text not null default 'Cerrada'
+  estado                   text not null default 'Cerrada',
+  correcciones             jsonb not null default '[]'::jsonb   -- ver registros_cabina
 );
 
 create table registros_vitrina (
@@ -449,10 +465,11 @@ create table registros_vitrina (
   hora_fin                time,
   practica_tecnica        text,
   productos_quimicos      text,
-  verificacion_previa     text,
+  verificacion_previa     text,      -- comprobaciones previas (apartado 4 del protocolo)
   limpieza_posterior      text,
   incidencias             text,
-  estado                  text not null default 'Abierta'
+  estado                  text not null default 'Abierta',
+  correcciones            jsonb not null default '[]'::jsonb   -- ver registros_cabina
 );
 
 -- ============================================================
@@ -1117,3 +1134,10 @@ create policy "verif_sesiones_select" on verif_sesiones for select to authentica
 -- Verificación de cada pipeta, dentro del registro de su revisión anual (o del bianual):
 -- réplicas, sesiones, cálculo, límites usados y resultado (lo calcula el servidor).
 alter table registro_mantenimientos add column if not exists verificacion jsonb;
+
+-- Resultado de un mantenimiento (2026-11-25): lo marca quien lo realiza al finalizar
+-- ('apto' | 'apto_tras_intervencion' | 'no_apto'); la app solo lo sugiere a partir de
+-- los pasos. Los registros anteriores quedan a null. Las intervenciones que salen de un
+-- paso (pieza cambiada, ajuste) van a `intervenciones` con origen «Mantenimiento
+-- preventivo RM…» y su id se guarda dentro del paso (pasos[i].id_intervencion).
+alter table registro_mantenimientos add column if not exists resultado text;

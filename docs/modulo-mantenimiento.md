@@ -144,6 +144,54 @@ Antes el alumnado necesitaba que cada plan estuviera marcado `con_alumnado` (lis
   Edge Function `gestionar-mantenimiento` (bloque `!esStaff`) en el servidor, que rechaza por
   separado los externos y los `solo_profesorado`.
 
+## El preventivo verifica: tipos de paso, qué se hizo y resultado (2026-11-25)
+
+Decisión de Paloma: un mantenimiento preventivo **comprueba**; cambiar una pieza o ajustar el
+equipo es una **intervención**, y queda **a la vez** en el paso del mantenimiento y en el
+historial del equipo (para saber qué pieza se cambió, cuándo, y que vino de un preventivo).
+
+**Tipo de cada paso** (`_tipoPasoDesdeTexto` en `js/mantenimiento.js`; los planes no lo traen,
+sale del texto al abrir; se guarda en `pasos[i].tipo`):
+
+| Tipo | Cuándo | En pantalla |
+|---|---|---|
+| `comprobar` | lleva criterio, empieza por Revisar/Comprobar/Verificar/Inspeccionar/Control…, o es una acción **condicional** («Cambio de junta … si procede», «Engrasar si procede») | ✓ / ⚠ / No aplica. Rótulos: con criterio «Cumple / No cumple»; condicional «No hacía falta / Hacía falta»; si no, «Correcto / Hay que actuar» |
+| `sustituir` | empieza por Sustituir/Sustitución/Cambio/Cambiar/Reemplazar/Renovar, sin condición y sin ser un fluido (agua, parafina, aceite…) | casilla + tipo (pieza / consumibles) + pieza puesta |
+| `hacer` | lo demás (limpiar, etiquetar, guardar…) | casilla |
+
+Los pasos de la verificación de pipetas (`vpPasoAuto`) no se reclasifican. Los pasos guardados
+antes de esto no tienen `tipo`: comprobación si llevan criterio, casilla si no.
+
+**Una comprobación que sale ⚠** pide «¿Qué has visto?» y «¿Qué has hecho?» (`accion`):
+- `corregido` — en el momento, sin pieza (engrasar, limpiar, reapretar): solo nota en el paso.
+- `intervencion` — pieza cambiada o equipo ajustado: `tipo_intervencion` (Sustitución de pieza,
+  Calibración, Cambio de consumibles, Correctivo) + `actuacion` (qué se cambió).
+- `reparacion` — necesita reparación: al finalizar se abre el aviso de avería (lo de antes).
+Una sustitución programada hecha se trata como `intervencion`.
+
+**Intervenciones que salen de los pasos** (`registrarIntervencionesDeMant` en
+`supabase/functions/_shared/mant_pasos.ts`): intervención **ya cerrada** con una tarea
+«Resuelto», `origen = 'Mantenimiento preventivo RM…'`, fecha y autor del mantenimiento; su id
+queda en `pasos[i].id_intervencion` (nunca se crea dos veces). Se crean cuando el registro es
+válido: al **finalizar** si lo hace el profesorado, al **firmar el visto bueno** si lo hizo el
+alumnado, y al **corregir** un finalizado. El ajuste de una micropipeta (AJUSTAR → repetición)
+crea igual una «Calibración» (`verificacion.intervencion_ajuste`). Pruebas:
+`node tools/mantenimiento/pasos.test.mjs` (y `--base` contra la base, con un registro ficticio
+del curso 2099-2100 que se borra solo).
+
+**Resultado del mantenimiento** (`registro_mantenimientos.resultado`): `apto` /
+`apto_tras_intervencion` / `no_apto`. **Lo marca la persona** (obligatorio para finalizar en la
+pantalla; el servidor lo acepta vacío para no bloquear pantallas antiguas); la app solo resalta
+con borde discontinuo el que sale de los pasos (`_mantResultadoSugerido`: algo que necesita
+reparación o pipeta RETIRAR → no apto; pieza cambiada o pipeta ajustada → apto tras
+intervención). Sale en «Realizados», en «Visto bueno» y en el Excel de calidad (col. H junto a
+la fecha; en J, por qué no fue «apto»).
+
+**Periodicidad `Quinquenal`** (cada 5 años, `_CICLO_ANIOS`): para calibraciones externas como
+la de las micropipetas, que sustituye al antiguo bianual interno «Cambio de juntas y
+verificación». Ese cambio de los planes viene de los protocolos (encargo en `PENDIENTES.md` de
+la carpeta de protocolos, 2026-11-25), no se hace a mano en la base.
+
 ## Comprobaciones con criterio: «Cumple» / «No cumple» (2026-11-23)
 
 Un paso de las instrucciones que acaba en `(criterio: …)` —así llegan de los protocolos vía

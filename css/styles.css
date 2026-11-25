@@ -1208,6 +1208,38 @@
     .mant-check-nota label { font-size: 12px; font-weight: 500; }
     .mant-check-nota textarea { width: 100%; margin-top: 4px; }
     .mant-check-nota-ayuda { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+    /* Tipos de paso (2026-11-25): No aplica, qué se hizo al salir mal, sustitución programada */
+    .mant-check-criterio.is-no_aplica .mant-btn-noaplica { background: var(--text-muted); border-color: var(--text-muted); color: #fff; }
+    .mant-check-criterio.is-no_aplica .mant-check-texto { color: var(--text-muted); }
+    .mant-check-botones .mant-btn-noaplica { color: var(--text-muted); }
+    .mant-check-accion-tit { font-size: 12px; font-weight: 500; margin-top: 8px; }
+    .mant-check-acciones { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+    .mant-check-acciones button {
+      font: inherit; font-size: 12px; padding: 4px 10px; border-radius: var(--radius-sm); cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text); text-align: left;
+    }
+    .mant-check-acciones button.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .mant-check-acciones button[data-accion="reparacion"].sel { background: var(--danger); border-color: var(--danger); }
+    .mant-check-actuacion, .mant-check-pieza { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .mant-check-item .mant-check-actuacion input, .mant-check-item .mant-check-pieza input {
+      flex: 1 1 220px; min-width: 0; width: auto; height: auto; margin: 0; cursor: text;
+    }
+    .mant-check-actuacion select, .mant-check-pieza select { flex: 0 1 auto; max-width: 100%; }
+    .mant-check-pieza .mant-check-nota-ayuda { flex-basis: 100%; }
+    .mant-check-sustituir { cursor: default; }
+    .mant-check-sustituir:hover { background: none; }
+    .mant-check-sustituir.is-hecho > .mant-check-cuerpo > .mant-check-texto { color: var(--text-muted); }
+    /* Resultado del mantenimiento */
+    .mant-resultado-botones { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .mant-resultado-botones button {
+      font: inherit; font-size: 13px; padding: 6px 14px; border-radius: 99px; cursor: pointer;
+      border: 1px solid var(--border); background: var(--surface); color: var(--text);
+    }
+    .mant-resultado-botones button.sugerido { border: 2px dashed var(--accent); padding: 5px 13px; }
+    .mant-resultado-botones button.sel[data-res="apto"] { background: var(--success, #1e8e3e); border-color: var(--success, #1e8e3e); color: #fff; }
+    .mant-resultado-botones button.sel[data-res="apto_tras_intervencion"] { background: var(--warning, #b7791f); border-color: var(--warning, #b7791f); color: #fff; }
+    .mant-resultado-botones button.sel[data-res="no_apto"] { background: var(--danger); border-color: var(--danger); color: #fff; }
+    .mant-resultado-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
     /* Calculadora de criterios (js/criterios-calc.js) */
     .mant-calc { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
     .mant-calc-regla {

@@ -40,7 +40,7 @@ import psycopg2.extras
 # ===========================================================================
 CARPETA = r"C:/Users/Paloma/OneDrive/Escritorio/CIFP Manuel Antonio/B. Laboratorio/Protocolos/GestionLab/"
 PERIODICIDADES = {'Mensual', 'Trimestral', 'Semestral', 'Anual', 'Bianual', 'Trianual',
-                  'Pretemporada', 'Posttemporada'}
+                  'Quinquenal', 'Pretemporada', 'Posttemporada'}
 # ===========================================================================
 
 APLICAR = '--aplicar' in sys.argv

@@ -50,6 +50,7 @@ FECHAS_CURSO = {
     'Anual'        : date(2025, 9, 1),
     'Bianual'      : date(2025, 9, 1),
     'Trianual'     : date(2025, 9, 1),
+    'Quinquenal'   : date(2025, 9, 1),
     'Pretemporada' : date(2025, 9, 1),
     'Posttemporada': date(2026, 6, 1),
 }

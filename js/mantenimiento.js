@@ -124,7 +124,8 @@ function _añoInicioCurso(cursoAcademico) {
 }
 
 // Nº de cursos que debe esperar cada periodicidad multianual antes de volver a pedirse
-const _CICLO_ANIOS = { 'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3 };
+// Quinquenal (2026-11-25): calibraciones externas cada 5 años (p. ej. las micropipetas).
+const _CICLO_ANIOS = { 'Bianual': 2, 'Cada 2 años': 2, 'Trianual': 3, 'Quinquenal': 5 };
 
 // Para Bianual/Trianual: solo "debido" cuando han pasado N cursos desde el último
 // registro real de este plan. Si nunca se ha realizado, se sigue pidiendo cada curso
@@ -161,6 +162,7 @@ function getPeriodosEsperados(plan, equipo, cursoAcademico) {
     case 'Anual':
     case 'Bianual':
     case 'Trianual':
+    case 'Quinquenal':
     case 'Cada 2 años': {
       if (!_esCursoDebidoMultianual(plan, cursoAcademico)) return [];
       const mes = _esMomentoFin(plan) ? mesesBase[mesesBase.length - 1] : mesesBase[0];
@@ -252,28 +254,78 @@ function _pasosDesdePlan(plan) {
     .map(l => l.replace(/^\s*(?:\d+[.)]|[-*•])\s*/, '').trim())
     .filter(Boolean);
   const textos = lineas.length ? lineas : [(plan.Operacion || 'Mantenimiento').trim()];
-  return textos.map(t => _normPasoMant({ texto: t, hecho: false }));
+  return textos.map(t => _normPasoMant({ texto: t, hecho: false }, true));
 }
 
 // Un paso que acaba en "(criterio: …)" —así vienen de los protocolos— es una COMPROBACIÓN:
 // no se marca como hecha, se resuelve con «Cumple» / «No cumple» (y en ese caso, qué se vio).
 const _RE_CRITERIO = /\s*\(\s*criterio\s*:\s*(.*)\)\s*$/i;   // el criterio puede llevar paréntesis dentro
 
-/** Normaliza un paso guardado o recién leído del plan: {texto, hecho, criterio, resultado, nota}.
- *  Los pasos guardados antes de existir los criterios llevan el criterio dentro del texto. */
-function _normPasoMant(p) {
+// ── Tipos de paso (2026-11-25) ─────────────────────────────────────────────
+// El preventivo VERIFICA (decisión de Paloma): cada paso es
+//   'comprobar' → ✓ / ⚠ / No aplica, y si sale mal, qué se hizo (ver _mantAccionPaso);
+//   'hacer'     → casilla (limpiar, etiquetar, guardar…);
+//   'sustituir' → sustitución PROGRAMADA de una pieza (vida útil fija): casilla + pieza puesta,
+//                 y queda también como intervención del equipo.
+// Los planes no traen el tipo: sale del texto. Un cambio condicional («Cambio de junta si
+// procede», «Engrasar si procede») no es una orden: es una comprobación de si hacía falta.
+const _RE_PASO_CONDICIONAL = /\bsi procede\b|\bsi (?:est[aá]n?|hay|no|falla|lo|la|se|es|tiene|pendiente)\b|\bsi [<>≤≥]|\bseg[uú]n uso\b|\bo antes\b/i;
+const _RE_PASO_ACCION_COND = /^(?:sustitu|cambi|reemplaz|renov|engras|lubric|descalcific|ajust|recalibr)/i;
+const _RE_PASO_SUSTITUIR = /^(?:sustitu|cambi(?:ar|o)\b|reemplaz|renovar)/i;
+// Cambiar el agua o la parafina es una tarea del mantenimiento, no una pieza.
+const _RE_PASO_FLUIDO = /\b(?:agua|parafina|aceite|medio|soluci[oó]n|disoluci[oó]n|gel|tamp[oó]n|alcohol|lej[ií]a|desecante)\b/i;
+const _RE_PASO_COMPROBAR = /^(?:revis|comprob|verific|inspecc|control|observ|examin|mirar|vigil|contrast)/i;
+
+function _tipoPasoDesdeTexto(texto, criterio) {
+  const t = String(texto || '').trim();
+  // Los pasos de la verificación de una pipeta los marca la app (js/verif-pipetas.js).
+  if (typeof vpPasoAuto === 'function' && vpPasoAuto(t)) return criterio ? 'comprobar' : 'hacer';
+  if (_RE_PASO_CONDICIONAL.test(t) && _RE_PASO_ACCION_COND.test(t)) return 'comprobar';
+  if (_RE_PASO_SUSTITUIR.test(t) && !_RE_PASO_FLUIDO.test(t)) return 'sustituir';
+  if (criterio) return 'comprobar';
+  if (_RE_PASO_COMPROBAR.test(t)) return 'comprobar';
+  return 'hacer';
+}
+
+/** Una comprobación escrita como acción condicional («Engrasar si procede»): se contesta
+ *  «No hacía falta» / «Hacía falta» en vez de «Correcto» / «Hay que actuar». */
+function _pasoEsCondicional(p) {
+  return p.tipo === 'comprobar' && !p.criterio && _RE_PASO_CONDICIONAL.test(p.texto) && _RE_PASO_ACCION_COND.test(p.texto);
+}
+
+const _TIPOS_INT_PASO = ['Sustitución de pieza', 'Calibración', 'Cambio de consumibles', 'Correctivo'];
+
+/** Normaliza un paso guardado o recién leído del plan (`delPlan`). Los pasos guardados antes
+ *  de existir los tipos no lo traen: comprobación si llevan criterio, casilla si no (así se
+ *  hicieron). Los guardados antes de existir los criterios llevan el criterio en el texto. */
+function _normPasoMant(p, delPlan) {
   let texto = String(p?.texto || '').trim();
   let criterio = p?.criterio ? String(p.criterio).trim() : '';
   if (!criterio) {
     const m = texto.match(_RE_CRITERIO);
     if (m) { criterio = m[1].trim(); texto = texto.replace(_RE_CRITERIO, '').trim(); }
   }
-  const resultado = (p?.resultado === 'cumple' || p?.resultado === 'no_cumple') ? p.resultado : null;
+  const tipo = ['comprobar', 'hacer', 'sustituir'].includes(p?.tipo) ? p.tipo
+    : delPlan ? _tipoPasoDesdeTexto(texto, criterio)
+    : (criterio ? 'comprobar' : 'hacer');
+  const base = { texto, tipo, criterio: criterio || null, id_intervencion: p?.id_intervencion || null, auto: !!p?.auto };
+  if (tipo === 'hacer') return { ...base, hecho: p?.hecho === true, resultado: null, nota: '', medidas: [] };
+  if (tipo === 'sustituir') {
+    return { ...base, hecho: p?.hecho === true, resultado: null, nota: '', medidas: [],
+      actuacion: String(p?.actuacion || ''),
+      // Filtros y tubos de bomba son consumibles; lo demás (tapas, juntas, tubo UV…), piezas.
+      tipo_intervencion: _TIPOS_INT_PASO.includes(p?.tipo_intervencion) ? p.tipo_intervencion
+        : /\bfiltro|\btubos?\b(?!\s*UV)/i.test(texto) ? 'Cambio de consumibles' : 'Sustitución de pieza' };
+  }
+  const resultado = ['cumple', 'no_cumple', 'no_aplica'].includes(p?.resultado) ? p.resultado : null;
+  const nc = resultado === 'no_cumple';
   return {
-    texto, criterio: criterio || null,
-    hecho: criterio ? !!resultado : p?.hecho === true,
-    resultado: criterio ? resultado : null,
-    nota: criterio && resultado === 'no_cumple' ? String(p?.nota || '') : '',
+    ...base,
+    hecho: !!resultado, resultado,
+    nota: nc ? String(p?.nota || '') : '',
+    accion: nc && ['corregido', 'intervencion', 'reparacion'].includes(p?.accion) ? p.accion : null,
+    actuacion: nc ? String(p?.actuacion || '') : '',
+    tipo_intervencion: _TIPOS_INT_PASO.includes(p?.tipo_intervencion) ? p.tipo_intervencion : 'Sustitución de pieza',
     // Datos tecleados en la calculadora de criterios (js/criterios-calc.js), uno por regla.
     medidas: criterio && Array.isArray(p?.medidas) ? p.medidas : [],
   };
@@ -281,7 +333,23 @@ function _normPasoMant(p) {
 
 /** Pasos de comprobación que no cumplen su criterio. */
 function _pasosNoCumple(pasos) {
-  return (Array.isArray(pasos) ? pasos : []).map(_normPasoMant).filter(p => p.resultado === 'no_cumple');
+  return (Array.isArray(pasos) ? pasos : []).map(p => _normPasoMant(p)).filter(p => p.resultado === 'no_cumple');
+}
+
+/** ¿Es un paso de la verificación de una pipeta (lo marca la app)? */
+function _pasoAutoMant(p) {
+  return !!p?.auto || (typeof vpPasoAuto === 'function' && vpPasoAuto(p?.texto || ''));
+}
+
+// Resultado del mantenimiento (columna `resultado`): lo marca quien lo realiza; la app sugiere.
+const _RESULTADO_MANT = {
+  apto:                    { txt: 'Apto',                    icono: '✓', badge: 'badge-green' },
+  apto_tras_intervencion:  { txt: 'Apto tras intervención',  icono: '🔩', badge: 'badge-orange' },
+  no_apto:                 { txt: 'No apto',                 icono: '✗', badge: 'badge-red' },
+};
+function _badgeResultadoMant(res) {
+  const r = _RESULTADO_MANT[res];
+  return r ? `<span class="badge ${r.badge}" style="font-size:10px;white-space:nowrap">${r.icono} ${r.txt}</span>` : '';
 }
 
 // ============================================================
@@ -522,6 +590,7 @@ let _mantEditRegistroId = null; // si no es null, el modal está editando un reg
 // Deja el modal en modo "ejecutar" (checklist + guardar progreso + finalizar).
 function _resetModalMantUI() {
   _mantEditRegistroId = null;
+  _mantResultado = null;
   if (typeof vpPrepararRevision === 'function') vpPrepararRevision(null);
   const t = document.getElementById('mant-modal-title');
   if (t) t.textContent = 'Ejecutar mantenimiento';
@@ -570,6 +639,7 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
 
   // Micropipetas: la verificación la calcula la app y marca ella sus pasos (js/verif-pipetas.js).
   const conVerif = typeof vpPrepararRevision === 'function' && vpPrepararRevision(plan, enCurso, curso);
+  _mantResultado = enCurso?.Resultado || null;
   _renderMantChecklist(pasos);
   if (conVerif) vpMarcarPasosRevision();
 
@@ -614,11 +684,13 @@ function openModalRegistrarMant(idPlan, idEquipo, periodo, curso) {
 }
 
 function _renderMantChecklist(pasos) {
-  _mantPasosActual = (pasos || []).map(_normPasoMant);
+  _mantPasosActual = (pasos || []).map(p => _normPasoMant(p));
   const cont = document.getElementById('mant-checklist');
   if (!cont) return;
+  const opcionesTipo = (sel, lista) => lista.map(t => `<option${t === sel ? ' selected' : ''}>${t}</option>`).join('');
+  const esAlumno = getUserRole() === 'Alumno';
   // Los textos van con textContent (vienen de los planes, no se interpolan como HTML).
-  cont.innerHTML = _mantPasosActual.map((p, i) => typeof vpPasoAuto === 'function' && vpPasoAuto(p.texto) ? `
+  cont.innerHTML = _mantPasosActual.map((p, i) => _pasoAutoMant(p) ? `
     <div class="mant-check-item mant-check-auto ${p.resultado ? 'is-' + p.resultado : p.hecho ? 'is-cumple' : ''}" data-idx="${i}">
       <span class="mant-check-auto-icono">${p.resultado === 'no_cumple' ? '❌' : (p.resultado === 'cumple' || p.hecho) ? '✅' : '⏳'}</span>
       <div class="mant-check-cuerpo">
@@ -626,20 +698,49 @@ function _renderMantChecklist(pasos) {
         ${p.criterio ? '<div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>' : ''}
         <div class="mant-check-auto-nota">🧪 Lo marca la app con el resultado de la verificación</div>
       </div>
-    </div>` : p.criterio ? `
+    </div>` : p.tipo === 'comprobar' ? (() => {
+      // Tres maneras de preguntar lo mismo, según cómo esté escrito el paso.
+      const [si, no] = p.criterio ? ['✓ Cumple', '✗ No cumple']
+        : _pasoEsCondicional(p) ? ['✓ No hacía falta', '⚠ Hacía falta'] : ['✓ Correcto', '⚠ Hay que actuar'];
+      return `
     <div class="mant-check-item mant-check-criterio ${p.resultado ? 'is-' + p.resultado : ''}" data-idx="${i}">
       <div class="mant-check-cuerpo">
         <span class="mant-check-texto"></span>
-        <div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>
-        ${_mantCalcHtml(p, i)}
+        ${p.criterio ? '<div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>' : ''}
+        ${p.criterio ? _mantCalcHtml(p, i) : ''}
         <div class="mant-check-botones">
-          <button type="button" class="mant-btn-cumple" onclick="_mantMarcarCriterio(${i}, 'cumple')">✓ Cumple</button>
-          <button type="button" class="mant-btn-nocumple" onclick="_mantMarcarCriterio(${i}, 'no_cumple')">✗ No cumple</button>
+          <button type="button" class="mant-btn-cumple" onclick="_mantMarcarCriterio(${i}, 'cumple')">${si}</button>
+          <button type="button" class="mant-btn-nocumple" onclick="_mantMarcarCriterio(${i}, 'no_cumple')">${no}</button>
+          <button type="button" class="mant-btn-noaplica" title="Este paso no aplica a este equipo o esta vez" onclick="_mantMarcarCriterio(${i}, 'no_aplica')">No aplica</button>
         </div>
         <div class="mant-check-nota" style="${p.resultado === 'no_cumple' ? '' : 'display:none'}">
           <label>¿Qué has visto? *</label>
-          <textarea rows="2" placeholder="Valor medido, lo que no funciona, lo que falta…" oninput="_mantNotaCriterio(${i}, this.value)"></textarea>
-          <div class="mant-check-nota-ayuda">Al finalizar se abrirá el aviso de avería del equipo con esto ya escrito.</div>
+          <textarea rows="2" data-campo="nota" placeholder="Valor medido, lo que está gastado, lo que no funciona…" oninput="_mantCampoPaso(${i}, 'nota', this.value)"></textarea>
+          <div class="mant-check-accion-tit">¿Qué has hecho? *</div>
+          <div class="mant-check-acciones">
+            <button type="button" data-accion="corregido" onclick="_mantAccionPaso(${i}, 'corregido')">🔧 Lo he corregido en el momento</button>
+            <button type="button" data-accion="intervencion" onclick="_mantAccionPaso(${i}, 'intervencion')">🔩 He cambiado una pieza o ajustado el equipo</button>
+            <button type="button" data-accion="reparacion" onclick="_mantAccionPaso(${i}, 'reparacion')">🚨 Necesita reparación</button>
+          </div>
+          <div class="mant-check-actuacion">
+            <select class="mant-check-tipoint" onchange="_mantCampoPaso(${i}, 'tipo_intervencion', this.value)">${opcionesTipo(p.tipo_intervencion, _TIPOS_INT_PASO)}</select>
+            <input type="text" data-campo="actuacion" oninput="_mantCampoPaso(${i}, 'actuacion', this.value)">
+          </div>
+          <div class="mant-check-nota-ayuda"></div>
+        </div>
+      </div>
+    </div>`; })() : p.tipo === 'sustituir' ? `
+    <div class="mant-check-item mant-check-sustituir ${p.hecho ? 'is-hecho' : ''}" data-idx="${i}">
+      <input type="checkbox" ${p.hecho ? 'checked' : ''} onchange="_mantPasoHecho(${i}, this.checked)">
+      <div class="mant-check-cuerpo">
+        <span class="mant-check-texto"></span>
+        ${p.criterio ? '<div class="mant-check-crit"><strong>Criterio:</strong> <span></span></div>' : ''}
+        <div class="mant-check-pieza" style="${p.hecho ? '' : 'display:none'}">
+          <select class="mant-check-tipoint" onchange="_mantCampoPaso(${i}, 'tipo_intervencion', this.value)">${opcionesTipo(p.tipo_intervencion, ['Sustitución de pieza', 'Cambio de consumibles'])}</select>
+          <input type="text" data-campo="actuacion" placeholder="Pieza puesta: referencia, lote… (opcional)" oninput="_mantCampoPaso(${i}, 'actuacion', this.value)">
+          <div class="mant-check-nota-ayuda">${p.id_intervencion
+            ? `🔩 Registrada como intervención ${p.id_intervencion} del equipo.`
+            : `🔩 Quedará también como intervención en el historial del equipo${esAlumno ? ' cuando el profesorado firme el visto bueno' : ''}.`}</div>
         </div>
       </div>
     </div>` : `
@@ -648,12 +749,16 @@ function _renderMantChecklist(pasos) {
       <span class="mant-check-texto"></span>
     </label>`).join('');
   cont.querySelectorAll('.mant-check-item').forEach(el => {
-    const p = _mantPasosActual[Number(el.dataset.idx)];
+    const i = Number(el.dataset.idx);
+    const p = _mantPasosActual[i];
     el.querySelector('.mant-check-texto').textContent = p.texto;
     const crit = el.querySelector('.mant-check-crit span');
     if (crit) crit.textContent = p.criterio;
-    const ta = el.querySelector('textarea');
+    const ta = el.querySelector('textarea[data-campo="nota"]');
     if (ta) ta.value = p.nota || '';
+    const act = el.querySelector('input[data-campo="actuacion"]');
+    if (act) act.value = p.actuacion || '';
+    if (p.tipo === 'comprobar' && !_pasoAutoMant(p)) _mantPintarAccion(i);
     // Calculadora: rellena lo ya guardado y pinta el resultado de cada regla.
     if (p._calc) p._calc.reglas.forEach((r, j) => {
       el.querySelectorAll(`.mant-calc-regla[data-r="${j}"] input`).forEach(inp => {
@@ -774,8 +879,69 @@ function _mantCalcVeredicto(i) {
 }
 
 function _mantPasoHecho(i, hecho) {
-  if (_mantPasosActual[i]) _mantPasosActual[i].hecho = !!hecho;
+  const p = _mantPasosActual[i];
+  if (!p) return;
+  p.hecho = !!hecho;
+  if (p.tipo === 'sustituir') {
+    const el = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"]`);
+    el?.classList.toggle('is-hecho', p.hecho);
+    const pieza = el?.querySelector('.mant-check-pieza');
+    if (pieza) pieza.style.display = p.hecho ? '' : 'none';
+  }
   _mantChecklistChanged();
+}
+
+/** Campo de texto de un paso (nota, actuacion, tipo_intervencion). */
+function _mantCampoPaso(i, campo, valor) {
+  const p = _mantPasosActual[i];
+  if (!p) return;
+  p[campo] = valor;
+  if (campo === 'tipo_intervencion' || campo === 'actuacion') _mantPintarResultado();
+}
+// Nombre antiguo (por si alguna pantalla cacheada lo llama).
+function _mantNotaCriterio(i, texto) { _mantCampoPaso(i, 'nota', texto); }
+
+/** Qué se hizo cuando una comprobación sale mal: 'corregido' (en el momento, sin pieza),
+ *  'intervencion' (pieza cambiada o ajuste: queda también como intervención del equipo) o
+ *  'reparacion' (aviso de avería al finalizar). Pulsar otra vez la misma, la quita. */
+function _mantAccionPaso(i, accion) {
+  const p = _mantPasosActual[i];
+  if (!p) return;
+  p.accion = p.accion === accion ? null : accion;
+  _mantPintarAccion(i);
+  _mantChecklistChanged();
+  if (p.accion === 'corregido' || p.accion === 'intervencion') {
+    document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"] input[data-campo="actuacion"]`)?.focus();
+  }
+}
+
+function _mantPintarAccion(i) {
+  const p = _mantPasosActual[i];
+  const el = document.querySelector(`#mant-checklist .mant-check-item[data-idx="${i}"]`);
+  if (!p || !el) return;
+  el.querySelectorAll('.mant-check-acciones button').forEach(b => b.classList.toggle('sel', b.dataset.accion === p.accion));
+  const act = el.querySelector('.mant-check-actuacion');
+  const conTexto = p.accion === 'corregido' || p.accion === 'intervencion';
+  if (act) {
+    act.style.display = conTexto ? '' : 'none';
+    const sel = act.querySelector('select');
+    if (sel) sel.style.display = p.accion === 'intervencion' ? '' : 'none';
+    const inp = act.querySelector('input');
+    if (inp) inp.placeholder = p.accion === 'intervencion'
+      ? '¿Qué has cambiado o ajustado? (p. ej. junta tórica nueva) *'
+      : '¿Qué has hecho? (p. ej. engrasado el pistón) *';
+  }
+  const ayuda = el.querySelector('.mant-check-nota-ayuda');
+  if (ayuda) {
+    const esAlumno = getUserRole() === 'Alumno';
+    ayuda.textContent = {
+      corregido: 'Queda anotado en este paso. Si has cambiado una pieza, elige «He cambiado una pieza».',
+      intervencion: p.id_intervencion
+        ? `Registrada como intervención ${p.id_intervencion} del equipo.`
+        : `Queda en este paso y, además, como intervención en el historial del equipo${esAlumno ? ', cuando el profesorado firme el visto bueno' : ''}.`,
+      reparacion: 'Al finalizar se abrirá el aviso de avería del equipo con esto ya escrito.',
+    }[p.accion] || 'Elige qué has hecho: corregirlo en el momento, cambiar una pieza o avisar de que necesita reparación.';
+  }
 }
 
 function _mantMarcarCriterio(i, resultado) {
@@ -794,17 +960,14 @@ function _mantAplicarCriterio(i, resultado, enfocar) {
   if (el) {
     el.classList.toggle('is-cumple', p.resultado === 'cumple');
     el.classList.toggle('is-no_cumple', p.resultado === 'no_cumple');
+    el.classList.toggle('is-no_aplica', p.resultado === 'no_aplica');
     const nota = el.querySelector('.mant-check-nota');
     if (nota) nota.style.display = p.resultado === 'no_cumple' ? '' : 'none';
-    const ta = el.querySelector('textarea');
+    const ta = el.querySelector('textarea[data-campo="nota"]');
     if (ta && ta.value !== (p.nota || '')) ta.value = p.nota || '';
     if (enfocar && p.resultado === 'no_cumple') ta?.focus();
   }
   _mantChecklistChanged();
-}
-
-function _mantNotaCriterio(i, texto) {
-  if (_mantPasosActual[i]) _mantPasosActual[i].nota = texto;
 }
 
 function _mantChecklistChanged() {
@@ -813,16 +976,83 @@ function _mantChecklistChanged() {
   const noCumple = _mantPasosActual.filter(p => p.resultado === 'no_cumple').length;
   const lbl = document.getElementById('mant-checklist-progreso');
   if (lbl) lbl.textContent = total
-    ? `${done}/${total} pasos${noCumple ? ` · ⚠ ${noCumple} no cumple${noCumple > 1 ? 'n' : ''}` : ''}`
+    ? `${done}/${total} pasos${noCumple ? ` · ⚠ ${noCumple} con algo que revisar` : ''}`
     : '';
+  _mantPintarResultado();
 }
 
 function _leerChecklist() {
-  return _mantPasosActual.map(p => p.criterio
-    ? { texto: p.texto, criterio: p.criterio, hecho: !!p.resultado, resultado: p.resultado,
-        nota: p.resultado === 'no_cumple' ? (p.nota || '').trim() : null,
-        ...(p._calc ? { medidas: _mantCalcMedidas(p) } : {}) }
-    : { texto: p.texto, hecho: p.hecho === true });
+  return _mantPasosActual.map(p => {
+    const base = { texto: p.texto, tipo: p.tipo,
+      ...(p.id_intervencion ? { id_intervencion: p.id_intervencion } : {}), ...(p.auto ? { auto: true } : {}) };
+    if (p.tipo === 'hacer') return { ...base, hecho: p.hecho === true };
+    if (p.tipo === 'sustituir') {
+      return { ...base, criterio: p.criterio, hecho: p.hecho === true,
+        actuacion: p.hecho ? (p.actuacion || '').trim() : null,
+        tipo_intervencion: p.hecho ? (p.tipo_intervencion || 'Sustitución de pieza') : null };
+    }
+    const nc = p.resultado === 'no_cumple';
+    const conTexto = nc && (p.accion === 'corregido' || p.accion === 'intervencion');
+    return { ...base, criterio: p.criterio, hecho: !!p.resultado, resultado: p.resultado,
+      nota: nc ? (p.nota || '').trim() : null,
+      accion: nc ? (p.accion || null) : null,
+      actuacion: conTexto ? (p.actuacion || '').trim() : null,
+      tipo_intervencion: nc && p.accion === 'intervencion' ? (p.tipo_intervencion || 'Sustitución de pieza') : null,
+      ...(p._calc ? { medidas: _mantCalcMedidas(p) } : {}) };
+  });
+}
+
+/** Lo que falta en un paso para poder finalizar (mensaje), o null. Espejo de faltaEnPaso()
+ *  en gestionar-mantenimiento. */
+function _mantFaltaEnPasos(pasos) {
+  for (const p of pasos) {
+    if (p.resultado !== 'no_cumple' || _pasoAutoMant(p)) continue;
+    if (!p.nota) return `Anota qué has visto en «${p.texto}»`;
+    if (!p.accion) return `Elige qué has hecho en «${p.texto}»: corregirlo, cambiar una pieza o avisar de que necesita reparación`;
+    if ((p.accion === 'corregido' || p.accion === 'intervencion') && !p.actuacion) return `Escribe qué has hecho en «${p.texto}»`;
+  }
+  return null;
+}
+
+// ── Resultado del mantenimiento ─────────────────────────────────────────────
+// Lo marca la persona (un «está bien» nunca lo pone la app sola); la app resalta el que
+// le sale de los pasos y explica por qué.
+let _mantResultado = null;
+
+/** { res, porque } sugerido a partir de los pasos (y de la verificación de una pipeta), o null
+ *  si aún faltan comprobaciones por contestar. */
+function _mantResultadoSugerido() {
+  const ps = _mantPasosActual;
+  const vc = (typeof _vpRev !== 'undefined' && _vpRev && typeof _vpCalcVer === 'function') ? _vpCalcVer() : null;
+  const manuales = ps.filter(p => p.tipo === 'comprobar' && !_pasoAutoMant(p));
+  if (manuales.some(p => p.resultado === 'no_cumple' && p.accion === 'reparacion')) return { res: 'no_apto', porque: 'hay algo que necesita reparación' };
+  if (vc?.final && /^RETIRAR/.test(vc.resultado || '')) return { res: 'no_apto', porque: 'la verificación dice RETIRAR' };
+  if (manuales.some(p => !p.resultado || (p.resultado === 'no_cumple' && !p.accion))) return null;
+  if (vc && !vc.final) return null;
+  if (manuales.some(p => p.accion === 'intervencion')) return { res: 'apto_tras_intervencion', porque: 'se ha cambiado una pieza o ajustado el equipo' };
+  if (vc?.final && (vc.fases?.length || 0) > 1) return { res: 'apto_tras_intervencion', porque: 'la pipeta se ha ajustado' };
+  return { res: 'apto', porque: 'las comprobaciones están bien' };
+}
+
+function _mantElegirResultado(res) {
+  _mantResultado = _mantResultado === res ? null : res;
+  _mantPintarResultado();
+}
+
+function _mantPintarResultado() {
+  const bloque = document.getElementById('mant-resultado-bloque');
+  if (!bloque) return;
+  const sug = _mantResultadoSugerido();
+  bloque.querySelectorAll('button[data-res]').forEach(b => {
+    b.classList.toggle('sel', b.dataset.res === _mantResultado);
+    b.classList.toggle('sugerido', !!sug && b.dataset.res === sug.res && _mantResultado !== sug.res);
+  });
+  const hint = document.getElementById('mant-resultado-hint');
+  if (!hint) return;
+  if (!sug) hint.textContent = 'Contesta las comprobaciones y marca el resultado.';
+  else if (_mantResultado && _mantResultado !== sug.res) hint.textContent = `Por los pasos saldría «${_RESULTADO_MANT[sug.res].txt}» (${sug.porque}); has marcado otro: explícalo en Observaciones.`;
+  else if (_mantResultado) hint.textContent = '';
+  else hint.textContent = `Por los pasos saldría «${_RESULTADO_MANT[sug.res].txt}»: ${sug.porque}. Márcalo tú.`;
 }
 
 /** Lo tecleado en la calculadora, para el registro: una entrada por regla con algún dato. */
@@ -847,7 +1077,7 @@ function _ofrecerAvisoNoCumple(idEquipo, idPlan, periodo, noCumple) {
   if (!noCumple.length) return;
   const plan = DATA.planesMantenimiento.find(p => p.ID_Plan === idPlan);
   const texto = `Mantenimiento «${plan?.Operacion || 'preventivo'}» (${labelPeriodo(periodo)}): ` +
-    noCumple.map(p => `no cumple «${p.texto}» (criterio: ${p.criterio}). Visto: ${p.nota}`).join(' · ');
+    noCumple.map(p => `${p.criterio ? `no cumple «${p.texto}» (criterio: ${p.criterio})` : `«${p.texto}»: necesita reparación`}. Visto: ${p.nota}`).join(' · ');
   // Si el equipo ya tiene un aviso abierto, lo visto se añade a ese aviso: no se abre otro
   // por lo mismo (decisión de Paloma, 2026-11-23).
   const abierto = typeof avisosAbiertosEquipo === 'function' ? avisosAbiertosEquipo(idEquipo)[0] : null;
@@ -882,6 +1112,22 @@ function _nombreUsuarioActual() {
   return _nombreCorto(nombre);
 }
 
+/** Intervenciones creadas por el servidor a partir de los pasos (piezas cambiadas, ajustes):
+ *  se suman a DATA sin recargar todo. Si alguna no se pudo crear, se avisa. */
+function _mantIncorporarIntervenciones(resp) {
+  (resp?.intervenciones || []).forEach(i => {
+    const o = _intervencionSbToObj(i);
+    const k = DATA.intervenciones.findIndex(x => x.ID_Intervencion === o.ID_Intervencion);
+    if (k >= 0) DATA.intervenciones[k] = o; else DATA.intervenciones.push(o);
+  });
+  (resp?.tareas || []).forEach(t => {
+    const o = _tareaSbToObj(t);
+    const k = DATA.tareasIntervencion.findIndex(x => x.ID_Tarea === o.ID_Tarea);
+    if (k >= 0) DATA.tareasIntervencion[k] = o; else DATA.tareasIntervencion.push(o);
+  });
+  if (resp?.aviso) setTimeout(() => showToast(resp.aviso, 'error'), 700);
+}
+
 function _refrescarTrasMant() {
   renderEquipos();
   if (document.getElementById('page-mantenimiento')?.classList.contains('active')) renderMantenimiento();
@@ -896,7 +1142,7 @@ async function guardarProgresoMant() {
     const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
       accion: 'guardar_progreso',
       id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
-      pasos: _leerChecklist(), iniciado_por: _nombreUsuarioActual(),
+      pasos: _leerChecklist(), iniciado_por: _nombreUsuarioActual(), resultado: _mantResultado,
       observaciones: document.getElementById('mant-observaciones').value.trim(),
       verificacion: typeof vpVerificacionParaGuardar === 'function' ? vpVerificacionParaGuardar() : undefined,
     });
@@ -945,24 +1191,32 @@ async function finalizarMant() {
   if (typeof vpPuedeFinalizar === 'function' && !vpPuedeFinalizar()) return;
 
   const pasos = _leerChecklist();
-  const sinNota = pasos.find(p => p.resultado === 'no_cumple' && !p.nota);
-  if (sinNota) { showToast(`Anota qué has visto en «${sinNota.texto}», que no cumple el criterio`, 'error'); return; }
+  const falta = _mantFaltaEnPasos(pasos);
+  if (falta) { showToast(falta, 'error'); return; }
+  if (!_mantResultado) {
+    showToast('Marca el resultado del mantenimiento: apto, apto tras intervención o no apto', 'error');
+    document.getElementById('mant-resultado-bloque')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
   const faltan = pasos.filter(p => !p.hecho).length;
   if (faltan && !confirm(`Quedan ${faltan} paso(s) sin marcar. ¿Dar el mantenimiento por finalizado de todas formas?`)) return;
-  // Los pasos de la verificación de una pipeta no abren aviso: si sale RETIRAR, la incidencia
-  // la abre el servidor con los valores.
-  const noCumple = pasos.filter(p => p.resultado === 'no_cumple' && !(typeof vpPasoAuto === 'function' && vpPasoAuto(p.texto)));
+  // Solo lo que «necesita reparación» abre el aviso de avería (lo corregido o la pieza cambiada,
+  // no). Los pasos de la verificación de una pipeta tampoco: si sale RETIRAR, la incidencia la
+  // abre el servidor con los valores.
+  const noCumple = pasos.filter(p => p.resultado === 'no_cumple' && p.accion === 'reparacion' && !_pasoAutoMant(p));
 
   showLoading('Finalizando...');
   try {
-    const { registro, incidencia } = await callEdgeFunction('gestionar-mantenimiento', {
+    const resp = await callEdgeFunction('gestionar-mantenimiento', {
       accion: 'finalizar',
       id_plan: idPlan, id_equipo: idEquipo, curso_academico: curso, periodo,
-      pasos, fecha_realizacion: fecha, realizado_por: quien,
+      pasos, fecha_realizacion: fecha, realizado_por: quien, resultado: _mantResultado,
       supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
       verificacion: typeof vpVerificacionParaGuardar === 'function' ? vpVerificacionParaGuardar() : undefined,
     });
+    const { registro, incidencia } = resp;
+    _mantIncorporarIntervenciones(resp);
     if (incidencia) {
       // Pipeta retirada: incidencia abierta (o añadida a la que había) y equipo fuera de servicio.
       const inc = _incidenciaSbToObj(incidencia);
@@ -978,9 +1232,10 @@ async function finalizarMant() {
         (r.Estado === 'no_aplica' || r.Estado === 'aplazado')));
     _upsertRegistroMant(_registroMantSbToObj(registro));
     closeModal('modal-registrar-mant');
+    const nInt = (resp.intervenciones || []).length;
     showToast(registro.estado === 'pendiente_vb'
       ? 'Registrado. Queda a la espera del visto bueno del profesorado.'
-      : 'Mantenimiento finalizado', 'success');
+      : `Mantenimiento finalizado${nInt ? ` · ${nInt} intervención(es) en el historial del equipo` : ''}`, 'success');
     _refrescarTrasMant();
     _ofrecerAvisoNoCumple(idEquipo, idPlan, periodo, noCumple);
   } catch (e) {
@@ -1015,6 +1270,7 @@ function openModalEditarRegistroMant(idRegistro) {
   const pasos = Array.isArray(reg.Pasos) && reg.Pasos.length
     ? reg.Pasos
     : (plan ? _pasosDesdePlan(plan) : []);
+  _mantResultado = reg.Resultado || null;
   _renderMantChecklist(pasos);
 
   document.getElementById('mant-id-plan').value   = reg.ID_Plan;
@@ -1041,20 +1297,21 @@ async function guardarEdicionMant() {
   if (!fecha) { showToast('Indica la fecha de realización', 'error'); return; }
   if (!quien) { showToast('Indica quién realizó el mantenimiento', 'error'); return; }
   const pasosEd = _leerChecklist();
-  const sinNota = pasosEd.find(p => p.resultado === 'no_cumple' && !p.nota);
-  if (sinNota) { showToast(`Anota qué has visto en «${sinNota.texto}», que no cumple el criterio`, 'error'); return; }
+  const falta = _mantFaltaEnPasos(pasosEd);
+  if (falta) { showToast(falta, 'error'); return; }
 
   showLoading('Guardando cambios...');
   try {
-    const { registro } = await callEdgeFunction('gestionar-mantenimiento', {
+    const resp = await callEdgeFunction('gestionar-mantenimiento', {
       accion: 'editar_registro',
       id_registro: _mantEditRegistroId,
       fecha_realizacion: fecha, realizado_por: quien,
       supervisado_por: document.getElementById('mant-supervisado-por').value.trim(),
       observaciones: document.getElementById('mant-observaciones').value.trim(),
-      pasos: pasosEd,
+      pasos: pasosEd, resultado: _mantResultado,
     });
-    _upsertRegistroMant(_registroMantSbToObj(registro));
+    _mantIncorporarIntervenciones(resp);
+    _upsertRegistroMant(_registroMantSbToObj(resp.registro));
     closeModal('modal-registrar-mant');
     showToast('Mantenimiento actualizado', 'success');
     _refrescarTrasMant();
@@ -1830,7 +2087,7 @@ function _renderFilasRealizados(lista) {
       <td>${eqTxt}</td>
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${oper}"><span class="badge ${tipoBadge}" style="font-size:10px">${plan?.Tipo_Intervencion||'—'}</span> ${oper}</td>
       <td>${labelPeriodo(reg.Periodo)}</td>
-      <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
+      <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}${reg.Resultado ? '<br>' + _badgeResultadoMant(reg.Resultado) : ''}</td>
       <td>${reg.Realizado_Por||'—'}</td>
       <td>${reg.Supervisado_Por||'—'}</td>
       <td style="white-space:nowrap"><button class="btn btn-secondary" style="padding:2px 8px;font-size:11px" onclick="openModalEditarRegistroMant('${reg.ID_Registro}')">✏️ Editar</button></td>
@@ -1892,8 +2149,17 @@ function _renderFilasVistoBueno(lista) {
       : '<span style="color:var(--text-muted)">—</span>';
     // Lo que no cumplió, a la vista de quien firma (texto del alumnado: escapado).
     const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    // Qué se hizo con cada cosa que salió mal, y qué piezas se cambiaron: al firmar, lo que
+    // lleva 🔩 pasa al historial del equipo como intervención.
+    const ACC = { corregido: '🔧 corregido', intervencion: '🔩 pieza/ajuste', reparacion: '🚨 necesita reparación' };
     const noCumpleTxt = noCumple.map(p =>
-      `<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(p.texto)} — no cumple (${esc(p.criterio)}): ${esc(p.nota || '—')}</div>`).join('');
+      `<div style="font-size:11px;color:var(--danger);margin-top:2px">⚠ ${esc(p.texto)}${p.criterio ? ` — no cumple (${esc(p.criterio)})` : ''}: ${esc(p.nota || '—')}` +
+      `${p.accion ? ` → ${ACC[p.accion]}${p.actuacion ? ': ' + esc(p.actuacion) : ''}` : ''}</div>`).join('') +
+      pasos.map(p => _normPasoMant(p)).filter(p => p.tipo === 'sustituir' && p.hecho).map(p =>
+      `<div style="font-size:11px;margin-top:2px">🔩 ${esc(p.texto)}${p.actuacion ? ': ' + esc(p.actuacion) : ''}</div>`).join('');
+    const nIntVb = pasos.map(p => _normPasoMant(p)).filter(p => !p.id_intervencion &&
+      ((p.tipo === 'sustituir' && p.hecho) || (p.resultado === 'no_cumple' && p.accion === 'intervencion'))).length;
+    const intVbTxt = nIntVb ? `<div style="font-size:11px;margin-top:2px;color:var(--text-muted)">Al firmar, ${nIntVb} intervención(es) pasarán al historial del equipo.</div>` : '';
     // Medidas de la calculadora que cumplen (las que no, ya salen en la nota de arriba):
     // quien firma ve los números, no solo el veredicto.
     const medidasTxt = pasos.flatMap(p => Array.isArray(p.medidas) ? p.medidas : [])
@@ -1910,7 +2176,7 @@ function _renderFilasVistoBueno(lista) {
       <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(plan&&plan.Operacion)||''}">${(plan&&plan.Operacion)||'—'}</td>
       <td>${labelPeriodo(reg.Periodo)}</td>
       <td style="white-space:nowrap">${formatDate(reg.Fecha_Realizacion)||'—'}</td>
-      <td>👨‍🎓 ${reg.Realizado_Por||'—'}${verTxt}${noCumpleTxt}${medidasTxt}${obs}</td>
+      <td>👨‍🎓 ${reg.Realizado_Por||'—'} ${_badgeResultadoMant(reg.Resultado)}${verTxt}${noCumpleTxt}${intVbTxt}${medidasTxt}${obs}</td>
       <td style="text-align:center">${pasosTxt}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-primary" style="padding:2px 10px;font-size:11px" onclick="darVistoBuenoMant('${reg.ID_Registro}')">✓ Firmar</button>
@@ -1925,11 +2191,13 @@ function _renderFilasVistoBueno(lista) {
 async function darVistoBuenoMant(idRegistro) {
   showLoading('Firmando...');
   try {
-    const { supervisado_por } = await callEdgeFunction('gestionar-mantenimiento', {
+    const { supervisado_por, intervenciones, aviso } = await callEdgeFunction('gestionar-mantenimiento', {
       accion: 'visto_bueno', id_registro: idRegistro, aceptar: true,
     });
     await loadAllData();
-    showToast(`Visto bueno dado — supervisa: ${supervisado_por}`, 'success');
+    const nInt = (intervenciones || []).length;
+    showToast(`Visto bueno dado — supervisa: ${supervisado_por}${nInt ? ` · ${nInt} intervención(es) en el historial del equipo` : ''}`, 'success');
+    if (aviso) setTimeout(() => showToast(aviso, 'error'), 700);
     _refrescarTrasMant();
   } catch (e) {
     showToast(e.message || 'No se pudo firmar', 'error');
@@ -2101,7 +2369,7 @@ async function exportarModeloCalidad(cursoAcademico) {
         const idx = _esMomentoFin(plan) ? [4, 9] : [0, 5];
         return meses.filter((_, i) => idx.includes(i)).map(m => m.str);
       }
-      case 'Anual': case 'Bianual': case 'Trianual': case 'Cada 2 años': {
+      case 'Anual': case 'Bianual': case 'Trianual': case 'Quinquenal': case 'Cada 2 años': {
         if (!_esCursoDebidoMultianual(plan, curso)) return [];
         const mes = _esMomentoFin(plan) ? meses[meses.length - 1] : meses[0];
         return [mes.str];
@@ -2162,7 +2430,22 @@ async function exportarModeloCalidad(cursoAcademico) {
         .map(p => {
           const reg = getRegistroMant(plan.ID_Plan, curso, p);
           // Micropipetas: el resultado de la verificación (OK / AJUSTADA / RETIRADA) junto a la revisión.
-          if (reg) return formatDate(reg.Fecha_Realizacion) + (reg.Verificacion?.calculo?.calidad ? ` (verificación: ${reg.Verificacion.calculo.calidad})` : '');
+          if (reg) {
+            // Resultado del mantenimiento (desde 2026-11-25) en H; en J, por qué no fue «apto»:
+            // las intervenciones que salieron de sus pasos y lo que necesita reparación.
+            const res = _RESULTADO_MANT[reg.Resultado];
+            if (res && reg.Resultado !== 'apto') {
+              const ps = (reg.Pasos || []).map(x => _normPasoMant(x));
+              const det = [
+                ...ps.filter(x => x.resultado === 'no_cumple' && x.accion === 'intervencion')
+                  .map(x => `${x.actuacion || x.texto}${x.id_intervencion ? ` (${x.id_intervencion})` : ''}`),
+                ...ps.filter(x => x.resultado === 'no_cumple' && x.accion === 'reparacion').map(x => `${x.texto}: ${x.nota}`),
+              ];
+              notasMarcador.push(`${labelPeriodo(p)}: ${res.txt.toLowerCase()}${det.length ? ' — ' + det.join('; ') : ''}`);
+            }
+            return formatDate(reg.Fecha_Realizacion) + (res ? ` (${res.txt.toLowerCase()})` : '') +
+              (reg.Verificacion?.calculo?.calidad ? ` (verificación: ${reg.Verificacion.calculo.calidad})` : '');
+          }
           const m = getMarcadorMant(plan.ID_Plan, curso, p);
           if (!m) return '';
           if (m.Estado === 'aplazado') {

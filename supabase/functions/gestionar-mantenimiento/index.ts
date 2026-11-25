@@ -11,46 +11,7 @@
 import { requireStaff, requireAdminOrGestor, requireValidSession, identificarUsuario, ES_STAFF, firmaAlumnado, nombreCorto, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 import * as VP from "../_shared/verif_pipetas.js";
 import { calcularVerificacionRegistro, limpiarVerificacion, calculoParaGuardar, parametrosParaGuardar, textoIncidenciaRetirada } from "../_shared/verif_pipetas_srv.ts";
-
-// Parsea el checklist recibido en el cuerpo. Un paso normal es {texto, hecho}; un paso de
-// COMPROBACIÓN (el plan trae "(criterio: …)") es {texto, criterio, resultado, nota, hecho}:
-// resultado 'cumple' | 'no_cumple' | null, y la nota (qué se vio) solo si no cumple.
-// Una comprobación puede llevar además `medidas`: lo tecleado en la calculadora de
-// criterios (js/criterios-calc.js) — por cada tolerancia numérica del criterio, los
-// datos del equipo y del instrumento y lo que salió. Se guardan como constancia; el
-// resultado del paso sigue siendo `resultado`.
-type Medida = Record<string, string | boolean | null>;
-type Paso = { texto: string; hecho: boolean; criterio?: string; resultado?: string | null; nota?: string | null; medidas?: Medida[] };
-const CAMPOS_MEDIDA = ["regla", "magnitud", "unidad", "equipo", "referencia", "valor", "lecturas", "detalle"];
-function parseMedidas(v: unknown): Medida[] | undefined {
-  if (!Array.isArray(v)) return undefined;
-  const out = v.slice(0, 12).map((m) => {
-    const o = (m ?? {}) as Record<string, unknown>;
-    const r: Medida = {};
-    for (const k of CAMPOS_MEDIDA) if (o[k] != null && o[k] !== "") r[k] = String(o[k]).slice(0, 300);
-    r.cumple = o.cumple === true ? true : o.cumple === false ? false : null;
-    return r;
-  }).filter((m) => m.regla);
-  return out.length ? out : undefined;
-}
-function parsePasos(v: unknown): Paso[] | null {
-  if (!Array.isArray(v)) return null;
-  return v.map((p) => {
-    const o = (p ?? {}) as Record<string, unknown>;
-    const texto = String(o.texto ?? "");
-    const criterio = o.criterio ? String(o.criterio).trim() : "";
-    if (!criterio) return { texto, hecho: o.hecho === true };
-    const resultado = o.resultado === "cumple" || o.resultado === "no_cumple" ? String(o.resultado) : null;
-    const nota = resultado === "no_cumple" && o.nota ? String(o.nota).trim() : null;
-    const medidas = parseMedidas(o.medidas);
-    return { texto, criterio, resultado, nota, hecho: !!resultado, ...(medidas ? { medidas } : {}) };
-  });
-}
-
-/** Un «no cumple» sin anotar qué se vio no sirve de registro: se rechaza al finalizar. */
-function pasoNoCumpleSinNota(pasos: Paso[] | null): Paso | undefined {
-  return (pasos || []).find((p) => p.resultado === "no_cumple" && !p.nota);
-}
+import { parsePasos, faltaEnPaso, resultadoMant, registrarIntervencionesDeMant } from "../_shared/mant_pasos.ts";
 
 // Evaluaciones en que se usa un equipo: [1, 3] o "1,3" → "1,3". Sin ninguna → null
 // (= todo el curso). Ordenadas y sin repetir, solo 1–3.
@@ -227,7 +188,7 @@ Deno.serve(async (req) => {
           verifCalc = r.calc;
           verifGuardar = { ...ver, sin_cribado: planV.periodicidad === "Bianual", calculo: calculoParaGuardar(r.calc),
             parametros: parametrosParaGuardar(r.par), calculado_en: new Date().toISOString(),
-            incidencia: previa?.incidencia || null };
+            incidencia: previa?.incidencia || null, intervencion_ajuste: previa?.intervencion_ajuste || null };
           if (pasosGuardar) pasosGuardar = VP.marcarPasosVerificacion(pasosGuardar, r.calc);
           if (ver.v_bajo_elegido && ver.v_bajo_elegido !== Number(r.par.v_bajo_elegido)) {
             await supabaseAdmin.from("verif_pipetas_parametros").update({
@@ -247,7 +208,7 @@ Deno.serve(async (req) => {
       const obsProgreso = body.observaciones ? String(body.observaciones) : null;
       if (enCurso) {
         const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
-          .update({ pasos: pasosGuardar, observaciones: obsProgreso, actualizado_en: ahora, ...(verifGuardar !== undefined ? { verificacion: verifGuardar } : {}) })
+          .update({ pasos: pasosGuardar, observaciones: obsProgreso, resultado: resultadoMant(body.resultado), actualizado_en: ahora, ...(verifGuardar !== undefined ? { verificacion: verifGuardar } : {}) })
           .eq("id_registro", enCurso.id_registro as string).select().single();
         if (error) return jsonError(`No se pudo guardar el progreso: ${error.message}`, 400);
         return jsonOk({ registro: data });
@@ -263,7 +224,7 @@ Deno.serve(async (req) => {
       const datos = {
         id_registro: generarIdRegistro(), id_plan: idPlan, id_equipo: idEquipo,
         curso_academico: curso, periodo,
-        estado: "en_curso", pasos: pasosGuardar, observaciones: obsProgreso,
+        estado: "en_curso", pasos: pasosGuardar, observaciones: obsProgreso, resultado: resultadoMant(body.resultado),
         ...(verifGuardar !== undefined ? { verificacion: verifGuardar } : {}),
         fecha_inicio: ahora.slice(0, 10),
         iniciado_por: esStaff ? (body.iniciado_por ? String(body.iniciado_por) : null) : firmaGrupo,
@@ -280,8 +241,8 @@ Deno.serve(async (req) => {
     if (!fecha || !realizadoPor) {
       return jsonError("fecha_realizacion y realizado_por son obligatorios", 400);
     }
-    const sinNota = pasoNoCumpleSinNota(pasosGuardar);
-    if (sinNota) return jsonError(`Anota qué se ha visto en «${sinNota.texto}», que no cumple el criterio`, 400);
+    const falta = faltaEnPaso(pasosGuardar);
+    if (falta) return jsonError(falta, 400);
     // El alumnado firma siempre con su grupo (nunca con el nombre que venga del
     // cliente) y deja el registro esperando visto bueno, sin supervisor: lo pone
     // quien lo valide, que es de quien depende la validez del registro.
@@ -291,6 +252,8 @@ Deno.serve(async (req) => {
       realizado_por: esStaff ? realizadoPor : firmaGrupo,
       supervisado_por: esStaff && body.supervisado_por ? String(body.supervisado_por) : null,
       observaciones: body.observaciones ? String(body.observaciones) : null,
+      // Apto / apto tras intervención / no apto: lo marca quien lo realiza (la app lo sugiere).
+      resultado: resultadoMant(body.resultado),
       estado: esStaff ? "finalizado" : "pendiente_vb",
       actualizado_en: new Date().toISOString(),
     };
@@ -354,7 +317,10 @@ Deno.serve(async (req) => {
         if (data) guardado = data;
       }
     }
-    return jsonOk({ registro: guardado, ...(incidencia ? { incidencia } : {}) });
+    // Piezas cambiadas / ajustes: intervenciones del equipo (solo si ya es válido, ver arriba).
+    const ints = await registrarIntervencionesDeMant(supabaseAdmin, guardado);
+    return jsonOk({ registro: ints.registro, ...(incidencia ? { incidencia } : {}),
+      intervenciones: ints.intervenciones, tareas: ints.tareas, ...(ints.aviso ? { aviso: ints.aviso } : {}) });
   }
 
   // ── Visto bueno a un mantenimiento registrado por alumnado ────────────
@@ -394,7 +360,10 @@ Deno.serve(async (req) => {
       .update({ estado: "finalizado", supervisado_por: revisor, actualizado_en: ahora })
       .eq("id_registro", idRegistro).select().single();
     if (error) return jsonError(`No se pudo dar el visto bueno: ${error.message}`, 400);
-    return jsonOk({ registro: data, supervisado_por: revisor });
+    // Lo que el alumnado cambió (piezas, ajustes) pasa a ser intervención al firmarlo.
+    const ints = await registrarIntervencionesDeMant(supabaseAdmin, data);
+    return jsonOk({ registro: ints.registro, supervisado_por: revisor,
+      intervenciones: ints.intervenciones, tareas: ints.tareas, ...(ints.aviso ? { aviso: ints.aviso } : {}) });
   }
 
   // ── Marcar un periodo programado como 'no_aplica' o 'aplazado' ────────
@@ -489,16 +458,19 @@ Deno.serve(async (req) => {
       observaciones: body.observaciones ? String(body.observaciones) : null,
       actualizado_en: new Date().toISOString(),
     };
+    if ("resultado" in body) upd.resultado = resultadoMant(body.resultado);
     const pasosEd = parsePasos(body.pasos);
-    const sinNotaEd = pasoNoCumpleSinNota(pasosEd);
-    if (sinNotaEd) return jsonError(`Anota qué se ha visto en «${sinNotaEd.texto}», que no cumple el criterio`, 400);
+    const faltaEd = faltaEnPaso(pasosEd);
+    if (faltaEd) return jsonError(faltaEd, 400);
     if (pasosEd) upd.pasos = pasosEd;
 
     const { data, error } = await supabaseAdmin.from("registro_mantenimientos")
       .update(upd).eq("id_registro", idRegistro).eq("estado", "finalizado").select().single();
     if (error) return jsonError(`No se pudo actualizar el registro: ${error.message}`, 400);
     if (!data) return jsonError(`No se encontró un mantenimiento finalizado "${idRegistro}"`, 404);
-    return jsonOk({ registro: data });
+    const ints = await registrarIntervencionesDeMant(supabaseAdmin, data);
+    return jsonOk({ registro: ints.registro, intervenciones: ints.intervenciones, tareas: ints.tareas,
+      ...(ints.aviso ? { aviso: ints.aviso } : {}) });
   }
 
   // ── Alta / edición / borrado de planes ───────────────────────────────
