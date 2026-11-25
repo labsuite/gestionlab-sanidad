@@ -1847,6 +1847,7 @@ function openModalAvisoAlumno(equipoId) {
   _avisoExistente = null;
   document.getElementById('aviso-titulo').textContent = 'Notificar aviso';
   document.getElementById('aviso-existente-grupo').style.display = 'none';
+  document.getElementById('aviso-otro-problema').style.display = 'none';
   document.getElementById('aviso-descripcion-label').textContent = 'Descripción del problema *';
   document.getElementById('aviso-btn-enviar').textContent = 'Enviar aviso';
   document.querySelectorAll('input[name="aviso-uso"]').forEach(r => { r.disabled = false; });
@@ -1858,6 +1859,16 @@ function openModalAvisoAlumno(equipoId) {
   document.querySelectorAll('input[name="aviso-uso"]').forEach(r => { r.checked = false; });
   sv('aviso-descripcion', '');
   openModal('modal-aviso-alumno');
+}
+
+/** 🚨 del alumnado. Si el equipo ya tiene un aviso abierto, lo que se escribe se añade a ese
+ *  aviso en vez de abrir otro por lo mismo (guion INC-1, 2026-11-25); si es un problema
+ *  distinto, «Es otro problema: abrir un aviso nuevo» deja la ventana como aviso nuevo. */
+function abrirAvisoAlumno(equipoId) {
+  const abierto = avisosAbiertosEquipo(equipoId)[0];
+  if (!abierto) return openModalAvisoAlumno(equipoId);
+  openModalAnadirAviso(equipoId, abierto, '');
+  document.getElementById('aviso-otro-problema').style.display = '';
 }
 
 /** Lo visto en un mantenimiento, a un aviso que ya está abierto en el equipo (no se abre otro).

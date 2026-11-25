@@ -331,7 +331,7 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
         ${puedeEditarEste ? `<button class="icon-btn" onclick="editEquipo(${DATA.equipos.indexOf(e)})" title="Editar">✏️</button>` : ''}
         ${puedeIntervenir ? `<button class="icon-btn" onclick="openModalRegistrarActuacionDirecta('${e.ID_Activo}')" title="Registrar actuación">🔧</button>` : ''}
         ${puedeHacer('crearIncidencias') ? `<button class="icon-btn" onclick="openModalIncidenciaEquipo('${e.ID_Activo}')" title="Reportar incidencia">⚠️</button>` : ''}
-        ${getUserRole() === 'Alumno' ? `<button class="icon-btn" onclick="openModalAvisoAlumno('${e.ID_Activo}')" title="Notificar aviso">🚨</button>` : ''}
+        ${getUserRole() === 'Alumno' ? `<button class="icon-btn" onclick="abrirAvisoAlumno('${e.ID_Activo}')" title="Notificar aviso">🚨</button>` : ''}
       </div></td>
     </tr>
     <tr class="equipo-row-expand" id="${expandId}"><td colspan="8"><div class="equipo-expand-inner">${buildIntervencionesEquipo(e.ID_Activo)}</div></td></tr>`;

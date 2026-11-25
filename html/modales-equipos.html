@@ -626,6 +626,12 @@
         <div class="form-group" id="aviso-existente-grupo" style="display:none">
           <label>Aviso abierto</label>
           <div id="aviso-existente"></div>
+          <!-- Solo desde el 🚨 (abrirAvisoAlumno): desde un mantenimiento no se ofrece -->
+          <div id="aviso-otro-problema" style="display:none;font-size:12px;color:var(--text-muted);margin-top:8px;line-height:1.5">
+            Si es por lo mismo, lo que escribas se añade a este aviso.
+            <button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:6px"
+              onclick="openModalAvisoAlumno(document.getElementById('aviso-equipo-id').value)">Es otro problema: abrir un aviso nuevo</button>
+          </div>
         </div>
         <div class="form-group">
           <label>¿Se puede seguir usando el equipo? *</label>
