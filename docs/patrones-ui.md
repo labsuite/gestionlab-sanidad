@@ -9,6 +9,8 @@ autocompletado de material (solicitud, línea de pedido, consumo, entrada), el e
 incidencia y de la línea de pedido, y el tipo de residuo al añadir a un contenedor. Por eso
 este último ya no es un `<datalist>` (el navegador hace ahí su propia búsqueda, con tildes):
 es la misma lista `.search-material-wrap` / `.autocomplete-list` que el material.
+La categoría del material se pasa con `nombreCategoria()` (sin la descripción tras « — »):
+si no, «guantes» saca todo lo de «EPI y seguridad — guantes, gafas…».
 
 ## Tabla de equipos (inventario de activos fijos)
 - `toggleEquipoExpand(id)` hace toggle de clase `open` — sin medición de ancho ni JS adicional

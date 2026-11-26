@@ -33,6 +33,12 @@ function urlEtiqueta(params) {
 function normalizarBusqueda(s) {
   return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
+// La categoría del material se guarda con su descripción («EPI y seguridad —
+// guantes, gafas…»): para buscar solo cuenta el nombre, o «guantes» sacaría
+// las pantallas y todo lo demás de EPI.
+function nombreCategoria(cat) {
+  return String(cat || '').split(' — ')[0].trim();
+}
 function coincideBusqueda(campos, query) {
   const palabras = normalizarBusqueda(query).split(/\s+/).filter(Boolean);
   if (!palabras.length) return true;

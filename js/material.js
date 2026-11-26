@@ -215,7 +215,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   let items = DATA.material;
 
   if (_filtroMaterial) {
-    items = items.filter(m => coincideBusqueda([m.Nombre, m.Categoria, m.ID_Material, m.Proveedor, m.Referencia_Proveedor], _filtroMaterial));
+    items = items.filter(m => coincideBusqueda([m.Nombre, nombreCategoria(m.Categoria), m.ID_Material, m.Proveedor, m.Referencia_Proveedor], _filtroMaterial));
   }
   if (_filtroMaterialCat) items = items.filter(m => m.Categoria === _filtroMaterialCat);
   if (_filtroMaterialStock === 'bajo') items = items.filter(m => stockBajoMinimo(m));
@@ -586,7 +586,7 @@ function buscarMaterialGenerico(query, listId, hiddenId, selectedId) {
   const list = document.getElementById(listId);
   if (!list) return -1;
   if (!query || query.trim().length < 2) { list.classList.remove('open'); return -1; }
-  const resultados = DATA.material.filter(m => coincideBusqueda([m.Nombre, m.ID_Material, m.Categoria], query)).slice(0, 10);
+  const resultados = DATA.material.filter(m => coincideBusqueda([m.Nombre, m.ID_Material, nombreCategoria(m.Categoria)], query)).slice(0, 10);
   if (!resultados.length) { list.classList.remove('open'); return 0; }
   list.innerHTML = resultados.map(m => {
     const stock = getStockTotal(m);
