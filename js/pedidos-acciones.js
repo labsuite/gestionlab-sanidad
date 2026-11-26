@@ -4,7 +4,7 @@
 async function guardarSolicitud() {
   const tipo = v('sol-tipo') || 'Material';
   // No fungible y servicios: siempre texto libre, sin catálogo ni unidad.
-  const esNuevo = tipo !== 'Material' || document.getElementById('btn-source-nuevo').classList.contains('active');
+  const esNuevo = tipo !== 'Material' || _solFuente === 'nuevo';
   // Declarar variables comunes ANTES del if/else para evitar problemas de scope
   const cant = v('sol-cantidad');
   if (!cant || parseFloat(cant) <= 0) { showToast('Indica la cantidad', 'error'); return; }
@@ -278,7 +278,7 @@ async function guardarLineaPedido() {
       } else idIntervencion = elegida;
     }
   } else {
-    const esLibre = document.getElementById('btn-lsource-libre').classList.contains('active');
+    const esLibre = _lineaFuente === 'libre';
     materialNombre = esLibre ? v('linea-material-libre') : (() => { const id = document.getElementById('linea-material-id').value; const mat = DATA.material.find(m => m.ID_Material === id); return mat ? mat.Nombre : ''; })();
     if (!materialNombre) { showToast('Indica el material', 'error'); return; }
     // Unidad pedida: texto libre en material no catalogado, o el desplegable

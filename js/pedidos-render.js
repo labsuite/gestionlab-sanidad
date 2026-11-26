@@ -865,6 +865,7 @@ function anadirLineaDesdeSinMatch(idx) {
   openModalNuevaLinea(pedidoId);
   setSourceLinea('libre', { reset: true });
   sv('linea-material-libre', it.material);
+  _mostrarAvisoNoCat('linea', 'Se añadirá como material no catalogado.');
   sv('linea-material-unidades', it.unidad || '');
   sv('linea-cantidad', it.cantidad != null ? it.cantidad : '');
   sv('linea-precio', it.precio_unitario != null ? it.precio_unitario : '');
@@ -1201,7 +1202,6 @@ function setTipoSolicitud(tipo) {
   Object.entries(ids).forEach(([t, id]) => document.getElementById('btn-soltipo-' + id).classList.toggle('active', t === tipo));
   document.getElementById('sol-tipo-ayuda').textContent = _AYUDA_TIPO_SOLICITUD[tipo] || '';
   const esMaterial = tipo === 'Material';
-  document.getElementById('sol-source-toggle').style.display = esMaterial ? '' : 'none';
   const lbl = document.getElementById('sol-material-libre-label');
   const inp = document.getElementById('sol-material-libre');
   if (tipo === 'Servicio') { lbl.textContent = 'Servicio que se necesita *'; inp.placeholder = 'Ej: reparación de la centrífuga, calibración de micropipetas…'; }
@@ -1216,19 +1216,20 @@ function setTipoSolicitud(tipo) {
   if (tipo === 'Servicio' && !v('sol-cantidad')) sv('sol-cantidad', '1');
 }
 
+// Catálogo o no catalogado. Sin pestañas desde 2026-11-26: se escribe en el
+// buscador y, si no está, el formulario pasa solo a «no catalogado» (abajo).
+let _solFuente = 'catalogo', _lineaFuente = 'catalogo';
 function setSourceSolicitud(source, opts = {}) {
+  _solFuente = source;
   const esCatalogo = source === 'catalogo';
-  document.getElementById('btn-source-catalogo').classList.toggle('active', esCatalogo);
-  document.getElementById('btn-source-nuevo').classList.toggle('active', !esCatalogo);
   document.getElementById('sol-catalogo-group').style.display = esCatalogo ? '' : 'none';
   document.getElementById('sol-nuevo-group').style.display = esCatalogo ? 'none' : '';
   document.getElementById('sol-unidad-group').style.display = esCatalogo ? 'none' : '';
   _ajustarNoCatalogado('sol', esCatalogo, opts);
 }
 function setSourceLinea(source, opts = {}) {
+  _lineaFuente = source;
   const esCatalogo = source === 'catalogo';
-  document.getElementById('btn-lsource-catalogo').classList.toggle('active', esCatalogo);
-  document.getElementById('btn-lsource-libre').classList.toggle('active', !esCatalogo);
   document.getElementById('linea-catalogo-group').style.display = esCatalogo ? '' : 'none';
   document.getElementById('linea-libre-group').style.display = esCatalogo ? 'none' : '';
   document.getElementById('linea-libre-unidad-group').style.display = esCatalogo ? 'none' : '';
@@ -1236,14 +1237,17 @@ function setSourceLinea(source, opts = {}) {
   _ajustarNoCatalogado('linea', esCatalogo, opts);
 }
 
-// ── Lo buscado no está en el catálogo → «no catalogado» sin dar la vuelta ──
-// (2026-11-26) Antes había que buscar, ver que no estaba y cambiar a mano de
-// pestaña. Ahora, si lo que se escribe (6+ letras) no da ningún resultado, el
-// formulario pasa solo a «no catalogado» con lo escrito como nombre y el cursor
-// al final, para seguir escribiendo sin cortar. Si fue una errata, «Volver a
-// buscar en el catálogo» devuelve el texto al buscador; a partir de ahí ya no
-// salta solo (si no, rebotaría a cada tecla), sino que la lista ofrece
-// «➕ Pedir … como no catalogado».
+// ── Un solo campo: lo que no está en el catálogo pasa solo a «no catalogado» ──
+// (2026-11-26) Antes había dos pestañas («Buscar en catálogo» / «Material no
+// catalogado») y había que buscar, ver que no estaba y cambiar de pestaña. Ahora
+// solo hay el buscador:
+//  · si lo escrito (6+ letras) no da ningún resultado, el formulario pasa solo a
+//    «no catalogado» con lo escrito como nombre y el cursor al final, para seguir
+//    escribiendo sin cortar;
+//  · la lista acaba siempre con «➕ Pedir … como material no catalogado», para
+//    cuando hay resultados pero ninguno es, o con menos de 6 letras;
+//  · en «no catalogado», «Buscar en el catálogo» devuelve el texto al buscador. A
+//    partir de ahí ya no salta solo (rebotaría a cada tecla): queda solo el ➕.
 const _NO_CAT = {
   sol:   { search: 'sol-search',   list: 'sol-autocomplete',   libre: 'sol-material-libre',   aviso: 'sol-aviso-no-catalogado',   fuente: 'nuevo', cambiar: (s, o) => setSourceSolicitud(s, o), buscar: v => buscarMaterialSolicitud(v) },
   linea: { search: 'linea-search', list: 'linea-autocomplete', libre: 'linea-material-libre', aviso: 'linea-aviso-no-catalogado', fuente: 'libre', cambiar: (s, o) => setSourceLinea(s, o),     buscar: v => buscarMaterialLinea(v) },
@@ -1253,16 +1257,18 @@ const _noCatSinSalto = { sol: false, linea: false };
 // Letras mínimas para el salto automático: con menos, una búsqueda a medio
 // escribir ya podría no dar nada. Por debajo no salta, pero la lista ofrece el ➕.
 const _NO_CAT_MIN_LETRAS = 6;
+// n = lo que devolvió buscarMaterialGenerico (-1: aún no ha buscado).
 function _materialSinResultados(clave, query, n) {
   const c = _NO_CAT[clave];
   const texto = String(query || '').trim();
-  if (!c || n !== 0) return;
-  if (!_noCatSinSalto[clave] && texto.replace(/\s/g, '').length >= _NO_CAT_MIN_LETRAS) { _pasarANoCatalogado(clave); return; }
+  if (!c || n < 0) return;
+  if (n === 0 && !_noCatSinSalto[clave] && texto.replace(/\s/g, '').length >= _NO_CAT_MIN_LETRAS) { _pasarANoCatalogado(clave); return; }
   const list = document.getElementById(c.list);
-  list.innerHTML = `<div class="autocomplete-item" onclick="_pasarANoCatalogado('${clave}')">
+  const opcion = `<div class="autocomplete-item" onclick="_pasarANoCatalogado('${clave}')">
     <div><div class="autocomplete-item-name">➕ Pedir «${_esc(texto)}» como material no catalogado</div>
-    <div class="autocomplete-item-meta">No hay nada así en el catálogo</div></div>
+    <div class="autocomplete-item-meta">${n === 0 ? 'No hay nada así en el catálogo' : '¿No es ninguno de estos?'}</div></div>
   </div>`;
+  list.innerHTML = (n === 0 ? '' : list.innerHTML) + opcion;
   list.classList.add('open');
 }
 
@@ -1273,12 +1279,16 @@ function _pasarANoCatalogado(clave) {
   document.getElementById(c.list).classList.remove('open');
   const inp = document.getElementById(c.libre);
   inp.value = texto;
-  const aviso = document.getElementById(c.aviso);
-  aviso.innerHTML = 'No está en el catálogo, así que se pedirá como material no catalogado. ' +
-    `<a href="#" onclick="_volverACatalogo('${clave}');return false">Volver a buscar en el catálogo</a>`;
-  aviso.style.display = '';
+  _mostrarAvisoNoCat(clave, 'No está en el catálogo, así que se pedirá como material no catalogado.');
   inp.focus();
   try { inp.setSelectionRange(texto.length, texto.length); } catch (e) {}
+}
+
+function _mostrarAvisoNoCat(clave, texto) {
+  const aviso = document.getElementById(_NO_CAT[clave].aviso);
+  if (!aviso) return;
+  aviso.innerHTML = texto + ` <a href="#" onclick="_volverACatalogo('${clave}');return false">Buscar en el catálogo</a>`;
+  aviso.style.display = '';
 }
 
 function _volverACatalogo(clave) {
@@ -1289,20 +1299,17 @@ function _volverACatalogo(clave) {
   c.buscar(search.value);
 }
 
-// Se llama en cada cambio de pestaña. `reset`: al abrir el modal o cambiar de
-// tipo; `desdeBusqueda`: el salto automático, que pone él mismo el aviso.
+// Se llama en cada cambio. `reset`: al abrir el modal o cambiar de tipo;
+// `desdeBusqueda`: el paso a «no catalogado», que pone él mismo el aviso.
 function _ajustarNoCatalogado(clave, esCatalogo, opts) {
   const c = _NO_CAT[clave];
   const aviso = document.getElementById(c.aviso);
   if (!aviso || opts.desdeBusqueda) return;
-  const veniaDelSalto = aviso.style.display !== 'none';
   aviso.style.display = 'none';
   if (opts.reset) { _noCatSinSalto[clave] = false; return; }
-  const search = document.getElementById(c.search), libre = document.getElementById(c.libre);
-  if (esCatalogo) {
-    if (veniaDelSalto) { _noCatSinSalto[clave] = true; search.value = libre.value.trim(); }
-  } else if (!libre.value.trim() && search.value.trim()) {
-    libre.value = search.value.trim();   // pestaña cambiada a mano: no se pierde lo escrito
+  if (esCatalogo) {                 // vuelta al buscador desde «no catalogado»
+    _noCatSinSalto[clave] = true;
+    document.getElementById(c.search).value = document.getElementById(c.libre).value.trim();
   }
 }
 
