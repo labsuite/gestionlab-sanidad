@@ -94,9 +94,7 @@ function updateBadges() {
   const badgeInc = document.getElementById('badge-incidencias');
   if (badgeInc) { badgeInc.textContent = abiertas; badgeInc.style.display = abiertas > 0 ? '' : 'none'; }
 
-  const _hoy = new Date().toISOString().split('T')[0];
-  const _snoozes = typeof _getSnoozes === 'function' ? _getSnoozes() : {};
-  const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(_snoozes[s.ID_Solicitud] && _snoozes[s.ID_Solicitud] > _hoy)).length;
+  const pendientes = solicitudesPendientesVisibles().length;
   const badgeSol = document.getElementById('badge-solicitudes');
   if (badgeSol) { badgeSol.textContent = pendientes; badgeSol.style.display = pendientes > 0 ? '' : 'none'; }
 
@@ -338,6 +336,9 @@ function showPage(page, opts) {
     reservas: 'Reservas de equipos', 'registros-uso': 'Registros de uso', congelados: 'Muestras congeladas', perfil: 'Mi perfil', ayuda: 'Ayuda'
   };
   document.getElementById('page-title').textContent = titles[page] || page;
+  // El panel principal se repinta al entrar: muchas acciones de otras secciones
+  // cambian DATA sin repintarlo, y si no se quedaba con los avisos de antes.
+  if (page === 'dashboard' && typeof renderDashboard === 'function') renderDashboard();
   if (page === 'perfil' && typeof renderPerfil === 'function') renderPerfil();
   if (page === 'verif-pipetas' && typeof renderVerifPipetas === 'function') renderVerifPipetas();
   if (page === 'ayuda' && typeof renderAyuda === 'function') {

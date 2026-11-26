@@ -76,7 +76,8 @@ function renderDashboard() {
   }
   if (incVisibles.length) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('incidencias')"><div class="alert-icon">⚠️</div><div class="alert-content"><div class="alert-title">${incVisibles.length} incidencia(s) pendiente(s) de resolución</div><div class="alert-text">${incVisibles.slice(0,3).map(i => i.ID_Incidencia + ' · ' + i.Equipo).join(' – ')}${incVisibles.length > 3 ? ' y ' + (incVisibles.length-3) + ' más...' : ''}</div></div></div>`;
 
-  const solPendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente');
+  // Las ocultas (🕐 o fecha de necesidad lejana) no avisan hasta su fecha: mismo criterio que el badge.
+  const solPendientes = solicitudesPendientesVisibles();
   if (solPendientes.length && puedeHacer('gestionarPedidos')) {
     alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('solicitudes')"><div class="alert-icon">📋</div><div class="alert-content"><div class="alert-title">${solPendientes.length} solicitud(es) de material pendiente(s) de gestión</div><div class="alert-text">${solPendientes.slice(0,4).map(s => s.Material + ' · ' + s.Solicitante).join(' – ')}${solPendientes.length > 4 ? ' y ' + (solPendientes.length-4) + ' más...' : ''}</div></div></div>`;
   }

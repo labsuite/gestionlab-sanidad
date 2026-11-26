@@ -29,6 +29,19 @@ function _getSnoozes() {
   });
   return map;
 }
+// Solicitudes Pendientes que no están ocultas (🕐 o por fecha de necesidad lejana).
+// Una sola regla para el aviso del panel principal y los dos badges del menú: si
+// se ocultó, no se avisa de ella hasta la fecha.
+function solicitudesPendientesVisibles() {
+  const hoy = new Date().toISOString().split('T')[0];
+  const snoozes = _getSnoozes();
+  return DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(snoozes[s.ID_Solicitud] && snoozes[s.ID_Solicitud] > hoy));
+}
+// Tras cambiar una solicitud: el panel principal y los badges también cuentan.
+function _refrescarAvisosSolicitudes() {
+  if (typeof renderDashboard === 'function') renderDashboard();
+  if (typeof updateBadges === 'function') updateBadges();
+}
 async function aplicarSnooze(solId) {
   const input = document.getElementById('snooze-date-' + solId);
   const fecha = input?.value;
@@ -40,7 +53,7 @@ async function aplicarSnooze(solId) {
   showLoading('Guardando...');
   try {
     await callEdgeFunction('gestionar-solicitud', { accion: 'snooze', id_solicitud: solId, fecha });
-    renderSolicitudes();
+    renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
@@ -55,7 +68,7 @@ async function cancelarSnooze(solId) {
   showLoading('Guardando...');
   try {
     await callEdgeFunction('gestionar-solicitud', { accion: 'snooze', id_solicitud: solId, fecha: hoy });
-    renderSolicitudes();
+    renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { sol.Snooze_Hasta = anterior; showToast('Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
@@ -283,9 +296,7 @@ function _actualizarBadgeSolicitudes() {
     badge.textContent = n;
     badge.style.display = n > 0 ? '' : 'none';
   } else {
-    const _hoy = new Date().toISOString().split('T')[0];
-    const _snz = _getSnoozes();
-    const pendientes = DATA.solicitudes.filter(s => s.Estado === 'Pendiente' && !(_snz[s.ID_Solicitud] && _snz[s.ID_Solicitud] > _hoy)).length;
+    const pendientes = solicitudesPendientesVisibles().length;
     badge.textContent = pendientes;
     badge.style.display = pendientes > 0 ? '' : 'none';
   }

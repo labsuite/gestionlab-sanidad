@@ -39,7 +39,7 @@ async function guardarSolicitud() {
     objLocal.Urgencia = urgencia;
     DATA.solicitudes.push(objLocal);
     showToast('Solicitud enviada', 'success');
-    closeModal('modal-solicitud'); renderSolicitudes(); updateBadges();
+    closeModal('modal-solicitud'); renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
@@ -52,7 +52,7 @@ async function rechazarSolicitud(solId) {
   try {
     const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'rechazar', id_solicitud: solId });
     DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
-    showToast('Solicitud rechazada', 'success'); renderSolicitudes();
+    showToast('Solicitud rechazada', 'success'); renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { showToast(e.message || 'Error', 'error'); }
   hideLoading();
 }
@@ -67,7 +67,7 @@ async function cancelarSolicitud(solId) {
   try {
     const { solicitud } = await callEdgeFunction('gestionar-solicitud', { accion: 'cancelar', id_solicitud: solId });
     DATA.solicitudes[idx] = { ...DATA.solicitudes[idx], ..._solicitudSbToObj(solicitud) };
-    showToast('Solicitud cancelada', 'success'); renderSolicitudes();
+    showToast('Solicitud cancelada', 'success'); renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { showToast(e.message || 'Error', 'error'); }
   hideLoading();
 }
@@ -1285,7 +1285,7 @@ async function guardarEdicionSolicitud() {
     sol.Observaciones = obsFinal;
     showToast('Solicitud actualizada', 'success');
     closeModal('modal-editar-solicitud');
-    renderSolicitudes();
+    renderSolicitudes(); _refrescarAvisosSolicitudes();
   } catch(e) { showToast(e.message || 'Error guardando', 'error'); console.error(e); }
   hideLoading();
 }
