@@ -482,6 +482,15 @@ El modal de solicitud empieza con **¿Qué necesitas?** (`setTipoSolicitud` en `
 calibración, revisión…). Lo no fungible y los servicios son siempre **texto libre**, sin
 unidad ni enlace al catálogo (`id_material = null`); el servicio propone cantidad 1.
 
+**Si lo buscado no está en el catálogo, pasa solo a «no catalogado»** (2026-11-26): en la
+solicitud y en «Añadir línea al pedido», si lo escrito (3+ letras) no da ningún resultado,
+el formulario cambia de pestaña con lo escrito como nombre y el foco en ese campo, para
+seguir tecleando sin cortar (`_materialSinResultados` / `_pasarANoCatalogado` en
+`js/pedidos-render.js`). Debajo, «Volver a buscar en el catálogo» por si fue una errata; tras
+volver ya no salta solo (rebotaría a cada tecla): la lista ofrece «➕ Pedir … como no
+catalogado». La búsqueda (`buscarMaterialGenerico`, compartida con consumo y entrada) no
+distingue tildes y busca palabra a palabra, para no saltar cuando sí estaba.
+
 - Columna `solicitudes.tipo` (`'Material'` por defecto, `'No fungible'`, `'Servicio'`) →
   `Tipo` en `_solicitudSbToObj`. La tarjeta lleva la etiqueta 🔧 Servicio / 🧰 No fungible.
 - Se añaden a cualquier pedido abierto, como las de material. La línea que nace de una
