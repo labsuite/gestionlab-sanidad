@@ -94,12 +94,12 @@ absorbentes`; las tres en el 207, Almacén de residuos, formato `Bolsa plástica
 |---|---|
 | `Aguas Laboratorio - Tinciones` | garrafa de colorantes, en cada laboratorio (hoy 203, 205, 207) |
 | `Aguas Laboratorio - Equipos` | garrafa de lejías y residuos de equipos, solo en el 203 |
-| `Garrafa etanol y X-Free` | garrafas de 5 L con símbolo UN (las del etanol), cerradas con parafilm, bajo la encimera |
+| `Garrafa 5 L - Etanol` / `- X-Free` / `- Parafina` | garrafas de 5 L con símbolo UN (las del etanol), cerradas con parafilm, bajo la encimera; como las bolsas, **una por cosa** (`garrafas_y_punzantes_2026_11.py`) |
 | `Bidón vidrio vacío` / `Reactivos de laboratorio` / `Bidón no halogenados` / `Bidón ácidos` / `Bidón halogenados` | bidones azules de ballesta (antes `Contenedor Inertes/Ácidos/Halogenados`) |
 | `Muestras en formol` | contenedor rígido azul, a incinerar (también los citotóxicos; el contenedor estaba como «Citotóxicos») |
 | `Contenedor negro (autoclave)` | contenedor rígido negro con bolsa de autoclave, al autoclave del gestor (une las antiguas `Bolsa de autoclave` y `Residuo Biológico GII`) |
 | `Bolsa químicos - …` (3) | ver arriba |
-| `Residuo Cortante` | contenedor amarillo de punzantes (aún sin dar de alta: no consta en qué labs hay) |
+| `Residuo Cortante` | contenedor amarillo de punzantes, en el 203 y en el 207 |
 
 «Aguas de laboratorio» es el nombre genérico de las garrafas, no un contenedor. Etiquetas NFC
 con los nombres antiguos: `RENOMBRADAS` en `_abrirAdicionPorNfc` las traduce.

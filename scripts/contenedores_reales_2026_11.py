@@ -20,6 +20,9 @@ Ajusta las categorías y los contenedores de residuos a los contenedores reales
 No toca las garrafas de colorantes ni los de punzantes (no consta en qué
 laboratorios hay): se dan de alta desde la app.
 
+⚠ NO volver a ejecutarlo: la garrafa de etanol y X-Free se dividió en tres después
+(garrafas_y_punzantes_2026_11.py) y este script la volvería a crear.
+
 Idempotente. Uso:
   python scripts/contenedores_reales_2026_11.py            (simulación)
   python scripts/contenedores_reales_2026_11.py --aplicar  (guarda)

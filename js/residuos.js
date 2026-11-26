@@ -38,11 +38,11 @@ const _NORMAS_GESTOR = [
   {
     icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
     texto: 'SOLO formol o etanol CON muestras dentro (y los citotóxicos, que casi no usamos). Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja.',
-    ojo: 'Formol SIN muestras (aunque las haya tenido) y el agua con restos de formol → bidón de no halogenados. El etanol sin muestra, a la garrafa de 5 L de etanol y X-Free.',
+    ojo: 'Formol SIN muestras (aunque las haya tenido) y el agua con restos de formol → bidón de no halogenados. El etanol sin muestra, a su garrafa de 5 L de etanol.',
   },
   {
-    icon: '🍶', titulo: 'Garrafa de 5 L de etanol y X-Free',
-    texto: 'Gastamos mucho etanol y X-Free (anatomía patológica): no merece la pena hacer botecitos para los bidones. Sus restos se vierten juntos en garrafas de 5 L, las mismas en que viene el etanol, y se cierran con parafilm.',
+    icon: '🍶', titulo: 'Garrafas de 5 L — etanol, X-Free y parafina, cada una para una cosa',
+    texto: 'Gastamos mucho etanol, X-Free y parafina (anatomía patológica): no merece la pena hacer botecitos para los bidones. Sus restos se vierten en garrafas de 5 L, las mismas en que viene el etanol, y se cierran con parafilm. Como las bolsas, cada garrafa es para UNA sola cosa: una de etanol, otra de X-Free y otra de parafina; no se mezclan.',
     ojo: 'Solo valen garrafas con el símbolo UN (las del etanol); las de X-Free no sirven, son de un plástico peor.',
   },
   {
@@ -168,7 +168,7 @@ const _ARBOL_RESIDUOS = {
     opciones: [
       { texto: 'Sí, la muestra está dentro', hoja: 'Muestras en formol' },
       { texto: 'No, es solo el formol (aunque haya tenido muestra)', hoja: 'Bidón no halogenados' },
-      { texto: 'No, es solo el etanol (aunque haya tenido muestra)', hoja: 'Garrafa etanol y X-Free' },
+      { texto: 'No, es solo el etanol (aunque haya tenido muestra)', hoja: 'Garrafa 5 L - Etanol' },
     ],
   },
   solido: {
@@ -188,11 +188,19 @@ const _ARBOL_RESIDUOS = {
       { texto: '🎨 De una tinción (también los kits de tinción)', hoja: 'Aguas Laboratorio - Tinciones' },
       { texto: '🔬 De un aparato o kit de diagnóstico, tampones, medios, PCR…', hoja: 'Aguas Laboratorio - Equipos' },
       { texto: '🧽 Lejía diluida de limpiar', hoja: 'Fregadero' },
-      { texto: '🍶 Restos de etanol o de X-Free', hoja: 'Garrafa etanol y X-Free' },
+      { texto: '🍶 Restos de etanol, de X-Free o de parafina', ir: 'garrafa5' },
       { texto: '🧪 Otro disolvente: formol sin muestra, xilol, isopropanol, cloroformo…', ir: 'disolvente' },
       { texto: '⚗️ Un ácido que no es de tinción', hoja: 'Bidón ácidos' },
       { texto: '🔥 Un oxidante: agua oxigenada, permanganato, ácido peryódico…', hoja: 'Reactivos de laboratorio' },
       { texto: '🤷 Otro reactivo / no lo sé', ir: 'dudo' },
+    ],
+  },
+  garrafa5: {
+    pregunta: '¿Qué es? Cada garrafa de 5 L es para una sola cosa.',
+    opciones: [
+      { texto: 'Etanol', hoja: 'Garrafa 5 L - Etanol' },
+      { texto: 'X-Free (aunque lleve restos de etanol)', hoja: 'Garrafa 5 L - X-Free' },
+      { texto: 'Parafina', hoja: 'Garrafa 5 L - Parafina' },
     ],
   },
   disolvente: {
@@ -217,9 +225,11 @@ const _ARBOL_HOJAS = {
   'Basura normal': { icon: '🗑️', sinContenedor: true, porque: 'Solo lleva trazas fijadas: va a la basura normal. Los portas, bien protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.' },
   'Residuo Cortante': { icon: '✂️', porque: 'Contenedor amarillo de punzantes: todo lo que corta o pincha, esté contaminado o no.' },
   'Muestras en formol': { icon: '🫙', porque: 'Contenedor rígido azul, va a incinerar: muestras con su formol o etanol dentro (y los citotóxicos, que casi no usamos). En autoclave el formol se liberaría y dañaría ojos y pulmones, y un sólido dentro de un líquido revienta. La tapa se apoya, nunca se cierra del todo.' },
-  'Bidón no halogenados': { icon: '🧪', porque: 'Bidón de ballesta del 207 para disolventes no halogenados: el formol que ya no lleva la muestra, xilol, isopropanol… El etanol y el X-Free van a su garrafa de 5 L.' },
+  'Bidón no halogenados': { icon: '🧪', porque: 'Bidón de ballesta del 207 para disolventes no halogenados: el formol que ya no lleva la muestra, xilol, isopropanol… El etanol, el X-Free y la parafina van cada uno a su garrafa de 5 L.' },
   'Bidón halogenados': { icon: '🧪', porque: 'Bidón de ballesta del 207 para los disolventes con cloro (cloroformo, Carnoy…): van separados de los no halogenados.' },
-  'Garrafa etanol y X-Free': { icon: '🍶', porque: 'Gastamos mucho etanol y X-Free (anatomía patológica): sus restos se vierten juntos en garrafas de 5 L, cerradas con parafilm. Solo valen garrafas con el símbolo UN, como las del etanol; las de X-Free no (son de un plástico peor).' },
+  'Garrafa 5 L - Etanol': { icon: '🍶', porque: 'Garrafa de 5 L solo para restos de etanol, cerrada con parafilm. El X-Free y la parafina van cada uno a su garrafa. Solo valen garrafas con el símbolo UN, como las del etanol.' },
+  'Garrafa 5 L - X-Free': { icon: '🍶', porque: 'Garrafa de 5 L solo para restos de X-Free, cerrada con parafilm. Ojo: tiene que ser una garrafa de etanol (con el símbolo UN); la garrafa en que viene el X-Free no sirve, es de un plástico peor.' },
+  'Garrafa 5 L - Parafina': { icon: '🕯️', porque: 'Garrafa de 5 L solo para la parafina usada, cerrada con parafilm. Los bloques con tejido y los cortes solo llevan trazas de X-Free: esos van a la basura normal.' },
   'Bidón vidrio vacío': { icon: '🍾', porque: 'Bidón de ballesta del 207 para envases de vidrio vacíos que contuvieron productos químicos. Los de plástico y los metálicos van a sus bolsas.' },
   'Bolsa químicos - Envases de plástico': { icon: '🛍️', porque: 'La bolsa marcada con la X de «envases que contienen restos de sustancias peligrosas»: solo envases de plástico vacíos, bien cerrados para que no se acumule líquido en el fondo. Los metálicos y los guantes o papel van cada uno a su bolsa.' },
   'Bolsa químicos - Envases metálicos': { icon: '🥫', porque: 'La bolsa marcada con la X de «envases metálicos»: solo envases de aluminio (o de otro metal) vacíos, bien cerrados. Los de plástico van a la otra bolsa.' },
@@ -327,7 +337,7 @@ const VIDEOS_RESIDUOS = [
   { id: 'azul-y-negro', titulo: 'Contenedores azul y negro', inicio: 127.88,
     categorias: ['Muestras en formol', 'Contenedor negro (autoclave)'] },
   { id: 'etanol-y-xfree', titulo: 'Etanol y X-Free', inicio: 234.33,
-    categorias: ['Garrafa etanol y X-Free'] },
+    categorias: ['Garrafa 5 L - Etanol', 'Garrafa 5 L - X-Free', 'Garrafa 5 L - Parafina'] },
   { id: 'bolsa-207', titulo: 'La bolsa del 207', inicio: 301.26,
     categorias: ['Bolsa químicos - Envases de plástico', 'Bolsa químicos - Envases metálicos', 'Bolsa químicos - Guantes, papel y absorbentes'] },
   { id: 'punzantes', titulo: 'Contenedor amarillo de punzantes', inicio: 377.09,
@@ -1391,7 +1401,7 @@ de estos contenedores existen físicamente aunque no aparezcan en las listas de 
 activos de arriba — puedes nombrarlos por su descripción (color, forma, rótulo):
 ${_normasGestorTexto()}
 
-KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno o formol (pasos del procesado, no tinción) → Bidón no halogenados; el X-Free → Garrafa etanol y X-Free. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno o formol (pasos del procesado, no tinción) → Bidón no halogenados; el X-Free → Garrafa 5 L - X-Free. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
 
 REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
 - Nunca digas que se puede verter por el desagüe ni tirar a la basura general, SALVO que el
@@ -1673,6 +1683,7 @@ function _abrirAdicionPorNfc(categoria, lab) {
     const DIVIDIDAS = {
       'Aguas Laboratorio': { prefijo: 'Aguas Laboratorio', que: 'garrafas de aguas (Tinciones y Equipos)' },
       'Bolsa plástica (químicos)': { prefijo: 'Bolsa químicos', que: 'bolsas de químicos (plástico, metálicos y guantes/papel)' },
+      'Garrafa etanol y X-Free': { prefijo: 'Garrafa 5 L', que: 'garrafas de 5 L (etanol, X-Free y parafina)' },
     };
     let c = DATA.contenedoresResiduo.find(x => x.Categoria === categoria && activo(x));
     const div = DIVIDIDAS[categoria];
