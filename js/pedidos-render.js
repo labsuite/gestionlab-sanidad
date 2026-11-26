@@ -1153,12 +1153,8 @@ function buscarEquipoLinea(query) {
   const list = document.getElementById('linea-equipo-autocomplete');
   if (!list) return;
   if (!query || query.length < 1) { list.classList.remove('open'); return; }
-  const q = query.toLowerCase();
   const resultados = DATA.equipos.filter(eq =>
-    (eq.ID_Activo || '').toLowerCase().includes(q) ||
-    (eq.Tipo_Equipo || '').toLowerCase().includes(q) ||
-    (eq.Marca || '').toLowerCase().includes(q) ||
-    (eq.Modelo || '').toLowerCase().includes(q)
+    coincideBusqueda([eq.ID_Activo, eq.Tipo_Equipo, eq.Marca, eq.Modelo], query)
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(eq => {

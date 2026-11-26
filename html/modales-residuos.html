@@ -86,9 +86,12 @@
       <div class="form-group">
         <label class="form-label">Residuo que vas a echar</label>
         <input type="hidden" id="adic-tipo-residuo">
-        <input id="adic-tipo-residuo-texto" class="form-input" list="adic-tipo-residuo-list"
-          placeholder="Buscar tipo de residuo…" autocomplete="off">
-        <datalist id="adic-tipo-residuo-list"></datalist>
+        <div class="search-material-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="adic-tipo-residuo-texto" placeholder="Buscar tipo de residuo…" autocomplete="off"
+            oninput="buscarTipoResiduoAdicion(this.value)" onfocus="buscarTipoResiduoAdicion(this.value)">
+          <div class="autocomplete-list" id="adic-tipo-residuo-autocomplete"></div>
+        </div>
       </div>
       <div class="form-group">
         <label class="form-label">…o descríbelo (si no está en la lista)</label>

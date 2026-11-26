@@ -1819,13 +1819,8 @@ function buscarEquipoIncidencia(query) {
   const list = document.getElementById('inc-equipo-autocomplete');
   if (!list) return;
   if (!query || query.length < 1) { list.classList.remove('open'); return; }
-  const q = query.toLowerCase();
   const resultados = DATA.equipos.filter(e =>
-    e.ID_Activo.toLowerCase().includes(q) ||
-    (e.Tipo_Equipo || '').toLowerCase().includes(q) ||
-    (e.Marca || '').toLowerCase().includes(q) ||
-    (e.Modelo || '').toLowerCase().includes(q) ||
-    (e.Ubicacion || '').toLowerCase().includes(q)
+    coincideBusqueda([e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo, e.Ubicacion], query)
   ).slice(0, 8);
   if (!resultados.length) { list.classList.remove('open'); return; }
   list.innerHTML = resultados.map(e => {

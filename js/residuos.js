@@ -888,17 +888,14 @@ function openModalAdicion(idx) {
   sv('adic-observaciones', '');
   sv('adic-nivel', c.Nivel || 'vacío');
 
-  // Buscador: datalist + mapa nombre→ID
+  // Buscador de tipos de residuo: solo los de este contenedor (o todos, si no
+  // hay ninguno de esa categoría). Lista propia en vez de <datalist>, que no
+  // deja buscar sin tildes ni palabra a palabra (buscarTipoResiduoAdicion).
   const tiposFiltrados = DATA.tiposResiduo.filter(t => t.Contenedor_Tipo === c.Categoria);
-  const tipos = tiposFiltrados.length ? tiposFiltrados : DATA.tiposResiduo;
-  window._adic_tipo_map = {};
-  tipos.forEach(t => { window._adic_tipo_map[t.Nombre] = t.ID_Residuo; });
-  const dl = document.getElementById('adic-tipo-residuo-list');
-  if (dl) dl.innerHTML = tipos.map(t => `<option value="${t.Nombre}">`).join('');
-  const textoEl = document.getElementById('adic-tipo-residuo-texto');
-  const hiddenEl = document.getElementById('adic-tipo-residuo');
-  if (textoEl) { textoEl.value = ''; textoEl.oninput = () => { hiddenEl.value = window._adic_tipo_map[textoEl.value] || ''; }; }
-  if (hiddenEl) hiddenEl.value = '';
+  _adicTipos = tiposFiltrados.length ? tiposFiltrados : DATA.tiposResiduo;
+  sv('adic-tipo-residuo-texto', '');
+  sv('adic-tipo-residuo', '');
+  document.getElementById('adic-tipo-residuo-autocomplete')?.classList.remove('open');
 
   // Warning por formato
   const warnEl = document.getElementById('adic-warning-formato');
@@ -913,6 +910,29 @@ function openModalAdicion(idx) {
   if (iaBox) { iaBox.style.display = 'none'; iaBox.innerHTML = ''; }
 
   openModal('modal-adicion-res');
+}
+
+// Con el buscador vacío (al entrar en él) enseña todos los tipos del contenedor,
+// como hacía el <datalist>. Escribir a mano el nombre exacto también lo elige.
+let _adicTipos = [];
+function buscarTipoResiduoAdicion(query) {
+  const list = document.getElementById('adic-tipo-residuo-autocomplete');
+  if (!list) return;
+  const exacto = _adicTipos.find(t => normalizarBusqueda(t.Nombre).trim() === normalizarBusqueda(query).trim());
+  sv('adic-tipo-residuo', exacto ? exacto.ID_Residuo : '');
+  const resultados = _adicTipos.filter(t => coincideBusqueda(t.Nombre, query));
+  if (!resultados.length) { list.classList.remove('open'); return; }
+  list.innerHTML = resultados.map(t => `<div class="autocomplete-item" onclick="seleccionarTipoResiduoAdicion('${_esc(t.ID_Residuo)}')">
+    <div><div class="autocomplete-item-name">${_esc(t.Nombre)}</div></div>
+  </div>`).join('');
+  list.classList.add('open');
+}
+function seleccionarTipoResiduoAdicion(id) {
+  const t = _adicTipos.find(x => x.ID_Residuo === id);
+  if (!t) return;
+  sv('adic-tipo-residuo', t.ID_Residuo);
+  sv('adic-tipo-residuo-texto', t.Nombre);
+  document.getElementById('adic-tipo-residuo-autocomplete').classList.remove('open');
 }
 
 // iaOverride=true → "registrar igualmente": salta SOLO la comprobación con IA de la
