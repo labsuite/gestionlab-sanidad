@@ -580,17 +580,20 @@ function filtrarMovimientosTipo(val) { renderMovimientos(val); }
 // ============================================================
 // AUTOCOMPLETE MATERIAL
 // ============================================================
+// Sin tildes ni mayúsculas, y palabra a palabra: «barra agitacion» encuentra
+// «Barra magnética de agitación». Devuelve cuántos encontró (-1 si aún no ha
+// buscado), para que el formulario de solicitud sepa cuándo no hay nada.
+function _matNormBusqueda(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
 function buscarMaterialGenerico(query, listId, hiddenId, selectedId) {
   const list = document.getElementById(listId);
-  if (!list) return;
-  if (!query || query.length < 2) { list.classList.remove('open'); return; }
-  const q = query.toLowerCase();
-  const resultados = DATA.material.filter(m =>
-    m.Nombre.toLowerCase().includes(q) ||
-    m.ID_Material.toLowerCase().includes(q) ||
-    (m.Categoria || '').toLowerCase().includes(q)
-  ).slice(0, 10);
-  if (!resultados.length) { list.classList.remove('open'); return; }
+  if (!list) return -1;
+  if (!query || query.trim().length < 2) { list.classList.remove('open'); return -1; }
+  const palabras = _matNormBusqueda(query).split(/\s+/).filter(Boolean);
+  const resultados = DATA.material.filter(m => {
+    const texto = _matNormBusqueda([m.Nombre, m.ID_Material, m.Categoria].join(' '));
+    return palabras.every(p => texto.includes(p));
+  }).slice(0, 10);
+  if (!resultados.length) { list.classList.remove('open'); return 0; }
   list.innerHTML = resultados.map(m => {
     const stock = getStockTotal(m);
     const min   = getStockMinTotal(m);
@@ -601,6 +604,7 @@ function buscarMaterialGenerico(query, listId, hiddenId, selectedId) {
     </div>`;
   }).join('');
   list.classList.add('open');
+  return resultados.length;
 }
 
 function seleccionarMaterial(id, nombre, listId, hiddenId, selectedId) {
@@ -620,8 +624,8 @@ function seleccionarMaterial(id, nombre, listId, hiddenId, selectedId) {
   if (hiddenId === 'linea-material-id') _mostrarSelectorUnidadLinea(mat);
 }
 
-function buscarMaterialSolicitud(val) { buscarMaterialGenerico(val, 'sol-autocomplete',    'sol-material-id',     'sol-material-selected'); }
-function buscarMaterialLinea(val)     { buscarMaterialGenerico(val, 'linea-autocomplete',  'linea-material-id',   'linea-material-selected'); }
+function buscarMaterialSolicitud(val) { _materialSinResultados('sol',   val, buscarMaterialGenerico(val, 'sol-autocomplete',   'sol-material-id',   'sol-material-selected')); }
+function buscarMaterialLinea(val)     { _materialSinResultados('linea', val, buscarMaterialGenerico(val, 'linea-autocomplete', 'linea-material-id', 'linea-material-selected')); }
 function buscarMaterialConsumo(val)   { buscarMaterialGenerico(val, 'consumo-autocomplete','consumo-material-id', 'consumo-material-selected'); }
 function buscarMaterialEntrada(val)   { buscarMaterialGenerico(val, 'entrada-autocomplete','entrada-material-id', 'entrada-material-selected'); }
 

@@ -852,7 +852,7 @@ function anadirLineaDesdeSinMatch(idx) {
   const doc = DATA.documentosProveedor.find(d => d.ID_Documento === idDocumento);
   closeModal('modal-revision-extraccion');
   openModalNuevaLinea(pedidoId);
-  setSourceLinea('libre');
+  setSourceLinea('libre', { reset: true });
   sv('linea-material-libre', it.material);
   sv('linea-material-unidades', it.unidad || '');
   sv('linea-cantidad', it.cantidad != null ? it.cantidad : '');
@@ -1196,7 +1196,7 @@ function setTipoSolicitud(tipo) {
   if (tipo === 'Servicio') { lbl.textContent = 'Servicio que se necesita *'; inp.placeholder = 'Ej: reparación de la centrífuga, calibración de micropipetas…'; }
   else if (tipo === 'No fungible') { lbl.textContent = 'Qué se necesita *'; inp.placeholder = 'Ej: micropipeta 10-100 µl, filtro HEPA de la cabina…'; }
   else { lbl.textContent = 'Nombre del material *'; inp.placeholder = 'Describe el material que necesitas...'; }
-  if (esMaterial) { setSourceSolicitud('catalogo'); }
+  if (esMaterial) { setSourceSolicitud('catalogo', { reset: true }); }
   else {
     document.getElementById('sol-catalogo-group').style.display = 'none';
     document.getElementById('sol-nuevo-group').style.display = '';
@@ -1205,15 +1205,16 @@ function setTipoSolicitud(tipo) {
   if (tipo === 'Servicio' && !v('sol-cantidad')) sv('sol-cantidad', '1');
 }
 
-function setSourceSolicitud(source) {
+function setSourceSolicitud(source, opts = {}) {
   const esCatalogo = source === 'catalogo';
   document.getElementById('btn-source-catalogo').classList.toggle('active', esCatalogo);
   document.getElementById('btn-source-nuevo').classList.toggle('active', !esCatalogo);
   document.getElementById('sol-catalogo-group').style.display = esCatalogo ? '' : 'none';
   document.getElementById('sol-nuevo-group').style.display = esCatalogo ? 'none' : '';
   document.getElementById('sol-unidad-group').style.display = esCatalogo ? 'none' : '';
+  _ajustarNoCatalogado('sol', esCatalogo, opts);
 }
-function setSourceLinea(source) {
+function setSourceLinea(source, opts = {}) {
   const esCatalogo = source === 'catalogo';
   document.getElementById('btn-lsource-catalogo').classList.toggle('active', esCatalogo);
   document.getElementById('btn-lsource-libre').classList.toggle('active', !esCatalogo);
@@ -1221,6 +1222,74 @@ function setSourceLinea(source) {
   document.getElementById('linea-libre-group').style.display = esCatalogo ? 'none' : '';
   document.getElementById('linea-libre-unidad-group').style.display = esCatalogo ? 'none' : '';
   if (!esCatalogo) document.getElementById('linea-catalogo-unidad-group').style.display = 'none';
+  _ajustarNoCatalogado('linea', esCatalogo, opts);
+}
+
+// ── Lo buscado no está en el catálogo → «no catalogado» sin dar la vuelta ──
+// (2026-11-26) Antes había que buscar, ver que no estaba y cambiar a mano de
+// pestaña. Ahora, si lo que se escribe (3+ letras) no da ningún resultado, el
+// formulario pasa solo a «no catalogado» con lo escrito como nombre y el cursor
+// al final, para seguir escribiendo sin cortar. Si fue una errata, «Volver a
+// buscar en el catálogo» devuelve el texto al buscador; a partir de ahí ya no
+// salta solo (si no, rebotaría a cada tecla), sino que la lista ofrece
+// «➕ Pedir … como no catalogado».
+const _NO_CAT = {
+  sol:   { search: 'sol-search',   list: 'sol-autocomplete',   libre: 'sol-material-libre',   aviso: 'sol-aviso-no-catalogado',   fuente: 'nuevo', cambiar: (s, o) => setSourceSolicitud(s, o), buscar: v => buscarMaterialSolicitud(v) },
+  linea: { search: 'linea-search', list: 'linea-autocomplete', libre: 'linea-material-libre', aviso: 'linea-aviso-no-catalogado', fuente: 'libre', cambiar: (s, o) => setSourceLinea(s, o),     buscar: v => buscarMaterialLinea(v) },
+};
+const _noCatSinSalto = { sol: false, linea: false };
+
+function _materialSinResultados(clave, query, n) {
+  const c = _NO_CAT[clave];
+  const texto = String(query || '').trim();
+  if (!c || n !== 0 || texto.length < 3) return;
+  if (!_noCatSinSalto[clave]) { _pasarANoCatalogado(clave); return; }
+  const list = document.getElementById(c.list);
+  list.innerHTML = `<div class="autocomplete-item" onclick="_pasarANoCatalogado('${clave}')">
+    <div><div class="autocomplete-item-name">➕ Pedir «${_esc(texto)}» como material no catalogado</div>
+    <div class="autocomplete-item-meta">No hay nada así en el catálogo</div></div>
+  </div>`;
+  list.classList.add('open');
+}
+
+function _pasarANoCatalogado(clave) {
+  const c = _NO_CAT[clave];
+  const texto = document.getElementById(c.search).value.trim();
+  c.cambiar(c.fuente, { desdeBusqueda: true });
+  document.getElementById(c.list).classList.remove('open');
+  const inp = document.getElementById(c.libre);
+  inp.value = texto;
+  const aviso = document.getElementById(c.aviso);
+  aviso.innerHTML = 'No está en el catálogo, así que se pedirá como material no catalogado. ' +
+    `<a href="#" onclick="_volverACatalogo('${clave}');return false">Volver a buscar en el catálogo</a>`;
+  aviso.style.display = '';
+  inp.focus();
+  try { inp.setSelectionRange(texto.length, texto.length); } catch (e) {}
+}
+
+function _volverACatalogo(clave) {
+  const c = _NO_CAT[clave];
+  c.cambiar('catalogo');            // _ajustarNoCatalogado devuelve el texto al buscador
+  const search = document.getElementById(c.search);
+  search.focus();
+  c.buscar(search.value);
+}
+
+// Se llama en cada cambio de pestaña. `reset`: al abrir el modal o cambiar de
+// tipo; `desdeBusqueda`: el salto automático, que pone él mismo el aviso.
+function _ajustarNoCatalogado(clave, esCatalogo, opts) {
+  const c = _NO_CAT[clave];
+  const aviso = document.getElementById(c.aviso);
+  if (!aviso || opts.desdeBusqueda) return;
+  const veniaDelSalto = aviso.style.display !== 'none';
+  aviso.style.display = 'none';
+  if (opts.reset) { _noCatSinSalto[clave] = false; return; }
+  const search = document.getElementById(c.search), libre = document.getElementById(c.libre);
+  if (esCatalogo) {
+    if (veniaDelSalto) { _noCatSinSalto[clave] = true; search.value = libre.value.trim(); }
+  } else if (!libre.value.trim() && search.value.trim()) {
+    libre.value = search.value.trim();   // pestaña cambiada a mano: no se pierde lo escrito
+  }
 }
 
 // Selector de unidad al añadir una línea de pedido: solo se muestra si el
@@ -1245,6 +1314,7 @@ function openModalSolicitud() {
   document.getElementById('sol-material-id').value = '';
   document.getElementById('sol-material-selected').style.display = 'none';
   document.getElementById('sol-search').value = '';
+  sv('sol-material-libre', '');
   sv('sol-cantidad',''); sv('sol-urgencia','Normal'); sv('sol-fecha-necesidad','');
   sv('sol-motivo',''); sv('sol-obs',''); sv('sol-unidad','');
   const sel = document.getElementById('sol-proveedor');
@@ -1268,7 +1338,7 @@ function openModalNuevaLinea(pedidoId) {
   clearEquipoLinea();
   sv('linea-nuevo-eq-tipo', '');
   sv('linea-nuevo-eq-marca', ''); sv('linea-nuevo-eq-modelo', '');
-  setSourceLinea('catalogo');
+  setSourceLinea('catalogo', { reset: true });
   document.getElementById('linea-material-id').value = '';
   document.getElementById('linea-material-selected').style.display = 'none';
   document.getElementById('linea-search').value = '';
