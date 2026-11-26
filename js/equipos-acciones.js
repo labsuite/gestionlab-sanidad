@@ -308,7 +308,7 @@ function abrirPlanificacion(incId, equipo, origenIntId) {
   const pendLista = document.getElementById('plan-pendientes-lista');
   if (origenIntId) {
     if (intro) intro.textContent = 'Programando una nueva actuación de seguimiento sobre la incidencia';
-    if (titulo) titulo.textContent = '📅 Programar próxima actuación';
+    if (titulo) titulo.textContent = '📅 Planificar próxima actuación';
     if (ayuda) ayuda.innerHTML = 'Esta incidencia sigue abierta y hace falta volver otro día. Toca abajo lo pendiente que corresponda a esta actuación — puede que no sea todo (p.ej. si hay tareas para especialistas distintos).';
     const sinResolver = t => ['Pendiente', 'Resuelto parcialmente', 'No resuelto'].includes(t.Resultado);
     const pendientes = getTareasIntervencion(origenIntId).filter(sinResolver);
