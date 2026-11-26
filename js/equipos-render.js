@@ -48,12 +48,9 @@ function renderDashboard() {
   const averiados = DATA.equipos.filter(e => e.Estado_Operativo === 'Averiado' || e.Estado_Operativo === 'Fuera de servicio');
 
   if (averiados.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner danger"><div class="alert-icon">🔴</div><div class="alert-content"><div class="alert-title">${averiados.length} equipo(s) fuera de servicio o averiado(s)</div><div class="alert-text">${averiados.map(e => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + ' ' + (e.Marca||'')).join(' · ')}</div></div></div>`;
-  // Equipos que el SAT se ha llevado y aún no ha devuelto — avisa de que no están
-  // físicamente en el laboratorio, aunque su estado operativo diga otra cosa.
-  const fueraDelCentro = DATA.equipos
-    .map(e => ({ e, int: intervencionEquipoFuera(e.ID_Activo) }))
-    .filter(x => x.int);
-  if (fueraDelCentro.length && esGestorAdmin) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('equipos')"><div class="alert-icon">📦</div><div class="alert-content"><div class="alert-title">${fueraDelCentro.length} equipo(s) fuera del centro (retirado(s) por el servicio técnico)</div><div class="alert-text">${fueraDelCentro.map(({e, int}) => e.ID_Activo + ' – ' + (e.Tipo_Equipo||'') + (int.Fecha_Retirada ? ' · desde ' + formatDate(int.Fecha_Retirada) : '')).join(' · ')}</div></div></div>`;
+  // Los equipos que el SAT se ha llevado NO avisan en el panel (decisión de la usuaria,
+  // 2026-11-26): no hay nada que hacer con ellos; ya se ven con el cartel 📦 Fuera del
+  // centro en la lista de equipos y en su ficha.
   if (pendientesMant > 0) alertas.innerHTML += `<div class="alert-banner" style="cursor:pointer" onclick="showPage('mantenimiento')"><div class="alert-icon">🛡️</div><div class="alert-content"><div class="alert-title">${pendientesMant} mantenimiento(s) preventivo(s) pendiente(s) en el curso actual</div><div class="alert-text">Ve a la sección Mantenimiento para registrarlos</div></div></div>`;
   const incVisibles = esGestorAdmin
     ? incAbiertas
