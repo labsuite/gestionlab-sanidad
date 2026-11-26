@@ -885,6 +885,9 @@ function _filaLineaPedido(l, p, puedeEditar) {
   const esServicio = l.Tipo_Linea === 'Servicio';
   const esEquipo = l.Tipo_Linea === 'Equipo';
   const esComun = lineaEsComun(l); // false en equipo o servicio
+  // Material recibido sin ficha en el catálogo: no entró en el inventario.
+  const sinFichaRecibida = l.Tipo_Linea === 'Material' && !l.Sin_Inventario && !l.ID_Material
+    && (parseFloat(l.Cantidad_Recibida) || 0) > 0 && !_materialDeLinea(l);
   // Servicio unido a su intervención: se da por realizado al cerrar la actuación.
   const interv = esServicio && l.ID_Intervencion ? DATA.intervenciones.find(i => i.ID_Intervencion === l.ID_Intervencion) : null;
   const intIdx = interv ? DATA.intervenciones.indexOf(interv) : -1;
@@ -908,6 +911,7 @@ function _filaLineaPedido(l, p, puedeEditar) {
       ${puedeEditar ? `<button class="icon-btn" title="Cómo se nombra en la hoja de pedido (otra forma de expresarlo, referencias…)" onclick="openModalConceptoFactura('${l.ID_Linea}','${pedidoId}')" style="${(l.Conceptos_Factura || []).length ? '' : 'opacity:.45'}">🧾</button>` : ''}
       ${puedeEditar && (l.Estado_Linea || 'Pendiente') === 'Pendiente' ? `<button class="icon-btn" title="Editar línea" onclick="openModalEditarLinea('${l.ID_Linea}','${pedidoId}')">✏️</button>` : ''}
       ${puedeEditar && !interv && l.Estado_Linea !== 'Recibido' && ['Presupuesto aprobado','Recepción parcial','Recepción completa'].includes(p.Estado) ? `<button class="icon-btn" title="Registrar recepción" onclick="openModalRecepcion('${l.ID_Linea}','${pedidoId}')">📥</button>` : ''}
+      ${puedeEditar && sinFichaRecibida ? `<button class="icon-btn" title="Se recibió sin ficha en el catálogo, así que no entró en el inventario. Darle ficha y meter lo recibido" onclick="darFichaLineaRecibida('${l.ID_Linea}','${pedidoId}')">🏷️</button>` : ''}
       ${puedeEliminar ? `<button class="icon-btn danger" title="Eliminar línea" onclick="eliminarLineaPedido('${l.ID_Linea}','${pedidoId}')">🗑️</button>` : ''}
     </div>
   </div>`;
@@ -1437,7 +1441,7 @@ function openModalRecepcionMasiva(pedidoId) {
       const ini = lotes.length === 1 ? lotes[0].ID_Ubicacion : (mat.Ubicacion || '');
       ubic = `<div id="recmas-ubicwrap-${id}" style="margin-top:4px"><div class="recmas-fila" style="margin-bottom:4px"><label>📍 ¿Dónde se guarda?</label></div>${repartoHTML('recmas-' + id, { totalId: 'recmas-cant-' + id, matId: mat.ID_Material, unidad, valor: ini })}</div>`;
     } else if (!esServ) {
-      ubic = `<div style="font-size:11px;color:var(--text-muted)">No está en el catálogo: al confirmar podrás darle ficha desde su línea (📥).</div>`;
+      ubic = `<div style="font-size:11px;color:var(--text-muted)">⚠ No está en el catálogo: al confirmar se te pedirá su ficha para que entre en el inventario (o márcalo 🚫 Sin inventario).</div>`;
     }
     const cantTxt = esServ ? (l.Tipo_Linea === 'Equipo' ? '🖥️ equipo' : '🔧 servicio')
       : `Pedido ${pedida} ${unidad}${yaRec > 0 ? ` · ya llegaron ${yaRec} · faltan ${pendiente}` : ''}`;

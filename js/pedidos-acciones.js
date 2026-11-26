@@ -384,7 +384,7 @@ async function guardarRecepcionMasiva() {
   const marcadas = new Set(_recmasMarcadas());
   const lineas = DATA.lineasPedido.filter(l => l.Pedido === pedidoId && marcadas.has(l.ID_Linea));
   if (!lineas.length) { showToast('Toca los artículos que vienen en el albarán', 'error'); return; }
-  const aRecibir = [];
+  const aRecibir = [], sinFicha = [];
   for (const l of lineas) {
     const esMaterial = (l.Tipo_Linea || 'Material') === 'Material';
     const yaRec = parseFloat(l.Cantidad_Recibida) || 0;
@@ -400,25 +400,37 @@ async function guardarRecepcionMasiva() {
       if (r.error) { showToast(`«${l.Material}»: ${r.error}`, 'error'); return; }
       repartos = r.repartos;
     }
-    aRecibir.push({
-      id_linea: l.ID_Linea, cantidad, sin_inventario: sinInv, repartos,
-      observaciones: document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '',
-    });
+    const obs = document.getElementById('recmas-obs-' + l.ID_Linea)?.value || '';
+    // Material que no está en el catálogo: no puede entrar en el inventario sin
+    // ficha. Se aparta y, tras registrar el resto, se pide su ficha (una a una).
+    if (esMaterial && !sinInv && !_materialDeLinea(l)) {
+      sinFicha.push({ modo: 'recibir', lineaId: l.ID_Linea, pedidoId, cantRec: cantidad, obs, idUbicacion: '', albaran });
+      continue;
+    }
+    aRecibir.push({ id_linea: l.ID_Linea, cantidad, sin_inventario: sinInv, repartos, observaciones: obs });
   }
   closeModal('modal-recepcion-masiva');
-  showLoading('Registrando albarán...');
-  try {
-    const { procesadas, errores } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion_masiva', pedido: pedidoId, lineas: aRecibir, albaran });
-    await loadAllData();
-    if (errores > 0) {
-      showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
-    } else {
-      showToast(`Albarán registrado: ${procesadas} línea(s)`, 'success');
-    }
-    renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
-    verDetallePedido(pedidoId);
-  } catch(e) { showToast(e.message || 'Error registrando el albarán', 'error'); console.error(e); }
-  hideLoading();
+  if (aRecibir.length) {
+    showLoading('Registrando albarán...');
+    try {
+      const { procesadas, errores } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion_masiva', pedido: pedidoId, lineas: aRecibir, albaran });
+      await loadAllData();
+      if (errores > 0) {
+        showToast(`${procesadas} línea(s) procesada(s), ${errores} con error`, errores === aRecibir.length ? 'error' : 'success');
+      } else {
+        showToast(`Albarán registrado: ${procesadas} línea(s)`, 'success');
+      }
+      renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+      verDetallePedido(pedidoId);
+    } catch(e) { showToast(e.message || 'Error registrando el albarán', 'error'); console.error(e); hideLoading(); return; }
+    hideLoading();
+  }
+  if (sinFicha.length) {
+    showToast(sinFicha.length === 1
+      ? 'Un artículo no está en el catálogo: dale ficha para recibirlo (si cancelas, se queda pendiente).'
+      : `${sinFicha.length} artículos no están en el catálogo: dales ficha uno a uno para recibirlos (el que canceles se queda pendiente).`, '', 6000);
+    _abrirFichaParaRecepcion({ ...sinFicha[0], cola: sinFicha.slice(1) });
+  }
 }
 
 async function guardarRecepcionLinea() {
@@ -469,22 +481,69 @@ async function guardarRecepcionLinea() {
   // Fuera del inventario: no hace falta darle ficha en el catálogo.
   if (!mat && cantRec > 0 && !sinInventario) {
     closeModal('modal-recepcion-linea');
-    _pendingRecepcion = { lineaId, pedidoId, cantRec, obs: v('rec-obs'), idUbicacion };
-    openModalMaterial(); sv('mat-nombre', l.Material);
-    setTimeout(() => {
-      const footer = document.querySelector('#modal-material .form-footer');
-      if (footer && !document.getElementById('aviso-recepcion-pendiente')) {
-        const aviso = document.createElement('div');
-        aviso.id = 'aviso-recepcion-pendiente';
-        aviso.style.cssText = 'grid-column:1/-1;padding:10px 12px;background:var(--warning-light);border-radius:var(--radius-sm);font-size:12px;color:var(--warning);border:1px solid #e8c98a;margin-bottom:4px';
-        aviso.innerHTML = '⚠️ Al guardar, se registrará automáticamente la recepción de <strong>' + cantRec + ' uds de ' + l.Material + '</strong> del pedido ' + pedidoId + '.';
-        footer.before(aviso);
-      }
-    }, 100);
+    _abrirFichaParaRecepcion({ modo: 'recibir', lineaId, pedidoId, cantRec, obs: v('rec-obs'), idUbicacion });
     showToast('Este material no está catalogado. Completa su ficha para continuar.', 'error');
     return;
   }
   await _completarRecepcionLinea(lineaId, pedidoId, cantRec, v('rec-obs'), idUbicacion, undefined, sinInventario, undefined, repartos);
+}
+
+// ── Material sin ficha al recibir ────────────────────────────
+// Lo que no está en el catálogo no puede entrar en el inventario: antes de
+// recibirlo se le da ficha (modal de material) y, al guardarla, se recibe
+// contra ese material (guardarMaterial → _recepcionTrasCatalogar).
+// `pend`: { modo, lineaId, pedidoId, cantRec, obs, idUbicacion, albaran, cola }
+//   modo 'recibir'   — la línea aún no se ha recibido: se registra la recepción.
+//   modo 'catalogar' — ya se recibió sin ficha (antes de 2026-11-26, «Recibir
+//                      albarán» lo permitía): entra ahora en el inventario lo que llegó.
+//   cola — siguientes artículos del mismo albarán que también necesitan ficha.
+function _limpiarRecepcionPendiente() {
+  _pendingRecepcion = null;
+  document.getElementById('aviso-recepcion-pendiente')?.remove();
+}
+
+function _abrirFichaParaRecepcion(pend) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === pend.lineaId);
+  if (!l) return;
+  const unidad = _unidadLineaPedido(l);
+  openModalMaterialCatalogacion(l.Material, unidad); // limpia cualquier pendiente anterior
+  _pendingRecepcion = pend;
+  const p = DATA.pedidos.find(x => x.ID_Pedido === pend.pedidoId);
+  const quedan = pend.cola?.length
+    ? ` Después ${pend.cola.length === 1 ? 'viene otro artículo' : `vienen otros ${pend.cola.length}`} del albarán sin ficha.` : '';
+  const que = pend.modo === 'catalogar'
+    ? 'entrará en el inventario lo que ya se recibió:'
+    : 'se registrará la recepción de';
+  const aviso = document.createElement('div');
+  aviso.id = 'aviso-recepcion-pendiente';
+  aviso.style.cssText = 'grid-column:1/-1;padding:10px 12px;background:var(--warning-light);border-radius:var(--radius-sm);font-size:12px;color:var(--warning);border:1px solid #e8c98a;margin-bottom:4px';
+  aviso.innerHTML = `⚠️ «${_escAttr(l.Material)}» no está en el catálogo. Al guardar su ficha ${que} <strong>${pend.cantRec} ${_escAttr(unidad || 'uds')}</strong> del pedido «${_escAttr(p?.Nombre_Lista || pend.pedidoId)}». Deja el stock de la ficha en 0: lo recibido se suma solo.${quedan}`;
+  document.querySelector('#modal-material .form-footer')?.before(aviso);
+}
+
+async function _recepcionTrasCatalogar(pend, idMaterial) {
+  if (pend.modo === 'catalogar') {
+    showLoading('Metiendo en el inventario lo recibido...');
+    try {
+      const { cantidad } = await callEdgeFunction('gestionar-linea-pedido', { accion: 'catalogar_recibida', id_linea: pend.lineaId, id_material: idMaterial });
+      await loadAllData();
+      showToast(`Ficha creada: entran en el inventario los ${cantidad} recibidos`, 'success');
+      renderMaterial(); renderSolicitudes(); renderPedidos(); renderDashboard(); updateBadges();
+      verDetallePedido(pend.pedidoId);
+    } catch (e) { showToast(e.message || 'No se pudo meter en el inventario lo recibido', 'error'); console.error(e); }
+    hideLoading();
+  } else {
+    showToast('Material catalogado. Registrando recepción...', 'success');
+    await _completarRecepcionLinea(pend.lineaId, pend.pedidoId, pend.cantRec, pend.obs, pend.idUbicacion, idMaterial, undefined, undefined, undefined, pend.albaran);
+  }
+  if (pend.cola?.length) _abrirFichaParaRecepcion({ ...pend.cola[0], cola: pend.cola.slice(1) });
+}
+
+// 🏷️ de una línea ya recibida sin ficha: darle ficha y meter en el inventario lo que llegó.
+function darFichaLineaRecibida(lineaId, pedidoId) {
+  const l = DATA.lineasPedido.find(x => x.ID_Linea === lineaId);
+  if (!l) return;
+  _abrirFichaParaRecepcion({ modo: 'catalogar', lineaId, pedidoId, cantRec: parseFloat(l.Cantidad_Recibida) || 0 });
 }
 
 // ── Orquestador principal de recepción ───────────────────────
@@ -492,10 +551,10 @@ async function guardarRecepcionLinea() {
 // origen) vive ahora server-side en gestionar-linea-pedido (accion:
 // 'recepcion') — aquí solo se llama y se refresca DATA desde el servidor,
 // que es la fuente de verdad tras una operación que toca varias tablas.
-async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario, idEquipo, repartos) {
+async function _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, idMaterial, sinInventario, idEquipo, repartos, albaran) {
   showLoading('Registrando recepción...');
   try {
-    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined, id_equipo: idEquipo || undefined, repartos: repartos?.length > 1 ? repartos : undefined });
+    await callEdgeFunction('gestionar-linea-pedido', { accion: 'recepcion', id_linea: lineaId, cantidad: cantRec, observaciones: obs, id_ubicacion: idUbicacion || undefined, id_material: idMaterial || undefined, sin_inventario: typeof sinInventario === 'boolean' ? sinInventario : undefined, id_equipo: idEquipo || undefined, repartos: repartos?.length > 1 ? repartos : undefined, albaran: albaran || undefined });
     await loadAllData();
     showToast('Recepción registrada', 'success');
     closeModal('modal-recepcion-linea');

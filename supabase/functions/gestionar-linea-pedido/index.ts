@@ -122,6 +122,12 @@ async function completarRecepcion(supabaseAdmin: any, idLinea: string, cantRec: 
   const estadoLinea = cantRecTotal >= cantPed ? "Recibido" : (cantRecTotal > 0 ? "Recibido parcialmente" : "Pendiente");
   const datosLinea: Record<string, unknown> = { cantidad_recibida: cantRecTotal, estado_linea: estadoLinea };
   const fueraInventario = sinInventario ?? linea.sin_inventario === true;
+  // Material sin ficha: recibirlo así lo daba por llegado sin meter nada en el
+  // inventario, y en silencio (pasó con «Recibir albarán», 2026-11-26). Primero
+  // se le da ficha (el cliente la pide al recibir) o se marca «Sin inventario».
+  if ((linea.tipo_linea || "Material") === "Material" && !fueraInventario && cantRec > 0 && !mat) {
+    return { error: jsonError(`«${linea.material}» no está en el catálogo: dale ficha antes de recibirlo, o márcalo «Sin inventario».`, 400) };
+  }
   if (sinInventario !== undefined) datosLinea.sin_inventario = sinInventario;
   if (idEquipo && linea.tipo_linea === "Equipo") datosLinea.id_equipo = idEquipo;
   // Nº del albarán en que llegó (una línea puede llegar en varios): se acumulan.
@@ -466,6 +472,28 @@ Deno.serve(async (req) => {
       else { procesadas++; resultados.push({ id_linea: l.id_linea, ok: true }); }
     }
     return jsonOk({ procesadas, errores, resultados });
+  }
+
+  // Línea de material ya recibida (toda o en parte) que se registró sin ficha en
+  // el catálogo, así que lo que llegó no entró en el inventario. Se le acaba de
+  // dar ficha: se enlaza y entra ahora lo recibido. Solo una vez: si la línea ya
+  // tiene material, su stock ya entró al recibirla.
+  if (accion === "catalogar_recibida") {
+    const idLinea = String(body.id_linea || "").trim();
+    const idMaterial = strField(body.id_material);
+    if (!idLinea || !idMaterial) return jsonError("id_linea e id_material son obligatorios", 400);
+    const { data: linea } = await supabaseAdmin.from("lineas_pedido").select("*").eq("id_linea", idLinea).maybeSingle();
+    if (!linea) return jsonError("Línea no encontrada", 404);
+    if ((linea.tipo_linea || "Material") !== "Material" || linea.sin_inventario === true) return jsonError("Esta línea no entra en el inventario", 400);
+    if (linea.id_material) return jsonError("Esta línea ya tiene ficha en el catálogo: lo recibido ya entró en el inventario", 400);
+    const cant = Number(linea.cantidad_recibida) || 0;
+    if (cant <= 0) return jsonError("Esta línea aún no se ha recibido: dale ficha al recibirla", 400);
+    const { data: mat } = await supabaseAdmin.from("material").select("*").eq("id_material", idMaterial).maybeSingle();
+    if (!mat) return jsonError(`No se encontró el material "${idMaterial}"`, 404);
+    const { data: lineaActualizada, error } = await supabaseAdmin.from("lineas_pedido").update({ id_material: idMaterial }).eq("id_linea", idLinea).select().single();
+    if (error) return jsonError(`No se pudo enlazar la línea: ${error.message}`, 400);
+    await actualizarStockMaterial(supabaseAdmin, mat, cant, linea.pedido, usuarioNombre, linea.unidad || null, strField(body.id_ubicacion));
+    return jsonOk({ linea: lineaActualizada, cantidad: cant });
   }
 
   if (accion === "actualizar_precio") {
