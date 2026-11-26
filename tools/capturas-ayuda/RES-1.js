@@ -44,7 +44,7 @@ async (page, { app: APP, salida: SALIDA }) => {
   // 3 · Asistente en un resultado, con los contenedores de ese tipo
   await limpiar();
   await page.evaluate(() => {
-    arbolReiniciar(); arbolResponder('inicio', 2); arbolResponder('biologico', 1);   // biológico → bolsa de autoclave
+    arbolReiniciar(); arbolResponder('inicio', 2);   // biológico → contenedor negro
     const a = document.getElementById('arbol-residuos').closest('.card');
     a.classList.add('ayuda-senal'); a.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80);
   });

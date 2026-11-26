@@ -37,8 +37,17 @@ const _NORMAS_GESTOR = [
   },
   {
     icon: '🫙', titulo: 'Muestras en formol — contenedor cuadrado azul (va a incinerar)',
-    texto: 'SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja.',
-    ojo: 'Formol o etanol SIN muestras (aunque las hayan tenido), y el agua con restos de formol → disolventes no halogenados (en este centro, Contenedor Inertes).',
+    texto: 'SOLO formol o etanol CON muestras dentro (y los citotóxicos, que casi no usamos). Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja.',
+    ojo: 'Formol SIN muestras (aunque las haya tenido) y el agua con restos de formol → bidón de no halogenados. El etanol sin muestra, a la garrafa de 5 L de etanol y X-Free.',
+  },
+  {
+    icon: '🍶', titulo: 'Garrafa de 5 L de etanol y X-Free',
+    texto: 'Gastamos mucho etanol y X-Free (anatomía patológica): no merece la pena hacer botecitos para los bidones. Sus restos se vierten juntos en garrafas de 5 L, las mismas en que viene el etanol, y se cierran con parafilm.',
+    ojo: 'Solo valen garrafas con el símbolo UN (las del etanol); las de X-Free no sirven, son de un plástico peor.',
+  },
+  {
+    icon: '🍾', titulo: 'Bidón de envases de vidrio vacíos',
+    texto: 'Bidón de ballesta del 207 para los envases de vidrio vacíos que contuvieron productos químicos.',
   },
   {
     icon: '🛍️', titulo: 'Bolsas de químicos — tres bolsas, cada una para una cosa',
@@ -141,7 +150,7 @@ const _ARBOL_RESIDUOS = {
     opciones: [
       { texto: '✂️ Algo que corta o pincha', ir: 'corta' },
       { texto: '🫙 Una muestra en formol o etanol', ir: 'formol' },
-      { texto: '🦠 Algo biológico: cultivos, muestras o material que las tocó', ir: 'biologico' },
+      { texto: '🦠 Algo biológico: cultivos, muestras, material que las tocó, EPI con sangre', hoja: 'Contenedor negro (autoclave)' },
       { texto: '🧤 Un sólido: envase vacío, papel, guantes, portas…', ir: 'solido' },
       { texto: '💧 Un líquido', ir: 'liquido' },
       { texto: '🤷 No lo sé / nada de esto', ir: 'dudo' },
@@ -154,18 +163,12 @@ const _ARBOL_RESIDUOS = {
       { texto: 'Bisturí, cuchilla de microtomo, aguja, lanceta… o un porta contaminado', hoja: 'Residuo Cortante' },
     ],
   },
-  biologico: {
-    pregunta: '¿Es ropa de protección (bata, guantes, EPI) manchada de sangre o muestras?',
-    opciones: [
-      { texto: 'Sí, es ropa o EPI', hoja: 'Residuo Biológico GII' },
-      { texto: 'No: cultivos, muestras, puntas, tubos…', hoja: 'Bolsa de autoclave' },
-    ],
-  },
   formol: {
     pregunta: '¿La muestra sigue dentro?',
     opciones: [
       { texto: 'Sí, la muestra está dentro', hoja: 'Muestras en formol' },
-      { texto: 'No, es solo el formol o el etanol (aunque haya tenido muestra)', hoja: 'Contenedor Inertes' },
+      { texto: 'No, es solo el formol (aunque haya tenido muestra)', hoja: 'Bidón no halogenados' },
+      { texto: 'No, es solo el etanol (aunque haya tenido muestra)', hoja: 'Garrafa etanol y X-Free' },
     ],
   },
   solido: {
@@ -174,6 +177,7 @@ const _ARBOL_RESIDUOS = {
       { texto: 'Un envase vacío de plástico que tuvo algo peligroso', hoja: 'Bolsa químicos - Envases de plástico' },
       { texto: 'Un envase vacío metálico (aluminio) que tuvo algo peligroso', hoja: 'Bolsa químicos - Envases metálicos' },
       { texto: 'Papel, guantes, filtros, absorbentes… manchados de un químico', hoja: 'Bolsa químicos - Guantes, papel y absorbentes' },
+      { texto: 'Un envase de vidrio vacío que tuvo un producto químico', hoja: 'Bidón vidrio vacío' },
       { texto: 'Portas teñidos, secciones histológicas o bloques de parafina', hoja: 'Basura normal' },
       { texto: 'Otra cosa', ir: 'dudo' },
     ],
@@ -184,8 +188,9 @@ const _ARBOL_RESIDUOS = {
       { texto: '🎨 De una tinción (también los kits de tinción)', hoja: 'Aguas Laboratorio - Tinciones' },
       { texto: '🔬 De un aparato o kit de diagnóstico, tampones, medios, PCR…', hoja: 'Aguas Laboratorio - Equipos' },
       { texto: '🧽 Lejía diluida de limpiar', hoja: 'Fregadero' },
-      { texto: '🧪 Un disolvente: formol o etanol sin muestra, X-Free, isopropanol…', ir: 'disolvente' },
-      { texto: '⚗️ Un ácido que no es de tinción', hoja: 'Contenedor Ácidos' },
+      { texto: '🍶 Restos de etanol o de X-Free', hoja: 'Garrafa etanol y X-Free' },
+      { texto: '🧪 Otro disolvente: formol sin muestra, xilol, isopropanol, cloroformo…', ir: 'disolvente' },
+      { texto: '⚗️ Un ácido que no es de tinción', hoja: 'Bidón ácidos' },
       { texto: '🔥 Un oxidante: agua oxigenada, permanganato, ácido peryódico…', hoja: 'Reactivos de laboratorio' },
       { texto: '🤷 Otro reactivo / no lo sé', ir: 'dudo' },
     ],
@@ -193,8 +198,8 @@ const _ARBOL_RESIDUOS = {
   disolvente: {
     pregunta: '¿Lleva cloroformo u otro disolvente clorado (p. ej. Carnoy)?',
     opciones: [
-      { texto: 'Sí', hoja: 'Contenedor Halogenados' },
-      { texto: 'No', hoja: 'Contenedor Inertes' },
+      { texto: 'Sí', hoja: 'Bidón halogenados' },
+      { texto: 'No', hoja: 'Bidón no halogenados' },
     ],
   },
   dudo: {
@@ -208,20 +213,21 @@ const _ARBOL_RESIDUOS = {
 
 // Por qué va ahí (normas del gestor). Las hojas sin contenedor físico lo dicen.
 const _ARBOL_HOJAS = {
-  'Bolsa de autoclave': { icon: '🦠', porque: 'Lo biológico se inactiva en autoclave antes de tirarlo.' },
-  'Residuo Biológico GII': { icon: '🦺', porque: 'La ropa y los EPI contaminados con sangre o muestras no se autoclavan de forma práctica: van como residuo biológico de grupo II.' },
+  'Contenedor negro (autoclave)': { icon: '🦠', porque: 'Contenedor rígido negro con bolsa de autoclave: residuos biosanitarios (cultivos, muestras, puntas y tubos que las tocaron, ropa o EPI con sangre). Va al autoclave del gestor. La tapa se apoya, nunca se cierra del todo: una vez cerrada no la abre nadie.' },
   'Basura normal': { icon: '🗑️', sinContenedor: true, porque: 'Solo lleva trazas fijadas: va a la basura normal. Los portas, bien protegidos para que nadie se corte; si no pueden ir a la basura, al contenedor amarillo de punzantes.' },
   'Residuo Cortante': { icon: '✂️', porque: 'Contenedor amarillo de punzantes: todo lo que corta o pincha, esté contaminado o no.' },
-  'Muestras en formol': { icon: '🫙', porque: 'Contenedor cuadrado azul, va a incinerar: SOLO formol o etanol con la muestra dentro. En autoclave el formol se liberaría y dañaría ojos y pulmones.' },
-  'Contenedor Inertes': { icon: '🧪', porque: 'Disolventes no halogenados: aquí va también el formol o etanol que ya no lleva la muestra.' },
-  'Contenedor Halogenados': { icon: '🧪', porque: 'Los disolventes clorados (cloroformo…) van separados de los no halogenados.' },
+  'Muestras en formol': { icon: '🫙', porque: 'Contenedor rígido azul, va a incinerar: muestras con su formol o etanol dentro (y los citotóxicos, que casi no usamos). En autoclave el formol se liberaría y dañaría ojos y pulmones, y un sólido dentro de un líquido revienta. La tapa se apoya, nunca se cierra del todo.' },
+  'Bidón no halogenados': { icon: '🧪', porque: 'Bidón de ballesta del 207 para disolventes no halogenados: el formol que ya no lleva la muestra, xilol, isopropanol… El etanol y el X-Free van a su garrafa de 5 L.' },
+  'Bidón halogenados': { icon: '🧪', porque: 'Bidón de ballesta del 207 para los disolventes con cloro (cloroformo, Carnoy…): van separados de los no halogenados.' },
+  'Garrafa etanol y X-Free': { icon: '🍶', porque: 'Gastamos mucho etanol y X-Free (anatomía patológica): sus restos se vierten juntos en garrafas de 5 L, cerradas con parafilm. Solo valen garrafas con el símbolo UN, como las del etanol; las de X-Free no (son de un plástico peor).' },
+  'Bidón vidrio vacío': { icon: '🍾', porque: 'Bidón de ballesta del 207 para envases de vidrio vacíos que contuvieron productos químicos. Los de plástico y los metálicos van a sus bolsas.' },
   'Bolsa químicos - Envases de plástico': { icon: '🛍️', porque: 'La bolsa marcada con la X de «envases que contienen restos de sustancias peligrosas»: solo envases de plástico vacíos, bien cerrados para que no se acumule líquido en el fondo. Los metálicos y los guantes o papel van cada uno a su bolsa.' },
   'Bolsa químicos - Envases metálicos': { icon: '🥫', porque: 'La bolsa marcada con la X de «envases metálicos»: solo envases de aluminio (o de otro metal) vacíos, bien cerrados. Los de plástico van a la otra bolsa.' },
   'Bolsa químicos - Guantes, papel y absorbentes': { icon: '🧤', porque: 'La bolsa marcada con la X de «absorbentes, materiales de filtración, guantes, ropas protectoras»: lo que ha absorbido o tocado un líquido peligroso. Si está manchado de disolventes volátiles (xilol, etanol…), antes en una bolsita zip. Un guante que no ha tocado nada peligroso no va aquí.' },
   'Aguas Laboratorio - Tinciones': { icon: '🎨', porque: 'Todo lo de las tinciones va junto (el protocolo ya lo mezcla). Suele ser ácido: por eso no va a la garrafa de Equipos, que lleva lejía. Ojo con los kits: si su ficha de seguridad lleva un oxidante, ácido pícrico/Bouin o DAB, eso va al salvavidas; y el xileno o el formol, a Inertes.' },
   'Aguas Laboratorio - Equipos': { icon: '🔬', porque: 'Lo que generan los aparatos de diagnóstico (también la botella del lavador del ELISA, que se vacía en la garrafa de Equipos del 203), kits, tampones y medios. Lleva la lejía de la limpieza de los aparatos: nada ácido aquí.' },
   'Fregadero': { icon: '🚰', sinContenedor: true, porque: 'La lejía diluida va al fregadero con abundante agua, sola: nunca mezclada antes con ácidos (desprende cloro). La lejía concentrada, al salvavidas.' },
-  'Contenedor Ácidos': { icon: '⚗️', porque: 'Los ácidos que no son de tinción van juntos aquí.' },
+  'Bidón ácidos': { icon: '⚗️', porque: 'Bidón de ballesta del 207: los ácidos que no son de tinción van juntos aquí.' },
   'Reactivos de laboratorio': { icon: '🛟', porque: 'El salvavidas: bote azul de ballesta para químicos en poca cantidad, cada uno en su frasco bien cerrado y resistente (Falcon, plástico) o de vidrio protegido. Aquí van también los oxidantes.' },
 };
 
@@ -310,18 +316,18 @@ function arbolReiniciar() { _arbolCamino = []; _repintarArbol(); }
 // (límite de 50 MB por archivo del plan), así que «Vídeo completo» reproduce los clips
 // seguidos y el índice salta al clip y al segundo. `categorias`: los Contenedor_Tipo que trata
 // cada clip (se enlaza en la Guía, en el asistente y en «Añadir residuo» de ese contenedor).
-// El contenedor negro (biosanitarios, al autoclave del gestor) es «Residuo Biológico GII», y el
-// mismo clip va en «Bolsa de autoclave» porque explica la alternativa de autoclavar en el
-// laboratorio (confirmado por Paloma, 2026-11-25).
+// El contenedor negro (biosanitarios, al autoclave del gestor, con bolsa de autoclave dentro) es
+// «Contenedor negro (autoclave)»: desde 2026-11-26 une las antiguas «Residuo Biológico GII» y
+// «Bolsa de autoclave», que eran el mismo contenedor.
 const VIDEOS_RESIDUOS = [
   { id: 'donde-esta-cada-punto', titulo: 'Dónde está cada punto', inicio: 7.02,
     categorias: ['Aguas Laboratorio - Tinciones', 'Aguas Laboratorio - Equipos'] },
   { id: 'bidones-207', titulo: 'Los bidones del 207', inicio: 58.26,
-    categorias: ['Reactivos de laboratorio', 'Contenedor Inertes', 'Contenedor Ácidos', 'Contenedor Halogenados'] },
+    categorias: ['Reactivos de laboratorio', 'Bidón vidrio vacío', 'Bidón no halogenados', 'Bidón ácidos', 'Bidón halogenados'] },
   { id: 'azul-y-negro', titulo: 'Contenedores azul y negro', inicio: 127.88,
-    categorias: ['Muestras en formol', 'Citotóxicos', 'Residuo Biológico GII', 'Bolsa de autoclave'] },
+    categorias: ['Muestras en formol', 'Contenedor negro (autoclave)'] },
   { id: 'etanol-y-xfree', titulo: 'Etanol y X-Free', inicio: 234.33,
-    categorias: ['Contenedor Inertes'] },
+    categorias: ['Garrafa etanol y X-Free'] },
   { id: 'bolsa-207', titulo: 'La bolsa del 207', inicio: 301.26,
     categorias: ['Bolsa químicos - Envases de plástico', 'Bolsa químicos - Envases metálicos', 'Bolsa químicos - Guantes, papel y absorbentes'] },
   { id: 'punzantes', titulo: 'Contenedor amarillo de punzantes', inicio: 377.09,
@@ -1385,7 +1391,7 @@ de estos contenedores existen físicamente aunque no aparezcan en las listas de 
 activos de arriba — puedes nombrarlos por su descripción (color, forma, rótulo):
 ${_normasGestorTexto()}
 
-KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno o formol (pasos del procesado, no tinción) → Bidón no halogenados; el X-Free → Garrafa etanol y X-Free. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
 
 REGLAS QUE NUNCA PUEDES SALTARTE (tanto si el caso está resuelto como si no):
 - Nunca digas que se puede verter por el desagüe ni tirar a la basura general, SALVO que el
@@ -1422,7 +1428,7 @@ literalmente con una de estas cuatro etiquetas, sin ningún texto antes, y debe 
 - [PREGUNTA] → cuando la descripción del usuario es ambigua entre varios tipos del catálogo con destino distinto y necesitas que aclare antes de poder responder, seguido de UNA sola pregunta corta y concreta (no una lista larga de opciones). No es un caso resuelto ni escalado, la conversación sigue en el siguiente mensaje del usuario.
 - [FUERA_DE_TEMA] → cuando el mensaje no describe un residuo real a tirar, seguido solo del recordatorio, sin responder nada más.
 
-SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Contenedor Inertes) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro". Si además hay un contenedor con el que sea fácil confundirlo, di por qué ese otro NO.
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Bidón no halogenados) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro". Si además hay un contenedor con el que sea fácil confundirlo, di por qué ese otro NO.
 
 Nunca omitas la etiqueta inicial. Nunca uses ninguna otra etiqueta que no sea esas cuatro.`;
 
@@ -1657,6 +1663,13 @@ function _abrirAdicionPorNfc(categoria, lab) {
     // Etiquetas grabadas antes de dividir una categoría: "Aguas Laboratorio" (dos
     // garrafas desde 2026-10-01) y "Bolsa plástica (químicos)" (tres bolsas desde
     // 2026-11-26). Si en ese lab solo hay uno de la familia, se abre ese.
+    // Renombradas 1 a 1 el 2026-11-26 (nombres con que el alumnado reconoce el contenedor).
+    const RENOMBRADAS = {
+      'Contenedor Inertes': 'Bidón no halogenados', 'Contenedor Ácidos': 'Bidón ácidos',
+      'Contenedor Halogenados': 'Bidón halogenados', 'Citotóxicos': 'Muestras en formol',
+      'Bolsa de autoclave': 'Contenedor negro (autoclave)', 'Residuo Biológico GII': 'Contenedor negro (autoclave)',
+    };
+    categoria = RENOMBRADAS[categoria] || categoria;
     const DIVIDIDAS = {
       'Aguas Laboratorio': { prefijo: 'Aguas Laboratorio', que: 'garrafas de aguas (Tinciones y Equipos)' },
       'Bolsa plástica (químicos)': { prefijo: 'Bolsa químicos', que: 'bolsas de químicos (plástico, metálicos y guantes/papel)' },

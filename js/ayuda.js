@@ -994,7 +994,7 @@ const AYUDA_TAREAS = {
       {
         texto: '**Al final, el asistente dice el contenedor** y por qué, con los contenedores de ese tipo que hay en el centro: laboratorio, sitio y nivel. «Qué residuos del catálogo van aquí» enseña los de la guía que van en él.',
         img: 'RES-1/03-asistente-resultado.png',
-        alt: 'Resultado del asistente: Bolsa de autoclave, el porqué y el contenedor del laboratorio 205 con su nivel',
+        alt: 'Resultado del asistente: Contenedor negro (autoclave), el porqué y el contenedor del laboratorio 207 con su nivel',
       },
       {
         texto: '**Leer también las «📋 Normas generales del gestor de residuos»** (pulsar para desplegarlas): son las reglas acordadas con la empresa de residuos y mandan sobre todo lo demás.',

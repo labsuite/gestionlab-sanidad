@@ -54,8 +54,8 @@ async (page, { app: APP, salida: SALIDA }) => {
     openModalAdicion(eval(i));
     sv('adic-tipo-residuo', ''); document.getElementById('adic-tipo-residuo-texto').value = '';
     sv('adic-descripcion-libre', 'Formol sobrante de un bote de biopsia, ya sin la muestra');
-    window.callEdgeFunction = async () => ({ ia_bloqueo: true, contenedor_sugerido: 'Contenedor Inertes',
-      mensaje: 'El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Contenedor Inertes. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a.' });
+    window.callEdgeFunction = async () => ({ ia_bloqueo: true, contenedor_sugerido: 'Bidón no halogenados',
+      mensaje: 'El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Bidón no halogenados. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a.' });
     await guardarAdicion();
     document.getElementById('adic-ia-resultado').classList.add('ayuda-senal');
     document.getElementById('adic-ia-resultado').scrollIntoView({ block: 'center' });

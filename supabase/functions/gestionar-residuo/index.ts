@@ -134,7 +134,7 @@ const GHS_INCOMPATIBLES: [string, string][] = [
 // granel en garrafa). En bidones azules, bolsas, cubos y punzantes cada cosa va en
 // su propio envase cerrado: ahí no hay reacción posible y la matriz bloqueaba sin
 // motivo (p. ej. etanol:éter en el salvavidas después de un permanganato).
-const CATEGORIAS_A_GRANEL = ["Aguas Laboratorio - Tinciones", "Aguas Laboratorio - Equipos", "Contenedor Inertes", "Contenedor Ácidos", "Contenedor Halogenados"];
+const CATEGORIAS_A_GRANEL = ["Aguas Laboratorio - Tinciones", "Aguas Laboratorio - Equipos", "Bidón no halogenados", "Bidón ácidos", "Bidón halogenados", "Garrafa etanol y X-Free"];
 function contenidoSeMezcla(categoria: string | null, formato: string | null): boolean {
   const f = (formato || "").toLowerCase();
   if (f.includes("garrafa")) return true;
@@ -192,7 +192,9 @@ const WARNINGS_FORMATO: { match: string; texto: string }[] = [
 // Normas generales del gestor de residuos (2026-10-01). Réplica de _NORMAS_GESTOR
 // en js/residuos.js (consultorio y tarjeta de la Guía): mantener las dos iguales.
 const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas, en DOS garrafas. TINCIONES: todo lo de las tinciones, incluidas las fracciones con etanol o metanol, las ácidas y las de fenol, y los kits de tinción aunque no se sepa qué lleva cada bote: el protocolo ya las mezcla en el cristalizador y pueden ir juntas mientras no reaccionen entre sí (el gestor separa luego las fases, que decantan por densidad). EQUIPOS: lo que generan los aparatos automáticos de diagnóstico (autoanalizadores, citómetro, coagulómetros, la botella del lavador de placas del ELISA), restos de kits de diagnóstico, tampones, medios… La de Equipos lleva la lejía de la limpieza de los aparatos: por eso NADA ácido va en ella, y lo ácido (las tinciones) va siempre a la de Tinciones.
-- Muestras en formol — contenedor cuadrado azul (va a incinerar): SOLO formol o etanol CON muestras dentro. Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja. OJO: Formol o etanol SIN muestras (aunque las hayan tenido), y el agua con restos de formol → disolventes no halogenados (en este centro, Contenedor Inertes).
+- Muestras en formol — contenedor cuadrado azul (va a incinerar): SOLO formol o etanol CON muestras dentro (y los citotóxicos, que casi no usamos). Va a incinerar porque en el autoclave u otros tratamientos el formol se libera y daña ojos y pulmones de quien trabaja. OJO: Formol SIN muestras (aunque las haya tenido) y el agua con restos de formol → bidón de no halogenados ("Bidón no halogenados"). El etanol sin muestra, a la garrafa de 5 L de etanol y X-Free.
+- Garrafa de 5 L de etanol y X-Free ("Garrafa etanol y X-Free"): gastamos mucho etanol y X-Free (anatomía patológica): no merece la pena hacer botecitos para los bidones. Sus restos se vierten juntos en garrafas de 5 L, las mismas en que viene el etanol, y se cierran con parafilm. OJO: solo valen garrafas con el símbolo UN (las del etanol); las de X-Free no sirven, son de un plástico peor.
+- Bidón de envases de vidrio vacíos ("Bidón vidrio vacío"): bidón de ballesta del 207 para los envases de vidrio vacíos que contuvieron productos químicos.
 - Bolsas de químicos — tres bolsas, cada una para una cosa: las bolsas son iguales, pero cada una se marca con una X en su etiqueta para UNA sola cosa: (1) envases de plástico vacíos que contuvieron sustancias peligrosas ("Bolsa químicos - Envases de plástico"); (2) envases metálicos (aluminio) vacíos que las contuvieron ("Bolsa químicos - Envases metálicos"); (3) guantes, papel, filtros, absorbentes, ropa de protección… manchados con sustancias peligrosas ("Bolsa químicos - Guantes, papel y absorbentes"). La casilla de decapado y pintura no nos toca. OJO: mira la X antes de echar nada: la misma bolsa NO vale para las tres cosas. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Los guantes o el papel manchados de disolventes volátiles, antes en una bolsa zip (la bolsa va abierta). Un guante que no ha tocado nada peligroso no va aquí.
 - Cómo reconocer los contenedores por el color: contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y las BOLSAS → químicos.
 - Punzantes — contenedor amarillo: puede ir cualquier punzante, esté contaminado o no. Bisturís y cuchillas de microtomo, siempre aquí: son muy cortantes. OJO: para que nos cobren menos, los portas NO contaminados (con el material ya fijado) pueden seguir yendo a la basura, protegidos para que nadie se corte (categoría "Basura normal"); los que no puedan ir a la basura, aquí. Las secciones histológicas y los bloques de parafina solo llevan trazas de X-Free: a la basura sin más.
@@ -204,7 +206,12 @@ const NORMAS_GESTOR = `- Aguas de laboratorio: las mezclas acuosas, en DOS garra
 const MOTIVO_CATEGORIA: Record<string, string> = {
   "Aguas Laboratorio - Tinciones": "La garrafa de Tinciones recoge todo lo de las tinciones, que suele ser ácido: por eso no va con la de Equipos, que lleva lejía.",
   "Aguas Laboratorio - Equipos": "La garrafa de Equipos recoge lo que generan los aparatos de diagnóstico (incluida la botella del lavador del ELISA), kits y tampones; lleva la lejía de su limpieza, así que nada ácido.",
-  "Contenedor Inertes": "El Contenedor Inertes recoge los disolventes no halogenados, también el formol o etanol sin muestra.",
+  "Bidón no halogenados": "El bidón de no halogenados recoge los disolventes sin cloro, también el formol sin muestra; el etanol y el X-Free van a su garrafa de 5 L.",
+  "Bidón halogenados": "El bidón de halogenados es solo para disolventes con cloro (cloroformo, Carnoy…).",
+  "Bidón ácidos": "El bidón de ácidos recoge los ácidos que no son de tinción.",
+  "Bidón vidrio vacío": "El bidón de vidrio es solo para envases de vidrio vacíos que contuvieron productos químicos.",
+  "Garrafa etanol y X-Free": "La garrafa de 5 L es solo para restos de etanol y de X-Free.",
+  "Contenedor negro (autoclave)": "El contenedor negro, con bolsa de autoclave, es para residuos biosanitarios: cultivos, muestras, material que las tocó y ropa o EPI con sangre.",
   "Muestras en formol": "El contenedor cuadrado azul es SOLO para formol o etanol con la muestra dentro: va a incinerar.",
   "Bolsa químicos - Envases de plástico": "Esta bolsa está marcada solo para envases de plástico vacíos que contuvieron químicos; los metálicos y los guantes o papel van cada uno a su bolsa.",
   "Bolsa químicos - Envases metálicos": "Esta bolsa está marcada solo para envases metálicos (aluminio) vacíos que contuvieron químicos; los de plástico van a la otra bolsa.",
@@ -284,7 +291,7 @@ ${excepciones}
 NORMAS GENERALES DEL GESTOR DE RESIDUOS (acordadas con la empresa gestora; para juzgar un texto libre mandan sobre lo que sugiera el catálogo; algunos de estos contenedores existen aunque no estén en la lista de activos):
 ${NORMAS_GESTOR}
 
-KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno, X-Free o formol (pasos del procesado, no tinción) → Contenedor Inertes. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
+KITS DE TINCIÓN cuyos botes no se sabe qué llevan (todo acaba junto en el cristalizador): por defecto van a la garrafa de Tinciones. Pregunta antes qué kit/tinción es, y si en su ficha de seguridad aparece algo de esto, sepáralo: oxidantes (ácido peryódico, permanganato), ácido pícrico/Bouin o DAB → salvavidas "Reactivos de laboratorio"; xileno o formol (pasos del procesado, no tinción) → Bidón no halogenados; el X-Free → Garrafa etanol y X-Free. Los kits que lleven plata, mercurio o cromo/dicromato son kits diagnósticos y van también a la garrafa de Tinciones (decisión de Gestión, 2026-10).
 
 REGLAS:
 - El residuo debe corresponder a la categoría del contenedor de destino. Si es un tipo del catálogo cuyo "Contenedor asignado" NO coincide con la categoría del contenedor de destino, es INCOMPATIBLE (salvo que esté en los casos aprobados de arriba).
@@ -297,7 +304,7 @@ FORMATO DE RESPUESTA — OBLIGATORIO. Tu respuesta debe EMPEZAR exactamente con 
 - [OK] → el residuo puede ir en ese contenedor. Añade una frase diciendo POR QUÉ va ahí y el aviso de formato si aplica.
 - [BLOQUEO|categoria=<una de: Tóxico, Nocivo / Irritante, Inflamable, Comburente, Corrosivo, Cancerígeno / CMR, Peligroso para el medio ambiente, Explosivo, Gas comprimido, Citotóxico, Desconocido>|contenedor_sugerido=<la categoría de contenedor correcta, o "ninguno">] → el residuo NO puede ir ahí. Explica por qué NO puede ir aquí y por qué el correcto es el otro, y di a qué contenedor y laboratorio llevarlo (si existe uno activo compatible en el centro); si no existe ninguno, di que lo deje en su propio envase cerrado y rotulado en la zona de residuos pendientes y avise a su profesor/a.
 
-SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Contenedor Inertes) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro".
+SIEMPRE explica el PORQUÉ con algo concreto de este residuo — qué lleva, con qué reaccionaría, o qué norma del gestor lo decide —, no solo "no es compatible" o "va ahí": que quien lo lea entienda la razón y no lo confunda con el contenedor de al lado. P. ej.: "el agua con restos de formol ya no lleva la muestra: por eso va a no halogenados (Bidón no halogenados) y no al contenedor cuadrado azul, que es solo para formol con la muestra dentro".
 
 Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la etiqueta inicial.`;
 
@@ -312,7 +319,7 @@ Nunca uses otra etiqueta ni añadas texto antes de la etiqueta. Nunca omitas la 
     { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio - Equipos\" (Lab 203):\n- Descrito por la persona en texto libre: \"PBS diluido sobrante de lavados, sin nada tóxico\"" }] },
     { role: "model", parts: [{ text: "[OK] El PBS diluido es un tampón acuoso de bajo riesgo, no es ácido ni reacciona con la lejía de la limpieza de los equipos: va bien en la garrafa de Equipos. Mantén la garrafa cerrada entre adiciones." }] },
     { role: "user", parts: [{ text: "CASO A EVALUAR — se quiere añadir al contenedor de categoría \"Aguas Laboratorio - Equipos\" (Lab 203):\n- Descrito por la persona en texto libre: \"formol sobrante de un bote de biopsia, ya sin la muestra\"" }] },
-    { role: "model", parts: [{ text: "[BLOQUEO|categoria=Cancerígeno / CMR|contenedor_sugerido=Contenedor Inertes] El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Contenedor Inertes. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
+    { role: "model", parts: [{ text: "[BLOQUEO|categoria=Cancerígeno / CMR|contenedor_sugerido=Bidón no halogenados] El formol sin muestra no va en Aguas de Laboratorio: va a disolventes no halogenados, que en este centro es el Bidón no halogenados. Si no hay ninguno activo, déjalo en su envase cerrado y rotulado en la zona de residuos pendientes y avisa a tu profesor/a." }] },
     { role: "user", parts: [{ text: casoText }] },
   ];
 }
