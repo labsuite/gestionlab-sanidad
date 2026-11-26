@@ -232,9 +232,7 @@ function renderEquipos(filtro, filtroEstado, filtroModulo, filtroUbicacion) {
   // Solo los campos que identifican el equipo: con JSON.stringify(e) también entraban el
   // protocolo de uso y las observaciones, y buscar "balanza" sacaba medio inventario.
   if (_filtroEquipos) {
-    const q = _filtroEquipos.toLowerCase();
-    items = items.filter(e => [e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo, e.Numero_Serie, e.Ubicacion, e.Responsable]
-      .join(' ').toLowerCase().includes(q));
+    items = items.filter(e => coincideBusqueda([e.ID_Activo, e.Tipo_Equipo, e.Marca, e.Modelo, e.Numero_Serie, e.Ubicacion, e.Responsable], _filtroEquipos));
   }
   if (_filtroEquiposEstado) items = items.filter(e => e.Estado_Operativo === _filtroEquiposEstado);
   if (_filtroEquiposModulo) {

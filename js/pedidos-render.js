@@ -1238,7 +1238,7 @@ function setSourceLinea(source, opts = {}) {
 
 // ── Lo buscado no está en el catálogo → «no catalogado» sin dar la vuelta ──
 // (2026-11-26) Antes había que buscar, ver que no estaba y cambiar a mano de
-// pestaña. Ahora, si lo que se escribe (3+ letras) no da ningún resultado, el
+// pestaña. Ahora, si lo que se escribe (6+ letras) no da ningún resultado, el
 // formulario pasa solo a «no catalogado» con lo escrito como nombre y el cursor
 // al final, para seguir escribiendo sin cortar. Si fue una errata, «Volver a
 // buscar en el catálogo» devuelve el texto al buscador; a partir de ahí ya no
@@ -1250,11 +1250,14 @@ const _NO_CAT = {
 };
 const _noCatSinSalto = { sol: false, linea: false };
 
+// Letras mínimas para el salto automático: con menos, una búsqueda a medio
+// escribir ya podría no dar nada. Por debajo no salta, pero la lista ofrece el ➕.
+const _NO_CAT_MIN_LETRAS = 6;
 function _materialSinResultados(clave, query, n) {
   const c = _NO_CAT[clave];
   const texto = String(query || '').trim();
-  if (!c || n !== 0 || texto.length < 3) return;
-  if (!_noCatSinSalto[clave]) { _pasarANoCatalogado(clave); return; }
+  if (!c || n !== 0) return;
+  if (!_noCatSinSalto[clave] && texto.replace(/\s/g, '').length >= _NO_CAT_MIN_LETRAS) { _pasarANoCatalogado(clave); return; }
   const list = document.getElementById(c.list);
   list.innerHTML = `<div class="autocomplete-item" onclick="_pasarANoCatalogado('${clave}')">
     <div><div class="autocomplete-item-name">➕ Pedir «${_esc(texto)}» como material no catalogado</div>

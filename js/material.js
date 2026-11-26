@@ -215,8 +215,7 @@ function renderMaterial(filtro, cat, stockFiltro, ubicacion) {
   let items = DATA.material;
 
   if (_filtroMaterial) {
-    const q = _filtroMaterial.toLowerCase();
-    items = items.filter(m => (m.Nombre + m.Categoria + m.ID_Material + m.Proveedor + m.Referencia_Proveedor).toLowerCase().includes(q));
+    items = items.filter(m => coincideBusqueda([m.Nombre, m.Categoria, m.ID_Material, m.Proveedor, m.Referencia_Proveedor], _filtroMaterial));
   }
   if (_filtroMaterialCat) items = items.filter(m => m.Categoria === _filtroMaterialCat);
   if (_filtroMaterialStock === 'bajo') items = items.filter(m => stockBajoMinimo(m));
@@ -580,19 +579,14 @@ function filtrarMovimientosTipo(val) { renderMovimientos(val); }
 // ============================================================
 // AUTOCOMPLETE MATERIAL
 // ============================================================
-// Sin tildes ni mayúsculas, y palabra a palabra: «barra agitacion» encuentra
-// «Barra magnética de agitación». Devuelve cuántos encontró (-1 si aún no ha
-// buscado), para que el formulario de solicitud sepa cuándo no hay nada.
-function _matNormBusqueda(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+// Busca sin tildes y palabra a palabra (coincideBusqueda, js/config.js).
+// Devuelve cuántos encontró (-1 si aún no ha buscado), para que el formulario
+// de solicitud sepa cuándo no hay nada.
 function buscarMaterialGenerico(query, listId, hiddenId, selectedId) {
   const list = document.getElementById(listId);
   if (!list) return -1;
   if (!query || query.trim().length < 2) { list.classList.remove('open'); return -1; }
-  const palabras = _matNormBusqueda(query).split(/\s+/).filter(Boolean);
-  const resultados = DATA.material.filter(m => {
-    const texto = _matNormBusqueda([m.Nombre, m.ID_Material, m.Categoria].join(' '));
-    return palabras.every(p => texto.includes(p));
-  }).slice(0, 10);
+  const resultados = DATA.material.filter(m => coincideBusqueda([m.Nombre, m.ID_Material, m.Categoria], query)).slice(0, 10);
   if (!resultados.length) { list.classList.remove('open'); return 0; }
   list.innerHTML = resultados.map(m => {
     const stock = getStockTotal(m);
@@ -829,6 +823,7 @@ function seleccionarUbicacionMatLote(id, label) {
 // ============================================================
 function openModalMaterial() {
   editingRow = null; _lotesTemp = [];
+  _limpiarRecepcionPendiente();
   document.getElementById('modal-material-title').textContent = 'Nuevo material';
   const matIdField = document.getElementById('mat-id'); if (matIdField) matIdField.readOnly = false;
   ['mat-id','mat-nombre','mat-unidad','mat-unidades-extra','mat-ubicacion','mat-referencia','mat-observaciones','mat-ubicacion-search'].forEach(id => sv(id, ''));
@@ -869,6 +864,7 @@ function _opcionCategoriaMaterial(cat) {
 
 function editMaterial(idx) {
   const m = DATA.material[idx];
+  _limpiarRecepcionPendiente();
   editingRow = { sheet: 'Material', rowIndex: idx };
   _lotesTemp = getMatUbics(m.ID_Material).map((l, li) => ({
     ID_Ubicacion: l.ID_Ubicacion,
@@ -1280,10 +1276,9 @@ async function guardarMaterial() {
       // Se recibe contra el material que se acaba de guardar, no contra el
       // nombre de la línea: al catalogarlo se le puede haber corregido el
       // nombre (se pidió un tamaño que no existe) y entonces no coincidiría.
-      const { lineaId, pedidoId, cantRec, obs, idUbicacion } = _pendingRecepcion;
+      const pend = _pendingRecepcion;
       _pendingRecepcion = null;
-      showToast('Material catalogado. Registrando recepción...', 'success');
-      await _completarRecepcionLinea(lineaId, pedidoId, cantRec, obs, idUbicacion, material.id_material);
+      await _recepcionTrasCatalogar(pend, material.id_material);
     } else {
       renderAll();
     }

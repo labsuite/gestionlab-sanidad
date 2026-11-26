@@ -26,6 +26,20 @@ function urlEtiqueta(params) {
   return APP_URL + '?' + new URLSearchParams(params).toString();
 }
 
+// Búsqueda de los buscadores (2026-11-26): sin tildes ni mayúsculas y palabra a
+// palabra — «barra agitacion» encuentra «Barra magnética de agitación», y
+// «centrifuga eppendorf» la centrífuga de esa marca aunque marca y tipo vayan en
+// campos distintos. `campos`: un texto o una lista de textos donde buscar.
+function normalizarBusqueda(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+function coincideBusqueda(campos, query) {
+  const palabras = normalizarBusqueda(query).split(/\s+/).filter(Boolean);
+  if (!palabras.length) return true;
+  const texto = normalizarBusqueda([].concat(campos).join(' '));
+  return palabras.every(p => texto.includes(p));
+}
+
 // Proyecto Supabase compartido con la app de Vercel (ciclos, módulos, asignaciones usuario-módulo)
 const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
