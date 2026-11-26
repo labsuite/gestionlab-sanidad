@@ -1032,7 +1032,7 @@ function _aplicarModoModalActuacion(i) {
         bEditar.style.background = 'var(--warning-light,#fdf3e7)';
         bEditar.style.border     = '1px solid var(--warning,#c17f3a)';
         bEditar.style.color      = 'var(--warning,#c17f3a)';
-        bEditar.innerHTML = `Estás <strong>editando una actuación ya cerrada</strong>${fechaTxt}. Los cambios se guardan sobre <strong>${i.ID_Intervencion}</strong> — <strong>no se crea una actuación nueva</strong>. Para registrar una actuación distinta, cierra esto y usa «📅 Programar otra actuación» desde la ficha de la intervención.`;
+        bEditar.innerHTML = `Estás <strong>editando una actuación ya cerrada</strong>${fechaTxt}. Los cambios se guardan sobre <strong>${i.ID_Intervencion}</strong> — <strong>no se crea una actuación nueva</strong>. Para registrar una actuación distinta, cierra esto y usa «📅 Planificar otra actuación» en el hilo de la incidencia.`;
       } else {
         bEditar.style.background = 'var(--accent-light)';
         bEditar.style.border     = 'none';

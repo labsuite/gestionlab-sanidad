@@ -414,8 +414,11 @@ tener tareas `Pendiente`; si una vuelve a `Pendiente`, `guardar_tarea` la reabre
   incidencia puede acumular varias actuaciones, así que un "Editar actuación" ahí sería
   ambiguo; la edición se hace siempre desde el hilo. Mientras la actuación no está finalizada
   la tarjeta sí muestra "Ver / Actuar".
-- Para una actuación **distinta** del mismo equipo: "📅 Programar otra actuación" en la ficha
-  (crea una intervención encadenada), no reabrir la finalizada.
+- Para una actuación **distinta** del mismo equipo: "📅 Planificar otra actuación" en el
+  **hilo** de la incidencia (crea una intervención encadenada), no reabrir la finalizada.
+  Desde 2026-11-26 la ficha de la intervención ya no lleva "Programar otra actuación" ni
+  "Ver hilo completo" (solo "🔧 Registrar otra actuación" si no hay incidencia); abierta
+  desde el hilo, su botón de cierre se llama "Volver al hilo de intervenciones".
 
 ---
 

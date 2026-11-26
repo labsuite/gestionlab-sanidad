@@ -993,15 +993,18 @@ function openFichaIntervencion(intIdx) {
     btns += `<button class="btn ${actFinalizada ? 'btn-secondary' : 'btn-primary'}" onclick="closeModal('modal-ficha-intervencion');openModalActuacionDerivada(${intIdx})">${btnLabel}</button>`;
   if (pendienteFactura && puedeActuar)
     btns += `<button class="btn btn-primary" onclick="closeModal('modal-ficha-intervencion');openModalAdjuntarFactura(${intIdx})">📎 Adjuntar factura y cerrar</button>`;
-  if (puedeNuevaVisita)
-    btns += `<button class="btn ${actFinalizada ? 'btn-primary' : 'btn-secondary'}" onclick="closeModal('modal-ficha-intervencion');${incVinculada ? `programarOtraVisita(${intIdx})` : `openModalRegistrarActuacionDirecta('${equipoIdFicha}')`}">${incVinculada ? '📅 Programar otra actuación' : '🔧 Registrar otra actuación'}</button>`;
+  // Con incidencia, otra actuación se planifica desde el hilo («📅 Planificar otra
+  // actuación»), que es donde se ve la secuencia entera; aquí solo sin incidencia.
+  if (puedeNuevaVisita && !incVinculada)
+    btns += `<button class="btn ${actFinalizada ? 'btn-primary' : 'btn-secondary'}" onclick="closeModal('modal-ficha-intervencion');openModalRegistrarActuacionDirecta('${equipoIdFicha}')">🔧 Registrar otra actuación</button>`;
   if (puedeActuar && i.Lugar_Intervencion === 'Equipo retirado' && !i.Fecha_Devolucion)
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');registrarDevolucionEquipo('${i.ID_Intervencion}')">📦 Registrar devolución</button>`;
-  if (incVinculada)
-    btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');abrirHiloIncidencia('${incVinculada.ID_Incidencia}')">🔗 Ver hilo completo</button>`;
   if (!lineasPed.length && puedeHacer('gestionarPedidos'))
     btns += `<button class="btn btn-secondary" onclick="closeModal('modal-ficha-intervencion');openModalPedirServicio('${i.ID_Intervencion}')">💶 Pedir a la casa comercial</button>`;
   acciones.innerHTML = btns;
+  // Desde el hilo, cerrar devuelve a él (cerrarYVolverAlHilo): el botón lo dice.
+  const btnCerrar = document.getElementById('ficha-int-cerrar');
+  if (btnCerrar) btnCerrar.textContent = _hiloIncidenciaActiva ? 'Volver al hilo de intervenciones' : 'Cerrar';
 
   openModal('modal-ficha-intervencion');
 }
