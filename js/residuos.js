@@ -18,7 +18,7 @@ const _WARNINGS_FORMATO = [
   },
   {
     match: 'bolsa plástica',
-    texto: '⚠️ La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Envases vacíos de plástico o aluminio que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con ellas. Que NO se acumule líquido en el fondo: los frascos y botes, bien cerrados. Lo manchado con disolventes volátiles, antes en una bolsa zip (esta bolsa va abierta).',
+    texto: '⚠️ Las tres bolsas de químicos son iguales: cada una lleva marcada con una X en su etiqueta para qué es (envases de plástico, envases metálicos, o guantes, papel y absorbentes). Echa aquí SOLO lo de su casilla. Que NO se acumule líquido en el fondo: los frascos y botes, bien cerrados. Lo manchado con disolventes volátiles, antes en una bolsa zip (esta bolsa va abierta).',
   },
   {
     match: 'garrafa',
@@ -41,13 +41,13 @@ const _NORMAS_GESTOR = [
     ojo: 'Formol o etanol SIN muestras (aunque las hayan tenido), y el agua con restos de formol → disolventes no halogenados (en este centro, Contenedor Inertes).',
   },
   {
-    icon: '🛍️', titulo: 'Bolsa plástica (químicos)',
-    texto: 'Frascos de aluminio o de plástico vacíos que contuvieron sustancias peligrosas, y papel, guantes, filtros… manchados con sustancias peligrosas.',
-    ojo: 'La bolsa es la MISMA para todo lo químico: mira bien lo que indica y marca con una X aquello para lo que la vas a usar. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Si va manchado de disolventes volátiles, meterlo antes en una bolsa zip (la bolsa va abierta).',
+    icon: '🛍️', titulo: 'Bolsas de químicos — tres bolsas, cada una para una cosa',
+    texto: 'Las bolsas son iguales, pero cada una se marca con una X en su etiqueta para UNA sola cosa: (1) envases de plástico vacíos que contuvieron sustancias peligrosas; (2) envases metálicos (aluminio) vacíos que las contuvieron; (3) guantes, papel, filtros, absorbentes, ropa de protección… manchados con sustancias peligrosas. La casilla de decapado y pintura no nos toca.',
+    ojo: 'Mira la X antes de echar nada: la misma bolsa NO vale para las tres cosas. Que NO se acumule líquido en el fondo: los frascos, botellas y botes, bien cerrados. Los guantes o el papel manchados de disolventes volátiles, antes en una bolsa zip (la bolsa va abierta). Un guante que no ha tocado nada peligroso no va aquí.',
   },
   {
     icon: '🎨', titulo: 'Cómo reconocer los contenedores por el color',
-    texto: 'Contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y la BOLSA → químicos.',
+    texto: 'Contenedores rígidos que se cierran para siempre: NEGROS → van a autoclavar; AZULES del mismo estilo → van a incinerar. Los AZULES DE BALLESTA y las BOLSAS → químicos.',
   },
   {
     icon: '✂️', titulo: 'Punzantes — contenedor amarillo',
@@ -171,8 +171,9 @@ const _ARBOL_RESIDUOS = {
   solido: {
     pregunta: '¿Qué tipo de sólido?',
     opciones: [
-      { texto: 'Un envase vacío de plástico o aluminio que tuvo algo peligroso', hoja: 'Bolsa plástica (químicos)' },
-      { texto: 'Papel, guantes, filtros… manchados de un químico', hoja: 'Bolsa plástica (químicos)' },
+      { texto: 'Un envase vacío de plástico que tuvo algo peligroso', hoja: 'Bolsa químicos - Envases de plástico' },
+      { texto: 'Un envase vacío metálico (aluminio) que tuvo algo peligroso', hoja: 'Bolsa químicos - Envases metálicos' },
+      { texto: 'Papel, guantes, filtros, absorbentes… manchados de un químico', hoja: 'Bolsa químicos - Guantes, papel y absorbentes' },
       { texto: 'Portas teñidos, secciones histológicas o bloques de parafina', hoja: 'Basura normal' },
       { texto: 'Otra cosa', ir: 'dudo' },
     ],
@@ -214,7 +215,9 @@ const _ARBOL_HOJAS = {
   'Muestras en formol': { icon: '🫙', porque: 'Contenedor cuadrado azul, va a incinerar: SOLO formol o etanol con la muestra dentro. En autoclave el formol se liberaría y dañaría ojos y pulmones.' },
   'Contenedor Inertes': { icon: '🧪', porque: 'Disolventes no halogenados: aquí va también el formol o etanol que ya no lleva la muestra.' },
   'Contenedor Halogenados': { icon: '🧪', porque: 'Los disolventes clorados (cloroformo…) van separados de los no halogenados.' },
-  'Bolsa plástica (químicos)': { icon: '🛍️', porque: 'Envases vacíos y sólidos manchados de químicos. Los frascos bien cerrados (que no se acumule líquido en el fondo); lo manchado de disolventes volátiles, antes en una bolsa zip. La bolsa es la misma para todo: marca con una X para qué la usas.' },
+  'Bolsa químicos - Envases de plástico': { icon: '🛍️', porque: 'La bolsa marcada con la X de «envases que contienen restos de sustancias peligrosas»: solo envases de plástico vacíos, bien cerrados para que no se acumule líquido en el fondo. Los metálicos y los guantes o papel van cada uno a su bolsa.' },
+  'Bolsa químicos - Envases metálicos': { icon: '🥫', porque: 'La bolsa marcada con la X de «envases metálicos»: solo envases de aluminio (o de otro metal) vacíos, bien cerrados. Los de plástico van a la otra bolsa.' },
+  'Bolsa químicos - Guantes, papel y absorbentes': { icon: '🧤', porque: 'La bolsa marcada con la X de «absorbentes, materiales de filtración, guantes, ropas protectoras»: lo que ha absorbido o tocado un líquido peligroso. Si está manchado de disolventes volátiles (xilol, etanol…), antes en una bolsita zip. Un guante que no ha tocado nada peligroso no va aquí.' },
   'Aguas Laboratorio - Tinciones': { icon: '🎨', porque: 'Todo lo de las tinciones va junto (el protocolo ya lo mezcla). Suele ser ácido: por eso no va a la garrafa de Equipos, que lleva lejía. Ojo con los kits: si su ficha de seguridad lleva un oxidante, ácido pícrico/Bouin o DAB, eso va al salvavidas; y el xileno o el formol, a Inertes.' },
   'Aguas Laboratorio - Equipos': { icon: '🔬', porque: 'Lo que generan los aparatos de diagnóstico (también la botella del lavador del ELISA, que se vacía en la garrafa de Equipos del 203), kits, tampones y medios. Lleva la lejía de la limpieza de los aparatos: nada ácido aquí.' },
   'Fregadero': { icon: '🚰', sinContenedor: true, porque: 'La lejía diluida va al fregadero con abundante agua, sola: nunca mezclada antes con ácidos (desprende cloro). La lejía concentrada, al salvavidas.' },
@@ -320,7 +323,7 @@ const VIDEOS_RESIDUOS = [
   { id: 'etanol-y-xfree', titulo: 'Etanol y X-Free', inicio: 234.33,
     categorias: ['Contenedor Inertes'] },
   { id: 'bolsa-207', titulo: 'La bolsa del 207', inicio: 301.26,
-    categorias: ['Bolsa plástica (químicos)'] },
+    categorias: ['Bolsa químicos - Envases de plástico', 'Bolsa químicos - Envases metálicos', 'Bolsa químicos - Guantes, papel y absorbentes'] },
   { id: 'punzantes', titulo: 'Contenedor amarillo de punzantes', inicio: 377.09,
     categorias: ['Residuo Cortante'] },
   { id: 'en-caso-de-duda', titulo: 'En caso de duda, la guía de GestionLab', inicio: 444.94,
@@ -1077,7 +1080,10 @@ function openModalContenedor(idx = null) {
   // Select cerrado de categorías desde Tipos_Residuo
   const catSel = document.getElementById('cont-categoria');
   if (catSel) {
-    const cats = [...new Set(DATA.tiposResiduo.map(t => t.Contenedor_Tipo).filter(Boolean))].sort();
+    // Basura normal y Fregadero son destinos del catálogo, no contenedores físicos.
+    const cats = [...new Set(DATA.tiposResiduo.map(t => t.Contenedor_Tipo).filter(Boolean))]
+      .filter(cat => !_ARBOL_HOJAS[cat]?.sinContenedor || cat === c?.Categoria)
+      .sort((a, b) => a.localeCompare(b, 'es'));
     catSel.innerHTML = '<option value="">— Seleccionar categoría —</option>' +
       cats.map(cat => `<option value="${cat}">${cat}</option>`).join('');
     catSel.value = c?.Categoria || '';
@@ -1648,17 +1654,23 @@ function _abrirAdicionPorNfc(categoria, lab) {
   showPage('residuos-contenedores');
   setTimeout(() => {
     const activo = x => x.Lab === lab && (x.Estado || 'activo') === 'activo';
-    // Las etiquetas grabadas antes de dividir Aguas en dos garrafas (2026-10-01)
-    // dicen "Aguas Laboratorio": se abre la garrafa de aguas que haya en ese lab.
+    // Etiquetas grabadas antes de dividir una categoría: "Aguas Laboratorio" (dos
+    // garrafas desde 2026-10-01) y "Bolsa plástica (químicos)" (tres bolsas desde
+    // 2026-11-26). Si en ese lab solo hay uno de la familia, se abre ese.
+    const DIVIDIDAS = {
+      'Aguas Laboratorio': { prefijo: 'Aguas Laboratorio', que: 'garrafas de aguas (Tinciones y Equipos)' },
+      'Bolsa plástica (químicos)': { prefijo: 'Bolsa químicos', que: 'bolsas de químicos (plástico, metálicos y guantes/papel)' },
+    };
     let c = DATA.contenedoresResiduo.find(x => x.Categoria === categoria && activo(x));
-    if (!c && categoria === 'Aguas Laboratorio') {
-      const aguas = DATA.contenedoresResiduo.filter(x => (x.Categoria || '').startsWith('Aguas Laboratorio') && activo(x));
-      if (aguas.length > 1) {
-        // Con dos garrafas en el mismo lab no se adivina: que la persona elija.
-        showToast(`Etiqueta antigua: en el Lab ${lab} hay ${aguas.length} garrafas de aguas (Tinciones y Equipos). Elige la tuya aquí abajo — y avisa para regrabar la etiqueta.`, 'warning');
+    const div = DIVIDIDAS[categoria];
+    if (!c && div) {
+      const familia = DATA.contenedoresResiduo.filter(x => (x.Categoria || '').startsWith(div.prefijo) && activo(x));
+      if (familia.length > 1) {
+        // Con varios en el mismo lab no se adivina: que la persona elija.
+        showToast(`Etiqueta antigua: en el Lab ${lab} hay ${familia.length} ${div.que}. Elige la tuya aquí abajo — y avisa para regrabar la etiqueta.`, 'warning');
         return;
       }
-      c = aguas[0];
+      c = familia[0];
     }
     if (!c) {
       showToast(`No se encontró un contenedor activo de "${categoria}" en Lab ${lab}`, 'error');

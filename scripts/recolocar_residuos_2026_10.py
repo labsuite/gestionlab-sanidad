@@ -33,6 +33,10 @@ con las decisiones que tomó la usuaria ese mismo día:
 Solo cambia Contenedor_Tipo (y la descripción cuando contradecía el destino
 nuevo). Idempotente: lo ya movido no se vuelve a tocar.
 
+⚠ NO volver a ejecutarlo: el 2026-11-26 la bolsa se dividió en tres
+(dividir_bolsa_quimicos_2026_11.py) y este script volvería a crear la
+"Bolsa plástica (químicos)" de antes.
+
 Uso:  python scripts/recolocar_residuos_2026_10.py            (simulación)
       python scripts/recolocar_residuos_2026_10.py --aplicar  (guarda)
 """

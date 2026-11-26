@@ -35,7 +35,7 @@
 |---|---|
 | bidón azul | Líquidos en bote propio, cerrado y rotulado dentro del bidón |
 | cubo con tapa / contenedor rígido | NO cerrar tapa hasta que esté lleno y listo para Consenur |
-| bolsa plástica | Solo envases vacíos de plástico/aluminio; nada a granel |
+| bolsa plástica | Tres bolsas iguales, cada una marcada con una X para una cosa; sin líquido en el fondo; volátiles en zip |
 | garrafa | Mantener cerrada entre adiciones; zona ventilada sin calor |
 
 ## Normas generales del gestor de residuos (2026-10-01)
@@ -79,6 +79,17 @@ bolsa (formato `Bolsa plástica`) y el salvavidas (formato `Bidón azul de balle
 lleva el recordatorio de que es la misma para todo y hay que marcar con una X su uso.
 
 El choque con la exclusividad CMR se resolvió quitando esa regla (ver Nivel 2 más abajo).
+
+**Tres bolsas de químicos (2026-11-26).** «Bolsa plástica (químicos)» no era real: las bolsas
+del gestor son iguales pero cada una se marca con una X en su etiqueta para **una sola cosa**
+(clip «La bolsa del 207»). Desde entonces son tres categorías: `Bolsa químicos - Envases de
+plástico`, `Bolsa químicos - Envases metálicos` (aluminio) y `Bolsa químicos - Guantes, papel y
+absorbentes`; las tres en el 207, Almacén de residuos, formato `Bolsa plástica`
+(`scripts/dividir_bolsa_quimicos_2026_11.py`, ya ejecutado). Las etiquetas NFC antiguas con
+`cont-cat=Bolsa plástica (químicos)` dejan elegir bolsa, como las de Aguas.
+
+**Basura normal y Fregadero no salen en «Nuevo contenedor»**: son destinos del catálogo sin
+contenedor físico (`sinContenedor` en `_ARBOL_HOJAS`, que es lo que filtra el desplegable).
 
 Tercera ronda: la **lejía diluida** va al fregadero (categoría `Fregadero`, no es contenedor); la
 indicación está en su descripción, que es lo que permite a las IAs decir "al desagüe".
