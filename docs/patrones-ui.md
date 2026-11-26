@@ -1,5 +1,15 @@
 # Patrones UI implementados
 
+## Buscadores: sin tildes y palabra a palabra (2026-11-26)
+Todo buscador nuevo filtra con `coincideBusqueda(campos, query)` de `js/config.js`, no con
+`toLowerCase().includes()`: no distingue tildes ni mayúsculas y exige que **cada palabra**
+esté en alguno de los campos («centrifuga eppendorf» → la centrífuga de esa marca, aunque tipo
+y marca vayan en campos distintos). Ya lo usan los inventarios de material y de equipos, el
+autocompletado de material (solicitud, línea de pedido, consumo, entrada), el equipo de la
+incidencia y de la línea de pedido, y el tipo de residuo al añadir a un contenedor. Por eso
+este último ya no es un `<datalist>` (el navegador hace ahí su propia búsqueda, con tildes):
+es la misma lista `.search-material-wrap` / `.autocomplete-list` que el material.
+
 ## Tabla de equipos (inventario de activos fijos)
 - `toggleEquipoExpand(id)` hace toggle de clase `open` — sin medición de ancho ni JS adicional
 - `.equipo-expand-inner` no tiene ancho explícito ni overflow
