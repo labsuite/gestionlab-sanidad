@@ -8,6 +8,9 @@
 # Ver supabase/base-limpia/README.md.
 #
 # ⚠ Una función que no esté aquí NO se despliega. Al crear una nueva, añadirla.
+#
+# Desde 2026-11-27 la rama preparacion-pffp es la rama de producción del proyecto de
+# PRUEBA (gestionlab-prueba). El proyecto real de GestionLab no está conectado.
 
 project_id = "gestionlab"
 
