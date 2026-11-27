@@ -270,9 +270,46 @@ llegue a la pantalla en vez de quedar solo en la consola.
 
 ---
 
+## Cambios de esquema: siempre como migración (desde 2026-11-27)
+
+Hasta 2026-11-27 las sesiones de Claude cambiaban el esquema de la base real directamente
+(scripts `migrar_*.py`, SQL a mano). **Desde entonces, todo cambio de esquema es un archivo
+nuevo en `supabase/migrations/`**, con nombre `AAAAMMDDHHMMSS_descripcion.sql`. Cuenta como
+cambio de esquema una tabla, columna, índice, restricción, política RLS, permiso, función
+SQL, disparador o bucket. Es lo único que viaja a las otras instalaciones (PFFP): si un cambio
+no está en una migración, a los demás centros no les llega nunca y su app se rompe al
+actualizar el código.
+
+- **Nunca editar una migración ya subida.** Si algo está mal, se corrige con otra nueva. La
+  primera, `20261127000000_base_limpia.sql`, está congelada.
+- **Cada tabla nueva lleva, en la misma migración, sus políticas RLS y sus `GRANT`**, y a
+  `anon` no se le da nada (ver la tabla de permisos en `supabase/base-limpia/README.md`).
+- **Cada Edge Function nueva se declara en `supabase/config.toml`**, o no se despliega.
+- Los **datos** no van en migraciones: son de cada instalación. Los scripts de datos de
+  `scripts/` siguen como siempre.
+
+**Cómo llega cada migración a cada sitio:**
+
+1. **`gestionlab-prueba`** (proyecto de prueba) tiene la integración de Supabase con GitHub
+   y sigue la rama `preparacion-pffp`. Al subir la migración a esa rama, **se aplica sola**.
+   Ahí se prueba primero.
+2. **La base real del CMA no está conectada a la integración.** La migración se le aplica a
+   mano, con el mismo archivo (`psql -1 -v ON_ERROR_STOP=1 -f`, con la conexión de
+   `scripts/supabase_credentials.json`), **solo después de probarla en `gestionlab-prueba` y
+   con el visto bueno de Paloma**. Después, `python tools/base-limpia/sacar_base_limpia.py
+   --comparar scripts/supabase_credentials_prueba.json` tiene que dar «Sin diferencias de
+   estructura».
+3. ⚠ **Antes de conectar algún día la base real a la integración**, hay que registrar en ella
+   como ya aplicadas la migración base y todas las que se le hayan aplicado a mano (tabla
+   `supabase_migrations.schema_migrations`). Si no, la integración intentaría volver a
+   crearlas: fallaría sin romper nada, pero bloquearía todas las siguientes. Está pendiente
+   de decidir si se conecta, y cuándo.
+
 ## Añadir una columna nueva a una tabla
 
-⚠ Al añadir una columna a una tabla de Supabase, actualizar: la migración SQL (`supabase/schema.sql`),
+⚠ Al añadir una columna a una tabla de Supabase, actualizar: una **migración nueva** en
+`supabase/migrations/` (ver «Cambios de esquema»; `supabase/schema.sql` queda como registro
+histórico y ya no se actualiza),
 la Edge Function `gestionar-*` correspondiente (leer/escribir el campo nuevo), la función
 `_xSbToObj()` en `js/sheets.js` (mapea la fila de Supabase al objeto que usa el resto de la
 app) y `COLS` en `js/config.js` si el módulo también tiene columnas legacy de Sheets. Si se
