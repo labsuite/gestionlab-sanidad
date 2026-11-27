@@ -1,7 +1,7 @@
 """
-sacar_base_limpia.py — Saca la LÍNEA BASE de GestionLab (solo estructura, sin un solo
-dato) a partir de la base de datos real, para instalar la app desde cero en un
-proyecto de Supabase vacío.
+sacar_base_limpia.py — Saca la LÍNEA BASE de GestionLab (la estructura, más los pocos
+datos de partida de DATOS_DE_PARTIDA) a partir de la base de datos real, para instalar
+la app desde cero en un proyecto de Supabase vacío.
 
 Uso (desde la raíz del repositorio):
 
@@ -24,7 +24,11 @@ Qué incluye base_limpia.sql (en una sola transacción: o entra entero o no entr
   3. Permisos: pg_dump solo escribe GRANT, suponiendo que cada objeto nace sin
      permisos. En Supabase no es así (las tablas nuevas nacen con TODO para anon), así
      que antes de los GRANT se quitan todos los permisos de anon/authenticated/
-     service_role, y los GRANT del volcado los dejan exactamente como en la base real.
+     service_role, y los GRANT del volcado los dejan como en la base real. Excepción:
+     anon no recibe NINGÚN permiso sobre tablas, secuencias ni funciones (la base real
+     aún le deja REFERENCES/TRIGGER/TRUNCATE/MAINTAIN en las tablas).
+  Y al final, los datos de partida (DATOS_DE_PARTIDA: las fichas de atributos_material).
+  Quita también pg_graphql, que un proyecto nuevo trae activada y GestionLab no usa.
   4. Buckets de Storage (su configuración, no los archivos) y sus políticas.
   5. Disparadores de eventos propios (ensure_rls: toda tabla nueva de public nace con
      RLS activado).
@@ -104,11 +108,24 @@ def volcar_public(c):
     return r.stdout
 
 
+PERMISO_ANON = re.compile(
+    r'^(GRANT .* ON (TABLE|SEQUENCE|FUNCTION) public\..* TO anon;'
+    r'|ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT .* TO anon;)$')
+
+
 def limpiar_volcado(sql):
-    """Quita del volcado lo que no se puede (o no se debe) ejecutar en un proyecto nuevo."""
+    """Quita del volcado lo que no se puede (o no se debe) ejecutar en un proyecto nuevo.
+    Devuelve (sql, nº de permisos de anon quitados)."""
     fuera = []
     lineas = []
+    anon = 0
     for l in sql.splitlines():
+        if PERMISO_ANON.match(l):
+            # anon no necesita ningún permiso sobre tablas, secuencias ni funciones: sin
+            # sesión no se lee ni se escribe nada (decisión 2026-11-27). Solo conserva
+            # USAGE en el esquema, que es de Supabase.
+            anon += 1
+            continue
         if l.startswith('\\restrict') or l.startswith('\\unrestrict'):
             continue  # metaórdenes de psql (pg_dump ≥17.6); el editor SQL de Supabase no las entiende
         if l == 'CREATE SCHEMA public;' or l.startswith('COMMENT ON SCHEMA public IS'):
@@ -120,16 +137,21 @@ def limpiar_volcado(sql):
         lineas.append(l)
     if fuera:
         sys.exit('El volcado trae datos (COPY/INSERT); no debería pasar con --schema-only:\n' + '\n'.join(fuera[:5]))
-    sql = '\n'.join(lineas) + '\n'
+    return '\n'.join(lineas) + '\n', anon
 
-    # Antes del primer bloque de permisos, dejar todo sin permisos (ver cabecera, punto 3).
-    marca = '--\n-- Name: SCHEMA public; Type: ACL;'
-    if marca not in sql:
+
+MARCA_PERMISOS = '--\n-- Name: SCHEMA public; Type: ACL;'
+
+
+def con_reinicio_de_permisos(sql):
+    """Antes del primer bloque de permisos, dejar todo sin permisos (ver cabecera, punto 3)."""
+    if MARCA_PERMISOS not in sql:
         sys.exit('No encuentro el bloque de permisos en el volcado: revisar el formato de pg_dump.')
     reinicio = f"""--
 -- Permisos: en Supabase los objetos nuevos nacen con todos los permisos para la API
--- (también anon). Se quitan aquí y los GRANT de abajo dejan exactamente los de la
--- base real. Sin esto, anon volvería a poder leer las tablas.
+-- (también anon). Se quitan aquí y los GRANT de abajo dejan los de la base real,
+-- salvo los de anon, que no tiene ninguno. Sin esto, anon volvería a poder leer las
+-- tablas.
 --
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {ROLES_API};
@@ -141,7 +163,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTI
 
 
 """
-    return sql.replace(marca, reinicio + marca, 1)
+    return sql.replace(MARCA_PERMISOS, reinicio + MARCA_PERMISOS, 1)
 
 
 def lit(v):
@@ -157,12 +179,48 @@ def lit(v):
     return "'" + str(v).replace("'", "''") + "'"
 
 
+# Extensiones que un proyecto nuevo de Supabase trae activadas y GestionLab no usa: si
+# la base real no las tiene, la base limpia las quita. pg_graphql: la app no usa GraphQL
+# y es una puerta más a la base (decisión 2026-11-27).
+EXTENSIONES_A_QUITAR = ['pg_graphql']
+
+
 def extensiones(cur):
     cur.execute("""select e.extname, n.nspname from pg_extension e
                    join pg_namespace n on n.oid = e.extnamespace
                    where e.extname not in ('plpgsql', 'supabase_vault') order by 1""")
     filas = cur.fetchall()
-    return ''.join(f'CREATE EXTENSION IF NOT EXISTS "{n}" WITH SCHEMA {s};\n' for n, s in filas)
+    hay = {n for n, _ in filas}
+    out = ''.join(f'CREATE EXTENSION IF NOT EXISTS "{n}" WITH SCHEMA {s};\n' for n, s in filas)
+    out += ''.join(f'DROP EXTENSION IF EXISTS "{n}";\n' for n in EXTENSIONES_A_QUITAR if n not in hay)
+    return out
+
+
+# Datos de partida: lo único con datos que lleva la base limpia (decisión 2026-11-27).
+# Las demás tablas de referencia son del centro; tipos_residuo va aparte como catálogo
+# de ejemplo opcional.
+DATOS_DE_PARTIDA = {'atributos_material': 'id_ficha'}
+
+
+def datos_de_partida(cur):
+    out = []
+    for tabla, pk in DATOS_DE_PARTIDA.items():
+        cur.execute(f'select * from public.{tabla} order by {pk}')
+        cols = [d[0] for d in cur.description]
+        filas = cur.fetchall()
+        out.append(f'-- {tabla}: {len(filas)} filas')
+        for f in filas:
+            vals = ', '.join(lit_json(v) for v in f)
+            out.append(f'INSERT INTO public.{tabla} ({", ".join(cols)}) VALUES ({vals})\n'
+                       f'  ON CONFLICT ({pk}) DO NOTHING;')
+    return '\n'.join(out) + '\n'
+
+
+def lit_json(v):
+    """Como lit(), pero las listas y diccionarios (jsonb) van como JSON."""
+    if isinstance(v, (list, dict)):
+        return lit(json.dumps(v, ensure_ascii=False)) + '::jsonb'
+    return lit(v)
 
 
 def storage(cur):
@@ -216,19 +274,23 @@ def comprobar_cron(cur):
                  'secretos o direcciones del centro) y añadirlas a este script antes de volver a sacar la base.')
 
 
-def estructura(c):
+def estructura(c, con_datos=False):
+    """Las piezas de la estructura de un proyecto. Devuelve (piezas, nº de permisos de anon)."""
     conn = conectar(c)
     cur = conn.cursor()
     comprobar_cron(cur)
+    public, anon = limpiar_volcado(volcar_public(c))
     partes = {
         'ext': extensiones(cur),
-        'public': limpiar_volcado(volcar_public(c)),
+        'public': public,
         'storage': storage(cur),
         'eventos': disparadores_de_eventos(cur),
         'realtime': realtime(cur),
     }
+    if con_datos:
+        partes['datos'] = datos_de_partida(cur)
     conn.close()
-    return partes
+    return partes, anon
 
 
 def componer(p):
@@ -252,7 +314,7 @@ BEGIN;
 -- ------------------------------------------------------------
 -- 2. Esquema public (pg_dump --schema-only)
 -- ------------------------------------------------------------
-{p['public']}
+{con_reinicio_de_permisos(p['public'])}
 -- ------------------------------------------------------------
 -- 3. Storage: buckets (configuración, sin archivos) y políticas
 -- ------------------------------------------------------------
@@ -266,6 +328,10 @@ SET search_path = public, pg_catalog;
 -- 5. Realtime
 -- ------------------------------------------------------------
 {p['realtime'] or '-- (ninguna tabla publicada)\n'}
+-- ------------------------------------------------------------
+-- 6. Datos de partida (los únicos datos de la base limpia)
+-- ------------------------------------------------------------
+{p['datos']}
 COMMIT;
 """
 
@@ -280,7 +346,7 @@ def main():
     real = leer_credenciales(CREDENCIALES)
     if '--comparar' in sys.argv:
         otro = leer_credenciales(sys.argv[sys.argv.index('--comparar') + 1])
-        a, b = estructura(real), estructura(otro)
+        (a, _), (b, anon_otro) = estructura(real), estructura(otro)
         hay = False
         for clave in a:
             d = list(difflib.unified_diff(normalizar(a[clave]), normalizar(b[clave]),
@@ -288,10 +354,16 @@ def main():
             if d:
                 hay = True
                 print('\n'.join(d))
+        if anon_otro:
+            hay = True
+            print(f'\n⚠ En el otro proyecto anon tiene {anon_otro} permisos sobre tablas, secuencias o '
+                  'funciones de public (en la base limpia, ninguno).')
         print('\nSin diferencias de estructura.' if not hay else '\nHay diferencias (arriba).')
         return
 
-    sql = componer(estructura(real))
+    partes, anon = estructura(real, con_datos=True)
+    print(f'Quitados {anon} permisos de anon que tiene la base real.')
+    sql = componer(partes)
     for n, l in enumerate(sql.splitlines(), 1):
         if MARCAS_DEL_CENTRO.search(l):
             sys.exit(f'Línea {n} parece llevar algo del centro; revisar antes de publicar:\n  {l}')

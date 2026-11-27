@@ -17,6 +17,7 @@ BEGIN;
 CREATE EXTENSION IF NOT EXISTS "pg_stat_statements" WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA extensions;
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA extensions;
+DROP EXTENSION IF EXISTS "pg_graphql";
 
 -- ------------------------------------------------------------
 -- 2. Esquema public (pg_dump --schema-only)
@@ -2589,8 +2590,9 @@ CREATE POLICY verif_sesiones_select ON public.verif_sesiones FOR SELECT TO authe
 
 --
 -- Permisos: en Supabase los objetos nuevos nacen con todos los permisos para la API
--- (también anon). Se quitan aquí y los GRANT de abajo dejan exactamente los de la
--- base real. Sin esto, anon volvería a poder leer las tablas.
+-- (también anon). Se quitan aquí y los GRANT de abajo dejan los de la base real,
+-- salvo los de anon, que no tiene ninguno. Sin esto, anon volvería a poder leer las
+-- tablas.
 --
 
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon, authenticated, service_role;
@@ -2623,7 +2625,6 @@ GRANT ALL ON FUNCTION public.rol_sesion() TO authenticated;
 -- Name: TABLE adiciones_residuo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.adiciones_residuo TO anon;
 GRANT ALL ON TABLE public.adiciones_residuo TO authenticated;
 GRANT ALL ON TABLE public.adiciones_residuo TO service_role;
 
@@ -2632,7 +2633,6 @@ GRANT ALL ON TABLE public.adiciones_residuo TO service_role;
 -- Name: TABLE atributos_material; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.atributos_material TO anon;
 GRANT ALL ON TABLE public.atributos_material TO authenticated;
 GRANT ALL ON TABLE public.atributos_material TO service_role;
 
@@ -2641,7 +2641,6 @@ GRANT ALL ON TABLE public.atributos_material TO service_role;
 -- Name: TABLE cajas_congelado; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.cajas_congelado TO anon;
 GRANT ALL ON TABLE public.cajas_congelado TO authenticated;
 GRANT ALL ON TABLE public.cajas_congelado TO service_role;
 
@@ -2650,7 +2649,6 @@ GRANT ALL ON TABLE public.cajas_congelado TO service_role;
 -- Name: TABLE ciclos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.ciclos TO anon;
 GRANT ALL ON TABLE public.ciclos TO authenticated;
 GRANT ALL ON TABLE public.ciclos TO service_role;
 
@@ -2659,7 +2657,6 @@ GRANT ALL ON TABLE public.ciclos TO service_role;
 -- Name: TABLE config_reservas; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.config_reservas TO anon;
 GRANT ALL ON TABLE public.config_reservas TO authenticated;
 GRANT ALL ON TABLE public.config_reservas TO service_role;
 
@@ -2668,7 +2665,6 @@ GRANT ALL ON TABLE public.config_reservas TO service_role;
 -- Name: TABLE consultas_residuo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.consultas_residuo TO anon;
 GRANT ALL ON TABLE public.consultas_residuo TO authenticated;
 GRANT ALL ON TABLE public.consultas_residuo TO service_role;
 
@@ -2677,7 +2673,6 @@ GRANT ALL ON TABLE public.consultas_residuo TO service_role;
 -- Name: TABLE contenedores_residuo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.contenedores_residuo TO anon;
 GRANT ALL ON TABLE public.contenedores_residuo TO authenticated;
 GRANT ALL ON TABLE public.contenedores_residuo TO service_role;
 
@@ -2693,7 +2688,6 @@ GRANT ALL ON TABLE public.credenciales_grupo TO service_role;
 -- Name: TABLE documentos_proveedor; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.documentos_proveedor TO anon;
 GRANT ALL ON TABLE public.documentos_proveedor TO authenticated;
 GRANT ALL ON TABLE public.documentos_proveedor TO service_role;
 
@@ -2702,7 +2696,6 @@ GRANT ALL ON TABLE public.documentos_proveedor TO service_role;
 -- Name: TABLE equipos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.equipos TO anon;
 GRANT ALL ON TABLE public.equipos TO authenticated;
 GRANT ALL ON TABLE public.equipos TO service_role;
 
@@ -2711,7 +2704,6 @@ GRANT ALL ON TABLE public.equipos TO service_role;
 -- Name: TABLE evaluaciones_curso; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.evaluaciones_curso TO anon;
 GRANT ALL ON TABLE public.evaluaciones_curso TO authenticated;
 GRANT ALL ON TABLE public.evaluaciones_curso TO service_role;
 
@@ -2720,7 +2712,6 @@ GRANT ALL ON TABLE public.evaluaciones_curso TO service_role;
 -- Name: TABLE excepciones_residuo_ia; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.excepciones_residuo_ia TO anon;
 GRANT ALL ON TABLE public.excepciones_residuo_ia TO authenticated;
 GRANT ALL ON TABLE public.excepciones_residuo_ia TO service_role;
 
@@ -2729,7 +2720,6 @@ GRANT ALL ON TABLE public.excepciones_residuo_ia TO service_role;
 -- Name: TABLE historico_precio; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.historico_precio TO anon;
 GRANT ALL ON TABLE public.historico_precio TO authenticated;
 GRANT ALL ON TABLE public.historico_precio TO service_role;
 
@@ -2738,7 +2728,6 @@ GRANT ALL ON TABLE public.historico_precio TO service_role;
 -- Name: TABLE incidencias; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.incidencias TO anon;
 GRANT ALL ON TABLE public.incidencias TO authenticated;
 GRANT ALL ON TABLE public.incidencias TO service_role;
 
@@ -2747,7 +2736,6 @@ GRANT ALL ON TABLE public.incidencias TO service_role;
 -- Name: TABLE intervenciones; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.intervenciones TO anon;
 GRANT ALL ON TABLE public.intervenciones TO authenticated;
 GRANT ALL ON TABLE public.intervenciones TO service_role;
 
@@ -2756,7 +2744,6 @@ GRANT ALL ON TABLE public.intervenciones TO service_role;
 -- Name: TABLE lineas_pedido; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.lineas_pedido TO anon;
 GRANT ALL ON TABLE public.lineas_pedido TO authenticated;
 GRANT ALL ON TABLE public.lineas_pedido TO service_role;
 
@@ -2765,7 +2752,6 @@ GRANT ALL ON TABLE public.lineas_pedido TO service_role;
 -- Name: TABLE material; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.material TO anon;
 GRANT ALL ON TABLE public.material TO authenticated;
 GRANT ALL ON TABLE public.material TO service_role;
 
@@ -2774,7 +2760,6 @@ GRANT ALL ON TABLE public.material TO service_role;
 -- Name: TABLE material_ubicaciones; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.material_ubicaciones TO anon;
 GRANT ALL ON TABLE public.material_ubicaciones TO authenticated;
 GRANT ALL ON TABLE public.material_ubicaciones TO service_role;
 
@@ -2783,7 +2768,6 @@ GRANT ALL ON TABLE public.material_ubicaciones TO service_role;
 -- Name: TABLE modulo_ciclo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.modulo_ciclo TO anon;
 GRANT ALL ON TABLE public.modulo_ciclo TO authenticated;
 GRANT ALL ON TABLE public.modulo_ciclo TO service_role;
 
@@ -2792,7 +2776,6 @@ GRANT ALL ON TABLE public.modulo_ciclo TO service_role;
 -- Name: TABLE modulos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.modulos TO anon;
 GRANT ALL ON TABLE public.modulos TO authenticated;
 GRANT ALL ON TABLE public.modulos TO service_role;
 
@@ -2801,7 +2784,6 @@ GRANT ALL ON TABLE public.modulos TO service_role;
 -- Name: TABLE movimientos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.movimientos TO anon;
 GRANT ALL ON TABLE public.movimientos TO authenticated;
 GRANT ALL ON TABLE public.movimientos TO service_role;
 
@@ -2810,7 +2792,6 @@ GRANT ALL ON TABLE public.movimientos TO service_role;
 -- Name: TABLE muestras_congeladas; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.muestras_congeladas TO anon;
 GRANT ALL ON TABLE public.muestras_congeladas TO authenticated;
 GRANT ALL ON TABLE public.muestras_congeladas TO service_role;
 
@@ -2819,7 +2800,6 @@ GRANT ALL ON TABLE public.muestras_congeladas TO service_role;
 -- Name: TABLE pedidos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.pedidos TO anon;
 GRANT ALL ON TABLE public.pedidos TO authenticated;
 GRANT ALL ON TABLE public.pedidos TO service_role;
 
@@ -2835,7 +2815,6 @@ GRANT ALL ON TABLE public.pedidos_token TO service_role;
 -- Name: TABLE planes_mantenimiento; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.planes_mantenimiento TO anon;
 GRANT ALL ON TABLE public.planes_mantenimiento TO authenticated;
 GRANT ALL ON TABLE public.planes_mantenimiento TO service_role;
 
@@ -2844,7 +2823,6 @@ GRANT ALL ON TABLE public.planes_mantenimiento TO service_role;
 -- Name: TABLE propuestas_material; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.propuestas_material TO anon;
 GRANT ALL ON TABLE public.propuestas_material TO authenticated;
 GRANT ALL ON TABLE public.propuestas_material TO service_role;
 
@@ -2853,7 +2831,6 @@ GRANT ALL ON TABLE public.propuestas_material TO service_role;
 -- Name: TABLE propuestas_ubicacion_equipo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.propuestas_ubicacion_equipo TO anon;
 GRANT ALL ON TABLE public.propuestas_ubicacion_equipo TO authenticated;
 GRANT ALL ON TABLE public.propuestas_ubicacion_equipo TO service_role;
 
@@ -2862,7 +2839,6 @@ GRANT ALL ON TABLE public.propuestas_ubicacion_equipo TO service_role;
 -- Name: TABLE proveedores; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.proveedores TO anon;
 GRANT ALL ON TABLE public.proveedores TO authenticated;
 GRANT ALL ON TABLE public.proveedores TO service_role;
 
@@ -2871,7 +2847,6 @@ GRANT ALL ON TABLE public.proveedores TO service_role;
 -- Name: TABLE registro_mantenimientos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.registro_mantenimientos TO anon;
 GRANT ALL ON TABLE public.registro_mantenimientos TO authenticated;
 GRANT ALL ON TABLE public.registro_mantenimientos TO service_role;
 
@@ -2880,7 +2855,6 @@ GRANT ALL ON TABLE public.registro_mantenimientos TO service_role;
 -- Name: TABLE registros_autoclave; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.registros_autoclave TO anon;
 GRANT ALL ON TABLE public.registros_autoclave TO authenticated;
 GRANT ALL ON TABLE public.registros_autoclave TO service_role;
 
@@ -2889,7 +2863,6 @@ GRANT ALL ON TABLE public.registros_autoclave TO service_role;
 -- Name: TABLE registros_cabina; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.registros_cabina TO anon;
 GRANT ALL ON TABLE public.registros_cabina TO authenticated;
 GRANT ALL ON TABLE public.registros_cabina TO service_role;
 
@@ -2898,7 +2871,6 @@ GRANT ALL ON TABLE public.registros_cabina TO service_role;
 -- Name: TABLE registros_vitrina; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.registros_vitrina TO anon;
 GRANT ALL ON TABLE public.registros_vitrina TO authenticated;
 GRANT ALL ON TABLE public.registros_vitrina TO service_role;
 
@@ -2907,7 +2879,6 @@ GRANT ALL ON TABLE public.registros_vitrina TO service_role;
 -- Name: TABLE reservas_equipos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.reservas_equipos TO anon;
 GRANT ALL ON TABLE public.reservas_equipos TO authenticated;
 GRANT ALL ON TABLE public.reservas_equipos TO service_role;
 
@@ -2916,7 +2887,6 @@ GRANT ALL ON TABLE public.reservas_equipos TO service_role;
 -- Name: TABLE revisiones_inventario; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.revisiones_inventario TO anon;
 GRANT ALL ON TABLE public.revisiones_inventario TO authenticated;
 GRANT ALL ON TABLE public.revisiones_inventario TO service_role;
 
@@ -2925,7 +2895,6 @@ GRANT ALL ON TABLE public.revisiones_inventario TO service_role;
 -- Name: TABLE solicitudes; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.solicitudes TO anon;
 GRANT ALL ON TABLE public.solicitudes TO authenticated;
 GRANT ALL ON TABLE public.solicitudes TO service_role;
 
@@ -2934,7 +2903,6 @@ GRANT ALL ON TABLE public.solicitudes TO service_role;
 -- Name: TABLE tareas_intervencion; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.tareas_intervencion TO anon;
 GRANT ALL ON TABLE public.tareas_intervencion TO authenticated;
 GRANT ALL ON TABLE public.tareas_intervencion TO service_role;
 
@@ -2943,7 +2911,6 @@ GRANT ALL ON TABLE public.tareas_intervencion TO service_role;
 -- Name: TABLE tareas_personales; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.tareas_personales TO anon;
 GRANT ALL ON TABLE public.tareas_personales TO authenticated;
 GRANT ALL ON TABLE public.tareas_personales TO service_role;
 
@@ -2952,7 +2919,6 @@ GRANT ALL ON TABLE public.tareas_personales TO service_role;
 -- Name: TABLE tipos_residuo; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.tipos_residuo TO anon;
 GRANT ALL ON TABLE public.tipos_residuo TO authenticated;
 GRANT ALL ON TABLE public.tipos_residuo TO service_role;
 
@@ -2961,7 +2927,6 @@ GRANT ALL ON TABLE public.tipos_residuo TO service_role;
 -- Name: TABLE ubicaciones; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.ubicaciones TO anon;
 GRANT ALL ON TABLE public.ubicaciones TO authenticated;
 GRANT ALL ON TABLE public.ubicaciones TO service_role;
 
@@ -2970,7 +2935,6 @@ GRANT ALL ON TABLE public.ubicaciones TO service_role;
 -- Name: TABLE user_modulos; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.user_modulos TO anon;
 GRANT ALL ON TABLE public.user_modulos TO authenticated;
 GRANT ALL ON TABLE public.user_modulos TO service_role;
 
@@ -2979,7 +2943,6 @@ GRANT ALL ON TABLE public.user_modulos TO service_role;
 -- Name: TABLE users; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.users TO anon;
 GRANT ALL ON TABLE public.users TO authenticated;
 GRANT ALL ON TABLE public.users TO service_role;
 
@@ -2988,7 +2951,6 @@ GRANT ALL ON TABLE public.users TO service_role;
 -- Name: TABLE usos_muestra; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.usos_muestra TO anon;
 GRANT ALL ON TABLE public.usos_muestra TO authenticated;
 GRANT ALL ON TABLE public.usos_muestra TO service_role;
 
@@ -2997,7 +2959,6 @@ GRANT ALL ON TABLE public.usos_muestra TO service_role;
 -- Name: TABLE usuarios; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.usuarios TO anon;
 GRANT ALL ON TABLE public.usuarios TO authenticated;
 GRANT ALL ON TABLE public.usuarios TO service_role;
 
@@ -3006,7 +2967,6 @@ GRANT ALL ON TABLE public.usuarios TO service_role;
 -- Name: TABLE verif_extraordinarias; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.verif_extraordinarias TO anon;
 GRANT ALL ON TABLE public.verif_extraordinarias TO authenticated;
 GRANT ALL ON TABLE public.verif_extraordinarias TO service_role;
 
@@ -3015,7 +2975,6 @@ GRANT ALL ON TABLE public.verif_extraordinarias TO service_role;
 -- Name: TABLE verif_pipetas_parametros; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.verif_pipetas_parametros TO anon;
 GRANT ALL ON TABLE public.verif_pipetas_parametros TO authenticated;
 GRANT ALL ON TABLE public.verif_pipetas_parametros TO service_role;
 
@@ -3024,7 +2983,6 @@ GRANT ALL ON TABLE public.verif_pipetas_parametros TO service_role;
 -- Name: TABLE verif_preparaciones; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.verif_preparaciones TO anon;
 GRANT ALL ON TABLE public.verif_preparaciones TO authenticated;
 GRANT ALL ON TABLE public.verif_preparaciones TO service_role;
 
@@ -3033,7 +2991,6 @@ GRANT ALL ON TABLE public.verif_preparaciones TO service_role;
 -- Name: TABLE verif_sesiones; Type: ACL; Schema: public; Owner: -
 --
 
-GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.verif_sesiones TO anon;
 GRANT ALL ON TABLE public.verif_sesiones TO authenticated;
 GRANT ALL ON TABLE public.verif_sesiones TO service_role;
 
@@ -3070,7 +3027,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIO
 --
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO postgres;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLES TO anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;
 
@@ -3115,5 +3071,46 @@ CREATE EVENT TRIGGER ensure_rls ON ddl_command_end WHEN TAG IN ('CREATE TABLE', 
 -- 5. Realtime
 -- ------------------------------------------------------------
 -- (ninguna tabla publicada)
+
+-- ------------------------------------------------------------
+-- 6. Datos de partida (los únicos datos de la base limpia)
+-- ------------------------------------------------------------
+-- atributos_material: 18 filas
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_colo_colorantes_y_tinciones', 'Colorante y tinción', 'Colorantes y tinciones', 15, '[{"tipo": "opcion", "clave": "presentacion", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Presentación", "opciones": ["solución", "polvo"], "obligatorio": false}, {"tipo": "numero", "clave": "concentracion", "nombre": {"sep": "coma", "sufijo": "%", "prefijo": ""}, "unidad": "%", "etiqueta": "Concentración", "obligatorio": false}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_colo_medios_de_montaje', 'Colorante y tinción', 'Medios de montaje', 16, '[{"tipo": "opcion", "clave": "tipo_medio", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Tipo de medio", "opciones": ["acuoso", "resina", "fluorescencia"], "obligatorio": true}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_epi_guantes', 'EPI y seguridad', 'Guantes', 13, '[{"tipo": "opcion", "clave": "material", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": ""}, "etiqueta": "Material", "opciones": ["nitrilo", "látex", "vinilo"], "obligatorio": true}, {"tipo": "opcion", "clave": "talla", "nombre": {"sep": "coma", "sufijo": "", "prefijo": "talla "}, "etiqueta": "Talla", "opciones": ["XS", "S", "M", "L", "XL"], "obligatorio": true}, {"tipo": "booleano", "clave": "con_polvo", "nombre": {"sep": "coma", "sufijo": "", "prefijo": "", "textoSi": "con polvo"}, "etiqueta": "Con polvo", "obligatorio": false}]'::jsonb, true, 'Guantes')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_kit_kits', 'Kit diagnóstico', 'Kits', 17, '[{"tipo": "numero", "clave": "determinaciones", "nombre": {"sep": "omitir", "sufijo": "", "prefijo": ""}, "unidad": "", "etiqueta": "Nº de determinaciones o usos", "obligatorio": false}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_c_maras_de_recuento', 'Material de vidrio', 'Cámaras de recuento', 12, '[{"tipo": "texto", "clave": "modelo", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Modelo", "obligatorio": true}]'::jsonb, true, 'Cámara')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_cristalizadores', 'Material de vidrio', 'Cristalizadores', 11, '[{"tipo": "numero", "clave": "diametro", "nombre": {"sep": "coma", "sufijo": " mm", "prefijo": ""}, "unidad": "mm", "etiqueta": "Diámetro", "obligatorio": true}]'::jsonb, true, 'Cristalizador')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_flask_cultivo_celular', 'Material fungible', 'Flask cultivo celular', 8, '[{"tipo": "opcion", "clave": "superficie", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Superficie", "opciones": ["T25", "T75", "T175"], "obligatorio": true}, {"tipo": "opcion", "clave": "tapon", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Tipo de tapón", "opciones": ["tapón con filtro", "tapón normal"], "obligatorio": false}]'::jsonb, true, 'Flask cultivo celular')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_jeringuillas', 'Material fungible', 'Jeringuillas', 9, '[{"tipo": "booleano", "clave": "esteril", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": "", "textoSi": "estériles"}, "etiqueta": "Estériles", "obligatorio": false}, {"tipo": "numero", "clave": "volumen", "nombre": {"sep": "coma", "sufijo": " mL", "prefijo": ""}, "unidad": "mL", "etiqueta": "Volumen", "obligatorio": true}]'::jsonb, true, 'Jeringuillas')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_pinzas', 'Material fungible', 'Pinzas', 10, '[{"tipo": "booleano", "clave": "esteril", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": "", "textoSi": "estériles"}, "etiqueta": "Estériles", "obligatorio": false}, {"tipo": "texto", "clave": "material", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Material", "obligatorio": false}]'::jsonb, true, 'Pinzas')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_pipetas_serol_gicas', 'Material fungible', 'Pipetas serológicas', 5, '[{"tipo": "booleano", "clave": "esteril", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": "", "textoSi": "estériles"}, "etiqueta": "Estériles", "obligatorio": false}, {"tipo": "numero", "clave": "volumen", "nombre": {"sep": "coma", "sufijo": " mL", "prefijo": ""}, "unidad": "mL", "etiqueta": "Volumen", "obligatorio": true}]'::jsonb, true, 'Pipetas serológicas')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_placas_petri', 'Material fungible', 'Placas Petri', 7, '[{"tipo": "booleano", "clave": "esteril", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": "", "textoSi": "estériles"}, "etiqueta": "Estériles", "obligatorio": false}, {"tipo": "numero", "clave": "diametro", "nombre": {"sep": "coma", "sufijo": " mm", "prefijo": ""}, "unidad": "mm", "etiqueta": "Diámetro", "obligatorio": true}]'::jsonb, true, 'Placas Petri')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_mate_puntas_de_micropipeta', 'Material fungible', 'Puntas de micropipeta', 6, '[{"tipo": "booleano", "clave": "esteril", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": "", "textoSi": "estériles"}, "etiqueta": "Estériles", "obligatorio": false}, {"tipo": "numero", "clave": "volumen", "nombre": {"sep": "coma", "sufijo": " µL", "prefijo": ""}, "unidad": "µL", "etiqueta": "Volumen", "obligatorio": true}, {"tipo": "booleano", "clave": "con_filtro", "nombre": {"sep": "coma", "sufijo": "", "prefijo": "", "textoSi": "con filtro"}, "etiqueta": "Con filtro", "obligatorio": false}]'::jsonb, true, 'Puntas micropipeta')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_pape_papel_secante', 'Papel y filtración', 'Papel secante', 14, '[{"tipo": "opcion", "clave": "formato", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Formato", "opciones": ["rollo", "hoja"], "obligatorio": true}, {"tipo": "texto", "clave": "tamano", "nombre": {"sep": "espacio", "sufijo": "", "prefijo": ""}, "etiqueta": "Tamaño", "obligatorio": false}]'::jsonb, true, 'Papel secante')
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_cidos_y_bases', 'Reactivo químico', 'Ácidos y bases', 0, '[{"tipo": "texto", "clave": "formula", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Fórmula", "obligatorio": true}, {"tipo": "numero", "clave": "concentracion", "nombre": {"sep": "coma", "sufijo": "%", "prefijo": ""}, "unidad": "%", "etiqueta": "Concentración", "obligatorio": true}, {"tipo": "texto", "clave": "pureza", "nombre": {"sep": "omitir", "sufijo": "", "prefijo": ""}, "etiqueta": "Grado de pureza", "obligatorio": false}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_disolventes', 'Reactivo químico', 'Disolventes', 1, '[{"tipo": "numero", "clave": "concentracion", "nombre": {"sep": "coma", "sufijo": "%", "prefijo": ""}, "unidad": "%", "etiqueta": "Concentración", "obligatorio": true}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_indicadores', 'Reactivo químico', 'Indicadores', 3, '[{"tipo": "opcion", "clave": "presentacion", "nombre": {"sep": "coma", "sufijo": "", "prefijo": ""}, "etiqueta": "Presentación", "opciones": ["solución", "polvo"], "obligatorio": false}, {"tipo": "numero", "clave": "concentracion", "nombre": {"sep": "coma", "sufijo": "%", "prefijo": ""}, "unidad": "%", "etiqueta": "Concentración", "obligatorio": false}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_reactivos_en_ampolla', 'Reactivo químico', 'Reactivos en ampolla', 4, '[]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
+INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_s_lidos', 'Reactivo químico', 'Sólidos', 2, '[{"tipo": "texto", "clave": "pureza", "nombre": {"sep": "omitir", "sufijo": "", "prefijo": ""}, "etiqueta": "Pureza", "obligatorio": false}]'::jsonb, true, NULL)
+  ON CONFLICT (id_ficha) DO NOTHING;
 
 COMMIT;
