@@ -100,7 +100,29 @@ python tools/base-limpia/sacar_base_limpia.py --comparar scripts/supabase_creden
 (`scripts/supabase_credentials_prueba.json`, fuera de git: `pooler_host`, `pooler_port`,
 `pooler_user`, `db_password` del proyecto nuevo, sacados de Connect → Session pooler).
 Sin diferencias = la base limpia está bien. Además avisa si `anon` tiene algún permiso
-en el proyecto nuevo.
+en el proyecto nuevo. Enseña aparte las **diferencias esperadas**, en las que la
+instalación nueva es más estricta que la real (hoy, una: `PUBLIC` no puede ejecutar
+`rls_auto_enable()`, que en todo caso solo la dispara `ensure_rls`).
+
+**Probada el 2026-11-27** en un proyecto vacío (PostgreSQL 17.12): entra entera con
+`psql -v ON_ERROR_STOP=1 -f`, «Sin diferencias de estructura», 47 tablas todas con RLS,
+`anon` sin ningún permiso, y una tabla creada después nace con RLS.
+
+## Catálogo de ejemplo de residuos (opcional)
+
+`ejemplo_tipos_residuo.sql`: 113 tipos de residuo de laboratorio con su nombre y su
+riesgo (pictogramas GHS), para quien quiera partir de algo. Se aplica **después** de
+`base_limpia.sql` y se puede repetir, porque no pisa lo que ya exista.
+
+**No lleva a qué contenedor va cada residuo**, ni laboratorio ni zona: eso depende de las
+normas del gestor de residuos de cada centro, y se asigna después en la app. Hasta
+entonces, la guía los agrupa en «Sin contenedor asignado». Las descripciones que hablan
+de contenedores, laboratorios o normas del gestor (`DESCRIPCION_DEL_CENTRO` en el script:
+hoy son 30) **van vacías**, enteras. Se saca con:
+
+```
+python tools/base-limpia/sacar_base_limpia.py --ejemplo-residuos
+```
 
 ## Lo que hace el guion de instalación después
 
@@ -130,7 +152,7 @@ Para el guion de instalación. Supabase → Edge Functions → Secrets.
 | Tabla | Filas hoy | Qué se hace |
 |---|--:|---|
 | `atributos_material` | 18 | **En la base limpia** (datos de partida) |
-| `tipos_residuo` | 113 | **Aparte**, como catálogo de ejemplo opcional, sin las asignaciones a los contenedores del centro |
+| `tipos_residuo` | 113 | **Aparte**, como catálogo de ejemplo opcional (`ejemplo_tipos_residuo.sql`), sin las asignaciones a los contenedores del centro |
 | `contenedores_residuo`, `config_reservas`, `evaluaciones_curso`, `ciclos`/`modulos`/`modulo_ciclo`, `verif_pipetas_parametros` | 21 / 23 / 3 / 5 / 106 | No: son del centro (sus laboratorios, sus equipos, sus fechas) |
 
 Lo demás (equipos, material, ubicaciones, proveedores, planes y registros de

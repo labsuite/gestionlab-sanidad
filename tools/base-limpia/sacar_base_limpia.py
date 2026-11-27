@@ -8,6 +8,10 @@ Uso (desde la raíz del repositorio):
     python tools/base-limpia/sacar_base_limpia.py
         Lee la base real y escribe supabase/base-limpia/base_limpia.sql
 
+    python tools/base-limpia/sacar_base_limpia.py --ejemplo-residuos
+        Escribe supabase/base-limpia/ejemplo_tipos_residuo.sql: catálogo de ejemplo
+        OPCIONAL de residuos, sin contenedores ni normas del centro.
+
     python tools/base-limpia/sacar_base_limpia.py --comparar <credenciales.json>
         Saca la estructura de OTRO proyecto (p. ej. la instalación de prueba) y la
         compara con la de la base real. Sin diferencias = la base limpia reproduce
@@ -336,6 +340,79 @@ COMMIT;
 """
 
 
+# ---------------------------------------------------------------------------
+# Catálogo de ejemplo de residuos (opcional, fuera de la base limpia)
+# ---------------------------------------------------------------------------
+SALIDA_RESIDUOS = os.path.join(RAIZ, 'supabase', 'base-limpia', 'ejemplo_tipos_residuo.sql')
+
+# Una descripción que nombre contenedores, laboratorios o normas del gestor del centro
+# se vacía entera (decisión 2026-11-27): se quedan el nombre y el riesgo GHS.
+DESCRIPCION_DEL_CENTRO = re.compile(
+    r'\b20[1-9]\b|salvavidas|garrafa|bid[oó]n|bolsa|contenedor|gestor|cma\b|vigo', re.I)
+
+
+def ejemplo_residuos(c):
+    conn = conectar(c)
+    cur = conn.cursor()
+    cur.execute('select distinct contenedor_tipo from public.tipos_residuo where contenedor_tipo is not null')
+    contenedores = [r[0].lower() for r in cur.fetchall()]
+    cur.execute('select id_residuo, nombre, descripcion, riesgo from public.tipos_residuo order by id_residuo')
+    filas = cur.fetchall()
+    conn.close()
+    out, vaciadas = [], 0
+    for id_, nombre, desc, riesgo in filas:
+        texto = f'{nombre} {desc or ""}'
+        if desc and (DESCRIPCION_DEL_CENTRO.search(texto) or any(k in texto.lower() for k in contenedores)):
+            desc = None
+            vaciadas += 1
+        out.append('INSERT INTO public.tipos_residuo (id_residuo, nombre, descripcion, riesgo) '
+                   f'VALUES ({lit(id_)}, {lit(nombre)}, {lit(desc)}, {lit(riesgo)})\n'
+                   '  ON CONFLICT (id_residuo) DO NOTHING;')
+    sql = f"""-- ============================================================
+-- GestionLab — catálogo de EJEMPLO de tipos de residuo (OPCIONAL)
+-- ============================================================
+-- Generado por tools/base-limpia/sacar_base_limpia.py --ejemplo-residuos.
+-- ⚠ NO EDITAR A MANO. Ver supabase/base-limpia/README.md.
+--
+-- {len(filas)} residuos de laboratorio con su nombre y su riesgo (pictogramas GHS), como punto
+-- de partida. NO lleva a qué contenedor va cada uno: eso lo deciden las normas del
+-- gestor de residuos de cada centro, y se asigna después en la app (Guía de residuos →
+-- editar cada tipo). Mientras no se asigne, la guía los agrupa en «Sin contenedor
+-- asignado». Las descripciones que hablaban de contenedores o normas de un centro
+-- concreto van vacías ({vaciadas}).
+--
+-- Se aplica DESPUÉS de base_limpia.sql, en el editor SQL. Se puede repetir: no pisa
+-- lo que ya exista.
+-- ============================================================
+
+BEGIN;
+
+{chr(10).join(out)}
+
+COMMIT;
+"""
+    return sql, len(filas), vaciadas
+
+
+def escribir(ruta, sql):
+    for n, l in enumerate(sql.splitlines(), 1):
+        if MARCAS_DEL_CENTRO.search(l):
+            sys.exit(f'{os.path.basename(ruta)}, línea {n}: parece llevar algo del centro; revisar:\n  {l}')
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    with open(ruta, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(sql)
+    print(f'Escrito {os.path.relpath(ruta, RAIZ)} ({len(sql.splitlines())} líneas).')
+
+
+# Diferencias a propósito entre una instalación nueva y la base real: la nueva es más
+# estricta. --comparar las enseña aparte en vez de darlas por error.
+DIFERENCIAS_ESPERADAS = {
+    # La base limpia quita EXECUTE a PUBLIC en todas las funciones; en la real PUBLIC aún
+    # puede ejecutar rls_auto_enable() (no tiene efecto: solo la dispara ensure_rls).
+    '+REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC;',
+}
+
+
 def normalizar(sql):
     """Para comparar dos volcados: fuera comentarios, líneas vacías y metaórdenes."""
     return [l for l in sql.splitlines()
@@ -348,12 +425,18 @@ def main():
         otro = leer_credenciales(sys.argv[sys.argv.index('--comparar') + 1])
         (a, _), (b, anon_otro) = estructura(real), estructura(otro)
         hay = False
+        esperadas = []
         for clave in a:
             d = list(difflib.unified_diff(normalizar(a[clave]), normalizar(b[clave]),
-                                          f'real/{clave}', f'otro/{clave}', lineterm='', n=1))
-            if d:
+                                          f'real/{clave}', f'otro/{clave}', lineterm='', n=0))
+            cambios = [l for l in d if l[:1] in '+-' and not l.startswith(('+++', '---'))]
+            esperadas += [l for l in cambios if l in DIFERENCIAS_ESPERADAS]
+            if any(l not in DIFERENCIAS_ESPERADAS for l in cambios):
                 hay = True
                 print('\n'.join(d))
+        if esperadas:
+            print('Diferencias esperadas (la instalación nueva es más estricta):')
+            print('\n'.join('  ' + l for l in esperadas))
         if anon_otro:
             hay = True
             print(f'\n⚠ En el otro proyecto anon tiene {anon_otro} permisos sobre tablas, secuencias o '
@@ -361,16 +444,15 @@ def main():
         print('\nSin diferencias de estructura.' if not hay else '\nHay diferencias (arriba).')
         return
 
+    if '--ejemplo-residuos' in sys.argv:
+        sql, n, vaciadas = ejemplo_residuos(real)
+        print(f'{n} residuos; {vaciadas} descripciones vaciadas por hablar de contenedores o normas del centro.')
+        escribir(SALIDA_RESIDUOS, sql)
+        return
+
     partes, anon = estructura(real, con_datos=True)
     print(f'Quitados {anon} permisos de anon que tiene la base real.')
-    sql = componer(partes)
-    for n, l in enumerate(sql.splitlines(), 1):
-        if MARCAS_DEL_CENTRO.search(l):
-            sys.exit(f'Línea {n} parece llevar algo del centro; revisar antes de publicar:\n  {l}')
-    os.makedirs(os.path.dirname(SALIDA), exist_ok=True)
-    with open(SALIDA, 'w', encoding='utf-8', newline='\n') as f:
-        f.write(sql)
-    print(f'Escrito {os.path.relpath(SALIDA, RAIZ)} ({len(sql.splitlines())} líneas).')
+    escribir(SALIDA, componer(partes))
 
 
 if __name__ == '__main__':
