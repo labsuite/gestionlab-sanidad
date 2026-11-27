@@ -404,8 +404,8 @@ function lineaEsComun(linea) {
 /**
  * Nombre y primer apellido, que es como consta el profesorado en los registros
  * ("Paloma Fernández"). Se quita el último apellido en vez de coger las dos
- * primeras palabras, porque hay nombres compuestos: "Ana Belén Silva Abuín" →
- * "Ana Belén Silva", que con las dos primeras se quedaría sin apellido.
+ * primeras palabras, porque hay nombres compuestos: "María José Otero Lema" →
+ * "María José Otero", que con las dos primeras se quedaría sin apellido.
  * Espejo de `nombreCorto()` en supabase/functions/_shared/auth.ts.
  */
 function _nombreCorto(nombre) {

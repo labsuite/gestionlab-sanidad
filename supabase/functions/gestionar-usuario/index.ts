@@ -405,8 +405,9 @@ Deno.serve(async (req) => {
       }
       // Su login puede estar con un email ANTIGUO: si se le cambió el email en la
       // ficha antes de que «actualizar» lo propagase, el perfil sigue enlazado por
-      // gestionlab_id pero con el email viejo (Marta Alén, 2026-11-19: crear uno
-      // nuevo chocaba con users_gestionlab_id_key). Se alinea con el de la ficha.
+      // gestionlab_id pero con el email viejo (caso de una docente, 2026-11-19:
+      // crear uno nuevo chocaba con users_gestionlab_id_key). Se alinea con el
+      // de la ficha.
       if (!authId) {
         const { data: perfilPorId } = await supabaseAdmin.from("users")
           .select("id, email").eq("gestionlab_id", f.id_usuario).maybeSingle();
@@ -422,8 +423,9 @@ Deno.serve(async (req) => {
       }
       // Dar de alta a alguien desde la app («Nuevo usuario») solo crea la ficha del
       // catálogo, no el login: hasta ahora la 🔑 respondía "No tiene cuenta de
-      // acceso" y no había forma de darle entrada desde la app (Marta Alén,
-      // 2026-11-19). Ahora se le crea aquí mismo, con la contraseña provisional.
+      // acceso" y no había forma de darle entrada desde la app (caso de una
+      // docente, 2026-11-19). Ahora se le crea aquí mismo, con la contraseña
+      // provisional.
       if (!authId) {
         const esGrupoNuevo = esCuentaDeGrupo(emailU);
         const password = (esGrupoNuevo || f.rol !== "Alumno") ? passwordDeGrupo() : passwordDesdeEmail(emailU);

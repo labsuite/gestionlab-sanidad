@@ -171,7 +171,7 @@ Una fila por equipo, ordenados por ubicación y tipo. Columnas:
 
 Botón **✉️ Email al proveedor** en la cabecera de "Líneas del pedido" en `verDetallePedido` (`js/pedidos-render.js`), visible para Administrador/Gestor cuando el pedido tiene al menos una línea. Abre el modal `modal-email-pedido` (`html/modales-pedidos.html`).
 
-- `generarTextoEmailPedido(pedidoId)` construye el texto: saludo "Hola, Krystal." (solo el **nombre de pila** de `Persona_Contacto` — se tutea a las comerciales; si no hay contacto, "Buenos días."), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre con "Muchas gracias." sin firma — la firma la añade el cliente de correo de la usuaria. ⚠ Saludo a la española: coma vocativa y **punto** al final, nunca coma.
+- `generarTextoEmailPedido(pedidoId)` construye el texto: saludo "Hola, Lucía." (solo el **nombre de pila** de `Persona_Contacto` — se tutea a las comerciales; si no hay contacto, "Buenos días."), una línea por cada línea del pedido con material + cantidad + unidad (reutiliza `_unidadLineaPedido`, extraída de la lógica que ya usaba el listado de líneas), y cierre con "Muchas gracias." sin firma — la firma la añade el cliente de correo de la usuaria. ⚠ Saludo a la española: coma vocativa y **punto** al final, nunca coma.
 - Encima del texto, **Para** (`Email_Contacto` del proveedor) y **Asunto** (`Nombre del pedido — CIFP Manuel Antonio, departamento de Sanidade`, sin la palabra "Pedido"; `(ampliación)` tras el nombre en el email de las líneas añadidas después), cada uno con su botón 📋 (`copiarCampoEmailPedido`). Más **📋 Copiar texto** (`copiarTextoEmailPedido`). No hay envío ni apertura directa del cliente de correo: la usuaria prefiere copiar, pegar y revisar antes de enviar.
 
 ---
@@ -213,12 +213,17 @@ no cambiaron: detrás de la fila de `usuarios` hay un grupo en vez de una person
 `nombreCorto()` (`_shared/auth.ts`) en el servidor y su espejo `_nombreCorto()`
 (`js/config.js`) en el cliente, para que en pantalla se vea lo que se va a
 guardar. La regla es **quitar el último apellido**, no coger las dos primeras
-palabras: "Ana Belén Silva Abuín" → "Ana Belén Silva" (con las dos primeras se
-quedaría sin apellido) y "Sabela Fernández de Sanmamed Girón" → "Sabela Fernández
-de Sanmamed". Con menos de tres palabras se deja igual ("Marta Alén"). ⚠ Nunca
+palabras: "María José Otero Lema" → "María José Otero" (con las dos primeras se
+quedaría sin apellido) y "Iria Pérez de Castro Vidal" → "Iria Pérez
+de Castro". Con menos de tres palabras se deja igual ("Rosa Lago"). ⚠ Nunca
 aplicarlo a una cuenta de grupo ("1º CS LCB" → "1º CS") ni a un nombre de empresa
 tecleado en "Realizado por" de un mantenimiento externo. Lo registrado antes de
 2026-09-20 se dejó como estaba, a propósito.
+
+⚠ **Este repositorio es público.** En el código, los comentarios y la documentación,
+los ejemplos van siempre con **nombres inventados**: nunca nombres reales de
+profesorado, alumnado ni comerciales de proveedores. Tampoco para contar un caso
+real: se escribe "una docente", no su nombre.
 
 Antes de guardar el nombre o el email de una persona en cualquier tabla, preguntarse si
 la **seguridad del laboratorio** exige saber quién fue. Si no, usar `autorRegistro()` de

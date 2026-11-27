@@ -134,10 +134,10 @@ export const AUTOR_ALUMNADO = "Alumnado";
  * apellido** ("Paloma Fernández", no "Paloma Fernández López" ni "Paloma").
  *
  * La regla es quitar el último apellido, no quedarse con las dos primeras
- * palabras: hay nombres compuestos ("Ana Belén Silva Abuín" → "Ana Belén Silva",
- * que con las dos primeras se quedaría en "Ana Belén", sin apellido) y apellidos
- * compuestos ("Sabela Fernández de Sanmamed Girón" → "Sabela Fernández de
- * Sanmamed"). Con menos de tres palabras se deja tal cual ("Marta Alén").
+ * palabras: hay nombres compuestos ("María José Otero Lema" → "María José Otero",
+ * que con las dos primeras se quedaría en "María José", sin apellido) y apellidos
+ * compuestos ("Iria Pérez de Castro Vidal" → "Iria Pérez de
+ * Castro"). Con menos de tres palabras se deja tal cual ("Rosa Lago").
  *
  * ⚠ Solo para personas. NUNCA aplicar a una cuenta de grupo ("1º CS LCB" se
  * quedaría en "1º CS") ni a un nombre de empresa tecleado a mano en "Realizado
