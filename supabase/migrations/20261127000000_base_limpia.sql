@@ -1,15 +1,16 @@
 -- ============================================================
--- GestionLab — LÍNEA BASE para instalar desde cero (solo estructura, sin datos)
+-- GestionLab — LÍNEA BASE (primera migración): estructura + datos de partida
 -- ============================================================
 -- Generado por tools/base-limpia/sacar_base_limpia.py a partir de la base real.
--- ⚠ NO EDITAR A MANO: se vuelve a sacar con el script. Ver supabase/base-limpia/README.md.
+-- ⚠ NO EDITAR A MANO. Ver supabase/base-limpia/README.md.
 --
--- Cómo se aplica: en un proyecto de Supabase VACÍO, pegar entero en el editor SQL y
--- ejecutar (o con psql -f). Va en una sola transacción: si algo falla, no queda nada
--- a medias.
+-- Cómo se aplica, en un proyecto de Supabase VACÍO:
+--   - sola, con la integración de Supabase con GitHub (Deploy to production), o
+--   - pegándola entera en el editor SQL, o con `psql -1 -f`.
+-- Sin BEGIN/COMMIT a propósito: la integración mete cada migración en una
+-- transacción, y el editor SQL ejecuta todo el texto como una sola. En los tres
+-- casos, si algo falla no queda nada a medias.
 -- ============================================================
-
-BEGIN;
 
 -- ------------------------------------------------------------
 -- 1. Extensiones
@@ -3112,5 +3113,3 @@ INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, at
   ON CONFLICT (id_ficha) DO NOTHING;
 INSERT INTO public.atributos_material (id_ficha, categoria, tipo_base, orden, atributos, activa, nombre_base) VALUES ('FAT_reac_s_lidos', 'Reactivo químico', 'Sólidos', 2, '[{"tipo": "texto", "clave": "pureza", "nombre": {"sep": "omitir", "sufijo": "", "prefijo": ""}, "etiqueta": "Pureza", "obligatorio": false}]'::jsonb, true, NULL)
   ON CONFLICT (id_ficha) DO NOTHING;
-
-COMMIT;

@@ -5,8 +5,10 @@ la app desde cero en un proyecto de Supabase vacío.
 
 Uso (desde la raíz del repositorio):
 
-    python tools/base-limpia/sacar_base_limpia.py
-        Lee la base real y escribe supabase/base-limpia/base_limpia.sql
+    python tools/base-limpia/sacar_base_limpia.py --rehacer-migracion-base
+        Lee la base real y reescribe la primera migración,
+        supabase/migrations/20261127000000_base_limpia.sql. Solo mientras ninguna
+        instalación de verdad la haya aplicado (después queda congelada).
 
     python tools/base-limpia/sacar_base_limpia.py --ejemplo-residuos
         Escribe supabase/base-limpia/ejemplo_tipos_residuo.sql: catálogo de ejemplo
@@ -21,7 +23,7 @@ Uso (desde la raíz del repositorio):
 en modo --schema-only: no escribe nada en ninguna base. Nunca añadir aquí nada que
 escriba en la base real.
 
-Qué incluye base_limpia.sql (en una sola transacción: o entra entero o no entra nada):
+Qué incluye la migración base (se aplica entera o no se aplica):
   1. Extensiones que usa el proyecto (CREATE EXTENSION IF NOT EXISTS).
   2. Esquema public completo de pg_dump: tipos, tablas, claves, índices, funciones,
      RLS y políticas, y permisos.
@@ -59,7 +61,10 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 CREDENCIALES = os.path.join(RAIZ, 'scripts', 'supabase_credentials.json')
-SALIDA = os.path.join(RAIZ, 'supabase', 'base-limpia', 'base_limpia.sql')
+# La base limpia es la PRIMERA MIGRACIÓN: la aplica la integración de Supabase con GitHub
+# (o se pega en el editor SQL). Una vez aplicada en una instalación de verdad queda
+# CONGELADA: los cambios posteriores van en migraciones nuevas, nunca reescribiendo esta.
+SALIDA = os.path.join(RAIZ, 'supabase', 'migrations', '20261127000000_base_limpia.sql')
 PG_DUMP_CANDIDATOS = [
     r'C:\Program Files\PostgreSQL\18\bin\pg_dump.exe',
     r'C:\Program Files\PostgreSQL\17\bin\pg_dump.exe',
@@ -299,17 +304,18 @@ def estructura(c, con_datos=False):
 
 def componer(p):
     return f"""-- ============================================================
--- GestionLab — LÍNEA BASE para instalar desde cero (solo estructura, sin datos)
+-- GestionLab — LÍNEA BASE (primera migración): estructura + datos de partida
 -- ============================================================
 -- Generado por tools/base-limpia/sacar_base_limpia.py a partir de la base real.
--- ⚠ NO EDITAR A MANO: se vuelve a sacar con el script. Ver supabase/base-limpia/README.md.
+-- ⚠ NO EDITAR A MANO. Ver supabase/base-limpia/README.md.
 --
--- Cómo se aplica: en un proyecto de Supabase VACÍO, pegar entero en el editor SQL y
--- ejecutar (o con psql -f). Va en una sola transacción: si algo falla, no queda nada
--- a medias.
+-- Cómo se aplica, en un proyecto de Supabase VACÍO:
+--   - sola, con la integración de Supabase con GitHub (Deploy to production), o
+--   - pegándola entera en el editor SQL, o con `psql -1 -f`.
+-- Sin BEGIN/COMMIT a propósito: la integración mete cada migración en una
+-- transacción, y el editor SQL ejecuta todo el texto como una sola. En los tres
+-- casos, si algo falla no queda nada a medias.
 -- ============================================================
-
-BEGIN;
 
 -- ------------------------------------------------------------
 -- 1. Extensiones
@@ -335,9 +341,7 @@ SET search_path = public, pg_catalog;
 -- ------------------------------------------------------------
 -- 6. Datos de partida (los únicos datos de la base limpia)
 -- ------------------------------------------------------------
-{p['datos']}
-COMMIT;
-"""
+{p['datos']}"""
 
 
 # ---------------------------------------------------------------------------
@@ -381,7 +385,7 @@ def ejemplo_residuos(c):
 -- asignado». Las descripciones que hablaban de contenedores o normas de un centro
 -- concreto van vacías ({vaciadas}).
 --
--- Se aplica DESPUÉS de base_limpia.sql, en el editor SQL. Se puede repetir: no pisa
+-- Se aplica DESPUÉS de la migración base, en el editor SQL. Se puede repetir: no pisa
 -- lo que ya exista.
 -- ============================================================
 
@@ -450,6 +454,10 @@ def main():
         escribir(SALIDA_RESIDUOS, sql)
         return
 
+    if os.path.exists(SALIDA) and '--rehacer-migracion-base' not in sys.argv:
+        sys.exit(f'{os.path.relpath(SALIDA, RAIZ)} ya existe y no se reescribe: si alguna instalación ya la\n'
+                 'aplicó, cambiarla no le llegaría nunca. Los cambios de esquema van en una migración NUEVA.\n'
+                 'Solo si ninguna instalación de verdad la ha aplicado: --rehacer-migracion-base.')
     partes, anon = estructura(real, con_datos=True)
     print(f'Quitados {anon} permisos de anon que tiene la base real.')
     escribir(SALIDA, componer(partes))

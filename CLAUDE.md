@@ -286,12 +286,13 @@ acciones). El protocolo se pide al abrirlo con `cargarProtocoloEquipo(id)`;
 `Protocolo_Uso === undefined` significa "aún sin pedir" y `Tiene_Protocolo` dice si lo hay.
 `gestionar-equipo` no toca `protocolo_uso` al actualizar si el campo no viene (ausente ≠ vacío).
 
-⚠ **Base limpia (instalación desde cero, 2026-11-27).** Cualquier cambio de esquema (tabla,
-columna, política, permiso, bucket) obliga a volver a sacar `supabase/base-limpia/base_limpia.sql`
-con `python tools/base-limpia/sacar_base_limpia.py` (solo lee la base real) y, si se puede,
-comprobarla con `--comparar`. La base limpia **no se edita a mano**. Ver
-`supabase/base-limpia/README.md`: ahí está también con qué permisos nace una tabla o función
-nueva (`anon` nunca tiene ninguno) y la lista de secretos de las Edge Functions.
+⚠ **Base limpia (instalación desde cero, 2026-11-27).** La estructura para instalar desde
+cero es la primera migración, `supabase/migrations/20261127000000_base_limpia.sql`
+(la saca `tools/base-limpia/sacar_base_limpia.py`, que solo lee la base real; **no se edita
+a mano**). Ver `supabase/base-limpia/README.md`: ahí está también con qué permisos nace una
+tabla o función nueva (`anon` nunca tiene ninguno) y la lista de secretos de las Edge
+Functions. Toda Edge Function nueva hay que declararla en `supabase/config.toml`, o no se
+despliega con la integración.
 
 (Ya no aplica el antiguo sistema de "rango A2:X" de Sheets — `loadAllData()` en `js/sheets.js`
 lee todas las tablas directo de Supabase con `select('*')`.)

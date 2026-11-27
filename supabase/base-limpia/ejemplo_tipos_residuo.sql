@@ -11,7 +11,7 @@
 -- asignado». Las descripciones que hablaban de contenedores o normas de un centro
 -- concreto van vacías (30).
 --
--- Se aplica DESPUÉS de base_limpia.sql, en el editor SQL. Se puede repetir: no pisa
+-- Se aplica DESPUÉS de la migración base, en el editor SQL. Se puede repetir: no pisa
 -- lo que ya exista.
 -- ============================================================
 
