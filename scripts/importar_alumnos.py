@@ -42,6 +42,7 @@ import json
 import secrets
 import string
 import requests
+from base import cabeceras_servidor  # secret key nueva (2026-11-28)
 
 # ===========================================================================
 # CONFIGURACIÓN — Claude rellena esta sección cada vez
@@ -58,8 +59,7 @@ with open('scripts/supabase_credentials.json', encoding='utf-8') as f:
     CREDS = json.load(f)
 SUPABASE_URL = CREDS['project_url']
 HEADERS_AUTH = {
-    'apikey': CREDS['service_role_key'],
-    'Authorization': f"Bearer {CREDS['service_role_key']}",
+    **cabeceras_servidor(),
     'Content-Type': 'application/json',
 }
 

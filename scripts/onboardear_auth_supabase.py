@@ -20,6 +20,7 @@ import sys
 
 import psycopg2
 import requests
+from base import cabeceras_servidor  # secret key nueva (2026-11-28)
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -27,10 +28,8 @@ with open('scripts/supabase_credentials.json', encoding='utf-8') as f:
     CREDS = json.load(f)
 
 SUPABASE_URL = CREDS['project_url']
-SERVICE_KEY = CREDS['service_role_key']
 HEADERS = {
-    'apikey': SERVICE_KEY,
-    'Authorization': f'Bearer {SERVICE_KEY}',
+    **cabeceras_servidor(),
     'Content-Type': 'application/json',
 }
 

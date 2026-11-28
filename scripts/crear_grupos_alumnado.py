@@ -33,6 +33,7 @@ import urllib.error
 import urllib.request
 
 from base import conectar, generar_id
+from base import cabeceras_servidor  # secret key nueva (2026-11-28)
 
 # ── CONFIGURACIÓN ────────────────────────────────────────────────────────
 # Un grupo por línea: (nombre visible, parte local del email, ciclo, labs).
@@ -95,8 +96,7 @@ def _auth_admin(metodo, ruta, payload=None):
         f"{c['project_url']}/auth/v1/admin{ruta}",
         data=(json.dumps(payload).encode() if payload is not None else None),
         headers={
-            "apikey": c["service_role_key"],
-            "Authorization": f"Bearer {c['service_role_key']}",
+            **cabeceras_servidor(),
             "Content-Type": "application/json",
         },
         method=metodo,

@@ -4,9 +4,10 @@
 // vea y complete la lista de pendientes SIN iniciar sesión. La seguridad la da
 // el token del enlace (?t=…): aquí solo se guarda su SHA-256 en
 // lab_pendientes_enlaces, y un token que no coincide con un enlace activo
-// recibe siempre el mismo 404 genérico. El navegador manda la anon key del
-// proyecto como Authorization (igual que pedido-publico en GestionLab), así que
-// verify_jwt sigue activado en el despliegue.
+// recibe siempre el mismo 404 genérico. Desde 2026-11-28 el navegador manda la
+// clave publishable del proyecto en `apikey` (no es un JWT), así que se despliega
+// con --no-verify-jwt, igual que pedido-publico en GestionLab. Y el servidor usa la
+// secret key «default» (SUPABASE_SECRET_KEYS), no la service_role antigua.
 //
 // Proyecto: sanidade-cma (compartido con GestionLab para ciclos y módulos).
 // Tablas: lab_pendientes, lab_pendientes_notas, lab_pendientes_config,
@@ -44,8 +45,21 @@ async function sha256(s: string): Promise<string> {
   return [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
 }
 
+// Secret key nueva «default». A propósito NO vuelve a la service_role antigua si
+// falta: así el fallo se ve ya, y no el día que se apaguen las claves antiguas.
+function claveDeServidor(): string {
+  let claves: Record<string, string> = {};
+  try {
+    claves = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}");
+  } catch {
+    throw new Error("SUPABASE_SECRET_KEYS no es un JSON válido");
+  }
+  if (!claves["default"]) throw new Error("Falta la secret key «default» del proyecto");
+  return claves["default"];
+}
+
 function admin() {
-  return createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+  return createClient(Deno.env.get("SUPABASE_URL")!, claveDeServidor(), {
     auth: { persistSession: false },
   });
 }

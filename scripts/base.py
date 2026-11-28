@@ -58,6 +58,23 @@ class Tabla:
 # CONEXIÓN
 # ---------------------------------------------------------------------------
 
+def cabeceras_servidor():
+    """Cabeceras para las APIs de Supabase con permisos de servidor (p. ej. administrar
+    logins en /auth/v1/admin/…), con la *secret key* nueva (`sb_secret_…`).
+
+    Sustituye a la `service_role_key` antigua (2026-11-28), que Supabase retira. La
+    clave nueva va SOLO en `apikey`: no es un JWT, así que no se manda como Bearer.
+    La clave es la `default` de Project Settings → API Keys, guardada como
+    `secret_key` en scripts/supabase_credentials.json (fuera de git). Sin ella, el
+    script se para: no se vuelve a la clave antigua."""
+    with open(CREDENTIALS_FILE, encoding='utf-8') as f:
+        clave = json.load(f).get('secret_key', '')
+    if not str(clave).startswith('sb_secret_'):
+        sys.exit('Falta "secret_key" (sb_secret_…) en scripts/supabase_credentials.json: '
+                 'Supabase → Project Settings → API Keys → secret key «default».')
+    return {'apikey': clave}
+
+
 def conectar():
     """Devuelve la conexión a Postgres autenticada."""
     with open(CREDENTIALS_FILE, encoding='utf-8') as f:

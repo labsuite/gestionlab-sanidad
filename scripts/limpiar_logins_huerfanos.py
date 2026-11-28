@@ -36,14 +36,14 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 from base import conectar
+from base import cabeceras_servidor  # secret key nueva (2026-11-28)
 
 DRY_RUN = "--aplicar" not in sys.argv
 REINTENTOS = 3
 HILOS = 6
 
 _CRED = json.load(open("scripts/supabase_credentials.json", encoding="utf-8"))
-_H = {"apikey": _CRED["service_role_key"],
-      "Authorization": f"Bearer {_CRED['service_role_key']}"}
+_H = cabeceras_servidor()
 
 
 def _listar_auth():

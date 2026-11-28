@@ -39,6 +39,7 @@ import urllib.error
 import urllib.request
 
 from base import conectar
+from base import cabeceras_servidor  # secret key nueva (2026-11-28)
 
 DOMINIO_GRUPOS = "@gestionlab.cma"
 DRY_RUN = "--aplicar" not in sys.argv
@@ -52,8 +53,7 @@ def _borrar_auth(user_id):
     c = _cred()
     req = urllib.request.Request(
         f"{c['project_url']}/auth/v1/admin/users/{user_id}",
-        headers={"apikey": c["service_role_key"],
-                 "Authorization": f"Bearer {c['service_role_key']}"},
+        headers=cabeceras_servidor(),
         method="DELETE",
     )
     try:
