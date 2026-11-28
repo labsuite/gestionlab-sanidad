@@ -476,7 +476,7 @@ function buildMantenimientoEquipo(equipoId) {
       ? `<div class="vp-guia">Tornillo de ajuste bajo la tapa del émbolo: <strong>${parV.ajuste_respuesta === 'si' ? 'sí tiene' : 'no tiene'}</strong> (${_vpEsc(parV.ajuste_respuesta_por || '')})</div>` : '';
     secciones.push(`<div class="vp-ficha">🧪 <strong>Última verificación:</strong> ${c
       ? `${formatDate(ult.Fecha_Realizacion)} · ${_vpBadgeResultado(c.resultado)}${ult.Estado === 'pendiente_vb' ? ' <span class="badge badge-orange">⏳ visto bueno</span>' : ''}<div class="vp-guia">${_vpEsc(resumenVerificacion(c))}</div>`
-      : '<span style="color:var(--text-muted)">ninguna registrada en GestionLab</span>'}${tornillo}</div>`);
+      : `<span style="color:var(--text-muted)">ninguna registrada en ${NOMBRE_APP}</span>`}${tornillo}</div>`);
   }
 
   // Planes de mantenimiento. Una cuenta de grupo solo ve los de los equipos de sus

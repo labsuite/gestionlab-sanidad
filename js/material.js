@@ -490,7 +490,7 @@ function _resumenAntiguedad(mat) {
   if (sinAtribuir > 0) {
     partes.push(hayEntradas
       ? `<strong>sin fecha de entrada</strong> ${cant(sinAtribuir)}`
-      : `<strong>anterior a GestionLab</strong> ${cant(sinAtribuir)}`);
+      : `<strong>anterior a ${NOMBRE_APP}</strong> ${cant(sinAtribuir)}`);
   }
   if (!partes.length) return '<span style="color:var(--text-muted)">Sin stock</span>';
   return partes.join(' · ');
@@ -515,7 +515,7 @@ function openModalHistorialMaterial(idMaterial) {
         </div>`).join('')}
       </div>` : ''}
       ${sinAtribuir > 0 ? `<div style="font-size:12px;color:var(--text-muted);margin-top:${tandas.length ? '6px' : '0'}">
-        <strong>${sinAtribuir}</strong> ${unidad} ${hayEntradas ? 'sin entrada registrada' : 'anteriores a GestionLab (nunca pasaron por un pedido)'}
+        <strong>${sinAtribuir}</strong> ${unidad} ${hayEntradas ? 'sin entrada registrada' : `anteriores a ${NOMBRE_APP} (nunca pasaron por un pedido)`}
       </div>` : ''}
       ${tandas.length > 1 ? `<div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.5">
         Repartido suponiendo que se gasta primero lo más antiguo. Sin etiquetar bote a bote no se

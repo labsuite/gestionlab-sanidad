@@ -342,7 +342,7 @@ const VIDEOS_RESIDUOS = [
     categorias: ['Bolsa químicos - Envases de plástico', 'Bolsa químicos - Envases metálicos', 'Bolsa químicos - Guantes, papel y absorbentes'] },
   { id: 'punzantes', titulo: 'Contenedor amarillo de punzantes', inicio: 377.09,
     categorias: ['Residuo Cortante'] },
-  { id: 'en-caso-de-duda', titulo: 'En caso de duda, la guía de GestionLab', inicio: 444.94,
+  { id: 'en-caso-de-duda', titulo: `En caso de duda, la guía de ${NOMBRE_APP}`, inicio: 444.94,
     categorias: [] },
 ];
 
@@ -468,7 +468,7 @@ const _INDICE_VIDEO_RESIDUOS = [
       },
       {
         "que": "No sé qué es ni dónde va",
-        "donde": "Guía de residuos de GestionLab",
+        "donde": `Guía de residuos de ${NOMBRE_APP}`,
         "t": 444.95
       }
     ]
@@ -1370,7 +1370,7 @@ function _construirSystemPromptResiduo(lab) {
     .join('\n') || '(No hay contenedores activos en otros laboratorios)';
   const avisos = _WARNINGS_FORMATO.map(w => `- Si el contenedor es "${w.match}": ${w.texto}`).join('\n');
 
-  const systemText = `Eres el consultorio de residuos de un laboratorio de un instituto de FP sanitaria (CIFP Manuel Antonio). Un alumno, profesor o gestor te va a describir un residuo que quiere tirar. Tu trabajo es decirle en qué contenedor va y dónde está, o si no hay ninguno adecuado en todo el centro, darle instrucciones de manejo provisional seguras.
+  const systemText = `Eres el consultorio de residuos de un laboratorio de un instituto de FP sanitaria${NOMBRE_CENTRO ? ` (${NOMBRE_CENTRO})` : ''}. Un alumno, profesor o gestor te va a describir un residuo que quiere tirar. Tu trabajo es decirle en qué contenedor va y dónde está, o si no hay ninguno adecuado en todo el centro, darle instrucciones de manejo provisional seguras.
 
 CATÁLOGO DE TIPOS DE RESIDUO CONOCIDOS (usa también el "Detalle" para desambiguar — varios
 tipos pueden sonar parecido en el nombre pero tener destinos distintos, p.ej. un mismo
@@ -1654,7 +1654,7 @@ function exportarInformeConsenur() {
 </head>
 <body>
   <h1>Listado de contenedores de residuos para recogida</h1>
-  <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${hoy} &nbsp;·&nbsp; ${cerrados.length} contenedor${cerrados.length > 1 ? 'es' : ''} pendiente${cerrados.length > 1 ? 's' : ''} de recogida</div>
+  <div class="meta">${NOMBRE_CENTRO ? NOMBRE_CENTRO + ' &nbsp;·&nbsp; ' : ''}${hoy} &nbsp;·&nbsp; ${cerrados.length} contenedor${cerrados.length > 1 ? 'es' : ''} pendiente${cerrados.length > 1 ? 's' : ''} de recogida</div>
   ${seccionesHtml}
 </body>
 <script>window.onload = function() { window.print(); }<\/script>

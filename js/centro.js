@@ -25,3 +25,17 @@
   window.__nombreConfigCentro = location.hostname + (tramo ? '_' + tramo : '');
   document.write('<script src="config/' + window.__nombreConfigCentro + '.js"><\/script>');
 })();
+
+// Icono de la instalación, elegido con UNA PALABRA en su archivo de configuración
+// (`icono: 'diente'`): nada de pegar emojis. Una palabra que no esté da 🧪. La lista
+// crece a demanda. La usan js/config.js y subir-factura.html.
+var ICONOS_APP = {
+  laboratorio: '🧪', microscopio: '🔬', quimica: '⚗️', diente: '🦷', oido: '👂',
+  salud: '🩺', farmacia: '💊', textil: '🧵', cocina: '🍳', planta: '🌱',
+  herramienta: '🔧', electricidad: '⚡', madera: '🪵', coche: '🚗', belleza: '💇',
+  informatica: '💻',
+};
+function iconoDeInstalacion(palabra) {
+  var p = String(palabra || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  return ICONOS_APP[p] || '🧪';
+}

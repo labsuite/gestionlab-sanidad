@@ -3,6 +3,16 @@
 // ⚠ Solo valores PÚBLICOS: van en el navegador de todo el mundo. Nunca una clave
 // secreta (sb_secret_…), una service_role ni una contraseña.
 window.GESTIONLAB_CENTRO = {
+  // Nombre de la app, del centro y su localidad, siglas e icono. Se ven antes de entrar.
+  // El icono es UNA PALABRA de la lista de js/centro.js (laboratorio, diente, textil…).
+  // ⚠ nombreApp + siglasCentro dan el final de las cuentas de grupo (@gestionlab.cma):
+  // si se cambian, Administración tiene que pulsar «Renombrar las cuentas de grupo».
+  nombreApp: 'GestionLab',
+  nombreCentro: 'CIFP Manuel Antonio',
+  localidad: 'Vigo',
+  siglasCentro: 'CMA',
+  icono: 'laboratorio',
+
   // Su proyecto de Supabase y su clave publishable (Project Settings → API Keys).
   supabaseUrl: 'https://vnoecaqldymonkgrmvlj.supabase.co',
   supabaseClavePublica: 'sb_publishable_RG8LDGtNkNdON9Nz4UOfnQ_TDgQ7U1u',

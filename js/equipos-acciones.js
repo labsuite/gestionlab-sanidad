@@ -1933,7 +1933,7 @@ async function guardarAvisoAlumno() {
     const quien = getUserRole() === 'Alumno'
       ? 'al profesorado responsable del equipo (o, si no tiene, a la gestión del laboratorio)'
       : equipoTieneResponsableActivo(eqAviso) ? 'al profesorado responsable del equipo' : 'a la gestión del laboratorio';
-    showToast(`Aviso enviado. Le aparece en GestionLab ${quien}, y quien abra el equipo verá el aviso. No se manda ningún correo: díselo también en persona.`, 'success');
+    showToast(`Aviso enviado. Le aparece en ${NOMBRE_APP} ${quien}, y quien abra el equipo verá el aviso. No se manda ningún correo: díselo también en persona.`, 'success');
     closeModal('modal-aviso-alumno');
     renderIncidencias();
     renderDashboard();

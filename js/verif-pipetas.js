@@ -173,7 +173,7 @@ function renderVerifPipetas() {
       </div>
       <div style="padding:0 16px 14px;font-size:13px;color:var(--text-soft);line-height:1.55">
         La verificación de cada pipeta se hace en su <strong>revisión anual</strong> (Mantenimiento): allí se meten las pesadas y las
-        lecturas, y GestionLab calcula y decide (OK, completar, ajustar o retirar). Aquí van la <strong>preparación del curso</strong>
+        lecturas, y ${NOMBRE_APP} calcula y decide (OK, completar, ajustar o retirar). Aquí van la <strong>preparación del curso</strong>
         (disoluciones de colorante y puntos de la recta) y las <strong>sesiones</strong> de cada día, comunes a todas las pipetas
         que se verifican ese día. ${validado ? '' : '<br><strong>⚠ Este curso aún no hay una sesión con la validación del método (anexo A, 8):</strong> hasta entonces no se puede dar por buena ninguna verificación fotométrica.'}
       </div>
@@ -660,7 +660,7 @@ function _vpPintarResumenRevision() {
   const pend = calc && !calc.final ? VP.resumenPendiente(calc) : '';
   cont.innerHTML = `<div class="vp-resumen-rev">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div><strong>🧪 Verificación de la pipeta</strong> <span class="vp-guia">(la calcula GestionLab)</span><br>
+      <div><strong>🧪 Verificación de la pipeta</strong> <span class="vp-guia">(la calcula ${NOMBRE_APP})</span><br>
         ${calc ? _vpBadgeResultado(calc.resultado) : ''} ${pend ? `<span class="vp-guia">${_vpEsc(pend)}</span>` : ''}
         ${calc?.final && resumenVerificacion(calc) ? `<div class="vp-guia">${_vpEsc(resumenVerificacion(calc))}</div>` : ''}</div>
       <button type="button" class="btn btn-primary" onclick="openModalVerifPipeta()">${par?.v_nominal ? 'Abrir la verificación' : 'Ver por qué no se puede verificar'}</button>
@@ -822,7 +822,7 @@ function _vpPintarResultadosVer() {
       ? (calc.final ? `<div class="vp-aviso-caja${/^OK/.test(calc.resultado) ? '' : ' vp-grave'}">${/^OK/.test(calc.resultado)
           ? 'Al finalizar, el resultado queda en la incidencia y ya se podrá cerrar desde su hilo dejando la pipeta operativa.'
           : 'Al finalizar, el resultado queda en la incidencia y la pipeta sigue fuera de servicio, con la incidencia abierta. Mantén la etiqueta «NO USAR».'}</div>` : '')
-      : (/^RETIRAR/.test(calc.resultado) ? '<div class="vp-aviso-caja vp-grave">Al finalizar la revisión, GestionLab abre la incidencia de la pipeta con lo que ha fallado y la deja fuera de servicio. Ponle la etiqueta «NO USAR».</div>' : '')}
+      : (/^RETIRAR/.test(calc.resultado) ? '<div class="vp-aviso-caja vp-grave">Al finalizar la revisión, ' + NOMBRE_APP + ' abre la incidencia de la pipeta con lo que ha fallado y la deja fuera de servicio. Ponle la etiqueta «NO USAR».</div>' : '')}
     ${acciones}`;
 }
 
@@ -867,7 +867,7 @@ async function vpGenerarPaginaRecogida() {
     };
     const json = JSON.stringify(datos).replace(/</g, '\\u003c');
     // Reemplazo con función: con un texto, «$'» o «$&» dentro del código se interpretarían.
-    const html = plantilla
+    const html = textoConMarca(plantilla)
       .replace('/*__DATOS__*/', () => 'const DATOS = ' + json + ';')
       .replace('/*__VALIDACION__*/', () => validacion.replace(/<\/script/gi, '<\\/script'));
     return { html, nombre: `recogida-verificacion-pipetas-${curso}.html` };

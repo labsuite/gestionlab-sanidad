@@ -33,7 +33,7 @@ async function loadModales() {
   ];
   try {
     const htmls = await Promise.all(archivos.map(f => _fetchConReintentos(f)));
-    document.getElementById('modales-container').innerHTML = htmls.join('\n');
+    document.getElementById('modales-container').innerHTML = textoConMarca(htmls.join('\n'));  // «GestionLab» → nombre de esta instalación
   } catch(e) {
     console.error('Error cargando modales:', e);
     throw e;  // Relanzar para que initAuth no arranque con DOM incompleto
@@ -408,7 +408,7 @@ function showApp() {
         <div style="font-size:48px;margin-bottom:16px">🔒</div>
         <div style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:8px">Acceso no autorizado</div>
         <div style="font-size:14px;color:var(--text-muted);margin-bottom:24px;line-height:1.6">
-          Tu cuenta <strong>(${currentUser?.email||''})</strong> no está registrada en GestionLab.<br>
+          Tu cuenta <strong>(${currentUser?.email||''})</strong> no está registrada en ${NOMBRE_APP}.<br>
           Contacta con el administrador del laboratorio para solicitar acceso.
         </div>
         <button class="btn btn-secondary" onclick="signOut()" style="font-size:14px">↩ Cerrar sesión</button>

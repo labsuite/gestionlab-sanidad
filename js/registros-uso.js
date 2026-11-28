@@ -946,7 +946,7 @@ function generarInformeRegistro(tipo) {
 </head>
 <body>
   <h1>Registro de uso — ${cfg.label}</h1>
-  <div class="meta">CIFP Manuel Antonio &nbsp;·&nbsp; ${nombreEquipo} &nbsp;·&nbsp; Generado el ${hoy} &nbsp;·&nbsp; ${cerradas.length} sesión${cerradas.length > 1 ? 'es' : ''}</div>
+  <div class="meta">${NOMBRE_CENTRO ? NOMBRE_CENTRO + ' &nbsp;·&nbsp; ' : ''}${nombreEquipo} &nbsp;·&nbsp; Generado el ${hoy} &nbsp;·&nbsp; ${cerradas.length} sesión${cerradas.length > 1 ? 'es' : ''}</div>
   <table>
     <thead><tr><th>Fecha</th><th>Horario</th><th>Usuario</th>${cfg.mostrarCicloModulo ? '<th>Ciclo / Módulo</th>' : ''}${campos.map(c => `<th>${c.label}</th>`).join('')}<th>${cfg.labelIncidencias || 'Incidencias'}</th>${hayCorrecciones ? '<th>Correcciones</th>' : ''}</tr></thead>
     <tbody>${filas}</tbody>

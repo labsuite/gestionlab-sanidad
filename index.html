@@ -34,9 +34,9 @@
 <!-- AUTH SCREEN -->
 <div id="auth-screen">
   <div class="auth-card">
-    <div class="auth-logo">🧪</div>
-    <h1>GestionLab</h1>
-    <p>CIFP Manuel Antonio · Vigo<br>Accede con tu cuenta de GestionLab</p>
+    <div class="auth-logo" data-marca="icono">🧪</div>
+    <h1 data-marca="nombre">GestionLab</h1>
+    <p><span data-marca="centro-localidad">CIFP Manuel Antonio · Vigo</span><br>Accede con tu cuenta de <span data-marca="nombre">GestionLab</span></p>
     <div id="auth-aviso-sesion" class="auth-aviso-sesion" style="display:none"></div>
     <form onsubmit="event.preventDefault(); signIn();" style="display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:8px">
       <div>
@@ -62,7 +62,7 @@
   <div class="auth-card">
     <div class="auth-logo">🔑</div>
     <h1>Nueva contraseña</h1>
-    <p>Escribe la nueva contraseña para tu cuenta de GestionLab.</p>
+    <p>Escribe la nueva contraseña para tu cuenta de <span data-marca="nombre">GestionLab</span>.</p>
     <form onsubmit="event.preventDefault(); guardarNuevaPassword();" style="display:flex;flex-direction:column;gap:10px;text-align:left;margin-top:8px">
       <div>
         <label for="rec-pass" style="font-size:12px;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Nueva contraseña</label>
@@ -85,10 +85,10 @@
   <nav class="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <div class="sidebar-logo-icon">🧪</div>
+        <div class="sidebar-logo-icon" data-marca="icono">🧪</div>
         <div class="sidebar-logo-lockup">
-          <div class="sidebar-logo-text">GestionLab</div>
-          <div class="sidebar-subtitle">CIFP Manuel Antonio</div>
+          <div class="sidebar-logo-text" data-marca="nombre">GestionLab</div>
+          <div class="sidebar-subtitle" data-marca="centro">CIFP Manuel Antonio</div>
         </div>
       </div>
     </div>

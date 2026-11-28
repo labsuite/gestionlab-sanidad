@@ -37,6 +37,83 @@ const APP_URL = CENTRO.appUrl;
 // el envío de verdad lo hace la Edge Function 'enviar-a-trebello'. null = sin Trebello.
 const TREBELLO_URL = CENTRO.trebelloUrl || null;
 
+// ------------------------------------------------------------
+// MARCA: nombre de la app, del centro e icono (2026-11-28)
+// ------------------------------------------------------------
+// Cada instalación pone los suyos en su archivo de configuración: un taller de
+// bucodental no tiene por qué llamarse «GestionLab». Van en el archivo, y no en la base,
+// porque se ven ANTES de entrar (la base no deja leer nada sin sesión). Sin ellos,
+// «GestionLab» con 🧪, como siempre: aquí sí vale un valor por defecto, porque el
+// nombre no conecta con nada.
+// El icono se elige con UNA PALABRA de la lista ICONOS_APP (nada de pegar emojis en el
+// archivo); una palabra que no esté da 🧪. La lista crece a demanda.
+// (La lista ICONOS_APP está en js/centro.js, que cargan todas las páginas.)
+const _sinTildes = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+const NOMBRE_APP = String(CENTRO.nombreApp || '').trim() || 'GestionLab';
+const ICONO_APP = iconoDeInstalacion(CENTRO.icono);
+const NOMBRE_CENTRO = String(CENTRO.nombreCentro || '').trim();
+const LOCALIDAD_CENTRO = String(CENTRO.localidad || '').trim();
+const SIGLAS_CENTRO = String(CENTRO.siglasCentro || '').trim();
+
+/** Final de las cuentas de GRUPO que corresponde a este archivo: @<nombre app>.<siglas>,
+ * en minúsculas y sin tildes, espacios ni signos («Higiene Bucodental» + «XYZ» →
+ * @higienebucodental.xyz). Es el que DEBERÍA haber; el vigente está guardado en la base
+ * (ajuste `dominio_grupos`) y solo cambia con el botón «Renombrar las cuentas de grupo».
+ * null si falta `siglasCentro` en el archivo. */
+function dominioGruposCalculado() {
+  const limpio = s => _sinTildes(s).replace(/[^a-z0-9]/g, '');
+  const nombre = limpio(NOMBRE_APP), siglas = limpio(SIGLAS_CENTRO);
+  return nombre && siglas ? '@' + nombre + '.' + siglas : null;
+}
+
+/** Cambia «GestionLab» y la dirección del CMA por los de esta instalación en textos
+ * escritos de antemano (manual de Ayuda, hoja de recogida de pipetas…). */
+function textoConMarca(t) {
+  const web = APP_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+  return String(t ?? '')
+    .replace(/labsuite\.github\.io\/gestionlab-sanidad/g, web)
+    .replace(/GestionLab/g, NOMBRE_APP);
+}
+
+/** Pone nombre, centro e icono en la pantalla de entrada, el menú, el título de la
+ * pestaña y el manifiesto (nombre de la app instalada). Se llama al cargar. */
+function aplicarMarca() {
+  const centroYLocalidad = [NOMBRE_CENTRO, LOCALIDAD_CENTRO].filter(Boolean).join(' · ');
+  document.title = NOMBRE_CENTRO ? `${NOMBRE_APP} · ${NOMBRE_CENTRO}` : NOMBRE_APP;
+  document.querySelectorAll('[data-marca="nombre"]').forEach(el => { el.textContent = NOMBRE_APP; });
+  document.querySelectorAll('[data-marca="icono"]').forEach(el => { el.textContent = ICONO_APP; });
+  document.querySelectorAll('[data-marca="centro"]').forEach(el => { el.textContent = NOMBRE_CENTRO; el.hidden = !NOMBRE_CENTRO; });
+  document.querySelectorAll('[data-marca="centro-localidad"]').forEach(el => { el.textContent = centroYLocalidad; el.hidden = !centroYLocalidad; });
+  document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute('content', NOMBRE_APP);
+  // Manifiesto con el nombre de esta instalación. El icono instalado es una imagen: la
+  // del matraz solo para «laboratorio»; para los demás, una neutra.
+  const img = ICONO_APP === '🧪' ? 'icon' : 'icon-neutro';
+  const manifiesto = {
+    name: document.title, short_name: NOMBRE_APP,
+    description: `Gestión ${img === 'icon' ? 'de laboratorio' : 'del taller'}${NOMBRE_CENTRO ? ' · ' + NOMBRE_CENTRO : ''}`,
+    lang: 'es', dir: 'ltr', start_url: APP_URL, scope: APP_URL, display: 'standalone',
+    background_color: '#f4f1ec', theme_color: '#2d5a3d',
+    icons: [
+      { src: APP_URL + `assets/${img}-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: APP_URL + `assets/${img}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: APP_URL + `assets/${img === 'icon' ? 'icon-maskable' : 'icon-neutro-maskable'}-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  };
+  const link = document.querySelector('link[rel="manifest"]');
+  if (link) link.href = 'data:application/manifest+json,' + encodeURIComponent(JSON.stringify(manifiesto));
+  if (img !== 'icon') {
+    // Pestaña del navegador: el propio dibujo elegido. iPhone: la imagen neutra.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">${ICONO_APP}</text></svg>`;
+    document.querySelectorAll('link[rel="icon"]').forEach(l => l.remove());
+    const fav = document.createElement('link');
+    fav.rel = 'icon'; fav.type = 'image/svg+xml'; fav.href = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    document.head.appendChild(fav);
+    document.querySelector('link[rel="apple-touch-icon"]')?.setAttribute('href', 'assets/icon-neutro-180.png');
+  }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', aplicarMarca);
+else aplicarMarca();
+
 // Base para las URLs de etiquetas NFC/QR — siempre la de producción.
 function urlEtiqueta(params) {
   return APP_URL + '?' + new URLSearchParams(params).toString();

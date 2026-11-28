@@ -1948,7 +1948,8 @@ function _ayudaTareasDe(rol) {
 }
 
 function _ayudaEsc(t) {
-  return String(t ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // textoConMarca: el manual dice «GestionLab»; se muestra con el nombre de esta instalación.
+  return textoConMarca(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 /** **negrita** y [[COD|texto]] → enlace a la tarea si está en el manual que se ve. */

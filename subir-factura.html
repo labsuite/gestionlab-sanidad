@@ -62,6 +62,13 @@ if (!CENTRO || !CENTRO.supabaseUrl || !CENTRO.supabaseClavePublica) {
   throw new Error('GestionLab: falta config/' + (window.__nombreConfigCentro || location.hostname) + '.js');
 }
 const SUPABASE_MIGRACION_URL = CENTRO.supabaseUrl;
+// Nombre, icono y centro de esta instalación (mismo criterio que js/config.js).
+(function () {
+  var nombre = String(CENTRO.nombreApp || '').trim() || 'GestionLab';
+  var centro = String(CENTRO.nombreCentro || '').trim();
+  document.title = 'Subir factura — ' + nombre;
+  document.querySelector('.logo').textContent = iconoDeInstalacion(CENTRO.icono) + ' ' + nombre + (centro ? ' · ' + centro : '');
+})();
 const SUPABASE_CLAVE_PUBLICA = CENTRO.supabaseClavePublica;
 
 const params = new URLSearchParams(location.search);
