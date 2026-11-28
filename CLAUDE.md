@@ -270,9 +270,46 @@ llegue a la pantalla en vez de quedar solo en la consola.
 
 ---
 
+## Cambios de esquema: siempre como migración (desde 2026-11-27)
+
+Hasta 2026-11-27 las sesiones de Claude cambiaban el esquema de la base real directamente
+(scripts `migrar_*.py`, SQL a mano). **Desde entonces, todo cambio de esquema es un archivo
+nuevo en `supabase/migrations/`**, con nombre `AAAAMMDDHHMMSS_descripcion.sql`. Cuenta como
+cambio de esquema una tabla, columna, índice, restricción, política RLS, permiso, función
+SQL, disparador o bucket. Es lo único que viaja a las otras instalaciones (PFFP): si un cambio
+no está en una migración, a los demás centros no les llega nunca y su app se rompe al
+actualizar el código.
+
+- **Nunca editar una migración ya subida.** Si algo está mal, se corrige con otra nueva. La
+  primera, `20261127000000_base_limpia.sql`, está congelada.
+- **Cada tabla nueva lleva, en la misma migración, sus políticas RLS y sus `GRANT`**, y a
+  `anon` no se le da nada (ver la tabla de permisos en `supabase/base-limpia/README.md`).
+- **Cada Edge Function nueva se declara en `supabase/config.toml`**, o no se despliega.
+- Los **datos** no van en migraciones: son de cada instalación. Los scripts de datos de
+  `scripts/` siguen como siempre.
+
+**Cómo llega cada migración a cada sitio:**
+
+1. **`gestionlab-prueba`** (proyecto de prueba) tiene la integración de Supabase con GitHub
+   y sigue la rama `preparacion-pffp`. Al subir la migración a esa rama, **se aplica sola**.
+   Ahí se prueba primero.
+2. **La base real del CMA no está conectada a la integración.** La migración se le aplica a
+   mano, con el mismo archivo (`psql -1 -v ON_ERROR_STOP=1 -f`, con la conexión de
+   `scripts/supabase_credentials.json`), **solo después de probarla en `gestionlab-prueba` y
+   con el visto bueno de Paloma**. Después, `python tools/base-limpia/sacar_base_limpia.py
+   --comparar scripts/supabase_credentials_prueba.json` tiene que dar «Sin diferencias de
+   estructura».
+3. ⚠ **Antes de conectar algún día la base real a la integración**, hay que registrar en ella
+   como ya aplicadas la migración base y todas las que se le hayan aplicado a mano (tabla
+   `supabase_migrations.schema_migrations`). Si no, la integración intentaría volver a
+   crearlas: fallaría sin romper nada, pero bloquearía todas las siguientes. Está pendiente
+   de decidir si se conecta, y cuándo.
+
 ## Añadir una columna nueva a una tabla
 
-⚠ Al añadir una columna a una tabla de Supabase, actualizar: la migración SQL (`supabase/schema.sql`),
+⚠ Al añadir una columna a una tabla de Supabase, actualizar: una **migración nueva** en
+`supabase/migrations/` (ver «Cambios de esquema»; `supabase/schema.sql` queda como registro
+histórico y ya no se actualiza),
 la Edge Function `gestionar-*` correspondiente (leer/escribir el campo nuevo), la función
 `_xSbToObj()` en `js/sheets.js` (mapea la fila de Supabase al objeto que usa el resto de la
 app) y `COLS` en `js/config.js` si el módulo también tiene columnas legacy de Sheets. Si se
@@ -285,6 +322,14 @@ la columna exista en la base de datos.
 acciones). El protocolo se pide al abrirlo con `cargarProtocoloEquipo(id)`;
 `Protocolo_Uso === undefined` significa "aún sin pedir" y `Tiene_Protocolo` dice si lo hay.
 `gestionar-equipo` no toca `protocolo_uso` al actualizar si el campo no viene (ausente ≠ vacío).
+
+⚠ **Base limpia (instalación desde cero, 2026-11-27).** La estructura para instalar desde
+cero es la primera migración, `supabase/migrations/20261127000000_base_limpia.sql`
+(la saca `tools/base-limpia/sacar_base_limpia.py`, que solo lee la base real; **no se edita
+a mano**). Ver `supabase/base-limpia/README.md`: ahí está también con qué permisos nace una
+tabla o función nueva (`anon` nunca tiene ninguno) y la lista de secretos de las Edge
+Functions. Toda Edge Function nueva hay que declararla en `supabase/config.toml`, o no se
+despliega con la integración.
 
 (Ya no aplica el antiguo sistema de "rango A2:X" de Sheets — `loadAllData()` en `js/sheets.js`
 lee todas las tablas directo de Supabase con `select('*')`.)
@@ -304,7 +349,8 @@ El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:h
 ⚠ Los cuatro generadores de etiqueta (`mostrarUrlNfc` en `js/ubicaciones.js`,
 `mostrarUrlNfcContenedor` en `js/residuos.js`, `openModalNfcRegistro` en
 `js/registros-uso.js`, `openModalEtiquetaCongelado` en `js/congelados.js`) llaman a `urlEtiqueta(params)` de `js/config.js`, que compone la URL
-sobre la constante `APP_URL`. No volver a usar `window.location.origin + pathname`: la URL se
+sobre la constante `APP_URL` (desde 2026-11-28 sale de `appUrl` en el archivo del centro, ver
+«Configuración del centro»). No volver a usar `window.location.origin + pathname`: la URL se
 graba **físicamente en el chip** y se queda pegada a una puerta durante años, así que basta
 generar la etiqueta desde un host distinto para dejar un tag muerto para siempre.
 
@@ -315,9 +361,36 @@ regrabar todas las etiquetas a mano desde la app (botones 🔗).
 
 ---
 
+## Configuración del centro: `config/<dominio>_<ruta>.js` (desde 2026-11-28)
+
+La dirección de Supabase, su **clave publishable** (`sb_publishable_…`), `APP_URL`, la dirección de
+Trebello y la conexión provisional a Trebello **no van en el código**. Van en un archivo por
+instalación, `config/<dominio>_<ruta>.js`, que define `window.GESTIONLAB_CENTRO`. El del CMA es
+`config/labsuite.github.io_gestionlab-sanidad.js`. Lo carga `js/centro.js` antes que
+`js/config.js`, en `index.html` y en `subir-factura.html`. Así cada centro (en su *fork*) añade su
+archivo y nunca toca código común, y sincronizar no da conflictos.
+
+- El nombre lleva **dominio y primer tramo de la ruta**, porque dos talleres en la misma cuenta de
+  GitHub comparten dominio.
+- ⚠ **Sin archivo para esa dirección exacta, la app no arranca** y dice cuál falta. **Nunca** poner
+  una configuración «por defecto» ni de reserva: conectaría a un centro con la base de otro.
+- ⚠ En ese archivo solo van valores **públicos**: nunca una *secret key*, una `service_role` ni
+  una contraseña.
+- Sin Trebello (`trebelloSupabase: null`), `_sb` es un sustituto que devuelve listas vacías.
+  Es provisional, hasta la pestaña de ciclos y módulos de Usuarios.
+- Para probar en local: `tools/capturas-ayuda/capturar.js` sirve una configuración de mentira
+  para `127.0.0.1`. No se sube ningún `config/127.0.0.1.js` ni `config/localhost.js`.
+- La clave publishable no es un JWT: va en la cabecera `apikey`, nunca como `Bearer`. Por eso
+  `pedido-publico`, que se llama sin sesión, va con `verify_jwt = false` en `supabase/config.toml`.
+  Las funciones del servidor usan la *secret key* `default` (`claveDeServidor()` en
+  `_shared/auth.ts`), nunca `SUPABASE_SERVICE_ROLE_KEY`.
+
+---
+
 ## Arquitectura general
 
 - `index.html` — página principal, carga todos los scripts y modales
+- `js/centro.js` — carga `config/<dominio>_<ruta>.js` (configuración del centro), antes que todo
 - `js/config.js` — constantes globales: DATA, COLS, ROLES, clientes Supabase (`_sb`, `_sbMigracion`)
 - `js/auth.js` — Supabase Auth (email + contraseña), sesión gestionada por supabase-js
 - `js/sheets.js` — `loadAllData()` (lee todas las tablas de Supabase), `callEdgeFunction()`, `subirDocumento()`/`abrirDocumento()` (Storage), y los `_xSbToObj()` de mapeo por tabla
@@ -336,7 +409,7 @@ regrabar todas las etiquetas a mano desde la app (botones 🔗).
 - `css/styles.css`
 
 **Orden de carga de scripts en index.html:**
-config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js → reservas.js
+centro.js (→ config/<dominio>_<ruta>.js) → config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js → reservas.js
 
 ---
 

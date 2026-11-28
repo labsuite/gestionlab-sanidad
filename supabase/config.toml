@@ -1,0 +1,124 @@
+# ============================================================
+# GestionLab — configuración de Supabase para la integración con GitHub
+# ============================================================
+# Al subir a la rama de producción del proyecto conectado (Project Settings →
+# Integrations → GitHub, «Deploy to production»), Supabase aplica las migraciones
+# nuevas de supabase/migrations/ y despliega las Edge Functions y los buckets
+# declarados AQUÍ. El resto de secciones (api, auth…) las ignora: no se ponen.
+# Ver supabase/base-limpia/README.md.
+#
+# ⚠ Una función que no esté aquí NO se despliega. Al crear una nueva, añadirla.
+#
+# Desde 2026-11-27 la rama preparacion-pffp es la rama de producción del proyecto de
+# PRUEBA (gestionlab-prueba). El proyecto real de GestionLab no está conectado.
+
+project_id = "gestionlab"
+
+# ------------------------------------------------------------
+# Edge Functions (27). verify_jwt = la pasarela de Supabase exige un token válido
+# antes de llegar a la función; además, cada función comprueba la sesión dentro.
+# ------------------------------------------------------------
+
+[functions.crear-usuario]
+verify_jwt = true
+
+[functions.enviar-a-trebello]
+verify_jwt = true
+
+[functions.gestionar-congelados]
+verify_jwt = true
+
+[functions.gestionar-equipo]
+verify_jwt = true
+
+[functions.gestionar-incidencia]
+verify_jwt = true
+
+[functions.gestionar-intervencion]
+verify_jwt = true
+
+[functions.gestionar-linea-pedido]
+verify_jwt = true
+
+[functions.gestionar-mantenimiento]
+verify_jwt = true
+
+[functions.gestionar-material]
+verify_jwt = true
+
+[functions.gestionar-pedido]
+verify_jwt = true
+
+[functions.gestionar-propuesta-material]
+verify_jwt = true
+
+[functions.gestionar-propuesta-ubicacion]
+verify_jwt = true
+
+[functions.gestionar-proveedor]
+verify_jwt = true
+
+[functions.gestionar-registro-uso]
+verify_jwt = true
+
+[functions.gestionar-reserva]
+verify_jwt = true
+
+[functions.gestionar-residuo]
+verify_jwt = true
+
+[functions.gestionar-solicitud]
+verify_jwt = true
+
+[functions.gestionar-tarea-personal]
+verify_jwt = true
+
+[functions.gestionar-ubicacion]
+verify_jwt = true
+
+[functions.gestionar-usuario]
+verify_jwt = true
+
+[functions.gestionar-verif-pipetas]
+verify_jwt = true
+
+[functions.importar-alumnos]
+verify_jwt = true
+
+[functions.importar-profesores]
+verify_jwt = true
+
+[functions.leer-documento-proveedor]
+verify_jwt = true
+
+[functions.obtener-documento]
+verify_jwt = true
+
+[functions.pedido-publico]
+# Página pública del proveedor (subir-factura.html), sin sesión: manda la clave
+# publishable en `apikey`, que no es un JWT, así que la pasarela no puede comprobarla.
+# La seguridad la da el token del enlace del pedido, que comprueba la propia función.
+verify_jwt = false
+
+[functions.subir-documento]
+verify_jwt = true
+
+
+# ------------------------------------------------------------
+# Storage: buckets privados. Sus reglas de acceso van en la migración base.
+# ------------------------------------------------------------
+[storage.buckets.documentos]
+public = false
+file_size_limit = "10MiB"
+allowed_mime_types = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]
+
+[storage.buckets.videos]
+public = false
+file_size_limit = "50MiB"
+allowed_mime_types = ["video/mp4", "text/vtt"]

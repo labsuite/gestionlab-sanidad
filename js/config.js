@@ -6,20 +6,36 @@
 // que leerlo antes de que nadie lo toque. Lo procesa initAuth() en auth.js.
 window.__authRecoveryHash = window.location.hash || '';
 
+// Configuración del centro: la deja js/centro.js, cargando config/<dominio>_<ruta>.js
+// (desde 2026-11-28; antes estos valores iban escritos aquí). Sin ella la app NO
+// arranca: nunca se usa la de otro centro como reserva, que conectaría con su base.
+const CENTRO = window.GESTIONLAB_CENTRO;
+if (!CENTRO || !CENTRO.supabaseUrl || !CENTRO.supabaseClavePublica || !CENTRO.appUrl) {
+  const archivo = 'config/' + (window.__nombreConfigCentro || location.hostname) + '.js';
+  document.addEventListener('DOMContentLoaded', () => {
+    document.body.innerHTML = '<div style="max-width:560px;margin:15vh auto;padding:24px;font-family:sans-serif;line-height:1.5">'
+      + '<h2>Falta la configuración del centro</h2>'
+      + '<p>Esta instalación de GestionLab no tiene el archivo <code>' + archivo + '</code>, '
+      + 'con la dirección de su base de datos. Hay que crearlo en el repositorio de la app '
+      + '(ver la guía de instalación).</p></div>';
+  });
+  throw new Error('GestionLab: falta ' + archivo);
+}
+
 // URL de la app en producción. Las etiquetas NFC/QR se graban una vez y se
 // quedan pegadas a una puerta durante años, así que su URL NO puede salir de
 // window.location: basta generar la etiqueta desde un host viejo (o desde un
 // index.html abierto en local) para grabar un tag que dará 404 para siempre.
 // Pasó de verdad: al transferir el repo a la organización labsuite (2026-08-23)
 // todas las etiquetas escritas antes quedaron apuntando a palomafedez.github.io,
-// que ya no existe. De ahí que esto sea una constante y no window.location.
-const APP_URL = 'https://labsuite.github.io/gestionlab-sanidad/';
+// que ya no existe. De ahí que salga del archivo del centro y no de window.location.
+const APP_URL = CENTRO.appUrl;
 
 // Trebello — app del departamento donde la jefa tramita todos los pedidos.
 // GestionLab le deposita ahí los de laboratorio (ver enviarPedidoATrebello en
 // js/pedidos-acciones.js); esto es solo para enlazar al pedido desde la ficha,
-// el envío de verdad lo hace la Edge Function 'enviar-a-trebello'.
-const TREBELLO_URL = 'https://trebello.vercel.app';
+// el envío de verdad lo hace la Edge Function 'enviar-a-trebello'. null = sin Trebello.
+const TREBELLO_URL = CENTRO.trebelloUrl || null;
 
 // Base para las URLs de etiquetas NFC/QR — siempre la de producción.
 function urlEtiqueta(params) {
@@ -46,14 +62,19 @@ function coincideBusqueda(campos, query) {
   return palabras.every(p => texto.includes(p));
 }
 
-// Proyecto Supabase compartido con la app de Vercel (ciclos, módulos, asignaciones usuario-módulo)
-const SUPABASE_URL  = 'https://clxcjsvkmaydpxvtqesv.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA';
-const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+// Supabase de Trebello (ciclos, módulos, asignaciones usuario-módulo). PROVISIONAL hasta
+// la pestaña de ciclos y módulos de Usuarios (propuesta 3 del plan del PFFP). Sin
+// Trebello configurado, `_sb` es un sustituto que devuelve listas vacías, así que las
+// lecturas de js/sheets.js siguen igual y la app funciona completa sin él.
+const _sb = CENTRO.trebelloSupabase
+  ? supabase.createClient(CENTRO.trebelloSupabase.url, CENTRO.trebelloSupabase.clavePublica)
+  : { from: () => ({ select: () => Promise.resolve({ data: [], error: null }) }) };
 
-// Proyecto Supabase propio de GestionLab (migración módulo a módulo desde Sheets) — tablas migradas y Edge Functions propias
-const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
-const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
+// Proyecto Supabase propio de GestionLab — tablas y Edge Functions. La clave es la
+// publishable (sb_publishable_…) desde 2026-11-28; el nombre de la constante se queda
+// por no tocar todo lo que la usa.
+const SUPABASE_MIGRACION_URL  = CENTRO.supabaseUrl;
+const SUPABASE_MIGRACION_ANON = CENTRO.supabaseClavePublica;
 // detectSessionInUrl:false — el login es solo email+contraseña, no hay OAuth ni
 // magic links, así que no queremos que supabase-js toque el hash de la URL. El
 // único caso con token en el fragmento es la recuperación de contraseña, y ese
