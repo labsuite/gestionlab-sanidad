@@ -349,7 +349,8 @@ El scroll horizontal de seguridad para tablas anchas está resuelto con `.card:h
 ⚠ Los cuatro generadores de etiqueta (`mostrarUrlNfc` en `js/ubicaciones.js`,
 `mostrarUrlNfcContenedor` en `js/residuos.js`, `openModalNfcRegistro` en
 `js/registros-uso.js`, `openModalEtiquetaCongelado` en `js/congelados.js`) llaman a `urlEtiqueta(params)` de `js/config.js`, que compone la URL
-sobre la constante `APP_URL`. No volver a usar `window.location.origin + pathname`: la URL se
+sobre la constante `APP_URL` (desde 2026-11-28 sale de `appUrl` en el archivo del centro, ver
+«Configuración del centro»). No volver a usar `window.location.origin + pathname`: la URL se
 graba **físicamente en el chip** y se queda pegada a una puerta durante años, así que basta
 generar la etiqueta desde un host distinto para dejar un tag muerto para siempre.
 
@@ -360,9 +361,36 @@ regrabar todas las etiquetas a mano desde la app (botones 🔗).
 
 ---
 
+## Configuración del centro: `config/<dominio>_<ruta>.js` (desde 2026-11-28)
+
+La dirección de Supabase, su **clave publishable** (`sb_publishable_…`), `APP_URL`, la dirección de
+Trebello y la conexión provisional a Trebello **no van en el código**. Van en un archivo por
+instalación, `config/<dominio>_<ruta>.js`, que define `window.GESTIONLAB_CENTRO`. El del CMA es
+`config/labsuite.github.io_gestionlab-sanidad.js`. Lo carga `js/centro.js` antes que
+`js/config.js`, en `index.html` y en `subir-factura.html`. Así cada centro (en su *fork*) añade su
+archivo y nunca toca código común, y sincronizar no da conflictos.
+
+- El nombre lleva **dominio y primer tramo de la ruta**, porque dos talleres en la misma cuenta de
+  GitHub comparten dominio.
+- ⚠ **Sin archivo para esa dirección exacta, la app no arranca** y dice cuál falta. **Nunca** poner
+  una configuración «por defecto» ni de reserva: conectaría a un centro con la base de otro.
+- ⚠ En ese archivo solo van valores **públicos**: nunca una *secret key*, una `service_role` ni
+  una contraseña.
+- Sin Trebello (`trebelloSupabase: null`), `_sb` es un sustituto que devuelve listas vacías.
+  Es provisional, hasta la pestaña de ciclos y módulos de Usuarios.
+- Para probar en local: `tools/capturas-ayuda/capturar.js` sirve una configuración de mentira
+  para `127.0.0.1`. No se sube ningún `config/127.0.0.1.js` ni `config/localhost.js`.
+- La clave publishable no es un JWT: va en la cabecera `apikey`, nunca como `Bearer`. Por eso
+  `pedido-publico`, que se llama sin sesión, va con `verify_jwt = false` en `supabase/config.toml`.
+  Las funciones del servidor usan la *secret key* `default` (`claveDeServidor()` en
+  `_shared/auth.ts`), nunca `SUPABASE_SERVICE_ROLE_KEY`.
+
+---
+
 ## Arquitectura general
 
 - `index.html` — página principal, carga todos los scripts y modales
+- `js/centro.js` — carga `config/<dominio>_<ruta>.js` (configuración del centro), antes que todo
 - `js/config.js` — constantes globales: DATA, COLS, ROLES, clientes Supabase (`_sb`, `_sbMigracion`)
 - `js/auth.js` — Supabase Auth (email + contraseña), sesión gestionada por supabase-js
 - `js/sheets.js` — `loadAllData()` (lee todas las tablas de Supabase), `callEdgeFunction()`, `subirDocumento()`/`abrirDocumento()` (Storage), y los `_xSbToObj()` de mapeo por tabla
@@ -381,7 +409,7 @@ regrabar todas las etiquetas a mano desde la app (botones 🔗).
 - `css/styles.css`
 
 **Orden de carga de scripts en index.html:**
-config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js → reservas.js
+centro.js (→ config/<dominio>_<ruta>.js) → config.js → mantenimiento.js → auth.js → sheets.js → ui.js → equipos-render.js → equipos-acciones.js → … → tareas.js → residuos.js → reservas.js
 
 ---
 

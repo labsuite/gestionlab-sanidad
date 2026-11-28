@@ -112,6 +112,12 @@ de producción** del proyecto conectado, aplica las migraciones nuevas de
    dentro). Sin ella no se puede entrar.
 6. *(Opcional)* catálogo de ejemplo de residuos: `ejemplo_tipos_residuo.sql` en el SQL
    Editor.
+7. **Archivo de configuración del centro**, en su *fork*, desde la web de GitHub (*Add file →
+   Create new file*): `config/<dominio>_<ruta>.js`, copiando el del CMA y cambiando la
+   dirección de Supabase, la clave **publishable** (Project Settings → API Keys) y la dirección
+   de su app. Por ejemplo, `config/iesejemplo.github.io_gestionlab-sanidad.js` para
+   `https://iesejemplo.github.io/gestionlab-sanidad/`. Si falta, la app avisa de cuál es el
+   nombre que espera. Ver «Configuración del centro» en `CLAUDE.md`.
 
 **Sin la integración** (si un centro no la quiere): pegar la migración base entera en el
 SQL Editor, y desplegar las funciones a mano. Lo primero se puede hacer desde el navegador;
