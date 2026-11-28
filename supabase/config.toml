@@ -95,7 +95,10 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.pedido-publico]
-verify_jwt = true
+# Página pública del proveedor (subir-factura.html), sin sesión: manda la clave
+# publishable en `apikey`, que no es un JWT, así que la pasarela no puede comprobarla.
+# La seguridad la da el token del enlace del pedido, que comprueba la propia función.
+verify_jwt = false
 
 [functions.subir-documento]
 verify_jwt = true

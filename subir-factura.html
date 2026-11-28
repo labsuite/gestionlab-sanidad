@@ -52,9 +52,17 @@
   <div class="logo">🧪 GestionLab · CIFP Manuel Antonio</div>
   <div id="contenido">Cargando...</div>
 </div>
+<script src="js/centro.js"></script>
 <script>
-const SUPABASE_MIGRACION_URL  = 'https://vnoecaqldymonkgrmvlj.supabase.co';
-const SUPABASE_MIGRACION_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZub2VjYXFsZHltb25rZ3JtdmxqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU4NDgxNjIsImV4cCI6MjEwMTQyNDE2Mn0.vur-8PuNaUJV22EmEBe6S5lofWqqyCxsh2IZ-_d79NI';
+// Dirección y clave pública de esta instalación: config/<dominio>_<ruta>.js, que carga
+// js/centro.js (ver js/config.js). Sin ella, la página no sigue: nunca la de otro centro.
+const CENTRO = window.GESTIONLAB_CENTRO;
+if (!CENTRO || !CENTRO.supabaseUrl || !CENTRO.supabaseClavePublica) {
+  document.getElementById('contenido').textContent = 'Falta la configuración de esta instalación de GestionLab.';
+  throw new Error('GestionLab: falta config/' + (window.__nombreConfigCentro || location.hostname) + '.js');
+}
+const SUPABASE_MIGRACION_URL = CENTRO.supabaseUrl;
+const SUPABASE_CLAVE_PUBLICA = CENTRO.supabaseClavePublica;
 
 const params = new URLSearchParams(location.search);
 const pedido = params.get('pedido') || '';
@@ -64,7 +72,10 @@ const contenido = document.getElementById('contenido');
 async function llamar(accion, extra) {
   const r = await fetch(`${SUPABASE_MIGRACION_URL}/functions/v1/pedido-publico`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${SUPABASE_MIGRACION_ANON}`, 'Content-Type': 'application/json' },
+    // La clave publishable va en `apikey`: no es una sesión, y como Bearer Supabase la rechaza.
+    // Por eso pedido-publico va sin la comprobación de sesión en la entrada (config.toml):
+    // la seguridad la da el token del enlace, que comprueba la propia función.
+    headers: { 'apikey': SUPABASE_CLAVE_PUBLICA, 'Content-Type': 'application/json' },
     body: JSON.stringify({ accion, pedido, token, ...extra }),
   });
   const data = await r.json().catch(() => ({}));

@@ -3,10 +3,9 @@
 // pedido concreto, sin darle acceso al resto de la app. La seguridad la da el
 // `token` (aleatorio, generado por gestionar-pedido/accion=generar_link_publico
 // y guardado en la tabla pedidos_token, que solo lee el servidor), no una sesión de Supabase Auth — por
-// eso este fichero NO usa requireAdminOrGestor/requireStaff. El navegador
-// sigue mandando la anon key como Authorization (igual que hace
-// callEdgeFunction() sin sesión), así que no hace falta desactivar verify_jwt
-// en el despliegue.
+// eso este fichero NO usa requireAdminOrGestor/requireStaff. Desde 2026-11-28 la
+// página (subir-factura.html) manda la clave publishable en `apikey`, que no es un
+// JWT: por eso esta función va con verify_jwt = false (supabase/config.toml).
 import { adminClient, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const TIPOS_MIME_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png"];

@@ -29,6 +29,14 @@ const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 const servidor = http.createServer((req, res) => {
   let ruta = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   if (ruta.endsWith('/')) ruta += 'index.html';
+  // La app necesita config/<dominio>_<ruta>.js (js/centro.js). Las capturas no llaman al
+  // servidor: se sirve una configuración de mentira, sin ningún proyecto real detrás.
+  if (ruta === '/config/127.0.0.1.js') {
+    res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+    return res.end("window.GESTIONLAB_CENTRO = { supabaseUrl: 'https://ejemplo.supabase.co', "
+      + "supabaseClavePublica: 'sb_publishable_ejemplo', appUrl: 'https://ejemplo.github.io/gestionlab/', "
+      + "trebelloUrl: null, trebelloSupabase: null };");
+  }
   const archivo = path.join(RAIZ, ruta);
   if (!archivo.startsWith(RAIZ) || !fs.existsSync(archivo) || fs.statSync(archivo).isDirectory()) { res.writeHead(404); return res.end(); }
   res.writeHead(200, { 'Content-Type': TIPOS[path.extname(archivo)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
