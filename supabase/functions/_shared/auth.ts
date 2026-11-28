@@ -11,11 +11,29 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const ROLES_PERMITIDOS = ["Administrador", "Gestor"];
 const ROLES_STAFF = ["Administrador", "Gestor", "Profesor"];
 
-function adminClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
+/**
+ * Clave de servidor: la *secret key* nueva (`sb_secret_…`) llamada `default`, que
+ * Supabase pone en `SUPABASE_SECRET_KEYS` (un JSON { nombre: clave }) en cada función.
+ * Sustituye a la `service_role` antigua (`SUPABASE_SERVICE_ROLE_KEY`), que Supabase
+ * retira (2026-11-28). ⚠ A propósito NO vuelve a la antigua si falta la nueva: así el
+ * fallo se ve ya, y no el día que se apaguen las claves antiguas.
+ */
+export function claveDeServidor(): string {
+  let claves: Record<string, string> = {};
+  try {
+    claves = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") || "{}");
+  } catch {
+    throw new Error("SUPABASE_SECRET_KEYS no es un JSON válido");
+  }
+  const clave = claves["default"];
+  if (!clave) {
+    throw new Error("Falta la secret key «default» del proyecto (Project Settings → API Keys)");
+  }
+  return clave;
+}
+
+export function adminClient() {
+  return createClient(Deno.env.get("SUPABASE_URL")!, claveDeServidor());
 }
 
 async function verificarSesion(req: Request, supabaseAdmin: ReturnType<typeof adminClient>): Promise<{ email: string } | { error: Response }> {

@@ -7,18 +7,10 @@
 // sigue mandando la anon key como Authorization (igual que hace
 // callEdgeFunction() sin sesión), así que no hace falta desactivar verify_jwt
 // en el despliegue.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
+import { adminClient, jsonError, jsonOk, handleCorsPreflight } from "../_shared/auth.ts";
 
 const TIPOS_MIME_PERMITIDOS = ["application/pdf", "image/jpeg", "image/png"];
 const TAMANO_MAXIMO_BYTES = 10 * 1024 * 1024; // 10 MB — igual que subir-documento
-
-function adminClient() {
-  return createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  );
-}
 
 function genId(prefix: string): string {
   return prefix + Date.now().toString(36).toUpperCase().slice(-6) + Math.floor(Math.random() * 36).toString(36).toUpperCase();
