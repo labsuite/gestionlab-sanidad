@@ -290,13 +290,17 @@ actualizar el código.
 
 **Cómo llega cada migración a cada sitio:**
 
-1. **`gestionlab-prueba`** (proyecto de prueba) tiene la integración de Supabase con GitHub
-   y sigue la rama `preparacion-pffp`. Al subir la migración a esa rama, **se aplica sola**.
-   Ahí se prueba primero.
+1. **Primero, en un proyecto de prueba vacío.** `gestionlab-prueba` existió del 27 al
+   28/11/2026 y se borró para hacer sitio a `trebello-prueba`: el plan gratuito da dos
+   proyectos por cuenta. Cuando haya que probar una migración, se pide a Paloma que cree
+   uno vacío, con los mismos pasos que en `supabase/base-limpia/README.md`, y que conecte la
+   integración con la rama de trabajo. Al subir, se aplican solas la migración base y todas
+   las siguientes, la nueva incluida, y se borra al terminar. Sus credenciales, en
+   `scripts/supabase_credentials_prueba.json` (fuera de git), que se borra también al terminar.
 2. **La base real del CMA no está conectada a la integración.** La migración se le aplica a
    mano, con el mismo archivo (`psql -1 -v ON_ERROR_STOP=1 -f`, con la conexión de
-   `scripts/supabase_credentials.json`), **solo después de probarla en `gestionlab-prueba` y
-   con el visto bueno de Paloma**. Después, `python tools/base-limpia/sacar_base_limpia.py
+   `scripts/supabase_credentials.json`), **solo después de probarla y con el visto bueno de
+   Paloma**. Si el proyecto de prueba sigue existiendo, `python tools/base-limpia/sacar_base_limpia.py
    --comparar scripts/supabase_credentials_prueba.json` tiene que dar «Sin diferencias de
    estructura».
 3. ⚠ **Antes de conectar algún día la base real a la integración**, hay que registrar en ella
