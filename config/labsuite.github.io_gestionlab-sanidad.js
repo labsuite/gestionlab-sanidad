@@ -19,6 +19,6 @@ window.GESTIONLAB_CENTRO = {
   // lectura directa de ciclos y módulos del Supabase de Trebello. Sin Trebello, null.
   trebelloSupabase: {
     url: 'https://clxcjsvkmaydpxvtqesv.supabase.co',
-    clavePublica: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNseGNqc3ZrbWF5ZHB4dnRxZXN2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNDI1OTEsImV4cCI6MjA5NDYxODU5MX0._uu-RO_AtA88mh3eC8oPBf7ikD2X5w-otl91pHSJ7GA',
+    clavePublica: 'sb_publishable_kFwvda000Self-lRCYGuiA_C1aRHh2u',
   },
 };
